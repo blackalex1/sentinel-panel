@@ -1,0 +1,37 @@
+<!-- SECTION 3: TELEGRAM BOT -->
+<div class="settings-section-panel" id="sec-telegram">
+    <!-- CARD 2: Интеграция с Telegram (Mini App) -->
+    <div class="glass-card settings-card">
+        <h3 data-i18n="settings_telegram_config">Интеграция с Telegram (Mini App)</h3>
+        <p class="card-desc" data-i18n="settings_telegram_desc">Настройки Telegram-бота для оповещений администратора о блокировках и интеграции Mini App.</p>
+        <div class="settings-form-content" style="margin-top: auto;">
+            <div style="display: flex; flex-direction: column; gap: 12px; background: var(--bg-input); border: 1px solid var(--border-color); border-radius: 12px; padding: 15px 20px; margin-bottom: 20px;">
+                <label class="checkbox-container" style="display: flex; align-items: center; gap: 10px; cursor: pointer; color: var(--text-secondary); font-size: 14px; font-weight: normal; text-transform: none; margin-bottom: 0;">
+                    <input type="checkbox" id="setting-telegram-bot-enable">
+                    <span data-i18n="settings_telegram_bot_enable">Запускать встроенного Telegram-бота (polling)</span>
+                </label>
+                <label class="checkbox-container" style="display: flex; align-items: center; gap: 10px; cursor: pointer; color: var(--text-secondary); font-size: 14px; font-weight: normal; text-transform: none; margin-bottom: 0;">
+                    <input type="checkbox" id="setting-telegram-client-events-enable">
+                    <span data-i18n="settings_telegram_client_events_enable">Уведомлять о подключениях и отключениях клиентов (Xray/Hysteria)</span>
+                </label>
+            </div>
+            <div class="input-group">
+                <label for="setting-telegram-token" data-i18n="settings_telegram_token">Токен Telegram-бота (Bot Token)</label>
+                <div class="copy-input-group">
+                    <input type="password" id="setting-telegram-token" placeholder="123456789:ABCDefGhIJKlmNoPQRsT" data-i18n-placeholder="settings_telegram_token_placeholder">
+                    <button type="button" class="btn" id="btn-toggle-telegram-token"><i class="fa-regular fa-eye"></i></button>
+                </div>
+            </div>
+
+            <div class="input-group" style="margin-top: 20px;">
+                <label for="setting-telegram-admin-ids" data-i18n="settings_telegram_admin_ids">Telegram ID администраторов</label>
+                <input type="text" id="setting-telegram-admin-ids" placeholder="Например: 123456789,987654321" data-i18n-placeholder="settings_telegram_admin_ids_placeholder">
+            </div>
+            
+            <div style="margin-top: 24px; display: flex; gap: 10px;">
+                <button type="button" id="btn-save-telegram" class="btn primary-btn w-100" style="padding: 10px; font-weight: 600;"><i class="fa-solid fa-floppy-disk"></i> <span data-i18n="settings_btn_save_short">Сохранить</span></button>
+                <button type="button" id="btn-restart-telegram-bot" class="btn secondary-btn w-100" style="padding: 10px; font-weight: 600; border-color: rgba(255, 159, 67, 0.3); color: #ff9f43;"><i class="fa-solid fa-arrows-rotate"></i> <span data-i18n="settings_telegram_btn_restart">Перезапустить</span></button>
+            </div>
+        </div>
+    </div>
+</div>

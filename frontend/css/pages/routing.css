@@ -1,0 +1,28 @@
+/* Routing Tab Styles */
+.routing-section {
+    padding: 26px;
+    border-radius: var(--radius-lg);
+    background: var(--bg-card);
+    backdrop-filter: var(--blur-glass);
+    border: 1px solid var(--border-color);
+}
+
+.routing-section .table-container {
+    margin-top: 14px;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--border-color);
+    background: rgba(8, 12, 24, 0.45);
+}
+
+.routing-section .glass-table th {
+    background: rgba(4, 7, 16, 0.5);
+    padding: 14px 18px;
+    font-size: 11px;
+    letter-spacing: 1px;
+    color: var(--text-muted);
+}
+
+.routing-section .glass-table td {
+    padding: 14px 18px;
+    font-size: 13.5px;
+}

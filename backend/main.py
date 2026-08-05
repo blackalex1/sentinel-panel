@@ -1,0 +1,304 @@
+import asyncio
+import logging
+from contextlib import asynccontextmanager
+from fastapi import FastAPI, Request, Response
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import HTMLResponse, JSONResponse
+from starlette.exceptions import HTTPException as StarletteHTTPException
+
+
+from backend.config import settings, BASE_DIR
+from backend.database import init_db
+from backend.xray import start_xray, stop_xray, query_traffic_stats
+from backend.hysteria import start_hysteria, stop_hysteria, query_hysteria_traffic
+from backend.singbox import start_singbox, stop_singbox, query_singbox_traffic
+from backend.api import router
+from backend.auth_utils import decoy_response, handle_decoy_route, DecoyException
+
+# Настройка логирования
+logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
+
+# Фоновые задачи
+polling_task = None
+
+async def poll_xray_stats_loop():
+    logging.info("Started background traffic statistics polling task.")
+    
+    # Fast-probe cores API ready status with 300ms intervals instead of static 5s sleep
+    for attempt in range(15):
+        await asyncio.sleep(0.3)
+        try:
+            await asyncio.to_thread(query_traffic_stats)
+            await asyncio.to_thread(query_hysteria_traffic)
+            await asyncio.to_thread(query_singbox_traffic)
+            break
+        except Exception:
+            pass
+
+    # Run the initial statistics and online check immediately at startup to populate caches
+    try:
+        await asyncio.to_thread(query_traffic_stats)
+        await asyncio.to_thread(query_hysteria_traffic)
+        await asyncio.to_thread(query_singbox_traffic)
+        
+        from backend.routes.clients import update_online_emails
+        await asyncio.to_thread(update_online_emails)
+        
+        from backend.scheduler import enforce_client_limits_and_rules
+        await asyncio.to_thread(enforce_client_limits_and_rules)
+    except Exception as e:
+        logging.error(f"Error in initial stats polling: {e}")
+        
+    while True:
+        try:
+            await asyncio.sleep(30)
+            await asyncio.to_thread(query_traffic_stats)
+            await asyncio.to_thread(query_hysteria_traffic)
+            await asyncio.to_thread(query_singbox_traffic)
+            
+            from backend.routes.clients import update_online_emails
+            await asyncio.to_thread(update_online_emails)
+            
+            # Update active Telegram cards traffic on the panel
+            try:
+                from backend.telegram_alerts import update_panel_active_cards_traffic
+                await update_panel_active_cards_traffic()
+            except Exception as e:
+                logging.error(f"Error updating active panel cards: {e}")
+                
+            # Проверка лимитов клиентов (лимит трафика, срок действия, лимит IP)
+            from backend.scheduler import enforce_client_limits_and_rules
+            await asyncio.to_thread(enforce_client_limits_and_rules)
+        except asyncio.CancelledError:
+            logging.info("Background traffic statistics polling task cancelled.")
+            break
+        except Exception as e:
+            logging.error(f"Error in stats polling: {e}")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    global polling_task
+    # Инициализация БД
+    init_db()
+    
+    # Синхронизация статуса WARP с хоста при запуске
+    try:
+        from backend.host_client import host_client
+        from backend.routes.system.warp import sync_warp_outbound_state
+        status = host_client.send_command("get_warp_status", timeout=15.0)
+        if isinstance(status, dict) and "connected" in status:
+            sync_warp_outbound_state(status["connected"])
+    except Exception as e:
+        logging.error(f"Failed to perform startup WARP status sync: {e}")
+    
+    # Генерация дефолтных самоподписанных сертификатов при старте
+    try:
+        from backend.ssl_utils import generate_default_self_signed_cert
+        generate_default_self_signed_cert()
+    except Exception as e:
+        logging.error(f"Failed to generate default self-signed certificate: {e}")
+        
+    # Загрузка словарей локализации
+    from backend.i18n import load_translations
+    load_translations()
+    
+    # Запуск Xray, Hysteria 2 и sing-box (если есть активные подключения)
+    start_xray()
+    start_hysteria()
+    try:
+        from backend.database import db_session, Inbound
+        with db_session() as session:
+            has_singbox_inbounds = session.query(Inbound).filter(
+                Inbound.enable == 1,
+                ((Inbound.core == "singbox") | (Inbound.protocol == "singbox"))
+            ).count() > 0
+        if has_singbox_inbounds:
+            start_singbox()
+    except Exception as e:
+        logging.error(f"Failed to check sing-box inbounds status at startup: {e}")
+    
+    # Запуск фонового опроса трафика
+    polling_task = asyncio.create_task(poll_xray_stats_loop())
+    
+    yield
+    
+    # Отмена фоновой задачи
+    if polling_task:
+        polling_task.cancel()
+        
+    # Остановка Xray, Hysteria 2 и sing-box
+    stop_xray()
+    stop_hysteria()
+    stop_singbox()
+
+# Отключаем документацию для скрытности (Stealth Mode)
+app = FastAPI(
+    title="Spectre Panel",
+    docs_url=None,
+    redoc_url=None,
+    openapi_url=None,
+    lifespan=lifespan
+)
+
+@app.exception_handler(StarletteHTTPException)
+async def custom_http_exception_handler(request: Request, exc: StarletteHTTPException):
+    if exc.status_code in (404, 405):
+        path = request.url.path.lstrip("/")
+        return await handle_decoy_route(request, path)
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={"detail": exc.detail}
+    )
+
+@app.exception_handler(DecoyException)
+async def decoy_exception_handler(request: Request, exc: DecoyException):
+    path = request.url.path.lstrip("/")
+    return await handle_decoy_route(request, path)
+
+
+
+# Настройка CORS
+# В продакшене фронтенд раздается на том же хосте/порту, что и API, поэтому CORS не требуется.
+# Для разработки (например, с Vite на порту 5173) разрешаем локальные хосты.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)  # nosec B104
+
+# Подключение сжатия Gzip для ответов API
+from fastapi.middleware.gzip import GZipMiddleware
+app.add_middleware(GZipMiddleware, minimum_size=1000)
+
+# Middleware для отключения кэширования фронтенда
+@app.middleware("http")
+async def add_no_cache_headers(request: Request, call_next):
+    response = await call_next(request)
+    path = request.url.path
+    if path.startswith(f"/{settings.PANEL_SECRET_PATH}"):
+        response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+        response.headers["Pragma"] = "no-cache"
+        response.headers["Expires"] = "0"
+    return response
+
+# Подключаем API роутер
+app.include_router(router)
+
+# Роут для Let's Encrypt HTTP-01 верификации
+@app.get("/.well-known/acme-challenge/{token}")
+async def acme_challenge(token: str):
+    from backend.acme_client import ACME_CHALLENGES
+    if token in ACME_CHALLENGES:
+        return Response(content=ACME_CHALLENGES[token], media_type="text/plain")
+    return Response(content="Challenge not found", status_code=404, media_type="text/plain")
+
+# Роут для отдачи приманки (Decoy) на корневом пути
+@app.get("/")
+async def get_decoy_root(request: Request):
+    return await handle_decoy_route(request)
+
+# Подключаем фронтенд-статику по секретному пути
+frontend_dir = BASE_DIR / "frontend"
+dist_react_dir = BASE_DIR / "dist-react"
+primary_dir = dist_react_dir if dist_react_dir.exists() else frontend_dir
+
+class AuthenticatedStaticFiles(StaticFiles):
+    async def get_response(self, path: str, scope) -> Response:
+        norm_path = path.replace("\\", "/").lstrip("/")
+        
+        # Ручная обработка пути /react для обратной совместимости
+        if norm_path == "react" or norm_path.startswith("react/"):
+            rel_react_path = norm_path[5:].lstrip("/") if norm_path.startswith("react/") else (norm_path[5:] if norm_path.startswith("react") else "")
+            if rel_react_path == "" or rel_react_path == "index.html":
+                target_file = dist_react_dir / "index.html"
+            else:
+                target_file = dist_react_dir / rel_react_path
+            
+            if target_file.exists() and target_file.is_file():
+                from starlette.responses import FileResponse
+                res = FileResponse(str(target_file))
+                if target_file.name == "index.html":
+                    res.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+                return res
+            elif (dist_react_dir / "index.html").exists():
+                from starlette.responses import FileResponse
+                res = FileResponse(str(dist_react_dir / "index.html"))
+                res.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+                return res
+
+        is_component = norm_path.startswith("components/")
+        is_private_js = "js/" in norm_path and any(x in norm_path for x in (
+            "panel-main.js", "dashboard.js", "hysteria.js", "routing.js", 
+            "inbound-modal.js", "clients.js", "modules/"
+        ))
+        is_private_css = "css/pages/" in norm_path and "login.css" not in norm_path
+        
+        if is_component or is_private_js or is_private_css:
+            from backend.auth_utils import check_auth, decoy_response
+            req = Request(scope)
+            if not check_auth(req):
+                return decoy_response()
+        
+        response = await super().get_response(path, scope)
+        
+        clean_path = path.strip("/")
+        if clean_path == "" or clean_path == "index.html":
+            response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+            response.headers["Pragma"] = "no-cache"
+            response.headers["Expires"] = "0"
+            
+        return response
+
+if frontend_dir.exists():
+    app.mount(
+        f"/{settings.PANEL_SECRET_PATH}", 
+        AuthenticatedStaticFiles(directory=str(frontend_dir), html=True), 
+        name="frontend"
+    )
+    logging.info(f"Frontend mounted at: /{settings.PANEL_SECRET_PATH}/")
+
+else:
+    logging.warning("Frontend directory not found. Serving API only.")
+
+# Роут-фолбек на все остальные пути для скрытности
+@app.api_route("/{path_name:path}", methods=["GET", "POST", "PUT", "DELETE"])
+async def catch_all(request: Request, path_name: str):
+    # Если путь не совпадает с секретным путем, отдаем заглушку Nginx или маскируемся
+    return await handle_decoy_route(request, path_name)
+
+if __name__ == "__main__":
+    import uvicorn
+    from backend.ssl_utils import generate_default_self_signed_cert, SSL_CERT_PATH, SSL_KEY_PATH
+    
+    # Гарантируем наличие сертификатов перед запуском веб-сервера
+    try:
+        generate_default_self_signed_cert()
+    except Exception as e:
+        logging.error(f"Failed to generate default self-signed certificate before startup: {e}")
+        
+    ssl_key = str(SSL_KEY_PATH) if SSL_KEY_PATH.exists() else None
+    ssl_cert = str(SSL_CERT_PATH) if SSL_CERT_PATH.exists() else None
+    
+    if ssl_key and ssl_cert:
+        logging.info(f"Starting HTTPS server on port {settings.PANEL_PORT}...")
+        uvicorn.run(
+            "backend.main:app",
+            host="0.0.0.0",
+            port=settings.PANEL_PORT,
+            ssl_keyfile=ssl_key,
+            ssl_certfile=ssl_cert,
+            reload=False
+        )  # nosec B104
+    else:
+        logging.warning("SSL certificates not found. Starting HTTP server...")
+        logging.info(f"Starting server on port {settings.PANEL_PORT}...")
+        uvicorn.run("backend.main:app", host="0.0.0.0", port=settings.PANEL_PORT, reload=False)  # nosec B104
+

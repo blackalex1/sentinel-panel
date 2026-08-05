@@ -1,0 +1,46 @@
+<!-- Tab panel 1: Basic (Основное) -->
+<div id="tab-panel-basic" class="tab-panel active-panel">
+    <div class="input-group">
+        <label for="ib-remark" data-i18n="ib_label_remark">Название (Remark)</label>
+        <input type="text" id="ib-remark" placeholder="VLESS Reality">
+    </div>
+    <div class="input-row">
+        <div class="input-group">
+            <label for="ib-port" data-i18n="inbound_port">Порт</label>
+            <div class="copy-input-group">
+                <input type="number" id="ib-port" min="1" max="65535" placeholder="443">
+                <button type="button" class="btn secondary-btn" id="ib-gen-port-btn" title="Подобрать порт" data-i18n-title="ib_title_gen_port" style="margin-left: 5px;"><i class="fa-solid fa-wand-magic-sparkles"></i></button>
+            </div>
+        </div>
+        <div class="input-group">
+            <label for="ib-protocol" data-i18n="ib_label_protocol">Протокол</label>
+            <select id="ib-protocol">
+                <option value="vless">VLESS</option>
+                <option value="vmess">VMess</option>
+                <option value="trojan">Trojan</option>
+                <option value="shadowsocks">Shadowsocks</option>
+                <option value="hysteria2">Hysteria 2</option>
+                <option value="socks">SOCKS5</option>
+                <option value="http">HTTP</option>
+            </select>
+        </div>
+        <div class="input-group">
+            <label for="ib-core" data-i18n="ib_label_core">Движок ядра (Engine)</label>
+            <select id="ib-core">
+                <option value="xray">Xray-core</option>
+                <option value="singbox">sing-box</option>
+                <option value="hysteria">Hysteria 2</option>
+            </select>
+        </div>
+    </div>
+    <div class="input-row">
+        <div class="input-group">
+            <label for="ib-total" data-i18n="ib_label_total">Лимит трафика (GB, 0 - безлимит)</label>
+            <input type="number" id="ib-total" min="0" value="0">
+        </div>
+        <div class="input-group">
+            <label for="ib-expiry-time" data-i18n="ib_label_expiry">Срок действия (Дата окончания)</label>
+            <input type="datetime-local" id="ib-expiry-time">
+        </div>
+    </div>
+</div>

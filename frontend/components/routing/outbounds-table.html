@@ -1,0 +1,25 @@
+<!-- Блок Исходящих подключений (Outbounds) -->
+<div class="routing-section glass-card" style="margin-bottom: 25px;">
+    <div class="section-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+        <h3 data-i18n="routing_outbounds_title" style="margin: 0; font-size: 1.3rem;"><i class="fa-solid fa-plane-departure" style="margin-right: 8px;"></i>Исходящие подключения (Outbounds)</h3>
+        <button id="add-outbound-btn" class="btn primary-btn" style="padding: 6px 12px; font-size: 13px;"><i class="fa-solid fa-plus" style="margin-right: 5px;"></i><span data-i18n="routing_add_outbound">Добавить Outbound</span></button>
+    </div>
+    <div class="table-container" style="overflow-x: auto;">
+        <table class="glass-table" style="width: 100%; border-collapse: collapse; text-align: left;">
+            <thead>
+                <tr style="border-bottom: 2px solid var(--border-color); color: var(--text-secondary);">
+                    <th data-i18n="routing_th_remark">Описание</th>
+                    <th data-i18n="routing_th_protocol">Протокол</th>
+                    <th data-i18n="routing_th_tag">Тег (Tag)</th>
+                    <th data-i18n="routing_th_settings">Настройки</th>
+                    <th data-i18n="routing_th_traffic">Трафик (↓ / ↑)</th>
+                    <th data-i18n="routing_th_status">Статус</th>
+                    <th data-i18n="routing_th_actions">Действия</th>
+                </tr>
+            </thead>
+            <tbody id="outbounds-list-tbody">
+                <!-- Заполняется динамически -->
+            </tbody>
+        </table>
+    </div>
+</div>

@@ -1,0 +1,250 @@
+<!-- Tab panel 3: Stream (Поток) -->
+<div id="tab-panel-stream" class="tab-panel" style="display: none;">
+    <div id="xray-network-security-row" class="input-group">
+        <label for="ib-network" data-i18n="ib_label_network">Транспорт (Network)</label>
+        <select id="ib-network">
+            <option value="tcp">TCP</option>
+            <option value="ws">WebSocket (WS)</option>
+            <option value="grpc">gRPC</option>
+            <option value="h2">HTTP/2 (h2)</option>
+            <option value="httpupgrade">HTTPUpgrade</option>
+            <option value="xhttp">XHTTP (SplitHTTP)</option>
+            <option value="mkcp">mKCP (UDP)</option>
+        </select>
+    </div>
+
+    <!-- TCP settings subgroup -->
+    <div id="tcp-settings-group" class="settings-subgroup" style="display: none;">
+        <h4 data-i18n="ib_title_tcp">Настройки TCP</h4>
+        <div class="input-group">
+            <label for="ib-tcp-type" data-i18n="ib_label_tcp_type">Тип обфускации заголовка</label>
+            <select id="ib-tcp-type">
+                <option value="none" data-i18n="ib_opt_none_obfs">none (без обфускации)</option>
+                <option value="http" data-i18n="ib_opt_http_obfs">http (имитация HTTP)</option>
+            </select>
+        </div>
+        <div id="tcp-http-settings" style="display: none; margin-top: 15px;">
+            <div class="input-group">
+                <label for="ib-tcp-host" data-i18n="ib_label_tcp_host">Хост (Host, через запятую)</label>
+                <input type="text" id="ib-tcp-host" placeholder="google.com, yandex.ru">
+            </div>
+            <div class="input-group" style="margin-top: 10px;">
+                <label for="ib-tcp-path" data-i18n="ib_label_tcp_path">Путь (Path, через запятую)</label>
+                <input type="text" id="ib-tcp-path" placeholder="/video, /stream">
+            </div>
+        </div>
+    </div>
+
+    <!-- WS settings subgroup -->
+    <div id="ws-settings-group" class="settings-subgroup" style="display: none;">
+        <h4 data-i18n="ib_title_ws">Настройки WebSocket</h4>
+        <div class="input-row">
+            <div class="input-group">
+                <label for="ib-ws-path" data-i18n="ib_label_ws_path">Путь (Path)</label>
+                <input type="text" id="ib-ws-path" placeholder="/">
+            </div>
+            <div class="input-group">
+                <label for="ib-ws-host" data-i18n="ib_label_ws_host">Хост (Host)</label>
+                <input type="text" id="ib-ws-host" placeholder="mydomain.com">
+            </div>
+        </div>
+        <div class="input-group" style="margin-top: 15px;">
+            <label for="ib-ws-ed" data-i18n="ib_label_ws_ed">Max Early Data Header Length</label>
+            <input type="number" id="ib-ws-ed" min="0" value="0">
+        </div>
+    </div>
+
+    <!-- gRPC settings subgroup -->
+    <div id="grpc-settings-group" class="settings-subgroup" style="display: none;">
+        <h4 data-i18n="ib_title_grpc">Настройки gRPC</h4>
+        <div class="input-group">
+            <label for="ib-grpc-service" data-i18n="ib_label_grpc_service">Имя сервиса (ServiceName)</label>
+            <input type="text" id="ib-grpc-service" placeholder="grpc">
+        </div>
+        <div class="input-group" style="margin-top: 15px;">
+            <label class="checkbox-container" style="display: flex; align-items: center; gap: 10px;">
+                <input type="checkbox" id="ib-grpc-multi-mode">
+                <span data-i18n="ib_label_grpc_multi">Multi Mode (Мультирежим)</span>
+            </label>
+        </div>
+    </div>
+
+    <!-- HTTP/2 settings subgroup -->
+    <div id="h2-settings-group" class="settings-subgroup" style="display: none;">
+        <h4 data-i18n="ib_title_h2">Настройки HTTP/2</h4>
+        <div class="input-row">
+            <div class="input-group">
+                <label for="ib-h2-path" data-i18n="ib_label_h2_path">Путь (Path)</label>
+                <input type="text" id="ib-h2-path" placeholder="/">
+            </div>
+            <div class="input-group">
+                <label for="ib-h2-host" data-i18n="ib_label_h2_host">Хост (Host, через запятую)</label>
+                <input type="text" id="ib-h2-host" placeholder="domain.com">
+            </div>
+        </div>
+    </div>
+
+    <!-- HTTPUpgrade settings subgroup -->
+    <div id="httpupgrade-settings-group" class="settings-subgroup" style="display: none;">
+        <h4 data-i18n="ib_title_httpupgrade">Настройки HTTPUpgrade</h4>
+        <div class="input-row">
+            <div class="input-group">
+                <label for="ib-httpupgrade-path" data-i18n="ib_label_httpupgrade_path">Путь (Path)</label>
+                <input type="text" id="ib-httpupgrade-path" placeholder="/" value="/">
+            </div>
+            <div class="input-group">
+                <label for="ib-httpupgrade-host" data-i18n="ib_label_httpupgrade_host">Хост (Host)</label>
+                <input type="text" id="ib-httpupgrade-host" placeholder="mydomain.com">
+            </div>
+        </div>
+    </div>
+
+    <!-- XHTTP (SplitHTTP) settings subgroup -->
+    <div id="xhttp-settings-group" class="settings-subgroup" style="display: none;">
+        <h4 data-i18n="ib_title_xhttp">Настройки XHTTP (SplitHTTP)</h4>
+        <div class="input-row">
+            <div class="input-group">
+                <label for="ib-xhttp-path" data-i18n="ib_label_xhttp_path">Путь (Path)</label>
+                <input type="text" id="ib-xhttp-path" placeholder="/" value="/">
+            </div>
+            <div class="input-group">
+                <label for="ib-xhttp-host" data-i18n="ib_label_xhttp_host">Хост (Host)</label>
+                <input type="text" id="ib-xhttp-host" placeholder="mydomain.com">
+            </div>
+        </div>
+        <div class="input-group" style="margin-top: 15px;">
+            <label for="ib-xhttp-mode" data-i18n="ib_label_xhttp_mode">Режим (Mode)</label>
+            <select id="ib-xhttp-mode">
+                <option value="auto" data-i18n="ib_opt_xhttp_auto" selected>auto (автоматический)</option>
+                <option value="packet-up">packet-up</option>
+                <option value="stream-up">stream-up</option>
+                <option value="stream-one">stream-one</option>
+            </select>
+        </div>
+        <div class="input-group" style="margin-top: 15px;">
+            <label for="ib-xhttp-extra" data-i18n="ib_label_xhttp_extra">Extra (JSON, дополнительные параметры)</label>
+            <textarea id="ib-xhttp-extra" placeholder='{"noGRPCHeader": false, "noSSEHeader": false}' style="width: 100%; height: 80px; font-family: monospace; font-size: 12px; background: #0b0f19; color: #cbd5e1; border: 1px solid var(--border-color); border-radius: 8px; padding: 10px; resize: vertical;"></textarea>
+        </div>
+    </div>
+
+    <!-- mKCP settings subgroup -->
+    <div id="mkcp-settings-group" class="settings-subgroup" style="display: none;">
+        <h4 data-i18n="ib_title_mkcp">Настройки mKCP</h4>
+        <div class="input-row">
+            <div class="input-group">
+                <label for="ib-mkcp-header" data-i18n="ib_label_mkcp_header">Тип заголовка</label>
+                <select id="ib-mkcp-header">
+                    <option value="none">none</option>
+                    <option value="srtp">srtp</option>
+                    <option value="utp">utp</option>
+                    <option value="wechat-video">wechat-video</option>
+                    <option value="dtls">dtls</option>
+                    <option value="wireguard">wireguard</option>
+                </select>
+            </div>
+            <div class="input-group">
+                <label for="ib-mkcp-seed" data-i18n="ib_label_mkcp_seed">Обфус-ключ (Seed)</label>
+                <input type="text" id="ib-mkcp-seed" placeholder="my_obfs_seed">
+            </div>
+        </div>
+        <div class="input-group" style="margin-top: 15px;">
+            <label class="checkbox-container" style="display: flex; align-items: center; gap: 10px;">
+                <input type="checkbox" id="ib-mkcp-congestion">
+                <span data-i18n="ib_label_mkcp_congestion">Контроль перегрузок (Congestion)</span>
+            </label>
+        </div>
+    </div>
+
+    <!-- Hysteria 2 settings group -->
+    <div id="hysteria-settings-group" class="settings-subgroup" style="display: none;">
+        <h4 data-i18n="ib_title_hysteria">Настройки Hysteria 2</h4>
+        
+        <div class="input-group">
+            <label for="ib-hysteria-mode" data-i18n="ib_label_hysteria_mode">Режим защиты Hysteria 2</label>
+            <select id="ib-hysteria-mode">
+                <option value="masq" data-i18n="ib_opt_masq" selected>Маскировка (Masquerade)</option>
+                <option value="obfs" data-i18n="ib_opt_obfs">Обфускация (Obfuscation / Salamander)</option>
+            </select>
+        </div>
+
+        <!-- Группа обфускации -->
+        <div id="hysteria-obfs-group" style="display: none; margin-top: 15px;">
+            <div class="input-group">
+                <label for="ib-hysteria-obfs-password" data-i18n="ib_label_hysteria_obfs_pass">Пароль обфускации (obfs password)</label>
+                <div class="copy-input-group">
+                    <input type="text" id="ib-hysteria-obfs-password" placeholder="Случайный пароль" data-i18n-placeholder="ib_placeholder_random_pass">
+                    <button type="button" id="btn-gen-obfs" class="btn secondary-btn" title="Сгенерировать" data-i18n-title="ib_title_generate"><i class="fa-solid fa-wand-magic-sparkles"></i></button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Группа маскировки -->
+        <div id="hysteria-masq-group" style="margin-top: 15px;">
+            <div class="input-row">
+                <div class="input-group">
+                    <label for="ib-hysteria-masq-type" data-i18n="ib_label_hysteria_masq_type">Тип маскировки (Masquerade)</label>
+                    <select id="ib-hysteria-masq-type">
+                        <option value="proxy" data-i18n="ib_opt_masq_proxy">Proxy (Перенаправление на сайт)</option>
+                        <option value="file" data-i18n="ib_opt_masq_file">File (Локальный каталог)</option>
+                        <option value="status" data-i18n="ib_opt_masq_status">Status Code (HTTP код ответа)</option>
+                    </select>
+                </div>
+                <div class="input-group">
+                    <label for="ib-hysteria-masq-value" data-i18n="ib_label_hysteria_masq_val">Значение маскировки</label>
+                    <input type="text" id="ib-hysteria-masq-value" placeholder="https://google.com">
+                </div>
+            </div>
+        </div>
+
+        <div class="input-row" style="margin-top: 15px;">
+            <div class="input-group">
+                <label for="ib-hysteria-up-mbps" data-i18n="ib_label_hysteria_up">Лимит отдачи (Up Mbps)</label>
+                <input type="number" id="ib-hysteria-up-mbps" min="0" value="100">
+            </div>
+            <div class="input-group">
+                <label for="ib-hysteria-down-mbps" data-i18n="ib_label_hysteria_down">Лимит загрузки (Down Mbps)</label>
+                <input type="number" id="ib-hysteria-down-mbps" min="0" value="100">
+            </div>
+        </div>
+        <div class="input-group" style="margin-top: 15px;">
+            <label class="checkbox-container" style="display: flex; align-items: center; gap: 10px;">
+                <input type="checkbox" id="ib-hysteria-ignore-bw">
+                <span data-i18n="ib_label_hysteria_ignore_bw">Игнорировать лимиты клиента (BBR вместо Brutal)</span>
+            </label>
+            <small style="color: var(--text-muted); font-size: 11px; margin-top: 4px; display: block;" data-i18n="ib_hysteria_ignore_bw_desc">
+                При включении сервер использует BBR congestion control и игнорирует bandwidth-хинты клиентов. Взаимоисключающе с лимитами выше.
+            </small>
+        </div>
+        <div class="input-group" style="margin-top: 15px;">
+            <label for="ib-hysteria-sni" data-i18n="ib_label_hysteria_sni">SNI (Server Name Indication)</label>
+            <input type="text" id="ib-hysteria-sni" placeholder="Оставьте пустым для авто (используется домен/IP хоста)" data-i18n-placeholder="ib_placeholder_hysteria_sni">
+        </div>
+        <div class="input-group" style="margin-top: 15px;">
+            <label for="ib-hysteria-cert-mode" data-i18n="ib_label_hysteria_cert_mode">Сертификат TLS</label>
+            <select id="ib-hysteria-cert-mode">
+                <option value="self" data-i18n="ib_opt_cert_self">Самоподписанный сертификат</option>
+                <option value="custom" data-i18n="ib_opt_cert_custom">Указать пути к файлам сертификата</option>
+            </select>
+        </div>
+        <div id="hysteria-custom-cert-fields" style="display: none; margin-top: 15px;">
+            <div class="input-group">
+                <label for="ib-hysteria-cert-path" data-i18n="ib_label_hysteria_cert_path">Путь к файлу сертификата (.crt/.pem)</label>
+                <input type="text" id="ib-hysteria-cert-path" placeholder="/etc/letsencrypt/live/domain/fullchain.pem">
+            </div>
+            <div class="input-group" style="margin-top: 10px;">
+                <label for="ib-hysteria-key-path" data-i18n="ib_label_hysteria_key_path">Путь к приватному ключу (.key)</label>
+                <input type="text" id="ib-hysteria-key-path" placeholder="/etc/letsencrypt/live/domain/privkey.pem">
+            </div>
+        </div>
+        <div class="input-group" style="margin-top: 15px;">
+            <label for="ib-hysteria-hop" data-i18n="ib_label_hysteria_hop">Порты hopping (диапазон или список, напр. 20000-30000)</label>
+            <input type="text" id="ib-hysteria-hop" placeholder="Оставьте пустым для отключения" data-i18n-placeholder="ib_placeholder_empty_disable">
+        </div>
+        <div class="input-group" style="margin-top: 15px;">
+            <label class="checkbox-container" style="display: flex; align-items: center; gap: 10px;">
+                <input type="checkbox" id="ib-hysteria-routing-xray">
+                <span data-i18n="ib_label_hysteria_routing_xray">Маршрутизировать Hysteria 2 трафик через Xray (SOCKS5)</span>
+            </label>
+        </div>
+    </div>
+</div>

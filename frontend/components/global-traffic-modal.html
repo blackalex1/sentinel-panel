@@ -1,0 +1,59 @@
+<!-- Модальное окно детализации потребления трафика по клиентам -->
+<div id="global-traffic-details-modal" class="modal" style="display: none; align-items: center; justify-content: center; z-index: 10000; position: fixed; inset: 0; background: rgba(0, 0, 0, 0.7); backdrop-filter: blur(8px);">
+    <div class="modal-content glass-card" style="width: 720px; max-width: 92vw; max-height: 85vh; border-radius: 18px; padding: 24px; display: flex; flex-direction: column; gap: 16px; border: 1px solid rgba(255, 255, 255, 0.1); box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6); position: relative; background: #0f172a; overflow: hidden;">
+        <!-- Заголовок -->
+        <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 12px;">
+            <h3 style="margin: 0; font-size: 17px; font-weight: 700; color: var(--text-primary); display: flex; align-items: center; gap: 10px;">
+                <i class="fa-solid fa-chart-pie" style="color: var(--accent-purple);"></i> 
+                <span>Детализация трафика за <span id="gt-modal-date" style="color: var(--accent-cyan);">—</span></span>
+            </h3>
+            <button class="modal-close-btn" id="gt-modal-close-btn" style="background: transparent; border: none; color: var(--text-muted); font-size: 18px; cursor: pointer; padding: 4px;"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+
+        <!-- Сводная плашка суммарного трафика за день -->
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px;">
+            <div style="background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.05); padding: 10px 14px; border-radius: 10px;">
+                <div style="font-size: 11px; color: var(--text-muted); font-weight: 600; text-transform: uppercase;">Общий трафик</div>
+                <div id="gt-modal-total-bytes" style="font-size: 16px; font-weight: 800; color: var(--text-primary); margin-top: 4px;">0 B</div>
+            </div>
+            <div style="background: rgba(16, 185, 129, 0.05); border: 1px solid rgba(16, 185, 129, 0.15); padding: 10px 14px; border-radius: 10px;">
+                <div style="font-size: 11px; color: var(--accent-green); font-weight: 600; text-transform: uppercase;">Скачивание</div>
+                <div id="gt-modal-down-bytes" style="font-size: 16px; font-weight: 800; color: var(--accent-green); margin-top: 4px;">0 B</div>
+            </div>
+            <div style="background: rgba(139, 92, 246, 0.05); border: 1px solid rgba(139, 92, 246, 0.15); padding: 10px 14px; border-radius: 10px;">
+                <div style="font-size: 11px; color: var(--accent-purple); font-weight: 600; text-transform: uppercase;">Загрузка</div>
+                <div id="gt-modal-up-bytes" style="font-size: 16px; font-weight: 800; color: var(--accent-purple); margin-top: 4px;">0 B</div>
+            </div>
+            <div style="background: rgba(6, 182, 212, 0.05); border: 1px solid rgba(6, 182, 212, 0.15); padding: 10px 14px; border-radius: 10px;">
+                <div style="font-size: 11px; color: var(--accent-cyan); font-weight: 600; text-transform: uppercase;">Активных клиентов</div>
+                <div id="gt-modal-client-count" style="font-size: 16px; font-weight: 800; color: var(--accent-cyan); margin-top: 4px;">0</div>
+            </div>
+        </div>
+
+        <!-- Панель поиска клиентов -->
+        <div style="display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-top: 4px;">
+            <div style="position: relative; flex: 1;">
+                <i class="fa-solid fa-magnifying-glass" style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--text-muted); font-size: 12px;"></i>
+                <input type="text" id="gt-modal-search" placeholder="Поиск по email..." style="width: 100%; padding: 8px 12px 8px 34px; font-size: 12px; border-radius: 8px; background: rgba(255,255,255,0.03); border: 1px solid var(--border-color); color: var(--text-primary); outline: none;">
+            </div>
+        </div>
+
+        <!-- Таблица поклиентного потребления -->
+        <div style="max-height: 400px; overflow-y: auto; border-radius: 10px; border: 1px solid rgba(255,255,255,0.05);">
+            <table class="glass-table" style="width: 100%; margin: 0;">
+                <thead>
+                    <tr style="background: rgba(255,255,255,0.02);">
+                        <th style="padding: 10px 14px; font-size: 11px; text-transform: uppercase; color: var(--text-muted);">Email клиента</th>
+                        <th style="padding: 10px 14px; font-size: 11px; text-transform: uppercase; color: var(--accent-green); text-align: right;">Скачано</th>
+                        <th style="padding: 10px 14px; font-size: 11px; text-transform: uppercase; color: var(--accent-purple); text-align: right;">Загружено</th>
+                        <th style="padding: 10px 14px; font-size: 11px; text-transform: uppercase; color: var(--text-primary); text-align: right;">Итого</th>
+                        <th style="padding: 10px 14px; font-size: 11px; text-transform: uppercase; color: var(--accent-cyan); text-align: right; width: 160px;">Доля в трафике</th>
+                    </tr>
+                </thead>
+                <tbody id="gt-modal-table-body">
+                    <!-- Заполняется динамически -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>

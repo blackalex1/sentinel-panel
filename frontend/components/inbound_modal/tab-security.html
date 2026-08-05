@@ -1,0 +1,128 @@
+<!-- Tab panel 4: Security (Безопасность) -->
+<div id="tab-panel-security" class="tab-panel" style="display: none;">
+    <div class="input-group">
+        <label for="ib-security" data-i18n="ib_label_security">Тип шифрования/безопасности</label>
+        <select id="ib-security">
+            <option value="none" data-i18n="ib_opt_none_sec">none (без шифрования)</option>
+            <option value="tls">TLS</option>
+            <option value="reality">REALITY</option>
+        </select>
+    </div>
+
+    <!-- TLS settings subgroup -->
+    <div id="tls-settings-group" class="settings-subgroup" style="display: none; margin-top: 15px;">
+        <h4 data-i18n="ib_title_tls">Настройки TLS</h4>
+        <div class="input-row">
+            <div class="input-group">
+                <label for="ib-tls-sni" data-i18n="ib_label_tls_sni">Server Name (SNI)</label>
+                <input type="text" id="ib-tls-sni" placeholder="mydomain.com">
+            </div>
+            <div class="input-group">
+                <label for="ib-tls-alpn" data-i18n="ib_label_tls_alpn">ALPN (через запятую)</label>
+                <input type="text" id="ib-tls-alpn" value="h2,http/1.1">
+            </div>
+        </div>
+        <div class="input-row" style="margin-top: 15px;">
+            <div class="input-group">
+                <label for="ib-tls-fp" data-i18n="ib_label_tls_fp">Эмуляция отпечатка браузера (Fingerprint)</label>
+                <select id="ib-tls-fp">
+                    <option value="chrome" selected>chrome</option>
+                    <option value="firefox">firefox</option>
+                    <option value="safari">safari</option>
+                    <option value="edge">edge</option>
+                    <option value="qq">qq</option>
+                    <option value="opera">opera</option>
+                    <option value="360">360</option>
+                    <option value="android">android</option>
+                    <option value="ios">ios</option>
+                    <option value="random">random</option>
+                    <option value="randomized">randomized</option>
+                </select>
+            </div>
+            <div class="input-group">
+                <label for="ib-tls-min-ver" data-i18n="ib_label_tls_min">Минимальная версия TLS</label>
+                <select id="ib-tls-min-ver">
+                    <option value="1.2">1.2</option>
+                    <option value="1.3" selected>1.3</option>
+                </select>
+            </div>
+        </div>
+        <div class="input-row" style="margin-top: 15px;">
+            <div class="input-group">
+                <label for="ib-tls-max-ver" data-i18n="ib_label_tls_max">Максимальная версия TLS</label>
+                <select id="ib-tls-max-ver">
+                    <option value="1.2">1.2</option>
+                    <option value="1.3" selected>1.3</option>
+                </select>
+            </div>
+        </div>
+        <div class="input-group" style="margin-top: 15px;">
+            <label class="checkbox-container" style="display: flex; align-items: center; gap: 10px;">
+                <input type="checkbox" id="ib-tls-insecure">
+                <span data-i18n="ib_label_tls_insecure">Разрешить небезопасные сертификаты (Allow Insecure)</span>
+            </label>
+        </div>
+    </div>
+
+    <!-- Reality settings subgroup -->
+    <div id="reality-settings-group" class="settings-subgroup" style="display: none; margin-top: 15px;">
+        <h4 data-i18n="ib_title_reality">Настройки Reality</h4>
+        <div class="input-row">
+            <div class="input-group">
+                <label for="ib-reality-dest" data-i18n="ib_label_reality_dest">Направление маскировки (Dest)</label>
+                <input type="text" id="ib-reality-dest" placeholder="yahoo.com:443">
+            </div>
+            <div class="input-group">
+                <label for="ib-reality-sni" data-i18n="ib_label_reality_sni">Маскировочный SNI (Server Names)</label>
+                <input type="text" id="ib-reality-sni" placeholder="yahoo.com">
+            </div>
+        </div>
+        <div class="input-group" style="margin-top: 15px;">
+            <label for="ib-reality-priv" data-i18n="ib_label_reality_priv">Приватный ключ (Private Key)</label>
+            <input type="text" id="ib-reality-priv" placeholder="Приватный ключ" data-i18n-placeholder="ib_placeholder_priv_key">
+        </div>
+        <div class="input-group" style="margin-top: 10px;">
+            <label for="ib-reality-pbk" data-i18n="ib_label_reality_pbk">Публичный ключ (Public Key)</label>
+            <input type="text" id="ib-reality-pbk" placeholder="Публичный ключ" data-i18n-placeholder="ib_placeholder_pub_key">
+        </div>
+        <div class="input-group" style="margin-top: 15px; display: flex; justify-content: flex-end; gap: 10px;">
+            <button type="button" id="gen-x25519-keys-btn" class="btn secondary-btn" style="padding: 6px 12px; font-size: 13px;" data-i18n="ib_btn_gen_keys"><i class="fa-solid fa-key"></i> Сгенерировать ключи</button>
+        </div>
+        <div class="input-row" style="margin-top: 15px;">
+            <div class="input-group">
+                <label for="ib-reality-shortids" data-i18n="ib_label_reality_shortids">Short IDs (через запятую, напр. 8f9c2d1b)</label>
+                <input type="text" id="ib-reality-shortids" placeholder="8f9c2d1b">
+            </div>
+            <div class="input-group" style="display: flex; align-items: flex-end; margin-bottom: 2px;">
+                <button type="button" id="gen-short-ids-btn" class="btn secondary-btn" style="padding: 10px 12px; font-size: 13px; width: 100%;" data-i18n="ib_btn_gen_shortid"><i class="fa-solid fa-wand-magic-sparkles"></i> Сгенерировать Short ID</button>
+            </div>
+        </div>
+        <div class="input-row" style="margin-top: 15px;">
+            <div class="input-group">
+                <label for="ib-reality-fp" data-i18n="ib_label_reality_fp">Эмуляция отпечатка браузера (Fingerprint)</label>
+                <select id="ib-reality-fp">
+                    <option value="chrome" selected>chrome</option>
+                    <option value="firefox">firefox</option>
+                    <option value="safari">safari</option>
+                    <option value="edge">edge</option>
+                    <option value="qq">qq</option>
+                    <option value="opera">opera</option>
+                    <option value="360">360</option>
+                    <option value="android">android</option>
+                    <option value="ios">ios</option>
+                    <option value="random">random</option>
+                    <option value="randomized">randomized</option>
+                </select>
+            </div>
+            <div class="input-group">
+                <label for="ib-reality-spx" data-i18n="ib_label_reality_spx">SpiderX</label>
+                <input type="text" id="ib-reality-spx" placeholder="/" value="/">
+            </div>
+        </div>
+        <div class="input-group" style="margin-top: 15px;">
+            <label for="ib-reality-max-time-diff" data-i18n="ib_label_reality_max_time_diff">Допуск расхождения времени (maxTimeDiff / max_time_difference)</label>
+            <input type="text" id="ib-reality-max-time-diff" placeholder="По умолчанию (1m)" value="">
+            <small style="color: var(--text-muted); font-size: 11px;">Оставьте пустым для значения по умолчанию (1m). Не устанавливайте 0s (0s полностью запрещает расхождение времени и сбрасывает все подключения).</small>
+        </div>
+    </div>
+</div>

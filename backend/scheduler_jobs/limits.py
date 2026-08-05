@@ -1,0 +1,300 @@
+import time
+import datetime
+import logging
+import asyncio
+from backend.models import ClientStats, Inbound
+from backend.utils import read_last_lines
+from backend.database import db_session
+
+# Cache of active IPs in memory for limit checks: { email: { ip: timestamp } }
+ACTIVE_IP_CACHE = {}
+
+# Notification timers to prevent Telegram spam
+_last_notified_blocks = {}
+_last_sb_client_traffic = {}
+
+def parse_recent_xray_ips():
+    """Scans Xray access.log and collects unique IPs for each client in the last 3 minutes."""
+    global ACTIVE_IP_CACHE
+    import backend.scheduler
+    
+    xray_log_path = backend.scheduler.XRAY_LOG_PATH
+    if not xray_log_path.exists():
+        return
+        
+    now_ts = time.time()
+    cutoff_ts = now_ts - 180  # 3 minutes
+    
+    # Clear expired IPs
+    for email in list(ACTIVE_IP_CACHE.keys()):
+        ip_map = ACTIVE_IP_CACHE[email]
+        for ip in list(ip_map.keys()):
+            if ip_map[ip] < cutoff_ts:
+                del ip_map[ip]
+        if not ip_map:
+            del ACTIVE_IP_CACHE[email]
+            
+    try:
+        # Read last 1000 lines
+        lines = read_last_lines(xray_log_path, 1000)
+            
+        for line in lines:
+            if "accepted" not in line or "email: " not in line:
+                continue
+                
+            parts = line.strip().split()
+            if len(parts) < 4:
+                continue
+                
+            try:
+                log_time_str = parts[0] + " " + parts[1]
+                log_time = datetime.datetime.strptime(log_time_str, "%Y/%m/%d %H:%M:%S")
+                log_ts = log_time.timestamp()
+            except Exception:
+                log_ts = now_ts  # fallback
+                
+            if log_ts < cutoff_ts:
+                continue
+                
+            email_part = line.split("email: ")
+            if len(email_part) < 2:
+                continue
+            email = email_part[1].strip()
+            
+            import re
+            match = re.search(r"from\s+\[([^\]]+)\]", line)
+            if not match:
+                match = re.search(r"from\s+(?:tcp:|udp:)?([^:\s]+)", line)
+            if not match:
+                continue
+            ip = match.group(1)
+                
+            if email not in ACTIVE_IP_CACHE:
+                ACTIVE_IP_CACHE[email] = {}
+            ACTIVE_IP_CACHE[email][ip] = log_ts
+            
+    except Exception as e:
+        logging.error(f"[Scheduler] Error parsing Xray access logs: {e}")
+
+def parse_recent_singbox_ips():
+    """Scans Sing-box singbox.log and collects unique IPs/activity for each client in the last 3 minutes."""
+    global ACTIVE_IP_CACHE
+    from backend.config import SINGBOX_LOG_PATH
+    
+    if not SINGBOX_LOG_PATH.exists():
+        return
+        
+    now_ts = time.time()
+    cutoff_ts = now_ts - 180  # 3 minutes
+    
+    # Clear expired IPs
+    for email in list(ACTIVE_IP_CACHE.keys()):
+        ip_map = ACTIVE_IP_CACHE[email]
+        for ip in list(ip_map.keys()):
+            if ip_map[ip] < cutoff_ts:
+                del ip_map[ip]
+        if not ip_map:
+            del ACTIVE_IP_CACHE[email]
+            
+    try:
+        from backend.database import db_session
+        from backend.models import ClientStats
+        with db_session() as session:
+            client_emails = {c.email for c in session.query(ClientStats).filter_by(enable=1).all()}
+
+        if not client_emails:
+            return
+
+        lines = read_last_lines(SINGBOX_LOG_PATH, 1000)
+            
+        for line in lines:
+            if not line.strip():
+                continue
+
+            log_ts = now_ts
+            parts = line.strip().split()
+            if len(parts) >= 2:
+                try:
+                    time_str = parts[0].replace("-", "/") + " " + parts[1]
+                    log_time = datetime.datetime.strptime(time_str[:19], "%Y/%m/%d %H:%M:%S")
+                    log_ts = log_time.timestamp()
+                except Exception:
+                    pass
+
+            if log_ts < cutoff_ts:
+                continue
+
+            for email in client_emails:
+                if email in line:
+                    import re
+                    match = re.search(r"(?:from|client)\s+(?:\[([^\]]+)\]|([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+))", line)
+                    if match:
+                        ip = match.group(1) or match.group(2)
+                    else:
+                        ip = "127.0.0.1"
+
+                    if email not in ACTIVE_IP_CACHE:
+                        ACTIVE_IP_CACHE[email] = {}
+                    ACTIVE_IP_CACHE[email][ip] = log_ts
+            
+    except Exception as e:
+        logging.error(f"[Scheduler] Error parsing Sing-box logs: {e}")
+
+def enforce_client_limits_and_rules():
+    """Main background client limits scheduler running every 30 seconds."""
+    import backend.scheduler
+    backend.scheduler.parse_recent_xray_ips()
+    backend.scheduler.parse_recent_singbox_ips()
+    try:
+        from backend.client_alerts import check_xray_inactivity_timeouts
+        check_xray_inactivity_timeouts()
+    except Exception as ex:
+        logging.error(f"[Scheduler] Error checking Xray inactivity: {ex}")
+    
+    now_ts = time.time()
+    now_ms = int(now_ts * 1000)
+    need_config_update = False
+    
+    from backend.database import get_setting
+    from backend.i18n import t
+
+    sys_lang = get_setting("language", "ru")
+    bot_token = get_setting("telegram_bot_token", "")
+    tg_admin_ids = get_setting("telegram_admin_ids", "")
+    
+    from backend.models import ClientTrafficDaily
+
+    current_date = datetime.date.today().isoformat()
+    with db_session() as session:
+        active_clients = session.query(ClientStats).filter_by(enable=1).all()
+        # Bulk load inbounds and daily traffic records to avoid N+1 query problem
+        inbounds_by_id = {ib.id: ib for ib in session.query(Inbound).all()}
+        daily_records = {rec.email: rec for rec in session.query(ClientTrafficDaily).filter_by(date=current_date).all()}
+        
+        for c in active_clients:
+            inbound = inbounds_by_id.get(c.inbound_id)
+            if not inbound:
+                continue
+
+            # Calculate daily delta
+            delta_up = c.up - c.last_seen_up if c.up >= c.last_seen_up else c.up
+            delta_down = c.down - c.last_seen_down if c.down >= c.last_seen_down else c.down
+            
+            delta_up = max(0, delta_up)
+            delta_down = max(0, delta_down)
+            
+            if delta_up > 0 or delta_down > 0:
+                daily_record = daily_records.get(c.email)
+                if daily_record:
+                    daily_record.up += delta_up
+                    daily_record.down += delta_down
+                else:
+                    new_record = ClientTrafficDaily(
+                        email=c.email,
+                        date=current_date,
+                        up=delta_up,
+                        down=delta_down
+                    )
+                    session.add(new_record)
+                    daily_records[c.email] = new_record
+                    
+            c.last_seen_up = c.up
+            c.last_seen_down = c.down
+            block_reason = ""
+            
+            # 1. Traffic limit check
+            if c.total > 0 and (c.up + c.down) >= c.total:
+                block_reason = t("traffic_limit_exceeded", sys_lang)
+                
+            # 2. Expiration check
+            elif c.expiry_time > 0 and now_ms > c.expiry_time:
+                block_reason = t("subscription_expired", sys_lang)
+                
+            # 3. IP limit check
+            elif c.limit_ip > 0:
+                active_ips = ACTIVE_IP_CACHE.get(c.email, {})
+                if len(active_ips) > c.limit_ip:
+                    block_reason = t("ip_limit_exceeded", sys_lang, count=len(active_ips), limit=c.limit_ip)
+                    
+            if block_reason:
+                logging.warning(f"[Scheduler] Blocking client {c.email} due to: {block_reason}")
+                c.enable = 0
+                c.block_reason = block_reason
+                need_config_update = True
+                
+                if inbound.protocol == "hysteria2":
+                    backend.scheduler.kick_client_hysteria_api(inbound.id, c.email)
+                else:
+                    backend.scheduler.remove_client_api(inbound.id, c.email)
+                    
+                backend.scheduler.asyncio_notify_admin(c.email, block_reason, bot_token, tg_admin_ids)
+                
+    if need_config_update:
+        backend.scheduler.write_xray_config()
+        backend.scheduler.restart_xray()
+        try:
+            from backend.singbox import write_singbox_config, restart_singbox
+            write_singbox_config()
+            restart_singbox()
+        except Exception as ex:
+            logging.error(f"[Scheduler] Failed to restart Sing-box after blocking client: {ex}")
+
+    # Run Watchdog
+    try:
+        from backend.scheduler_jobs.watchdog import run_service_watchdog
+        run_service_watchdog()
+    except Exception as e:
+        logging.error(f"[Watchdog] Error running watchdog: {e}")
+        
+    # Run Backup
+    try:
+        from backend.scheduler_jobs.backups import check_and_run_backups
+        check_and_run_backups()
+    except Exception as e:
+        logging.error(f"[Backup Scheduler] Error running backups: {e}")
+
+    # Run Log Rotation
+    try:
+        from backend.scheduler_jobs.maintenance import truncate_logs_if_large
+        truncate_logs_if_large()
+    except Exception as e:
+        logging.error(f"[Log Rotation] Error running log rotation: {e}")
+
+    # Run DB Cleanup Maintenance
+    try:
+        from backend.scheduler_jobs.maintenance import run_db_cleanup_maintenance
+        run_db_cleanup_maintenance()
+    except Exception as e:
+        logging.error(f"[DB Maintenance] Error running database cleanup: {e}")
+
+def asyncio_notify_admin(email: str, reason: str, bot_token: str, tg_admin_ids: str):
+    """Sends a block alert to admins in Telegram (async background task)."""
+    global _last_notified_blocks
+    
+    last_t = _last_notified_blocks.get((email, reason), 0)
+    if time.time() - last_t < 600:
+        return
+        
+    _last_notified_blocks[(email, reason)] = time.time()
+    
+    try:
+        if bot_token and tg_admin_ids:
+            from aiogram import Bot
+            temp_bot = Bot(token=bot_token)
+            admin_ids = [x.strip() for x in tg_admin_ids.split(",") if x.strip()]
+            for admin_id in admin_ids:
+                msg = f"🛑 <b>[Система Лимитов]</b>\nПользователь <code>{email}</code> заблокирован автоматически.\nПричина: <b>{reason}</b>"
+                try:
+                    loop = asyncio.get_running_loop()
+                    
+                    async def send_and_close(bot_inst, chat, text):
+                        try:
+                            await bot_inst.send_message(chat_id=chat, text=text, parse_mode="HTML")
+                        finally:
+                            await bot_inst.session.close()
+                            
+                    loop.create_task(send_and_close(temp_bot, admin_id, msg))
+                except RuntimeError:
+                    pass
+    except Exception as e:
+        logging.error(f"[Scheduler] Failed to send Telegram alert: {e}")

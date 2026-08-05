@@ -1,0 +1,76 @@
+<!-- SECTION 4: SYSTEM & WARP -->
+<div class="settings-section-panel" id="sec-system">
+    <!-- CARD 5: Системные оптимизации сети -->
+    <div class="glass-card settings-card">
+        <h3 data-i18n="settings_sys_opt_title">Системные оптимизации сети</h3>
+        <p class="card-desc" data-i18n="settings_sys_opt_desc">Оптимизация параметров ядра Linux (sysctl.conf и limits.conf) для работы под высокими нагрузками (1Gbps+). Включает TCP тюнинг и увеличение лимитов открытых файлов.</p>
+        
+        <div style="margin-top: auto;">
+            <div style="display: flex; justify-content: space-between; align-items: center; background: var(--bg-input); border: 1px solid var(--border-color); border-radius: 12px; padding: 15px 20px; margin-bottom: 20px;">
+                <span style="color: var(--text-secondary); font-size: 14px;" data-i18n="settings_sys_opt_status">Текущий статус оптимизации</span>
+                <span id="optimization-status-badge" class="badge secondary-badge" style="font-weight: 600; padding: 6px 12px; border-radius: 20px; font-size: 13px;">...</span>
+            </div>
+            
+            <button type="button" id="btn-apply-optimizations" class="btn primary-btn w-100"><i class="fa-solid fa-gauge-high"></i> <span data-i18n="settings_sys_opt_btn">Применить оптимизации</span></button>
+        </div>
+    </div>
+
+    <!-- CARD 5.5: Cloudflare WARP -->
+    <div class="glass-card settings-card" id="settings-card-warp">
+        <h3 data-i18n="settings_warp_title">Управление Cloudflare WARP</h3>
+        <p class="card-desc" data-i18n="settings_warp_desc">Используется для перенаправления определенного трафика через Cloudflare WARP для обхода ограничений.</p>
+        
+        <div class="settings-form-content" style="margin-top: auto; display: flex; flex-direction: column; gap: 15px;">
+            <!-- Status Row 1: Installation -->
+            <div style="display: flex; justify-content: space-between; align-items: center; background: var(--bg-input); border: 1px solid var(--border-color); border-radius: 12px; padding: 12px 18px;">
+                <span style="color: var(--text-secondary); font-size: 14px;" data-i18n="settings_warp_installed_label">Статус установки</span>
+                <span id="settings-warp-installed-badge" class="badge secondary-badge" style="font-weight: 600; padding: 5px 11px; border-radius: 20px; font-size: 13px;">...</span>
+            </div>
+            
+            <!-- Status Row 2: Connection -->
+            <div id="settings-warp-status-row" style="display: none; justify-content: space-between; align-items: center; background: var(--bg-input); border: 1px solid var(--border-color); border-radius: 12px; padding: 12px 18px;">
+                <span style="color: var(--text-secondary); font-size: 14px;" data-i18n="settings_warp_status_label">Статус подключения</span>
+                <span id="settings-warp-status-badge" class="badge secondary-badge" style="font-weight: 600; padding: 5px 11px; border-radius: 20px; font-size: 13px;">...</span>
+            </div>
+
+            <!-- Status Row 3: Account -->
+            <div id="settings-warp-account-row" style="display: none; justify-content: space-between; align-items: center; background: var(--bg-input); border: 1px solid var(--border-color); border-radius: 12px; padding: 12px 18px;">
+                <span style="color: var(--text-secondary); font-size: 14px;" data-i18n="settings_warp_account_label">Тип аккаунта</span>
+                <span id="settings-warp-account-badge" class="badge secondary-badge" style="font-weight: 600; padding: 5px 11px; border-radius: 20px; font-size: 13px;">...</span>
+            </div>
+
+            <!-- Status Row 4: Quota -->
+            <div id="settings-warp-quota-row" style="display: none; justify-content: space-between; align-items: center; background: var(--bg-input); border: 1px solid var(--border-color); border-radius: 12px; padding: 12px 18px;">
+                <span style="color: var(--text-secondary); font-size: 14px;" data-i18n="settings_warp_quota_label">Остаток трафика WARP+</span>
+                <span id="settings-warp-quota-badge" class="badge secondary-badge" style="font-weight: 600; padding: 5px 11px; border-radius: 20px; font-size: 13px;">...</span>
+            </div>
+
+            <!-- Action Button: Install -->
+            <button type="button" id="btn-warp-install" class="btn primary-btn w-100" style="display: none; padding: 12px;"><i class="fa-solid fa-download"></i> <span data-i18n="settings_warp_btn_install">Установить WARP</span></button>
+
+            <!-- WARP Configuration Panel -->
+            <div id="settings-warp-config-panel" style="display: none; flex-direction: column; gap: 15px;">
+                <!-- Key Input -->
+                <div class="input-group">
+                    <label for="settings-warp-license" data-i18n="settings_warp_license_label">Лицензионный ключ WARP+ (Опционально)</label>
+                    <input type="text" id="settings-warp-license" placeholder="Введите 26-символьный ключ..." data-i18n-placeholder="settings_warp_license_placeholder">
+                </div>
+
+                <!-- Key Actions -->
+                <div style="display: flex; gap: 10px;">
+                    <button type="button" id="btn-warp-apply-key" class="btn primary-btn w-100" style="padding: 10px;"><i class="fa-solid fa-key"></i> <span data-i18n="settings_warp_btn_apply_key">Активировать WARP+</span></button>
+                    <button type="button" id="btn-warp-register-free" class="btn secondary-btn w-100" style="display: none; padding: 10px;"><i class="fa-solid fa-rotate-left"></i> <span data-i18n="settings_warp_btn_register_free">Сбросить на Free</span></button>
+                </div>
+
+                <!-- Connection Action Toggles -->
+                <div style="display: flex; gap: 10px;">
+                    <button type="button" id="btn-warp-connect" class="btn btn-outline-success w-100" style="padding: 10px;"><i class="fa-solid fa-play"></i> <span data-i18n="settings_warp_btn_connect">Подключить</span></button>
+                    <button type="button" id="btn-warp-disconnect" class="btn btn-outline-danger w-100" style="padding: 10px;"><i class="fa-solid fa-stop"></i> <span data-i18n="settings_warp_btn_disconnect">Отключить</span></button>
+                </div>
+
+                <!-- Uninstall Action -->
+                <button type="button" id="btn-warp-uninstall" class="btn secondary-btn w-100" style="margin-top: 10px; padding: 10px; border-color: rgba(255, 71, 87, 0.3); color: #ff4757;"><i class="fa-solid fa-trash-can"></i> <span data-i18n="settings_warp_btn_uninstall">Удалить WARP</span></button>
+            </div>
+        </div>
+    </div>
+</div>

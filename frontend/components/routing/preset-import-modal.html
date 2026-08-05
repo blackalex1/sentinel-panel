@@ -1,0 +1,35 @@
+<!-- Модальное окно Импорта Пресета Маршрутизации -->
+<div id="routing-preset-import-modal" class="modal" style="z-index: 1100;">
+    <div class="glass-card modal-card" style="background: hsl(223, 47%, 11%) !important; width: 500px; max-width: 95%;">
+        <div class="modal-header">
+            <h3>Импорт пресета маршрутизации</h3>
+            <button class="btn icon-btn close-modal-btn"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <form id="routing-preset-import-form">
+            <div class="input-group">
+                <label for="preset-template-select">Выберите готовый шаблон или загрузите файл</label>
+                <select id="preset-template-select" class="glass-select">
+                    <option value="custom">-- Загрузить собственный JSON файл --</option>
+                    <option value="ai_bypass">Маршрутизация OpenAI / ChatGPT / AI в VPN</option>
+                    <option value="block_ads_torrent">Блокировка рекламы и BitTorrent</option>
+                    <option value="split_ru_direct">Разделение RU-трафика (Direct) и VPN</option>
+                </select>
+            </div>
+
+            <div class="input-group" id="preset-file-group">
+                <label for="preset-json-file">Загрузить файл пресета (.json)</label>
+                <input type="file" id="preset-json-file" accept=".json">
+            </div>
+
+            <div class="input-group">
+                <label for="preset-mode-select">Режим импорта</label>
+                <select id="preset-mode-select" class="glass-select">
+                    <option value="append" selected>Добавить к существующим правилам (Append)</option>
+                    <option value="overwrite">Заменить текущие правила (Overwrite)</option>
+                </select>
+            </div>
+
+            <button type="submit" class="btn primary-btn" style="width: 100%; margin-top: 15px;"><i class="fa-solid fa-file-import" style="margin-right: 5px;"></i>Импортировать правила</button>
+        </form>
+    </div>
+</div>

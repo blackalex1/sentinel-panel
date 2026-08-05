@@ -1,0 +1,74 @@
+<!-- Quick Security Rules Section -->
+<div class="routing-section glass-card" style="margin-bottom: 25px;" id="quick-security-rules-card">
+    <h3 data-i18n="routing_quick_rules_title" style="margin-top: 0; margin-bottom: 15px; font-size: 1.3rem;">
+        <i class="fa-solid fa-shield-halved" style="margin-right: 8px; color: var(--accent-color);"></i>
+        Быстрые правила безопасности
+    </h3>
+    <p class="card-desc" style="font-size: 13px; color: var(--text-secondary); margin-bottom: 20px;">
+        Включение этих правил автоматически заблокирует соответствующие категории трафика (реклама, торренты, страны) для всех пользователей.
+    </p>
+    <div class="quick-rules-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 20px;">
+        <!-- Block Torrent -->
+        <div style="display: flex; align-items: center; justify-content: space-between; background: var(--bg-input); border: 1px solid var(--border-color); border-radius: 12px; padding: 15px 20px;">
+            <div style="display: flex; flex-direction: column; gap: 4px;">
+                <span style="font-weight: 600; font-size: 14px;">Блокировать BitTorrent</span>
+                <span style="font-size: 11px; color: var(--text-secondary);">Торрент-трафик и трекеры</span>
+            </div>
+            <span class="switch-toggle">
+                <input type="checkbox" id="quick-block-bittorrent">
+                <span class="switch-slider"></span>
+            </span>
+        </div>
+        
+        <!-- Block Ads -->
+        <div style="display: flex; align-items: center; justify-content: space-between; background: var(--bg-input); border: 1px solid var(--border-color); border-radius: 12px; padding: 15px 20px;">
+            <div style="display: flex; flex-direction: column; gap: 4px;">
+                <span style="font-weight: 600; font-size: 14px;">Блокировать рекламу</span>
+                <span style="font-size: 11px; color: var(--text-secondary);">AdBlock geosite категории</span>
+            </div>
+            <span class="switch-toggle">
+                <input type="checkbox" id="quick-block-ads">
+                <span class="switch-slider"></span>
+            </span>
+        </div>
+
+        <!-- Block China -->
+        <div style="display: flex; align-items: center; justify-content: space-between; background: var(--bg-input); border: 1px solid var(--border-color); border-radius: 12px; padding: 15px 20px;">
+            <div style="display: flex; flex-direction: column; gap: 4px;">
+                <span style="font-weight: 600; font-size: 14px;">Блокировать Китай (CN)</span>
+                <span style="font-size: 11px; color: var(--text-secondary);">Все IP и сайты Китая</span>
+            </div>
+            <span class="switch-toggle">
+                <input type="checkbox" id="quick-block-cn">
+                <span class="switch-slider"></span>
+            </span>
+        </div>
+
+        <!-- Block Russia -->
+        <div style="display: flex; align-items: center; justify-content: space-between; background: var(--bg-input); border: 1px solid var(--border-color); border-radius: 12px; padding: 15px 20px;">
+            <div style="display: flex; flex-direction: column; gap: 4px;">
+                <span style="font-weight: 600; font-size: 14px;">Блокировать Россию (RU)</span>
+                <span style="font-size: 11px; color: var(--text-secondary);">Все IP и сайты России</span>
+            </div>
+            <span class="switch-toggle">
+                <input type="checkbox" id="quick-block-ru">
+                <span class="switch-slider"></span>
+            </span>
+        </div>
+
+        <!-- Block US -->
+        <div style="display: flex; align-items: center; justify-content: space-between; background: var(--bg-input); border: 1px solid var(--border-color); border-radius: 12px; padding: 15px 20px;">
+            <div style="display: flex; flex-direction: column; gap: 4px;">
+                <span style="font-weight: 600; font-size: 14px;">Блокировать США (US)</span>
+                <span style="font-size: 11px; color: var(--text-secondary);">Все IP и сайты США</span>
+            </div>
+            <span class="switch-toggle">
+                <input type="checkbox" id="quick-block-us">
+                <span class="switch-slider"></span>
+            </span>
+        </div>
+    </div>
+    <div style="margin-top: 20px; display: flex; justify-content: flex-end;">
+        <button id="btn-save-quick-rules" class="btn primary-btn" style="padding: 8px 16px;"><i class="fa-solid fa-floppy-disk" style="margin-right: 5px;"></i>Сохранить правила</button>
+    </div>
+</div>

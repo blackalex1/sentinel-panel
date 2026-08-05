@@ -1,0 +1,259 @@
+/* Кнопки Spectre Design System */
+.btn {
+    border: none;
+    border-radius: var(--radius-md, 12px);
+    padding: 12px 24px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    letter-spacing: var(--tracking-tight, -0.018em);
+    transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    position: relative;
+    overflow: hidden;
+}
+
+.btn:active {
+    transform: scale(0.96) !important;
+}
+
+.primary-btn {
+    background: var(--primary-gradient);
+    color: #ffffff;
+    box-shadow: 0 4px 20px var(--primary-glow);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+.primary-btn:hover {
+    background: var(--primary-gradient-hover);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 28px rgba(139, 92, 246, 0.45), 0 0 25px rgba(6, 182, 212, 0.25);
+}
+
+.secondary-btn {
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid var(--border-color);
+    color: var(--text-secondary);
+}
+
+.secondary-btn:hover {
+    background: rgba(255, 255, 255, 0.08);
+    border-color: var(--border-highlight);
+    color: var(--text-primary);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 16px rgba(139, 92, 246, 0.15);
+}
+
+.secondary-btn.active {
+    background: rgba(139, 92, 246, 0.18);
+    border-color: var(--primary);
+    color: var(--text-primary);
+    box-shadow: 0 0 16px rgba(139, 92, 246, 0.25);
+}
+
+.danger-btn {
+    background: linear-gradient(135deg, var(--accent-rose) 0%, #e11d48 100%);
+    color: #ffffff;
+    box-shadow: 0 4px 18px var(--accent-rose-glow);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.danger-btn:hover {
+    background: linear-gradient(135deg, var(--accent-rose-hover) 0%, var(--accent-rose) 100%);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(244, 63, 94, 0.4), 0 0 22px rgba(244, 63, 94, 0.3);
+}
+
+.success-btn {
+    background: linear-gradient(135deg, var(--accent-green) 0%, #059669 100%);
+    color: #ffffff;
+    box-shadow: 0 4px 18px var(--accent-green-glow);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.success-btn:hover {
+    background: linear-gradient(135deg, var(--accent-green-hover) 0%, var(--accent-green) 100%);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(16, 185, 129, 0.4), 0 0 22px rgba(16, 185, 129, 0.3);
+}
+
+/* Полупрозрачные контурные кнопки */
+.btn-outline-success {
+    background: rgba(16, 185, 129, 0.12) !important;
+    color: var(--accent-green) !important;
+    border: 1px solid rgba(16, 185, 129, 0.35) !important;
+    box-shadow: none !important;
+    transition: all 0.25s ease;
+}
+
+.btn-outline-success:hover {
+    background: rgba(16, 185, 129, 0.22) !important;
+    border-color: rgba(16, 185, 129, 0.6) !important;
+    transform: translateY(-1.5px);
+    box-shadow: 0 0 16px rgba(16, 185, 129, 0.2) !important;
+}
+
+.btn-outline-danger {
+    background: rgba(244, 63, 94, 0.12) !important;
+    color: var(--accent-rose) !important;
+    border: 1px solid rgba(244, 63, 94, 0.35) !important;
+    box-shadow: none !important;
+    transition: all 0.25s ease;
+}
+
+.btn-outline-danger:hover {
+    background: rgba(244, 63, 94, 0.22) !important;
+    border-color: rgba(244, 63, 94, 0.6) !important;
+    transform: translateY(-1.5px);
+    box-shadow: 0 0 16px rgba(244, 63, 94, 0.2) !important;
+}
+
+.icon-btn {
+    padding: 10px;
+    border-radius: var(--radius-md);
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--border-color);
+    color: var(--text-secondary);
+    transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.icon-btn:hover {
+    color: var(--text-primary);
+    background: rgba(255, 255, 255, 0.08);
+    border-color: var(--border-highlight);
+    transform: translateY(-1.5px);
+}
+
+.w-100 {
+    width: 100%;
+}
+
+.error-msg {
+    color: var(--accent-rose);
+    font-size: 13px;
+    margin-top: 15px;
+    text-align: center;
+    font-weight: 500;
+}
+
+/* Копирование в инпуте */
+.copy-input-group {
+    display: flex;
+    position: relative;
+}
+
+.copy-input-group input {
+    flex: 1;
+    padding-right: 54px !important;
+}
+
+.copy-input-group .btn {
+    position: absolute;
+    right: 0;
+    top: 0;
+    height: 100%;
+    padding: 0 16px;
+    background: transparent;
+    border: none;
+    border-left: 1px solid var(--border-color);
+    border-radius: 0 10px 10px 0;
+}
+
+.copy-input-group .btn:hover {
+    background: rgba(255, 255, 255, 0.08);
+    color: var(--primary-hover);
+}
+
+.actions-group {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    flex-wrap: nowrap;
+}
+
+/* Unified Premium Action Buttons */
+.table-action-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    padding: 0;
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--border-color);
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.table-action-btn:hover:not(:disabled) {
+    background: rgba(255, 255, 255, 0.08);
+    border-color: var(--border-highlight);
+    color: var(--text-primary);
+    transform: translateY(-2px);
+}
+
+.table-action-btn:active:not(:disabled) {
+    transform: translateY(0);
+}
+
+.table-action-btn.edit-btn:hover:not(:disabled) {
+    background: rgba(139, 92, 246, 0.16) !important;
+    border-color: rgba(139, 92, 246, 0.45) !important;
+    color: var(--primary-hover) !important;
+    box-shadow: 0 0 16px rgba(139, 92, 246, 0.3);
+}
+
+.table-action-btn.delete-btn:hover:not(:disabled) {
+    background: rgba(244, 63, 94, 0.16) !important;
+    border-color: rgba(244, 63, 94, 0.45) !important;
+    color: var(--accent-rose) !important;
+    box-shadow: 0 0 16px rgba(244, 63, 94, 0.3);
+}
+
+.table-action-btn.move-btn:hover:not(:disabled) {
+    background: rgba(6, 182, 212, 0.16) !important;
+    border-color: rgba(6, 182, 212, 0.45) !important;
+    color: var(--accent-cyan) !important;
+    box-shadow: 0 0 16px rgba(6, 182, 212, 0.3);
+}
+
+.table-action-btn.chart-btn:hover:not(:disabled) {
+    background: rgba(16, 185, 129, 0.16) !important;
+    border-color: rgba(16, 185, 129, 0.45) !important;
+    color: var(--accent-green) !important;
+    box-shadow: 0 0 16px rgba(16, 185, 129, 0.3);
+}
+
+.table-action-btn.links-btn:hover:not(:disabled) {
+    background: rgba(245, 158, 11, 0.16) !important;
+    border-color: rgba(245, 158, 11, 0.45) !important;
+    color: var(--accent-orange) !important;
+    box-shadow: 0 0 16px rgba(245, 158, 11, 0.3);
+}
+
+.table-action-btn.test-btn:hover:not(:disabled) {
+    background: rgba(16, 185, 129, 0.16) !important;
+    border-color: rgba(16, 185, 129, 0.45) !important;
+    color: var(--accent-green) !important;
+    box-shadow: 0 0 16px rgba(16, 185, 129, 0.3);
+}
+
+.table-action-btn.test-btn-http:hover:not(:disabled) {
+    background: rgba(6, 182, 212, 0.16) !important;
+    border-color: rgba(6, 182, 212, 0.45) !important;
+    color: var(--accent-cyan) !important;
+    box-shadow: 0 0 16px rgba(6, 182, 212, 0.3);
+}
+
+.table-action-btn:disabled {
+    opacity: 0.25;
+    cursor: not-allowed;
+    background: transparent;
+    border-color: rgba(255, 255, 255, 0.05);
+    color: var(--text-muted);
+}

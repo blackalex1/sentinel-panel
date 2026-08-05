@@ -1,0 +1,83 @@
+<!-- SECTION 6: LOGS & AUDIT -->
+<div class="settings-section-panel" id="sec-logs">
+    <!-- CARD 6.5: Active Sessions -->
+    <div class="glass-card settings-card">
+        <h3 data-i18n="active_sessions_title">Active Sessions</h3>
+        <p class="card-desc" data-i18n="active_sessions_desc">List of devices and browsers logged into the panel under your account.</p>
+        
+        <div style="margin-top: 20px;">
+            <div class="table-container">
+                <table class="glass-table">
+                    <thead>
+                        <tr>
+                            <th style="white-space: nowrap;" data-i18n="sessions_th_ip">IP Address</th>
+                            <th style="white-space: nowrap;" data-i18n="sessions_th_ua">Browser / Device</th>
+                            <th style="white-space: nowrap;" data-i18n="sessions_th_created">Created</th>
+                            <th style="white-space: nowrap;" data-i18n="sessions_th_expires">Expires</th>
+                            <th style="text-align: right; width: 100px;" data-i18n="sessions_th_action">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody id="active-sessions-tbody">
+                        <!-- Заполняется динамически -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- CARD 7: Action Audit Logs -->
+    <div class="glass-card settings-card">
+        <h3 data-i18n="audit_logs_title">Action Audit Logs</h3>
+        <p class="card-desc" data-i18n="audit_logs_desc">History of administrator actions and system configuration changes.</p>
+        
+        <div style="margin-top: 20px;">
+            <div style="margin-bottom: 15px; display: flex; gap: 10px; flex-wrap: wrap; align-items: center;">
+                <div class="search-bar" style="flex-grow: 1; min-width: 200px; margin-bottom: 0;">
+                    <i class="fa-solid fa-magnifying-glass"></i>
+                    <input type="text" id="audit-logs-search" placeholder="Поиск по логам..." data-i18n-placeholder="audit_logs_search">
+                </div>
+                <div style="min-width: 180px;">
+                    <select id="audit-logs-category" style="width: 100%; height: 40px; padding: 0 10px; border-radius: var(--border-radius); background: var(--bg-input, rgba(255,255,255,0.05)); border: 1px solid var(--border-color, rgba(255,255,255,0.1)); color: var(--text-primary); cursor: pointer; outline: none; font-size: 14px;">
+                        <option value="" data-i18n="audit_cat_all">📂 Все логи</option>
+                        <option value="login" data-i18n="audit_cat_logins">🔑 Авторизация</option>
+                        <option value="client" data-i18n="audit_cat_clients">👤 Клиенты</option>
+                        <option value="inbound" data-i18n="audit_cat_inbounds">🔌 Подключения / Протоколы</option>
+                        <option value="block" data-i18n="audit_cat_security">🛡️ Безопасность / Блокировки</option>
+                        <option value="setting" data-i18n="audit_cat_settings">⚙️ Настройки</option>
+                    </select>
+                </div>
+                <button type="button" id="btn-clear-connections" class="btn danger-btn" style="height: 40px; display: flex; align-items: center; gap: 6px; padding: 0 15px; font-size: 13px; font-weight: 600; border: 1px solid rgba(255, 71, 87, 0.3); color: #ff4757; background: rgba(255, 71, 87, 0.1);">
+                    <i class="fa-solid fa-trash-can"></i>
+                    <span data-i18n="btn_clear_connections">Сбросить базу подключений</span>
+                </button>
+            </div>
+            
+            <div class="table-container">
+                <table class="glass-table">
+                    <thead>
+                        <tr>
+                            <th style="white-space: nowrap;" data-i18n="audit_logs_th_time">Время</th>
+                            <th style="white-space: nowrap;" data-i18n="audit_logs_th_user">Пользователь</th>
+                            <th style="white-space: nowrap;" data-i18n="audit_logs_th_action">Действие</th>
+                            <th style="white-space: nowrap;" data-i18n="audit_logs_th_target">Объект</th>
+                            <th data-i18n="audit_logs_th_details">Детали</th>
+                        </tr>
+                    </thead>
+                    <tbody id="audit-logs-tbody">
+                        <!-- Заполняется динамически -->
+                    </tbody>
+                </table>
+            </div>
+            
+            <!-- Пагинация -->
+            <div style="margin-top: 15px; display: flex; justify-content: space-between; align-items: center;">
+                <span id="audit-logs-total-text" style="font-size: 13px; color: var(--text-secondary);"></span>
+                <div style="display: flex; gap: 8px;">
+                    <button type="button" id="btn-audit-prev" class="btn secondary-btn icon-btn" style="padding: 6px 12px;"><i class="fa-solid fa-chevron-left"></i></button>
+                    <span id="audit-page-number" style="align-self: center; font-size: 14px; font-weight: 500; min-width: 30px; text-align: center;">1</span>
+                    <button type="button" id="btn-audit-next" class="btn secondary-btn icon-btn" style="padding: 6px 12px;"><i class="fa-solid fa-chevron-right"></i></button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

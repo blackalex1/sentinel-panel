@@ -1,0 +1,106 @@
+<!-- SECTION 5: BACKUPS -->
+<div class="settings-section-panel" id="sec-backups">
+    <!-- CARD 6: Резервное копирование (Backups) -->
+    <div class="glass-card settings-card">
+        <h3 data-i18n="settings_backups_title">Резервное копирование (Backups)</h3>
+        <p class="card-desc" data-i18n="settings_backups_desc">Настройка автоматического создания бэкапов базы данных и управление файлами резервных копий.</p>
+        <div class="settings-form-content" style="margin-top: auto; display: flex; flex-direction: column; gap: 15px;">
+            
+            <div style="display: flex; flex-direction: column; gap: 12px; background: var(--bg-input); border: 1px solid var(--border-color); border-radius: 12px; padding: 15px 20px;">
+                <label class="checkbox-container" style="display: flex; align-items: center; gap: 10px; cursor: pointer; color: var(--text-secondary); font-size: 14px; font-weight: normal; text-transform: none; margin-bottom: 0;">
+                    <input type="checkbox" id="setting-backup-enable">
+                    <span data-i18n="settings_backup_enable">Хранить бэкапы локально</span>
+                </label>
+                <label class="checkbox-container" style="display: flex; align-items: center; gap: 10px; cursor: pointer; color: var(--text-secondary); font-size: 14px; font-weight: normal; text-transform: none; margin-bottom: 0;">
+                    <input type="checkbox" id="setting-backup-telegram">
+                    <span data-i18n="settings_backup_telegram">Отправлять бэкап в Telegram</span>
+                </label>
+                <label class="checkbox-container" style="display: flex; align-items: center; gap: 10px; cursor: pointer; color: var(--text-secondary); font-size: 14px; font-weight: normal; text-transform: none; margin-bottom: 0;">
+                    <input type="checkbox" id="setting-backup-encrypt">
+                    <span data-i18n="settings_backup_encrypt">Шифровать файлы бэкапов</span>
+                </label>
+            </div>
+
+            <div class="input-group" id="setting-backup-password-group" style="display: none; margin-top: 15px; border-top: 1px dashed var(--border-color); padding-top: 15px;">
+                <h4 style="margin-bottom: 15px; font-size: 14px; color: var(--text-primary);" data-i18n="settings_backup_change_pwd_title">Смена пароля шифрования бэкапов</h4>
+                
+                <div class="input-group" style="margin-bottom: 12px;">
+                    <label for="setting-backup-current-password" data-i18n="settings_backup_current_password">Текущий пароль шифрования</label>
+                    <input type="password" id="setting-backup-current-password" placeholder="Введите текущий пароль...">
+                </div>
+                
+                <div class="input-group" style="margin-bottom: 12px;">
+                    <label for="setting-backup-new-password" data-i18n="settings_backup_new_password">Новый пароль шифрования</label>
+                    <div class="copy-input-group">
+                        <input type="text" id="setting-backup-new-password" placeholder="Введите новый пароль...">
+                        <button type="button" id="btn-change-backup-gen" class="btn secondary-btn" title="Сгенерировать"><i class="fa-solid fa-wand-magic-sparkles"></i></button>
+                    </div>
+                </div>
+                
+                <div class="input-group" style="margin-bottom: 15px;">
+                    <label for="setting-backup-confirm-password" data-i18n="settings_backup_confirm_password">Подтвердите новый пароль</label>
+                    <input type="password" id="setting-backup-confirm-password" placeholder="Повторите новый пароль...">
+                </div>
+                
+                <button type="button" id="btn-change-backup-password" class="btn primary-btn w-100" style="padding: 10px; font-weight: 600; margin-bottom: 15px;"><i class="fa-solid fa-key"></i> <span data-i18n="settings_backup_btn_change_password">Изменить пароль</span></button>
+                
+                <div id="setting-backup-password-warning" style="background: rgba(255, 159, 67, 0.1); border: 1px solid rgba(255, 159, 67, 0.25); border-radius: 8px; padding: 12px; color: #ff9f43; font-size: 13px; line-height: 1.4; display: flex; align-items: flex-start; gap: 8px;">
+                    <i class="fa-solid fa-triangle-exclamation" style="margin-top: 2px;"></i>
+                    <span data-i18n="settings_backup_password_warning">ВНИМАНИЕ: Обязательно сохраните/запомните этот пароль! Без него восстановление резервных копий будет невозможно.</span>
+                </div>
+            </div>
+
+            <div class="input-row" style="display: flex; flex-wrap: wrap; gap: 15px;">
+                <div class="input-group" style="flex: 1 1 150px;">
+                    <label for="setting-backup-interval" data-i18n="settings_backup_interval">Интервал создания</label>
+                    <select id="setting-backup-interval">
+                        <option value="hourly">Каждый час</option>
+                        <option value="daily" selected>Раз в сутки</option>
+                        <option value="weekly">Раз в неделю</option>
+                    </select>
+                </div>
+                <div class="input-group" id="setting-backup-rotation-group" style="flex: 1 1 150px;">
+                    <label for="setting-backup-rotation" data-i18n="settings_backup_rotation">Хранить копий (ротация)</label>
+                    <input type="number" id="setting-backup-rotation" min="1" value="7">
+                </div>
+            </div>
+
+            <div style="margin-top: 10px; display: flex; flex-direction: column; gap: 10px;">
+                <button type="button" id="btn-save-backups" class="btn primary-btn w-100" style="padding: 10px; font-weight: 600;"><i class="fa-solid fa-floppy-disk"></i> <span data-i18n="settings_btn_save_short">Сохранить</span></button>
+                <div style="display: flex; gap: 10px; width: 100%;">
+                    <button type="button" id="btn-download-backup" class="btn secondary-btn w-100" style="padding: 10px; font-weight: 600;"><i class="fa-solid fa-download"></i> <span>Скачать бэкап</span></button>
+                    <button type="button" id="btn-trigger-upload-backup" class="btn secondary-btn w-100" style="padding: 10px; font-weight: 600; border-color: rgba(255, 71, 87, 0.3); color: #ff4757;"><i class="fa-solid fa-upload"></i> <span>Восстановить</span></button>
+                </div>
+                <button type="button" id="btn-clear-backups" class="btn danger-btn w-100" style="padding: 10px; font-weight: 600; border: 1px solid rgba(255, 71, 87, 0.3); color: #ff4757; background: rgba(255, 71, 87, 0.1);"><i class="fa-solid fa-trash-can"></i> <span data-i18n="settings_backup_btn_clear">Удалить локальные копии</span></button>
+                <input type="file" id="backup-file-input" style="display: none;" accept=".json">
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal for Backups Password Setup -->
+<div id="backup-pwd-setup-modal" class="modal" style="z-index: 1200;">
+    <div class="glass-card modal-card" style="max-width: 450px; width: 90%; padding: 25px;">
+        <div class="modal-header" style="margin-bottom: 15px; border-bottom: 1px solid var(--border-color); padding-bottom: 10px; display: flex; justify-content: space-between; align-items: center;">
+            <h3 style="margin: 0; font-size: 18px; font-weight: 700; color: var(--text-primary);" data-i18n="settings_backup_setup_title">Настройка пароля шифрования</h3>
+            <button type="button" class="btn icon-btn close-modal-btn" id="backup-pwd-setup-close" style="background: transparent; color: var(--text-secondary); border: none; cursor: pointer; font-size: 18px;"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <div class="modal-body" style="padding: 0; display: flex; flex-direction: column; gap: 15px; margin-bottom: 20px;">
+            <div class="input-group">
+                <label for="setup-backup-password" data-i18n="settings_backup_new_password">Новый пароль шифрования</label>
+                <div class="copy-input-group">
+                    <input type="text" id="setup-backup-password" placeholder="Введите или сгенерируйте пароль...">
+                    <button type="button" id="btn-setup-backup-gen" class="btn secondary-btn" title="Сгенерировать"><i class="fa-solid fa-wand-magic-sparkles"></i></button>
+                </div>
+            </div>
+            <div class="input-group">
+                <label for="setup-backup-confirm" data-i18n="settings_backup_confirm_password">Подтвердите новый пароль</label>
+                <input type="password" id="setup-backup-confirm" placeholder="Повторите пароль...">
+            </div>
+        </div>
+        <div style="display: flex; justify-content: flex-end; gap: 10px;">
+            <button type="button" class="btn secondary-btn" id="backup-pwd-setup-cancel" data-i18n="config_btn_cancel">Отмена</button>
+            <button type="button" class="btn primary-btn" id="backup-pwd-setup-save" data-i18n="config_btn_save">Сохранить</button>
+        </div>
+    </div>
+</div>

@@ -1,0 +1,66 @@
+<!-- Модальное окно добавления/редактирования Правила маршрутизации -->
+<div id="routing-rule-modal" class="modal" style="z-index: 1100;">
+    <div class="glass-card modal-card" style="background: hsl(223, 47%, 11%) !important; width: 500px; max-width: 95%;">
+        <div class="modal-header">
+            <h3 id="routing-rule-modal-title">Создание правила маршрутизации</h3>
+            <button class="btn icon-btn close-modal-btn"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <form id="routing-rule-form">
+            <input type="hidden" id="rule-id">
+            <div class="input-group">
+                <label for="rule-remark" data-i18n="routing_rule_modal_remark">Описание / Название</label>
+                <input type="text" id="rule-remark">
+            </div>
+
+            <div class="input-row">
+                <div class="input-group">
+                    <label for="rule-outbound" data-i18n="routing_rule_modal_outbound">Назначение (Outbound Tag)</label>
+                    <select id="rule-outbound" class="glass-select">
+                        <!-- Заполняется динамически на основе доступных tags -->
+                    </select>
+                </div>
+                <div class="input-group">
+                    <label for="rule-protocols" data-i18n="routing_rule_modal_protocols">Протоколы (через запятую)</label>
+                    <input type="text" id="rule-protocols" placeholder="Например: bittorrent">
+                </div>
+            </div>
+
+            <div class="input-row">
+                <div class="input-group">
+                    <label for="rule-inbound-select">Входящее подключение (Inbound)</label>
+                    <select id="rule-inbound-select" class="glass-select">
+                        <option value="">Все подключения (Any)</option>
+                    </select>
+                </div>
+                <div class="input-group" id="rule-client-select-group" style="display: none;">
+                    <label for="rule-client-select">Конкретный клиент (Email)</label>
+                    <select id="rule-client-select" class="glass-select">
+                        <option value="">Все клиенты (All)</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="input-group">
+                <label for="rule-domains" data-i18n="routing_rule_modal_domains">Доменные имена (одно на строку)</label>
+                <textarea id="rule-domains" rows="3" placeholder="Например:&#13;domain:openai.com&#13;geosite:google&#13;regexp:\.ru$"></textarea>
+            </div>
+
+            <div class="input-group">
+                <label for="rule-ips" data-i18n="routing_rule_modal_ips">IP адреса / подсети (одно на строку)</label>
+                <textarea id="rule-ips" rows="3" placeholder="Например:&#13;8.8.8.8&#13;1.1.1.1/24&#13;geoip:private"></textarea>
+            </div>
+
+            <div class="input-group checkbox-group" style="margin-bottom: 15px;">
+                <label style="display: inline-flex; align-items: center; gap: 10px; cursor: pointer;">
+                    <span class="switch-toggle">
+                        <input type="checkbox" id="rule-enable" checked>
+                        <span class="switch-slider"></span>
+                    </span>
+                    <span data-i18n="routing_rule_modal_enable">Включить правило</span>
+                </label>
+            </div>
+
+            <button type="submit" class="btn primary-btn"><i class="fa-solid fa-floppy-disk" style="margin-right: 5px;"></i><span data-i18n="routing_modal_save">Сохранить</span></button>
+        </form>
+    </div>
+</div>

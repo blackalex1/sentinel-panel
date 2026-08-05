@@ -1,0 +1,241 @@
+import json
+from typing import Optional
+from fastapi import APIRouter, Request
+from pydantic import BaseModel, Field
+
+from backend.database import (
+    get_all_inbounds, get_clients_for_inbound, add_inbound, update_inbound, delete_inbound
+)
+from backend.xray import restart_xray
+from backend.hysteria import restart_hysteria
+from backend.singbox import restart_singbox
+from backend.auth_utils import check_auth, decoy_response
+from backend.routes.inbound_routes.validation import validate_inbound_port_collision
+
+router = APIRouter()
+
+class InboundCreate(BaseModel):
+    remark: str
+    port: int
+    protocol: str
+    core: Optional[str] = "xray"
+    settings: dict
+    streamSettings: Optional[dict] = Field(default_factory=dict)
+    sniffing: Optional[dict] = Field(default_factory=dict)
+    total: Optional[int] = 0
+    expiryTime: Optional[int] = 0
+
+class InboundUpdate(BaseModel):
+    remark: str
+    port: int
+    protocol: str
+    core: Optional[str] = "xray"
+    settings: dict
+    streamSettings: Optional[dict] = Field(default_factory=dict)
+    sniffing: Optional[dict] = Field(default_factory=dict)
+    enable: Optional[int] = 1
+    total: Optional[int] = 0
+    expiryTime: Optional[int] = 0
+
+@router.get("/panel/api/inbounds/list")
+async def list_inbounds_api(request: Request):
+    if not check_auth(request):
+        return decoy_response()
+        
+    inbounds = get_all_inbounds()
+    obj_list = []
+    
+    for ib in inbounds:
+        ib_id = ib["id"]
+        clients = get_clients_for_inbound(ib_id)
+        
+        # Формируем settings.clients для совместимости
+        db_settings_dict = json.loads(ib["settings"] or "{}")
+        db_clients_list = db_settings_dict.get("clients", [])
+        
+        settings_dict = db_settings_dict.copy()
+        settings_dict["clients"] = []
+        for c in clients:
+            flow = ""
+            for dc in db_clients_list:
+                if dc.get("email") == c["email"]:
+                    flow = dc.get("flow", "")
+                    break
+            client_item = {
+                "id": c["client_uuid_or_pwd"],
+                "email": c["email"],
+                "enable": bool(c["enable"]),
+                "limitIp": c["limit_ip"],
+                "allowedIps": c.get("allowed_ips", ""),
+                "totalGB": int(c["total"] / (1024**3)) if c["total"] > 0 else 0,
+                "expiryTime": c["expiry_time"]
+            }
+            if ib["protocol"] == "vless":
+                client_item["flow"] = flow
+            settings_dict["clients"].append(client_item)
+        
+        # clientStats содержит статистику трафика по клиентам
+        client_stats_list = [
+            {
+                "id": c["id"],
+                "inboundId": ib_id,
+                "email": c["email"],
+                "up": c["up"],
+                "down": c["down"],
+                "total": c["total"],
+                "expiryTime": c["expiry_time"],
+                "enable": bool(c["enable"]),
+                "allowedIps": c.get("allowed_ips", ""),
+                "limitIp": c.get("limit_ip", 0)
+            } for c in clients
+        ]
+        
+        obj_list.append({
+            "id": ib_id,
+            "up": ib["up"],
+            "down": ib["down"],
+            "total": ib["total"],
+            "remark": ib["remark"],
+            "enable": bool(ib["enable"]),
+            "port": ib["port"],
+            "protocol": ib["protocol"],
+            "core": ib.get("core") or ("hysteria" if ib["protocol"] == "hysteria2" else "xray"),
+            "settings": json.dumps(settings_dict),
+            "streamSettings": ib["stream_settings"],
+            "sniffing": ib["sniffing"],
+            "expiryTime": ib["expiry_time"],
+            "clientStats": client_stats_list
+        })
+        
+    return {"success": True, "obj": obj_list}
+
+def _sanitize_hysteria_payload(payload):
+    if payload.protocol == "hysteria2":
+        if payload.core != "singbox":
+            payload.core = "hysteria"
+        payload.sniffing = {"enabled": False, "destOverride": []}
+        hysteria_opts = (payload.streamSettings or {}).get("hysteria", {})
+        if hysteria_opts.get("ignoreClientBandwidth"):
+            hysteria_opts["upMbps"] = 0
+            hysteria_opts["downMbps"] = 0
+        if not hysteria_opts.get("masqType"):
+            hysteria_opts["masqType"] = "proxy"
+        if not hysteria_opts.get("masqValue"):
+            hysteria_opts["masqValue"] = "https://yahoo.com"
+        if hysteria_opts.get("routingViaXray"):
+            import secrets
+            if not hysteria_opts.get("socksUsername"):
+                hysteria_opts["socksUsername"] = secrets.token_hex(12)
+            if not hysteria_opts.get("socksPassword"):
+                hysteria_opts["socksPassword"] = secrets.token_hex(16)
+        payload.streamSettings["hysteria"] = hysteria_opts
+
+        if isinstance(payload.settings, dict) and "clients" in payload.settings:
+            for c in payload.settings["clients"]:
+                c.pop("flow", None)
+
+@router.post("/api/inbounds/create")
+async def create_inbound_ui(request: Request, payload: InboundCreate):
+    if not check_auth(request):
+        return decoy_response()
+        
+    _sanitize_hysteria_payload(payload)
+    stream_settings = payload.streamSettings or {}
+    
+    # Run collision check
+    err = validate_inbound_port_collision(payload.port, payload.protocol, stream_settings)
+    if err:
+        return {"success": False, "msg": err}
+            
+    inbound_id = add_inbound(
+        remark=payload.remark,
+        port=payload.port,
+        protocol=payload.protocol,
+        core=payload.core or "xray",
+        settings_dict=payload.settings,
+        stream_settings_dict=stream_settings,
+        sniffing_dict=payload.sniffing,
+        total=payload.total,
+        expiry_time=payload.expiryTime
+    )
+    if inbound_id:
+        from backend.audit import log_action, get_actor_username
+        actor = get_actor_username(request)
+        log_action(actor, "create_inbound", target=f"port:{payload.port}", details=f"remark:{payload.remark}, protocol:{payload.protocol}, core:{payload.core}")
+        xray_ok = restart_xray()
+        restart_hysteria()
+        singbox_ok = restart_singbox()
+        target_core = payload.core or ("hysteria" if payload.protocol == "hysteria2" else "xray")
+        if target_core == "xray" and xray_ok is False:
+            from backend.xray.service import get_last_xray_error
+            last_err = get_last_xray_error()
+            if last_err:
+                return {"success": False, "msg": f"Ошибка конфигурации Xray: {last_err}"}
+        elif target_core == "singbox" and singbox_ok is False:
+            from backend.singbox.service import get_last_singbox_error
+            last_err = get_last_singbox_error()
+            if last_err:
+                return {"success": False, "msg": f"Ошибка конфигурации Sing-box: {last_err}"}
+        return {"success": True, "id": inbound_id}
+    return {"success": False, "msg": "Порт уже занят или неверные параметры"}
+
+@router.post("/panel/api/inbounds/update/{inbound_id}")
+async def update_inbound_ui(request: Request, inbound_id: int, payload: InboundUpdate):
+    if not check_auth(request):
+        return decoy_response()
+        
+    _sanitize_hysteria_payload(payload)
+    stream_settings = payload.streamSettings or {}
+    
+    # Run collision check
+    err = validate_inbound_port_collision(payload.port, payload.protocol, stream_settings, exclude_inbound_id=inbound_id)
+    if err:
+        return {"success": False, "msg": err}
+            
+    success = update_inbound(
+        inbound_id=inbound_id,
+        remark=payload.remark,
+        port=payload.port,
+        protocol=payload.protocol,
+        core=payload.core or "xray",
+        settings_dict=payload.settings,
+        stream_settings_dict=stream_settings,
+        sniffing_dict=payload.sniffing,
+        enable=payload.enable,
+        total=payload.total,
+        expiry_time=payload.expiryTime
+    )
+    if success:
+        from backend.audit import log_action, get_actor_username
+        actor = get_actor_username(request)
+        log_action(actor, "update_inbound", target=f"id:{inbound_id}", details=f"remark:{payload.remark}, port:{payload.port}, protocol:{payload.protocol}, core:{payload.core}, enable:{payload.enable}")
+        xray_ok = restart_xray()
+        restart_hysteria()
+        singbox_ok = restart_singbox()
+        target_core = payload.core or ("hysteria" if payload.protocol == "hysteria2" else "xray")
+        if target_core == "xray" and xray_ok is False:
+            from backend.xray.service import get_last_xray_error
+            last_err = get_last_xray_error()
+            if last_err:
+                return {"success": False, "msg": f"Ошибка конфигурации Xray: {last_err}"}
+        elif target_core == "singbox" and singbox_ok is False:
+            from backend.singbox.service import get_last_singbox_error
+            last_err = get_last_singbox_error()
+            if last_err:
+                return {"success": False, "msg": f"Ошибка конфигурации Sing-box: {last_err}"}
+        return {"success": True}
+    return {"success": False, "msg": "Inbound не найден или порт уже занят"}
+
+@router.post("/api/inbounds/delete/{inbound_id}")
+async def delete_inbound_ui(request: Request, inbound_id: int):
+    if not check_auth(request):
+        return decoy_response()
+    if delete_inbound(inbound_id):
+        from backend.audit import log_action, get_actor_username
+        actor = get_actor_username(request)
+        log_action(actor, "delete_inbound", target=f"id:{inbound_id}")
+        restart_xray()
+        restart_hysteria()
+        restart_singbox()
+        return {"success": True}
+    return {"success": False, "msg": "Inbound не найден"}

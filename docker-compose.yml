@@ -1,0 +1,39 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: spectre-db
+    restart: always
+    network_mode: host
+    command: postgres -c listen_addresses='127.0.0.1'
+    env_file:
+      - ./config/.env
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./config/init-roles.sh:/docker-entrypoint-initdb.d/init-roles.sh:ro
+
+  spectre-panel:
+    build: .
+    container_name: spectre-panel
+    restart: always
+    network_mode: host
+    cap_add:
+      - NET_ADMIN
+    depends_on:
+      - db
+    volumes:
+      - ./config:/app/config
+      - ./bin:/app/bin
+      - ./backups:/app/backups
+      - ./frontend/decoy:/app/frontend/decoy
+      - /var/run/spectre:/var/run/spectre
+    environment:
+      - PYTHONUNBUFFERED=1
+    env_file:
+      - ./config/.env
+    # ulimits:
+    #   nofile:
+    #     soft: 1000000
+    #     hard: 1000000
+
+volumes:
+  pgdata:

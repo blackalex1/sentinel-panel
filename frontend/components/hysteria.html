@@ -1,0 +1,89 @@
+<section id="tab-hysteria" class="tab-content">
+    <div class="core-controls glass-card">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+            <h3 style="margin: 0; display: flex; align-items: center; gap: 8px;">
+                <svg viewBox="0 0 442.19 323.31" width="22" height="16" style="display: inline-block; vertical-align: middle;"><polygon fill="currentColor" points="72.8 140.45 60.1 285.55 102.51 285.55 111.5 182.86 111.54 182.86 115.21 140.45 72.8 140.45"/><polygon fill="currentColor" points="124.16 37.75 81.76 37.75 76.19 101.36 118.59 101.36 124.16 37.75"/><polygon fill="currentColor" points="318.36 285.56 360.44 285.56 366.01 221.95 323.9 221.95 318.36 285.56"/><polygon fill="currentColor" points="382.09 37.76 340 37.76 329.16 161.66 221.09 161.66 206.95 323.31 292.78 201.84 438.67 201.84 442.19 161.66 371.25 161.66 382.09 37.76"/><polygon fill="#ffbc00" points="149.41 121.47 3.52 121.47 0 161.66 221.09 161.66 235.23 0 149.41 121.47"/></svg>
+                <span data-i18n="hysteria_title">Логи и управление ядром Hysteria 2</span>
+            </h3>
+            <label style="display: flex; align-items: center; gap: 8px; font-size: 13px; cursor: pointer; color: var(--text-secondary);">
+                <input type="checkbox" id="hysteria-prerelease-toggle" style="cursor: pointer; accent-color: var(--accent-blue);">
+                <span data-i18n="hysteria_include_prerelease">Включать пре-релизы (Pre-releases)</span>
+            </label>
+        </div>
+        <div class="core-info-row">
+            <div>
+                <p class="label" data-i18n="hysteria_curr_version">Установленная версия</p>
+                <p class="value" id="hysteria-curr-version">...</p>
+            </div>
+            <div>
+                <p class="label" data-i18n="hysteria_latest_version">Доступная версия на GitHub</p>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <p class="value" id="hysteria-latest-version" style="margin: 0;">...</p>
+                    <span id="hysteria-prerelease-badge" class="tag-badge" style="display: none; background: rgba(255, 171, 0, 0.15); color: #ffab00; border: 1px solid rgba(255, 171, 0, 0.3); font-size: 11px; padding: 2px 6px; border-radius: 4px; font-weight: 600;">Pre-release</span>
+                </div>
+                <select id="hysteria-version-select" class="version-select-dropdown" style="display: none;"></select>
+            </div>
+            <div class="core-actions">
+                <button id="hysteria-update-btn" class="btn primary-btn" disabled><i class="fa-solid fa-download"></i> <span data-i18n="hysteria_btn_update">Обновить ядро</span></button>
+                <button id="hysteria-restart-btn" class="btn secondary-btn"><i class="fa-solid fa-rotate-right"></i> <span data-i18n="hysteria_btn_restart">Перезапустить Hysteria</span></button>
+                <button id="hysteria-stop-btn" class="btn danger-btn"><i class="fa-solid fa-stop"></i> <span data-i18n="hysteria_btn_stop">Остановить</span></button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Логи терминала -->
+    <div class="terminal-card glass-card">
+        <div class="terminal-header">
+            <span style="display: flex; align-items: center; gap: 8px;">
+                <svg viewBox="0 0 442.19 323.31" width="20" height="15" style="display: inline-block; vertical-align: middle;"><polygon fill="currentColor" points="72.8 140.45 60.1 285.55 102.51 285.55 111.5 182.86 111.54 182.86 115.21 140.45 72.8 140.45"/><polygon fill="currentColor" points="124.16 37.75 81.76 37.75 76.19 101.36 118.59 101.36 124.16 37.75"/><polygon fill="currentColor" points="318.36 285.56 360.44 285.56 366.01 221.95 323.9 221.95 318.36 285.56"/><polygon fill="currentColor" points="382.09 37.76 340 37.76 329.16 161.66 221.09 161.66 206.95 323.31 292.78 201.84 438.67 201.84 442.19 161.66 371.25 161.66 382.09 37.76"/><polygon fill="#ffbc00" points="149.41 121.47 3.52 121.47 0 161.66 221.09 161.66 235.23 0 149.41 121.47"/></svg>
+                <span data-i18n="hysteria_terminal_title">Логи ядра Hysteria 2 (в реальном времени)</span>
+            </span>
+            <div style="display: flex; gap: 8px;">
+                <button class="btn icon-btn" id="hysteria-copy-logs-btn" title="Копировать логи" data-i18n-title="hysteria_btn_copy_logs"><i class="fa-regular fa-copy"></i></button>
+                <button class="btn icon-btn" id="hysteria-clear-logs-btn" title="Очистить терминал" data-i18n-title="hysteria_btn_clear_logs"><i class="fa-regular fa-trash-can"></i></button>
+            </div>
+        </div>
+        <div class="terminal-body" id="hysteria-logs-terminal">
+            <!-- Логи заполняются динамически -->
+        </div>
+    </div>
+
+    <!-- Конфигурация ядра -->
+    <div class="terminal-card glass-card" style="margin-top: 30px; height: auto; display: flex; flex-direction: column;">
+        <div class="terminal-header" style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 10px; margin-bottom: 15px; flex-wrap: wrap; gap: 15px;">
+            <span style="display: flex; align-items: center; gap: 8px;">
+                <svg viewBox="0 0 442.19 323.31" width="20" height="15" style="display: inline-block; vertical-align: middle;"><polygon fill="currentColor" points="72.8 140.45 60.1 285.55 102.51 285.55 111.5 182.86 111.54 182.86 115.21 140.45 72.8 140.45"/><polygon fill="currentColor" points="124.16 37.75 81.76 37.75 76.19 101.36 118.59 101.36 124.16 37.75"/><polygon fill="currentColor" points="318.36 285.56 360.44 285.56 366.01 221.95 323.9 221.95 318.36 285.56"/><polygon fill="currentColor" points="382.09 37.76 340 37.76 329.16 161.66 221.09 161.66 206.95 323.31 292.78 201.84 438.67 201.84 442.19 161.66 371.25 161.66 382.09 37.76"/><polygon fill="#ffbc00" points="149.41 121.47 3.52 121.47 0 161.66 221.09 161.66 235.23 0 149.41 121.47"/></svg>
+                <span data-i18n="hysteria_config_title">Конфигурация ядра Hysteria 2</span>
+            </span>
+            
+            <div style="display: flex; align-items: center; gap: 15px; margin-left: auto;">
+                <!-- Выбор инбаунда Hysteria -->
+                <div id="hysteria-inbound-select-wrapper" style="display: none; align-items: center; gap: 8px;">
+                    <label for="hysteria-config-inbound-select" style="font-size: 13px; color: var(--text-secondary);" data-i18n="hysteria_config_select_label">Подключение:</label>
+                    <select id="hysteria-config-inbound-select" class="glass-select" style="background: var(--bg-input); border: 1px solid var(--border-color); border-radius: 8px; padding: 6px 12px; font-size: 13px; cursor: pointer; outline: none; transition: var(--transition-fast); color: var(--text-primary);">
+                        <!-- Заполняется динамически -->
+                    </select>
+                </div>
+                
+                <div style="display: flex; gap: 8px; align-items: center;">
+                    <button class="btn success-btn" id="hysteria-config-save-btn" style="padding: 6px 12px; font-size: 13px; display: none;"><i class="fa-solid fa-floppy-disk"></i> <span data-i18n="config_save_btn">Сохранить</span></button>
+                    <button class="btn danger-btn" id="hysteria-config-reset-btn" style="padding: 6px 12px; font-size: 13px; display: none;"><i class="fa-solid fa-rotate-left"></i> <span data-i18n="config_reset_btn">Сбросить</span></button>
+                    <button class="btn secondary-btn active" id="hysteria-config-tab-parsed" style="padding: 6px 12px; font-size: 13px;"><span data-i18n="hysteria_config_tab_parsed">Структура</span></button>
+                    <button class="btn secondary-btn" id="hysteria-config-tab-raw" style="padding: 6px 12px; font-size: 13px;"><span data-i18n="hysteria_config_tab_raw">JSON</span></button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Parsed View -->
+        <div id="hysteria-config-parsed-container" class="config-view-container active">
+            <!-- Будет заполнено динамически -->
+        </div>
+        
+        <!-- Raw View -->
+        <div id="hysteria-config-raw-container" class="config-view-container" style="display: none; position: relative;">
+            <button class="btn icon-btn copy-btn" id="hysteria-config-copy-btn" data-target="hysteria-config-raw-pre" style="position: absolute; right: 15px; top: 15px; background: rgba(0,0,0,0.5); z-index: 10;" title="Копировать" data-i18n-title="copy_btn"><i class="fa-regular fa-copy"></i></button>
+            <textarea id="hysteria-config-raw-pre" class="terminal-body" style="height: 350px; margin: 0; font-family: monospace; white-space: pre-wrap; word-break: break-all; overflow-y: auto; user-select: text; border: 1px solid var(--border-color); border-radius: 8px; padding: 15px; background: #020617; width: 100%; color: #cbd5e1; outline: none; resize: vertical;"></textarea>
+        </div>
+    </div>
+</section>
+

@@ -1,0 +1,18 @@
+<div id="json-edit-modal" class="modal" style="z-index: 1200;">
+    <div class="glass-card modal-card" style="max-width: 750px; width: 95%;">
+        <div class="modal-header">
+            <h2 id="json-modal-title" data-i18n="config_json_modal_title">Редактирование JSON</h2>
+            <button class="btn icon-btn close-modal-btn" id="json-modal-close-btn"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <div class="modal-body" style="padding-top: 10px;">
+            <div class="input-group">
+                <label id="json-modal-label" style="margin-bottom: 8px; font-size: 13px; color: var(--text-secondary); display: block;"></label>
+                <textarea id="json-modal-textarea" style="height: 400px; font-family: monospace; font-size: 13px; background: #020617; border: 1px solid var(--border-color); border-radius: 8px; padding: 15px; width: 100%; color: #cbd5e1; outline: none; resize: vertical; margin-bottom: 15px; line-height: 1.5;"></textarea>
+            </div>
+            <div style="display: flex; justify-content: flex-end; gap: 10px;">
+                <button type="button" class="btn secondary-btn" id="json-modal-cancel-btn" data-i18n="config_btn_cancel">Отмена</button>
+                <button type="button" class="btn primary-btn" id="json-modal-save-btn" data-i18n="config_btn_save">Сохранить</button>
+            </div>
+        </div>
+    </div>
+</div>

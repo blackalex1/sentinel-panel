@@ -1,0 +1,79 @@
+# === Environments and Secrets ===
+.env
+config/.env
+*.pem
+*.key
+*.crt
+*.pub
+secret/
+secrets/
+/backups/
+
+# === IDEs and Editors ===
+.idea/
+.vscode/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.swp
+*~
+
+# === OS Files ===
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# === Python Caches and Virtual Envs ===
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.venv/
+env/
+venv/
+ENV/
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.poetry/
+.pip-cache/
+
+# === Databases ===
+*.db
+*.db-journal
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3
+pgdata/
+
+# === Core Binaries & Generated Assets ===
+bin/xray
+bin/xray.exe
+bin/sing-box
+bin/sing-box.exe
+bin/hysteria-*
+bin/hysteria-*.exe
+bin/config.json
+bin/singbox.json
+bin/xray.log
+bin/singbox.log
+bin/hysteria.log
+bin/hysteria.crt
+bin/hysteria.key
+bin/hysteria_*.json
+bin/geoip.dat
+bin/geosite.dat
+bin/wintun.dll
+bin/LICENSE
+bin/LICENSE-*.txt
+bin/README.md
+
+# === Mock Files ===
+warp_mock.json
+
+# === Scratch & Helper Tools ===
+scratch/
+run_remote_tests.py

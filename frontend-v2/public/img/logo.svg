@@ -1,0 +1,178 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-40 -40 592 592" width="100%" height="100%" shape-rendering="geometricPrecision">
+  <defs>
+    <style>
+      @keyframes ringRotateForward {
+        from { transform: rotate(0deg); }
+        to { transform: rotate(360deg); }
+      }
+      @keyframes ringRotateReverse {
+        from { transform: rotate(360deg); }
+        to { transform: rotate(-360deg); }
+      }
+      @keyframes glyphPulse {
+        0%, 100% { opacity: 0.75; transform: scale(1); }
+        50% { opacity: 1; transform: scale(1.1); }
+      }
+      .spin-ring-forward { transform-origin: 256px 256px; animation: ringRotateForward 24s linear infinite; }
+      .spin-ring-reverse { transform-origin: 256px 256px; animation: ringRotateReverse 16s linear infinite; }
+      .pulsing-glyphs { transform-origin: 256px 256px; animation: glyphPulse 3s ease-in-out infinite; }
+    </style>
+
+    <!-- Harmonized Ambient Background -->
+    <radialGradient id="spectreBgAura" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#7c3aed" stop-opacity="0.3"/>
+      <stop offset="60%" stop-color="#06b6d4" stop-opacity="0.12"/>
+      <stop offset="100%" stop-color="#0b0f19" stop-opacity="0"/>
+    </radialGradient>
+
+    <!-- Signature Violet-Cyan Gradient -->
+    <linearGradient id="spectreGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#c084fc"/>
+      <stop offset="40%" stop-color="#7c3aed"/>
+      <stop offset="80%" stop-color="#38bdf8"/>
+      <stop offset="100%" stop-color="#06b6d4"/>
+    </linearGradient>
+
+    <!-- Platinum Highlight Gradient -->
+    <linearGradient id="platGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#ffffff"/>
+      <stop offset="100%" stop-color="#a5b4fc"/>
+    </linearGradient>
+
+    <!-- Deep Carbon Stealth Shell -->
+    <linearGradient id="spectreCarbon" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#1e1b4b"/>
+      <stop offset="50%" stop-color="#0f172a"/>
+      <stop offset="100%" stop-color="#090d16"/>
+    </linearGradient>
+
+    <!-- Crisp Plasma Beam -->
+    <linearGradient id="spectreBeam" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ffffff"/>
+      <stop offset="50%" stop-color="#38bdf8"/>
+      <stop offset="100%" stop-color="#c084fc"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Soft Ambient Glow -->
+  <circle cx="256" cy="256" r="275" fill="url(#spectreBgAura)"/>
+
+  <!-- 1. HIGH-VISIBILITY OUTER ORBITING GLYPHS RING (CLOCKWISE) -->
+  <g class="spin-ring-forward" opacity="0.95">
+    <!-- Outer Dashed Tactical Ring -->
+    <circle cx="256" cy="256" r="260" fill="none" stroke="url(#spectreGrad)" stroke-width="2.5" stroke-dasharray="30 40 90 40"/>
+    <circle cx="256" cy="256" r="242" fill="none" stroke="#38bdf8" stroke-width="1.8" stroke-dasharray="18 60 10 60"/>
+
+    <!-- Orbiting Tech Glyphs & Crosshair Markers -->
+    <!-- Top Glyph (0 deg) -->
+    <g transform="translate(256, -4)">
+      <polygon points="0,-10 8,0 0,10 -8,0" fill="#38bdf8"/>
+      <circle cx="0" cy="0" r="3" fill="#ffffff"/>
+    </g>
+    <!-- Right Glyph (90 deg) -->
+    <g transform="translate(516, 256)">
+      <polygon points="0,-10 8,0 0,10 -8,0" fill="#c084fc"/>
+      <circle cx="0" cy="0" r="3" fill="#ffffff"/>
+    </g>
+    <!-- Bottom Glyph (180 deg) -->
+    <g transform="translate(256, 516)">
+      <polygon points="0,-10 8,0 0,10 -8,0" fill="#06b6d4"/>
+      <circle cx="0" cy="0" r="3" fill="#ffffff"/>
+    </g>
+    <!-- Left Glyph (270 deg) -->
+    <g transform="translate(-4, 256)">
+      <polygon points="0,-10 8,0 0,10 -8,0" fill="#c084fc"/>
+      <circle cx="0" cy="0" r="3" fill="#ffffff"/>
+    </g>
+
+    <!-- Intermediate Orbiting Rune Dots -->
+    <circle cx="437" cy="75" r="5" fill="#ffffff"/>
+    <circle cx="437" cy="437" r="5" fill="#38bdf8"/>
+    <circle cx="75" cy="437" r="5" fill="#c084fc"/>
+    <circle cx="75" cy="75" r="5" fill="#ffffff"/>
+  </g>
+
+  <!-- 2. INNER REVERSE ORBITING GLYPHS RING (COUNTER-CLOCKWISE) -->
+  <g class="spin-ring-reverse" opacity="0.9">
+    <circle cx="256" cy="256" r="275" fill="none" stroke="#c084fc" stroke-width="1.8" stroke-dasharray="40 90 20 90"/>
+    
+    <!-- Reverse Orbiting Tech Markers -->
+    <rect x="251" y="-23" width="10" height="10" fill="#ffffff" transform="rotate(45 256 -18)"/>
+    <rect x="529" y="251" width="10" height="10" fill="#38bdf8" transform="rotate(45 534 256)"/>
+    <rect x="251" y="525" width="10" height="10" fill="#c084fc" transform="rotate(45 256 530)"/>
+    <rect x="-23" y="251" width="10" height="10" fill="#06b6d4" transform="rotate(45 -18 256)"/>
+  </g>
+
+  <!-- Razor Sharp Outer Stealth Shield Frame -->
+  <path d="M 256 24 
+           L 440 96 
+           L 440 264 
+           C 440 380 256 480 256 480 
+           C 256 480 72 380 72 264 
+           L 72 96 Z" 
+        fill="none" 
+        stroke="url(#spectreGrad)" 
+        stroke-width="11" 
+        stroke-linejoin="miter" 
+        stroke-miterlimit="10"/>
+
+  <!-- Inner Carbon Fiber Shell -->
+  <path d="M 256 46 
+           L 420 112 
+           L 420 256 
+           C 420 360 256 452 256 452 
+           C 256 452 92 360 92 256 
+           L 92 112 Z" 
+        fill="url(#spectreCarbon)" 
+        stroke="#7c3aed" 
+        stroke-width="3" 
+        opacity="0.98"/>
+
+  <!-- Side Wings -->
+  <path d="M 92 112 L 170 160 L 170 280 L 120 310 L 92 256 Z" fill="url(#spectreGrad)" opacity="0.35"/>
+  <path d="M 92 112 L 170 160 L 140 240 Z" fill="url(#platGrad)" opacity="0.5"/>
+  <path d="M 420 112 L 342 160 L 342 280 L 392 310 L 420 256 Z" fill="url(#spectreGrad)" opacity="0.35"/>
+  <path d="M 420 112 L 342 160 L 372 240 Z" fill="url(#platGrad)" opacity="0.5"/>
+
+  <!-- Tech Netting Lines -->
+  <path d="M 256 46 L 256 450 M 94 180 L 418 180 M 110 270 L 402 270 M 135 355 L 377 355" 
+        stroke="#06b6d4" 
+        stroke-width="1" 
+        opacity="0.25" 
+        stroke-dasharray="8 6"/>
+
+  <!-- SPECTRE PHANTOM MASK -->
+  <g class="pulsing-glyphs">
+    <path d="M 256 110 
+             L 348 160 
+             L 364 250 
+             L 330 325 
+             L 256 395 
+             L 182 325 
+             L 148 250 
+             L 164 160 Z" 
+          fill="#0a0f1d" 
+          stroke="url(#spectreGrad)" 
+          stroke-width="5"/>
+
+    <path d="M 180 170 L 256 135 L 332 170" fill="none" stroke="url(#platGrad)" stroke-width="3.5" stroke-linecap="round"/>
+
+    <!-- Sharp Eyes Visor -->
+    <polygon points="178,212 240,234 234,254 190,242" fill="url(#spectreBeam)"/>
+    <polygon points="334,212 272,234 278,254 322,242" fill="url(#spectreBeam)"/>
+
+    <!-- Diamond Plasma Reactor -->
+    <polygon points="256,150 290,210 256,330 222,210" fill="url(#spectreGrad)" opacity="0.85"/>
+    <polygon points="256,185 278,225 256,300 234,225" fill="url(#spectreBeam)"/>
+    <polygon points="256,205 268,232 256,268 244,232" fill="#ffffff"/>
+  </g>
+
+  <!-- Shield Corner Orbs -->
+  <circle cx="256" cy="24" r="5" fill="#c084fc"/>
+  <circle cx="440" cy="96" r="5" fill="#38bdf8"/>
+  <circle cx="72" cy="96" r="5" fill="#38bdf8"/>
+  <circle cx="256" cy="480" r="6" fill="#06b6d4"/>
+
+  <!-- Top Crest Sight -->
+  <path d="M 226 12 L 256 0 L 286 12" fill="none" stroke="#38bdf8" stroke-width="3.5" stroke-linecap="round"/>
+</svg>

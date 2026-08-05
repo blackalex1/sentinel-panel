@@ -1,0 +1,29 @@
+<div id="inbound-modal" class="modal" style="z-index: 1050;">
+    <div class="glass-card modal-card large-card">
+        <div class="modal-header">
+            <h2 id="inbound-modal-title">Создание подключения</h2>
+            <button type="button" class="btn close-modal-btn"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <div class="modal-body">
+            <form id="inbound-form">
+                <!-- Tabs navigation header -->
+                <div class="modal-tabs" style="display: flex; gap: 8px; margin-bottom: 20px; border-bottom: 1px solid var(--border-color); padding-bottom: 10px; overflow-x: auto; white-space: nowrap;">
+                    <button type="button" class="btn secondary-btn modal-tab-btn active" data-tab="basic" data-i18n="ib_tab_basic">Основное</button>
+                    <button type="button" class="btn secondary-btn modal-tab-btn" data-tab="protocol" id="ib-tab-protocol" data-i18n="ib_tab_protocol">Протокол</button>
+                    <button type="button" class="btn secondary-btn modal-tab-btn" data-tab="stream" id="ib-tab-stream" data-i18n="ib_tab_stream">Поток</button>
+                    <button type="button" class="btn secondary-btn modal-tab-btn" data-tab="security" id="ib-tab-security" data-i18n="ib_tab_security">Безопасность</button>
+                    <button type="button" class="btn secondary-btn modal-tab-btn" data-tab="sniffing" id="ib-tab-sniffing" data-i18n="ib_tab_sniffing">Сниффинг</button>
+                    <button type="button" class="btn secondary-btn modal-tab-btn" data-tab="advanced" id="ib-tab-advanced" data-i18n="ib_tab_json">JSON шаблон</button>
+                </div>
+
+                <!-- DYNAMIC TAB PANELS CONTAINER -->
+                <div id="inbound-form-tabs-container">
+                    <!-- Dynamically populated from components/inbound_modal/tab-*.html -->
+                </div>
+
+                <!-- Footer submit button -->
+                <button type="submit" class="btn primary-btn w-100" style="margin-top: 25px;">Создать</button>
+            </form>
+        </div>
+    </div>
+</div>

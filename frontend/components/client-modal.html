@@ -1,0 +1,76 @@
+<div id="client-modal" class="modal" style="z-index: 1100;">
+    <div class="glass-card modal-card">
+        <div class="modal-header">
+            <h2 id="client-modal-title" data-i18n="client_add_title">Добавление клиента</h2>
+            <button class="btn close-modal-btn"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <div class="modal-body">
+            <form id="client-form">
+                <input type="hidden" id="client-ib-id">
+                <div class="input-group">
+                    <label for="c-email" data-i18n="client_email_label">Имя или Email (Идентификатор)</label>
+                    <div class="copy-input-group">
+                        <input type="text" id="c-email" placeholder="Имя или email (например: alex, user@mail.com)">
+                        <button type="button" id="c-gen-email-btn" class="btn secondary-btn" title="Сгенерировать"><i class="fa-solid fa-wand-magic-sparkles"></i></button>
+                    </div>
+                </div>
+                <div class="input-group">
+                    <label for="c-uuid" data-i18n="client_uuid_label">UUID / Пароль</label>
+                    <div class="copy-input-group">
+                        <input type="text" id="c-uuid" placeholder="UUID или Пароль">
+                        <button type="button" id="c-gen-uuid-btn" class="btn secondary-btn" title="Сгенерировать"><i class="fa-solid fa-wand-magic-sparkles"></i></button>
+                    </div>
+                </div>
+                <div class="input-row">
+                    <div class="input-group">
+                        <label for="c-limit-gb" data-i18n="client_limit_label">Лимит трафика (GB)</label>
+                        <input type="number" id="c-limit-gb" min="0" value="0" placeholder="0 - безлимит" data-i18n-placeholder="client_placeholder_unlimited">
+                    </div>
+                    <div class="input-group">
+                        <label for="c-expiry-days" data-i18n="client_expiry_label">Срок (дней)</label>
+                        <input type="number" id="c-expiry-days" min="0" value="0" placeholder="0 - бессрочно" data-i18n-placeholder="client_placeholder_never">
+                    </div>
+                </div>
+                <div class="input-row">
+                    <div class="input-group">
+                        <label for="c-limit-ip" data-i18n="client_limit_ip_label">Лимит IP-адресов</label>
+                        <input type="number" id="c-limit-ip" min="0" value="0" placeholder="0 - безлимит" data-i18n-placeholder="client_placeholder_unlimited">
+                    </div>
+                    <div class="input-group" style="display: flex; flex-direction: column; justify-content: center; margin-top: 15px;">
+                        <label class="checkbox-container" style="display: flex; align-items: center; gap: 10px; cursor: pointer; color: var(--text-secondary); font-size: 14px; font-weight: normal; text-transform: none;">
+                            <input type="checkbox" id="c-enable" checked>
+                            <span data-i18n="client_enable_label">Пользователь активен</span>
+                </div>
+                <div class="input-group" style="margin-top: 10px;">
+                    <label for="c-allowed-ips">Разрешенные IP (IP Whitelist)</label>
+                    <input type="text" id="c-allowed-ips" placeholder="Пусто - любой IP. Пример: 1.2.3.4, 10.0.0.0/24">
+                </div>
+                <div class="input-group" id="client-flow-group" style="display: none;">
+                    <label for="c-flow">Flow (для VLESS XTLS)</label>
+                    <select id="c-flow">
+                        <option value="xtls-rprx-vision" selected>xtls-rprx-vision</option>
+                        <option value="">None (без шифрования Flow)</option>
+                    </select>
+                </div>
+                <div class="input-group" id="client-vmess-group" style="display: none;">
+                    <div class="input-row">
+                        <div class="input-group">
+                            <label for="c-alter-id">AlterID</label>
+                            <input type="number" id="c-alter-id" min="0" value="0">
+                        </div>
+                        <div class="input-group">
+                            <label for="c-security">Шифрование</label>
+                            <select id="c-security">
+                                <option value="auto">auto</option>
+                                <option value="aes-128-gcm">aes-128-gcm</option>
+                                <option value="chacha20-ietf-poly1305">chacha20-ietf-poly1305</option>
+                                <option value="none">none</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                <button type="submit" class="btn primary-btn w-100" style="margin-top: 10px;"><span data-i18n="client_btn_save">Сохранить</span></button>
+            </form>
+        </div>
+    </div>
+</div>
