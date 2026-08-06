@@ -23,7 +23,7 @@ async def get_settings_api(request: Request):
             
     return {
         "success": True,
-        "api_token": settings.API_TOKEN,
+        "api_token": "••••••••" if settings.API_TOKEN else "",
         "secret_path": settings.PANEL_SECRET_PATH,
         "admin_username": admin_username,
         "totp_enabled": totp_enabled,

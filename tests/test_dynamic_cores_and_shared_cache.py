@@ -262,6 +262,7 @@ def test_decoy_verify_ssl_false(monkeypatch):
         return default
         
     monkeypatch.setattr("backend.auth_utils.get_setting", mock_get_setting)
+    monkeypatch.setattr("socket.getaddrinfo", lambda host, port: [(2, 1, 6, '', ('198.51.100.214', 0))])
     
     # Build a mock request
     scope = {

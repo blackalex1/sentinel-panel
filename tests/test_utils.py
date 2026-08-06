@@ -44,3 +44,21 @@ def test_read_last_lines_large(tmp_path):
     read_lines_500 = read_last_lines(large_file, 500)
     assert len(read_lines_500) == 500
     assert read_lines_500 == lines[-500:]
+
+def test_is_safe_url_ssrf():
+    import socket
+    from backend.auth_utils import is_safe_url
+    
+    # 1. Loopback / Private IP addresses -> False
+    assert is_safe_url("http://127.0.0.1/test") is False
+    assert is_safe_url("http://10.0.0.1/test") is False
+    assert is_safe_url("http://192.168.1.1/test") is False
+    assert is_safe_url("http://169.254.169.254/latest/meta-data/") is False
+
+    # 2. Invalid or unresolvable hostname -> False (SSRF guard default deny)
+    assert is_safe_url("http://this-domain-does-not-exist-123456789.invalid/") is False
+
+    # 3. Empty or malformed URL -> False
+    assert is_safe_url("") is False
+    assert is_safe_url("not_a_url") is False
+

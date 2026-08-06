@@ -692,7 +692,8 @@ if dp:
         url = f"http://127.0.0.1:{settings.PANEL_PORT}/api/auth/tg-2fa/action"
         try:
             async with aiohttp.ClientSession() as session:
-                async with session.post(url, json={"token": token, "action": "approve"}) as resp:
+                headers = {"Authorization": f"Bearer {settings.API_TOKEN}"}
+                async with session.post(url, json={"token": token, "action": "approve"}, headers=headers) as resp:
                     if resp.status == 200:
                         res = await resp.json()
                         if res.get("success"):
@@ -714,7 +715,8 @@ if dp:
         url = f"http://127.0.0.1:{settings.PANEL_PORT}/api/auth/tg-2fa/action"
         try:
             async with aiohttp.ClientSession() as session:
-                async with session.post(url, json={"token": token, "action": "block"}) as resp:
+                headers = {"Authorization": f"Bearer {settings.API_TOKEN}"}
+                async with session.post(url, json={"token": token, "action": "block"}, headers=headers) as resp:
                     if resp.status == 200:
                         res = await resp.json()
                         if res.get("success"):

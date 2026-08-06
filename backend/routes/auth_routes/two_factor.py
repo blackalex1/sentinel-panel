@@ -204,8 +204,11 @@ class Tg2faActionBody(BaseModel):
     action: str
 
 @router.post("/api/auth/tg-2fa/action")
-async def tg_2fa_action(payload: Tg2faActionBody):
+async def tg_2fa_action(payload: Tg2faActionBody, request: Request):
     """Executes approval or block actions for a Telegram 2FA request."""
+    if not check_auth(request):
+        return decoy_response()
+
     from backend.database import db_session, get_setting, set_setting
     from backend.models import SystemSetting
     import json

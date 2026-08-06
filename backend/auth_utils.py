@@ -29,9 +29,8 @@ def is_safe_url(url: str) -> bool:
         try:
             ips = socket.getaddrinfo(host, None)
         except socket.gaierror:
-            # Если имя не разрешается (например, mock-домен decoy.site в тестах),
-            # это безопасно для SSRF, так как сетевой запрос к нему совершить невозможно.
-            return True
+            # Если имя не разрешается в DNS контексте, считаем хост не подтвержденным (deny по умолчанию для защиты от SSRF)
+            return False
             
         for family, _, _, _, sockaddr in ips:
             ip_str = sockaddr[0]

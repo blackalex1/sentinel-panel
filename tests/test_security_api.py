@@ -247,8 +247,13 @@ def test_telegram_2fa_auth_endpoints(client):
     assert data["success"] is True
     assert data["status"] == "pending"
     
-    # 3. Выполняем подтверждение входа (approve)
-    response = client.post("/api/auth/tg-2fa/action", json={"token": token, "action": "approve"})
+    # 2.5. Неавторизованный запрос к action -> 404 decoy
+    res_unauth = client.post("/api/auth/tg-2fa/action", json={"token": token, "action": "approve"})
+    assert res_unauth.status_code == 404
+
+    # 3. Выполняем подтверждение входа (approve) с авторизацией
+    headers = {"Authorization": "Bearer test_bearer_token"}
+    response = client.post("/api/auth/tg-2fa/action", json={"token": token, "action": "approve"}, headers=headers)
     assert response.status_code == 200
     data = response.json()
     assert data["success"] is True
@@ -276,7 +281,7 @@ def test_telegram_2fa_auth_endpoints(client):
         session.add(req)
         session.commit()
         
-    response = client.post("/api/auth/tg-2fa/action", json={"token": token_block, "action": "block"})
+    response = client.post("/api/auth/tg-2fa/action", json={"token": token_block, "action": "block"}, headers=headers)
     assert response.status_code == 200
     data = response.json()
     assert data["success"] is True
