@@ -130,6 +130,8 @@ async function loadPanelStylesheets() {
     }));
 }
 
+import { enhanceAllSelects } from "./components/customSelect.js";
+
 async function startPanel() {
     try {
         await Promise.all([
@@ -140,6 +142,7 @@ async function startPanel() {
         // Dynamically import admin logic only after successful authorization
         const { initPanel } = await import("./panel-main.js");
         await initPanel();
+        enhanceAllSelects();
     } catch (err) {
         console.error("Error starting panel:", err);
     } finally {

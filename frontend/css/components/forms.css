@@ -26,7 +26,8 @@ select {
     appearance: none;
     -webkit-appearance: none;
     -moz-appearance: none;
-    background-color: var(--bg-input, rgba(15, 23, 42, 0.8));
+    color-scheme: dark;
+    background-color: var(--bg-input, rgba(15, 23, 42, 0.85));
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%23a855f7'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2.5' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E");
     background-repeat: no-repeat;
     background-position: right 14px center;
@@ -41,12 +42,13 @@ select {
 
 select:hover {
     border-color: rgba(168, 85, 247, 0.5);
-    background-color: rgba(26, 31, 52, 0.9);
+    background-color: rgba(26, 31, 52, 0.95);
 }
 
 select option {
-    background-color: #111625;
-    color: #f8fafc;
+    color-scheme: dark;
+    background-color: #0b0f19 !important;
+    color: #f8fafc !important;
     padding: 12px 16px;
     font-size: 14px;
 }
@@ -55,8 +57,8 @@ select option:hover,
 select option:focus,
 select option:active,
 select option:checked {
-    background-color: #1e2640 !important;
-    color: #a855f7 !important;
+    background-color: #1e1b4b !important;
+    color: #c084fc !important;
 }
 
 /* Явная и контрастная рамка для выбора версии ядра */
