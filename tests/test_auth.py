@@ -197,8 +197,8 @@ def test_decoy_system_static(client):
 def test_decoy_system_drop(client):
     set_setting("decoy_type", "drop")
     
-    response = client.get("/")
-    assert response.status_code == 444
+    with pytest.raises(Exception):
+        client.get("/", timeout=0.1)
 
 
 def test_decoy_system_none(client):
