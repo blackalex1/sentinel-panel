@@ -40,6 +40,21 @@ function getLogLevelStyle(level) {
     };
 }
 
+export async function loadSingboxConfig() {
+    const res = await apiFetch("/api/singbox/config");
+    if (!res || !res.success) return;
+
+    window.singboxConfig = res.config;
+    const config = window.singboxConfig;
+
+    const rawPre = document.getElementById("singbox-config-raw-pre");
+    if (rawPre) {
+        rawPre.value = JSON.stringify(config, null, 2);
+    }
+
+    renderSingboxConfig(config);
+}
+
 export function renderSingboxConfig(config) {
     const parsedContainer = document.getElementById("singbox-config-parsed-container");
     if (!parsedContainer) return;
