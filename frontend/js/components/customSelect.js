@@ -74,17 +74,27 @@ export function initCustomSelect(selectElement) {
     
     buildOptions();
     
+    function closeAll() {
+        document.querySelectorAll(".custom-select-container.open").forEach(c => {
+            c.classList.remove("open");
+            const parentCard = c.closest(".settings-card, .glass-card, .input-group, .modal-body, .form-group, .settings-section-panel");
+            if (parentCard) parentCard.classList.remove("custom-select-open-parent");
+        });
+    }
+    
     trigger.addEventListener("click", (e) => {
         e.stopPropagation();
-        // Close all other open custom selects
-        document.querySelectorAll(".custom-select-container.open").forEach(c => {
-            if (c !== container) c.classList.remove("open");
-        });
-        container.classList.toggle("open");
+        const isOpen = container.classList.contains("open");
+        closeAll();
+        if (!isOpen) {
+            container.classList.add("open");
+            const parentCard = container.closest(".settings-card, .glass-card, .input-group, .modal-body, .form-group, .settings-section-panel");
+            if (parentCard) parentCard.classList.add("custom-select-open-parent");
+        }
     });
     
     document.addEventListener("click", () => {
-        container.classList.remove("open");
+        closeAll();
     });
     
     selectElement.addEventListener("change", () => {

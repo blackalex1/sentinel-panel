@@ -8,7 +8,19 @@
 }
 
 .custom-select-container.open {
-    z-index: 9999 !important;
+    z-index: 999999 !important;
+}
+
+/* Elevate parent card/container z-index when custom select is open so it renders ABOVE all sibling cards! */
+.custom-select-open-parent,
+.settings-card:has(.custom-select-container.open),
+.glass-card:has(.custom-select-container.open),
+.input-group:has(.custom-select-container.open),
+.form-group:has(.custom-select-container.open),
+.settings-section-panel:has(.custom-select-container.open) {
+    z-index: 99999 !important;
+    position: relative !important;
+    overflow: visible !important;
 }
 
 /* Ensure parent cards and containers allow dropdown popups to float freely */
@@ -16,7 +28,8 @@
 .glass-card,
 .setting-group,
 .form-group,
-.settings-section {
+.settings-section,
+.settings-section-panel {
     overflow: visible !important;
 }
 
