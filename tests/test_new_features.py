@@ -295,33 +295,33 @@ def test_new_ip_security_alerts():
 
     # Mock logs (descending order by timestamp)
     mock_logs = [
-        {"timestamp": 100, "username": "system", "action": "xray_connect", "target": "192.168.1.1", "details": '{"username": "svatex", "tx": 100, "rx": 100}'},
-        {"timestamp": 90, "username": "system", "action": "xray_disconnect", "target": "192.168.1.2", "details": '{"username": "svatex", "duration": "50 сек"}'},
-        {"timestamp": 50, "username": "system", "action": "xray_connect", "target": "192.168.1.2", "details": '{"username": "svatex"}'},
-        {"timestamp": 40, "username": "system", "action": "xray_connect", "target": "10.0.0.1", "details": '{"username": "other_user"}'},
+        {"timestamp": 100, "username": "system", "action": "xray_connect", "target": "198.51.100.1", "details": '{"username": "client_user_1", "tx": 100, "rx": 100}'},
+        {"timestamp": 90, "username": "system", "action": "xray_disconnect", "target": "198.51.100.2", "details": '{"username": "client_user_1", "duration": "50 сек"}'},
+        {"timestamp": 50, "username": "system", "action": "xray_connect", "target": "198.51.100.2", "details": '{"username": "client_user_1"}'},
+        {"timestamp": 40, "username": "system", "action": "xray_connect", "target": "203.0.113.1", "details": '{"username": "other_user"}'},
     ]
 
-    # Current connection from 192.168.1.1 at t=100.
-    # The previous connection for svatex was from 192.168.1.2 at t=50.
-    # So 192.168.1.1 is indeed a new IP!
+    # Current connection from 198.51.100.1 at t=100.
+    # The previous connection for client_user_1 was from 198.51.100.2 at t=50.
+    # So 198.51.100.1 is indeed a new IP!
     is_new_ip, history = check_new_ip_and_get_history(
-        username="svatex",
-        current_ip="192.168.1.1",
+        username="client_user_1",
+        current_ip="198.51.100.1",
         current_timestamp=100,
         logs=mock_logs
     )
 
     assert is_new_ip is True
     assert len(history) == 1
-    assert history[0]["ip"] == "192.168.1.2"
+    assert history[0]["ip"] == "198.51.100.2"
     assert history[0]["duration"] == "50 сек"
 
-    # Current connection from 192.168.1.2 at t=100.
-    # The previous connection was also from 192.168.1.2.
-    # So 192.168.1.2 is NOT a new IP!
+    # Current connection from 198.51.100.2 at t=100.
+    # The previous connection was also from 198.51.100.2.
+    # So 198.51.100.2 is NOT a new IP!
     is_new_ip, history = check_new_ip_and_get_history(
-        username="svatex",
-        current_ip="192.168.1.2",
+        username="client_user_1",
+        current_ip="198.51.100.2",
         current_timestamp=100,
         logs=mock_logs
     )
