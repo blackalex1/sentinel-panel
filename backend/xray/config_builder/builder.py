@@ -103,12 +103,15 @@ def generate_xray_config_json() -> dict:
                 })
             xray_settings = {
                 "clients": clients_list,
+                "decryption": db_settings.get("decryption", "none")
             }
             fallbacks = db_settings.get("fallbacks")
             if fallbacks:
                 xray_settings["fallbacks"] = fallbacks
-            else:
-                xray_settings["decryption"] = db_settings.get("decryption", "none")
+            elif stream_settings.get("security") in ("tls", "reality"):
+                from backend.config import settings
+                panel_port = getattr(settings, "PANEL_PORT", 8000)
+                xray_settings["fallbacks"] = [{"dest": panel_port, "xver": 0}]
             
         elif protocol == "vmess":
             clients_list = []
@@ -140,9 +143,17 @@ def generate_xray_config_json() -> dict:
                     "email": c["email"]
                 })
             xray_settings = {
-                "clients": clients_list,
-                "fallbacks": db_settings.get("fallbacks", [])
+                "clients": clients_list
             }
+            fallbacks = db_settings.get("fallbacks")
+            if fallbacks:
+                xray_settings["fallbacks"] = fallbacks
+            elif stream_settings.get("security") in ("tls", "reality"):
+                from backend.config import settings
+                panel_port = getattr(settings, "PANEL_PORT", 8000)
+                xray_settings["fallbacks"] = [{"dest": panel_port, "xver": 0}]
+            else:
+                xray_settings["fallbacks"] = []
             
         elif protocol == "shadowsocks":
             method = db_settings.get("method") or "aes-256-gcm"

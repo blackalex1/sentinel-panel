@@ -115,6 +115,12 @@ def generate_singbox_routing(get_all_routing_rules_fn=None, get_setting_fn=None)
                     if d.startswith("geosite:"):
                         gs_name = d.replace("geosite:", "").strip().lower()
                         rule_sets_needed.append(add_singbox_rule_set("geosite", gs_name))
+                    elif d.startswith("geoip:"):
+                        gi_name = d.replace("geoip:", "").strip().lower()
+                        if gi_name == "private":
+                            r_obj["ip_is_private"] = True
+                        else:
+                            rule_sets_needed.append(add_singbox_rule_set("geoip", gi_name))
                     elif d.startswith("domain:"):
                         domain_list.append(d.split(":", 1)[1])
                     elif d.startswith("full:"):

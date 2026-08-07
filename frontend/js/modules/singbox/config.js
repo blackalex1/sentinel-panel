@@ -202,8 +202,12 @@ export async function loadSingboxConfig() {
         config.route.rules.forEach(r => {
             let matchDesc = [];
             if (r.inbound) matchDesc.push(`Inbound: <code>${r.inbound.join(", ")}</code>`);
+            if (r.domain) matchDesc.push(`Domain: <code>${r.domain.join(", ")}</code>`);
             if (r.domain_suffix) matchDesc.push(`Domain Suffix: <code>${r.domain_suffix.join(", ")}</code>`);
             if (r.domain_regex) matchDesc.push(`Domain Regex: <code>${r.domain_regex.join(", ")}</code>`);
+            if (r.domain_keyword) matchDesc.push(`Domain Keyword: <code>${r.domain_keyword.join(", ")}</code>`);
+            if (r.ip_is_private) matchDesc.push(`IP: <code>Private / LAN</code>`);
+            if (r.ip_cidr) matchDesc.push(`IP CIDR: <code>${r.ip_cidr.join(", ")}</code>`);
             if (r.protocol) matchDesc.push(`Protocol: <code>${r.protocol.join(", ")}</code>`);
             if (r.rule_set) matchDesc.push(`RuleSet: <code>${r.rule_set.join(", ")}</code>`);
             if (matchDesc.length === 0) matchDesc.push("Default / Any");

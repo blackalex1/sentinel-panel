@@ -136,11 +136,13 @@ async def update_settings_api(request: Request):
                 set_setting("telegram_2fa_enabled", "true" if data.get("telegram_2fa_enabled") in (True, "true") else "false")
             
         # 3. Decoy Site Card
+        decoy_updated = False
         if "decoy_type" in data:
             decoy_type = data.get("decoy_type")
-            if decoy_type not in ("none", "static", "proxy", "redirect"):
+            if decoy_type not in ("none", "static", "proxy", "redirect", "drop"):
                 return {"success": False, "msg": "Неверный тип маскировки"}
             set_setting("decoy_type", decoy_type)
+            decoy_updated = True
             
         if "decoy_value" in data:
             decoy_type = data.get("decoy_type", get_setting("decoy_type", "none"))
@@ -148,6 +150,18 @@ async def update_settings_api(request: Request):
             if decoy_type in ("proxy", "redirect") and not decoy_value.startswith("http"):
                 return {"success": False, "msg": "Для выбранного типа маскировки необходимо указать полный URL (http/https)"}
             set_setting("decoy_value", decoy_value)
+            decoy_updated = True
+
+        if decoy_updated:
+            try:
+                from backend.xray import restart_xray
+                from backend.hysteria import restart_hysteria
+                from backend.singbox import restart_singbox
+                restart_xray()
+                restart_hysteria()
+                restart_singbox()
+            except Exception as e:
+                logging.error(f"Error restarting cores after decoy update: {e}")
             
         # 4. SSL Domain / Email
         if "ssl_domain" in data:

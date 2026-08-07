@@ -382,6 +382,7 @@
     "inbound_updated_toast": "Connection updated successfully!",
     "inbound_update_error_toast": "Error updating connection",
     "settings_decoy_type_none": "Nginx 404 (Default Error Page)",
+    "settings_decoy_type_drop": "Connection Drop / Silent (HTTP 444 / No Response)",
     "settings_decoy_type_static": "Local Template (Corporate Landing Page)",
     "settings_decoy_type_proxy": "Proxying (Transparent Third-party Site)",
     "settings_decoy_type_redirect": "Redirect (HTTP Redirect 302)",

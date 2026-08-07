@@ -121,8 +121,16 @@ class DecoyException(Exception):
     """Исключение для динамического перехвата маскировки"""
     pass
 
-def decoy_response_html():
-    """Возвращает стандартную заглушку Nginx 404"""
+def decoy_response_html(request: Request = None):
+    """Возвращает стандартную заглушку Nginx 404 или сбрасывает соединение при decoy_type=drop"""
+    decoy_type = get_setting("decoy_type", "none")
+    if decoy_type == "drop":
+        if request and "transport" in getattr(request, "scope", {}):
+            try:
+                request.scope["transport"].close()
+            except Exception:
+                pass
+        return Response(status_code=444)
     html_content = """<html>
 <head><title>404 Not Found</title></head>
 <body>
@@ -375,7 +383,14 @@ async def handle_decoy_route(request: Request, path: str = "") -> Response:
     """Определяет тип маскировки и отдает соответствующий ответ"""
     decoy_type = get_setting("decoy_type", "none")
     
-    if decoy_type == "proxy":
+    if decoy_type == "drop":
+        try:
+            if "transport" in request.scope:
+                request.scope["transport"].close()
+        except Exception:
+            pass
+        return Response(status_code=444)
+    elif decoy_type == "proxy":
         return await proxy_decoy_request(request, path)
     elif decoy_type == "redirect":
         decoy_value = get_setting("decoy_value", "company_landing")
@@ -385,5 +400,5 @@ async def handle_decoy_route(request: Request, path: str = "") -> Response:
     elif decoy_type == "static":
         return render_static_decoy(request, path)
     else:
-        return decoy_response_html()
+        return decoy_response_html(request)
 

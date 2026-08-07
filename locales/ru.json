@@ -382,6 +382,7 @@
     "inbound_updated_toast": "Подключение успешно обновлено!",
     "inbound_update_error_toast": "Ошибка обновления подключения",
     "settings_decoy_type_none": "Nginx 404 (Стандартная страница ошибки)",
+    "settings_decoy_type_drop": "Сброс соединения / Молчание (HTTP 444 / No Response)",
     "settings_decoy_type_static": "Локальный шаблон (Красивый корпоративный лендинг)",
     "settings_decoy_type_proxy": "Проксирование (Прозрачное отображение стороннего сайта)",
     "settings_decoy_type_redirect": "Перенаправление (HTTP Redirect 302 на другой сайт)",

@@ -194,6 +194,13 @@ def test_decoy_system_static(client):
     assert "Nimbus Digital Solutions" in response.text
 
 
+def test_decoy_system_drop(client):
+    set_setting("decoy_type", "drop")
+    
+    response = client.get("/")
+    assert response.status_code == 444
+
+
 def test_decoy_system_none(client):
     set_setting("decoy_type", "none")
     

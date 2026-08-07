@@ -65,7 +65,8 @@ async def search_client(request: Request, key: str = Query("")):
                     "id": c.id, "inbound_id": c.inbound_id, "email": c.email,
                     "client_uuid_or_pwd": c.client_uuid_or_pwd, "up": c.up, "down": c.down,
                     "total": c.total, "expiry_time": c.expiry_time, "enable": c.enable,
-                    "limit_ip": c.limit_ip, "block_reason": c.block_reason or ""
+                    "limit_ip": c.limit_ip, "block_reason": c.block_reason or "",
+                    "allowed_ips": c.allowed_ips or ""
                 }
                 ib_dict = {
                     "id": ib.id, "remark": ib.remark, "port": ib.port, "protocol": ib.protocol,

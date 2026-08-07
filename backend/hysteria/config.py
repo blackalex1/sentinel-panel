@@ -67,36 +67,84 @@ def generate_hysteria_config(inbound_id: int, port: int, clients: list, stream_s
         tls_config["sni"] = sni
 
     # Настройка Masquerade
-    if masq_type == "file":
-        masq_config = {
-            "type": "file",
-            "file": {
-                "dir": masq_value
+    from backend.database import get_setting
+    central_decoy_type = get_setting("decoy_type", "none")
+    central_decoy_value = get_setting("decoy_value", "company_landing")
+
+    if hysteria_opts and "masqType" in hysteria_opts:
+        if masq_type == "file":
+            masq_config = {
+                "type": "file",
+                "file": {
+                    "dir": masq_value
+                }
             }
-        }
-    elif masq_type == "status":
-        try:
-            status_code = int(masq_value)
-        except ValueError:
-            status_code = 404
-        masq_config = {
-            "type": "string",
-            "string": {
-                "content": str(status_code),
-                "headers": {
-                    "Content-Type": "text/plain"
-                },
-                "statusCode": status_code
+        elif masq_type == "status":
+            try:
+                status_code = int(masq_value)
+            except ValueError:
+                status_code = 404
+            masq_config = {
+                "type": "string",
+                "string": {
+                    "content": str(status_code),
+                    "headers": {
+                        "Content-Type": "text/plain"
+                    },
+                    "statusCode": status_code
+                }
             }
-        }
-    else:  # proxy
-        masq_config = {
-            "type": "proxy",
-            "proxy": {
-                "url": masq_value or "https://yahoo.com",
-                "rewriteHost": True
+        else:  # proxy
+            masq_config = {
+                "type": "proxy",
+                "proxy": {
+                    "url": masq_value or "https://yahoo.com",
+                    "rewriteHost": True
+                }
             }
-        }
+    else:
+        # Централизованный Decoy панели для Hysteria 2
+        if central_decoy_type == "drop":
+            masq_config = {
+                "type": "string",
+                "string": {
+                    "content": "",
+                    "headers": {},
+                    "statusCode": 444
+                }
+            }
+        elif central_decoy_type == "none":
+            masq_config = {
+                "type": "string",
+                "string": {
+                    "content": "404 Not Found",
+                    "headers": {
+                        "Content-Type": "text/html"
+                    },
+                    "statusCode": 404
+                }
+            }
+        elif central_decoy_type in ("proxy", "redirect") and central_decoy_value.startswith("http"):
+            masq_config = {
+                "type": "proxy",
+                "proxy": {
+                    "url": central_decoy_value,
+                    "rewriteHost": True
+                }
+            }
+        else:
+            from backend.config import settings
+            from backend.ssl_utils import SSL_CERT_PATH, SSL_KEY_PATH
+            use_https = SSL_CERT_PATH.exists() and SSL_KEY_PATH.exists()
+            panel_proto = "https" if use_https else "http"
+            masq_config = {
+                "type": "proxy",
+                "proxy": {
+                    "url": f"{panel_proto}://127.0.0.1:{settings.PANEL_PORT}",
+                    "rewriteHost": True,
+                    "insecure": True
+                }
+            }
 
     # Настройка listen (с поддержкой Port Hopping)
     listen_str = f":{port}"
