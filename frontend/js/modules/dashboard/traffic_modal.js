@@ -54,15 +54,22 @@ export async function openGlobalTrafficDetailsModal(selectedDate) {
         const filtered = res.clients.filter(c => c.email.toLowerCase().includes(query));
 
         if (filtered.length === 0) {
-            tableBody.innerHTML = `<tr><td colspan="5" style="text-align: center; padding: 20px; color: var(--text-muted);">Нет данных по клиентам за эту дату</td></tr>`;
+            tableBody.innerHTML = `<tr><td colspan="6" style="text-align: center; padding: 20px; color: var(--text-muted);">Нет данных по клиентам за эту дату</td></tr>`;
             return;
         }
 
         tableBody.innerHTML = filtered.map(c => {
             const barWidth = c.percent > 0 ? Math.max(c.percent, 3) : 0;
+            const proto = (c.protocol || "vless").toUpperCase();
+            const core = (c.core || "singbox").toUpperCase();
+            const coreBadgeClass = (core.includes("XRAY")) ? "tag-badge-warp" : (core.includes("HYSTERIA")) ? "tag-badge-blocked" : "tag-badge-proxy";
             return `
             <tr style="border-bottom: 1px solid rgba(255,255,255,0.03); transition: background 0.2s;" onmouseenter="this.style.background='rgba(255,255,255,0.03)'" onmouseleave="this.style.background='transparent'">
                 <td style="padding: 10px 14px; font-weight: 600; color: var(--text-primary);">${c.email}</td>
+                <td style="padding: 10px 14px; text-align: center; white-space: nowrap;">
+                    <span class="tag-badge tag-badge-direct" style="font-size: 10.5px; padding: 2px 7px; text-transform: uppercase; font-weight: 700;">${proto}</span>
+                    <span class="tag-badge ${coreBadgeClass}" style="font-size: 10.5px; padding: 2px 7px; text-transform: uppercase; font-weight: 700; margin-left: 4px;">${core}</span>
+                </td>
                 <td style="padding: 10px 14px; text-align: right; color: var(--accent-green); font-weight: 600;">⬇️ ${formatBytes(c.down)}</td>
                 <td style="padding: 10px 14px; text-align: right; color: var(--accent-purple); font-weight: 600;">⬆️ ${formatBytes(c.up)}</td>
                 <td style="padding: 10px 14px; text-align: right; font-weight: 700; color: var(--text-primary);">${formatBytes(c.total)}</td>

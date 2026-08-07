@@ -1,6 +1,7 @@
 import { apiFetch } from "../../api.js";
 import { showToast } from "../../ui.js";
 import { t, translatePage } from "../../i18n.js";
+import { initCustomSelect } from "../../components/customSelect.js";
 
 function getLogLevelStyle(level) {
     const l = (level || "").toLowerCase();
@@ -39,27 +40,20 @@ function getLogLevelStyle(level) {
     };
 }
 
-export async function loadSingboxConfig() {
-    const res = await apiFetch("/api/singbox/config");
-    if (!res || !res.success) return;
-
-    window.singboxConfig = res.config;
-    const config = window.singboxConfig;
-
-    const rawPre = document.getElementById("singbox-config-raw-pre");
-    if (rawPre) {
-        rawPre.value = JSON.stringify(config, null, 2);
-    }
-
+export function renderSingboxConfig(config) {
     const parsedContainer = document.getElementById("singbox-config-parsed-container");
     if (!parsedContainer) return;
 
+    if (!config) {
+        parsedContainer.innerHTML = `<div style="text-align: center; padding: 40px 20px; color: var(--text-muted);">` + t("singbox_no_config", "Конфигурация Sing-box пуста или не загружена") + `</div>`;
+        return;
+    }
+
     let html = "";
 
-    // -- 1. SYSTEM SETTINGS & LOGGING --
+    // -- 1. LOGGING & GLOBAL SETTINGS --
     config.log = config.log || {};
     const currLevel = config.log.level || "debug";
-    const logStyle = getLogLevelStyle(currLevel);
     html += `<div style="margin-bottom: 25px;">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
             <h4 style="margin: 0; font-size: 15px; font-weight: 600; color: var(--accent-orange); display: flex; align-items: center; gap: 8px;">
@@ -69,16 +63,16 @@ export async function loadSingboxConfig() {
         </div>
         <div class="glass-card" style="padding: 16px; border-radius: 12px; background: rgba(255,255,255,0.015); border: 1px solid var(--border-color);">
             <div style="font-size: 13px; line-height: 1.6; color: var(--text-secondary);">
-                <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 6px;">
-                    <span>LogLevel:</span>
-                    <select id="singbox-loglevel-select" style="padding: 3px 22px 3px 10px; font-size: 12px; border-radius: 6px; background: ${logStyle.bg}; color: ${logStyle.color}; border: ${logStyle.border}; font-weight: 600; cursor: pointer; outline: none; appearance: none; -webkit-appearance: none; -moz-appearance: none; transition: all 0.2s ease;">
-                        <option value="trace" style="background: #0f172a; color: #f8fafc;" ${currLevel === 'trace' ? 'selected' : ''}>trace</option>
-                        <option value="debug" style="background: #0f172a; color: #f8fafc;" ${currLevel === 'debug' ? 'selected' : ''}>debug</option>
-                        <option value="info" style="background: #0f172a; color: #f8fafc;" ${currLevel === 'info' ? 'selected' : ''}>info</option>
-                        <option value="warn" style="background: #0f172a; color: #f8fafc;" ${currLevel === 'warn' ? 'selected' : ''}>warn</option>
-                        <option value="error" style="background: #0f172a; color: #f8fafc;" ${currLevel === 'error' ? 'selected' : ''}>error</option>
-                        <option value="fatal" style="background: #0f172a; color: #f8fafc;" ${currLevel === 'fatal' ? 'selected' : ''}>fatal</option>
-                        <option value="panic" style="background: #0f172a; color: #f8fafc;" ${currLevel === 'panic' ? 'selected' : ''}>panic</option>
+                <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 6px;">
+                    <span style="font-weight: 500;">LogLevel:</span>
+                    <select id="singbox-loglevel-select" class="inline-select">
+                        <option value="trace" ${currLevel === 'trace' ? 'selected' : ''}>trace</option>
+                        <option value="debug" ${currLevel === 'debug' ? 'selected' : ''}>debug</option>
+                        <option value="info" ${currLevel === 'info' ? 'selected' : ''}>info</option>
+                        <option value="warn" ${currLevel === 'warn' ? 'selected' : ''}>warn</option>
+                        <option value="error" ${currLevel === 'error' ? 'selected' : ''}>error</option>
+                        <option value="fatal" ${currLevel === 'fatal' ? 'selected' : ''}>fatal</option>
+                        <option value="panic" ${currLevel === 'panic' ? 'selected' : ''}>panic</option>
                     </select>
                 </div>
                 <div style="margin-top: 5px;">DNS Servers: <code style="font-size: 11px; color: var(--text-primary);">${(config.dns && config.dns.servers ? config.dns.servers.map(s => typeof s === 'string' ? s : `${s.tag || ''}: ${s.server || s.address || ''}`).join(", ") : "—")}</code></div>
@@ -224,12 +218,9 @@ export async function loadSingboxConfig() {
 
     const singboxLogLevelSelect = parsedContainer.querySelector("#singbox-loglevel-select");
     if (singboxLogLevelSelect) {
+        initCustomSelect(singboxLogLevelSelect);
         singboxLogLevelSelect.addEventListener("change", async (e) => {
             const newLevel = e.target.value;
-            const st = getLogLevelStyle(newLevel);
-            singboxLogLevelSelect.style.background = st.bg;
-            singboxLogLevelSelect.style.color = st.color;
-            singboxLogLevelSelect.style.border = st.border;
             window.singboxConfig.log = window.singboxConfig.log || {};
             window.singboxConfig.log.level = newLevel;
             const res = await apiFetch("/api/singbox/config/save", {

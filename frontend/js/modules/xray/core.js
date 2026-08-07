@@ -28,7 +28,6 @@ export async function loadCoreInfo() {
     const normVer = (v) => (v || "").toString().trim().replace(/^v/i, "");
 
     if (res.versions && res.versions.length > 0 && versionSelect) {
-        versionSelect.style.display = "inline-block";
         versionSelect.innerHTML = "";
         res.versions.forEach(item => {
             const opt = document.createElement("option");
@@ -42,6 +41,13 @@ export async function loadCoreInfo() {
             }
             versionSelect.appendChild(opt);
         });
+
+        const customContainer = versionSelect.closest(".custom-select-container");
+        if (customContainer) {
+            customContainer.style.display = "block";
+        } else {
+            versionSelect.style.display = "none";
+        }
 
         const updateSelectedState = () => {
             const selectedOpt = versionSelect.options[versionSelect.selectedIndex];

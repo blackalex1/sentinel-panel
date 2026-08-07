@@ -12,6 +12,9 @@ export function initCustomSelect(selectElement) {
     
     const container = document.createElement("div");
     container.className = "custom-select-container";
+    if (selectElement.classList.contains("inline-select") || selectElement.classList.contains("compact-select")) {
+        container.classList.add("inline-select");
+    }
     
     const trigger = document.createElement("div");
     trigger.className = "custom-select-trigger";

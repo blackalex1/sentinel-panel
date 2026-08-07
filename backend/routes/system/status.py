@@ -137,29 +137,67 @@ async def global_traffic_details_api(request: Request, date: str = ""):
 
     import datetime
     from backend.database import db_session
-    from backend.models import ClientTrafficDaily
+    from backend.models import ClientTrafficDaily, ClientStats, Inbound
 
     target_date = date.strip() or datetime.date.today().isoformat()
+    today_str = datetime.date.today().isoformat()
 
     with db_session() as session:
+        # Load client inbounds to retrieve protocol & core
+        all_clients = session.query(ClientStats, Inbound).join(Inbound, ClientStats.inbound_id == Inbound.id).all()
+        client_inbound_map = {}
+        for cs, ib in all_clients:
+            core_name = ib.core or ("hysteria" if ib.protocol in ("hysteria", "hysteria2") else "singbox")
+            client_inbound_map[cs.email] = {
+                "protocol": ib.protocol,
+                "core": core_name,
+                "inbound_remark": ib.remark,
+                "port": ib.port
+            }
+
         records = session.query(
             ClientTrafficDaily.email,
             ClientTrafficDaily.up,
             ClientTrafficDaily.down
         ).filter(ClientTrafficDaily.date == target_date).all()
 
-        total_day_up = sum(r.up or 0 for r in records)
-        total_day_down = sum(r.down or 0 for r in records)
+        daily_data = {}
+        for r in records:
+            daily_data[r.email] = {
+                "up": int(r.up or 0),
+                "down": int(r.down or 0)
+            }
+
+        # If inspecting today's date, also include real-time clients that have traffic today
+        if target_date == today_str:
+            for cs, ib in all_clients:
+                c_up = int(cs.up or 0)
+                c_down = int(cs.down or 0)
+                if c_up > 0 or c_down > 0:
+                    if cs.email not in daily_data:
+                        daily_data[cs.email] = {"up": c_up, "down": c_down}
+                    else:
+                        # Pick max of daily record or cumulative stats
+                        daily_data[cs.email]["up"] = max(daily_data[cs.email]["up"], c_up)
+                        daily_data[cs.email]["down"] = max(daily_data[cs.email]["down"], c_down)
+
+        total_day_up = sum(d["up"] for d in daily_data.values())
+        total_day_down = sum(d["down"] for d in daily_data.values())
         total_day_bytes = total_day_up + total_day_down
 
         clients = []
-        for r in records:
-            up_bytes = int(r.up or 0)
-            down_bytes = int(r.down or 0)
+        for email, d in daily_data.items():
+            up_bytes = d["up"]
+            down_bytes = d["down"]
             total_bytes = up_bytes + down_bytes
             pct = round((total_bytes / total_day_bytes * 100), 2) if total_day_bytes > 0 else 0.0
+            ib_info = client_inbound_map.get(email, {})
             clients.append({
-                "email": r.email,
+                "email": email,
+                "protocol": ib_info.get("protocol") or "vless",
+                "core": ib_info.get("core") or "singbox",
+                "inbound_remark": ib_info.get("inbound_remark") or "",
+                "port": ib_info.get("port") or 0,
                 "up": up_bytes,
                 "down": down_bytes,
                 "total": total_bytes,

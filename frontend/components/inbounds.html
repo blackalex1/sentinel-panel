@@ -12,16 +12,15 @@
                 <input type="text" id="inbounds-search" placeholder="Поиск подключений..." data-i18n-placeholder="inbounds_search_placeholder" style="width: 100%; padding: 9px 16px 9px 38px; font-size: 13px; height: 40px; border-radius: 10px; background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border-color); color: var(--text-primary); outline: none;">
             </div>
             
-            <div class="sort-wrap" style="display: flex; align-items: center; gap: 8px; background: rgba(255, 255, 255, 0.03); padding: 0 12px; border-radius: 10px; border: 1px solid var(--border-color); height: 40px;">
-                <i class="fa-solid fa-arrow-down-short-wide" style="color: var(--accent-cyan); font-size: 14px;"></i>
-                <select id="inbounds-sort" style="padding: 4px 8px; font-size: 13px; height: 100%; border: none; background: transparent; color: var(--text-primary); cursor: pointer; outline: none; font-weight: 500;">
-                    <option value="id_asc" style="background: #0f172a; color: #f8fafc;" data-i18n="sort_id_asc">ID (по умолч.)</option>
-                    <option value="remark_asc" style="background: #0f172a; color: #f8fafc;" data-i18n="sort_remark_asc">Название (А-Я)</option>
-                    <option value="remark_desc" style="background: #0f172a; color: #f8fafc;" data-i18n="sort_remark_desc">Название (Я-А)</option>
-                    <option value="port_asc" style="background: #0f172a; color: #f8fafc;" data-i18n="sort_port_asc">Порт (возр.)</option>
-                    <option value="port_desc" style="background: #0f172a; color: #f8fafc;" data-i18n="sort_port_desc">Порт (убыв.)</option>
-                    <option value="traffic_desc" style="background: #0f172a; color: #f8fafc;" data-i18n="sort_traffic_desc">Трафик (макс.)</option>
-                    <option value="protocol_asc" style="background: #0f172a; color: #f8fafc;" data-i18n="sort_proto_asc">Протокол</option>
+            <div class="sort-wrap" style="min-width: 180px;">
+                <select id="inbounds-sort" class="glass-select">
+                    <option value="id_asc" data-i18n="sort_id_asc">ID (по умолч.)</option>
+                    <option value="remark_asc" data-i18n="sort_remark_asc">Название (А-Я)</option>
+                    <option value="remark_desc" data-i18n="sort_remark_desc">Название (Я-А)</option>
+                    <option value="port_asc" data-i18n="sort_port_asc">Порт (возр.)</option>
+                    <option value="port_desc" data-i18n="sort_port_desc">Порт (убыв.)</option>
+                    <option value="traffic_desc" data-i18n="sort_traffic_desc">Трафик (макс.)</option>
+                    <option value="protocol_asc" data-i18n="sort_proto_asc">Протокол</option>
                 </select>
             </div>
         </div>

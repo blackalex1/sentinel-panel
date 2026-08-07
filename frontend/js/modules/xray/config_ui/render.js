@@ -2,6 +2,7 @@ import { apiFetch } from "../../../api.js";
 import { t, translatePage } from "../../../i18n.js";
 import { saveXrayConfigToServer } from "./api.js";
 import { initEditorModal } from "./editor_modal.js";
+import { initCustomSelect } from "../../../components/customSelect.js";
 
 // Ensure openJsonEditModal is initialized
 initEditorModal();
@@ -65,7 +66,6 @@ export async function loadXrayConfig() {
     // -- 1. LOGGING & GLOBAL SETTINGS --
     config.log = config.log || {};
     const currLevel = config.log.loglevel || "info";
-    const logStyle = getLogLevelStyle(currLevel);
     html += `<div style="margin-bottom: 25px;">
         <h4 style="margin-top: 0; margin-bottom: 12px; font-size: 15px; font-weight: 600; color: var(--accent-orange); display: flex; align-items: center; gap: 8px; width: 100%;">
             <i class="fa-solid fa-file-invoice"></i> <span data-i18n="config_log_title">Системные настройки и логирование</span>
@@ -73,14 +73,14 @@ export async function loadXrayConfig() {
         </h4>
         <div class="glass-card" style="padding: 15px; border-radius: 10px; background: rgba(255,255,255,0.015);">
             <div style="font-size: 13px; line-height: 1.6; color: var(--text-secondary);">
-                <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 6px;">
-                    <span>LogLevel:</span>
-                    <select id="xray-loglevel-select" style="padding: 3px 22px 3px 10px; font-size: 12px; border-radius: 6px; background: ${logStyle.bg}; color: ${logStyle.color}; border: ${logStyle.border}; font-weight: 600; cursor: pointer; outline: none; appearance: none; -webkit-appearance: none; -moz-appearance: none; transition: all 0.2s ease;">
-                        <option value="debug" style="background: #0f172a; color: #f8fafc;" ${currLevel === 'debug' ? 'selected' : ''}>debug</option>
-                        <option value="info" style="background: #0f172a; color: #f8fafc;" ${currLevel === 'info' ? 'selected' : ''}>info</option>
-                        <option value="warning" style="background: #0f172a; color: #f8fafc;" ${currLevel === 'warning' ? 'selected' : ''}>warning</option>
-                        <option value="error" style="background: #0f172a; color: #f8fafc;" ${currLevel === 'error' ? 'selected' : ''}>error</option>
-                        <option value="none" style="background: #0f172a; color: #f8fafc;" ${currLevel === 'none' ? 'selected' : ''}>none</option>
+                <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 6px;">
+                    <span style="font-weight: 500;">LogLevel:</span>
+                    <select id="xray-loglevel-select" class="inline-select">
+                        <option value="debug" ${currLevel === 'debug' ? 'selected' : ''}>debug</option>
+                        <option value="info" ${currLevel === 'info' ? 'selected' : ''}>info</option>
+                        <option value="warning" ${currLevel === 'warning' ? 'selected' : ''}>warning</option>
+                        <option value="error" ${currLevel === 'error' ? 'selected' : ''}>error</option>
+                        <option value="none" ${currLevel === 'none' ? 'selected' : ''}>none</option>
                     </select>
                 </div>
                 <div style="margin-top: 5px;">Access Log: <code style="font-size: 11px; word-break: break-all; color: var(--text-primary);">${config.log.access || "—"}</code></div>
@@ -308,12 +308,9 @@ export async function loadXrayConfig() {
     
     const xrayLogLevelSelect = parsedContainer.querySelector("#xray-loglevel-select");
     if (xrayLogLevelSelect) {
+        initCustomSelect(xrayLogLevelSelect);
         xrayLogLevelSelect.addEventListener("change", async (e) => {
             const newLevel = e.target.value;
-            const st = getLogLevelStyle(newLevel);
-            xrayLogLevelSelect.style.background = st.bg;
-            xrayLogLevelSelect.style.color = st.color;
-            xrayLogLevelSelect.style.border = st.border;
             window.xrayConfig.log = window.xrayConfig.log || {};
             window.xrayConfig.log.loglevel = newLevel;
             await saveXrayConfigToServer();

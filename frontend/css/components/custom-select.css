@@ -1,5 +1,9 @@
 /* Premium Glassmorphism Custom Select Dropdown */
 
+select[data-custom-select-init="true"] {
+    display: none !important;
+}
+
 .custom-select-container {
     position: relative;
     width: 100%;
@@ -7,8 +11,26 @@
     font-family: inherit;
 }
 
-.custom-select-container.open {
-    z-index: 999999 !important;
+.custom-select-container.inline-select,
+.custom-select-container.compact-select {
+    display: inline-block !important;
+    width: auto !important;
+    min-width: 130px;
+    vertical-align: middle;
+}
+
+.custom-select-container.inline-select .custom-select-trigger,
+.custom-select-container.compact-select .custom-select-trigger {
+    padding: 5px 12px;
+    font-size: 12.5px;
+    border-radius: 8px;
+    min-height: 28px;
+    font-weight: 600;
+}
+
+.custom-select-container.inline-select .custom-select-dropdown,
+.custom-select-container.compact-select .custom-select-dropdown {
+    min-width: 140px;
 }
 
 /* Elevate parent card/container z-index when custom select is open so it renders ABOVE all sibling cards! */

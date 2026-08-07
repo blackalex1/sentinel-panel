@@ -107,7 +107,6 @@ export function renderSelectedHysteriaConfig(config, clients = []) {
     // -- 0. SYSTEM SETTINGS & LOGGING --
     const hystLog = (config && config.log) || {};
     const currHystLevel = hystLog.level || "info";
-    const logStyle = getLogLevelStyle(currHystLevel);
     html += `<div style="margin-bottom: 25px;">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
             <h4 style="margin: 0; font-size: 15px; font-weight: 600; color: var(--accent-orange); display: flex; align-items: center; gap: 8px;">
@@ -116,13 +115,13 @@ export function renderSelectedHysteriaConfig(config, clients = []) {
         </div>
         <div class="glass-card" style="padding: 16px; border-radius: 12px; background: rgba(255,255,255,0.015); border: 1px solid var(--border-color);">
             <div style="font-size: 13px; line-height: 1.6; color: var(--text-secondary);">
-                <div style="display: flex; align-items: center; gap: 10px;">
-                    <span>LogLevel:</span>
-                    <select id="hysteria-loglevel-select" style="padding: 3px 22px 3px 10px; font-size: 12px; border-radius: 6px; background: ${logStyle.bg}; color: ${logStyle.color}; border: ${logStyle.border}; font-weight: 600; cursor: pointer; outline: none; appearance: none; -webkit-appearance: none; -moz-appearance: none; transition: all 0.2s ease;">
-                        <option value="debug" style="background: #0f172a; color: #f8fafc;" ${currHystLevel === 'debug' ? 'selected' : ''}>debug</option>
-                        <option value="info" style="background: #0f172a; color: #f8fafc;" ${currHystLevel === 'info' ? 'selected' : ''}>info</option>
-                        <option value="warn" style="background: #0f172a; color: #f8fafc;" ${currHystLevel === 'warn' ? 'selected' : ''}>warn</option>
-                        <option value="error" style="background: #0f172a; color: #f8fafc;" ${currHystLevel === 'error' ? 'selected' : ''}>error</option>
+                <div style="display: flex; align-items: center; gap: 12px;">
+                    <span style="font-weight: 500;">LogLevel:</span>
+                    <select id="hysteria-loglevel-select" class="inline-select">
+                        <option value="debug" ${currHystLevel === 'debug' ? 'selected' : ''}>debug</option>
+                        <option value="info" ${currHystLevel === 'info' ? 'selected' : ''}>info</option>
+                        <option value="warn" ${currHystLevel === 'warn' ? 'selected' : ''}>warn</option>
+                        <option value="error" ${currHystLevel === 'error' ? 'selected' : ''}>error</option>
                     </select>
                 </div>
             </div>
@@ -311,12 +310,9 @@ export function renderSelectedHysteriaConfig(config, clients = []) {
     
     const hystLogLevelSelect = parsedContainer.querySelector("#hysteria-loglevel-select");
     if (hystLogLevelSelect) {
+        initCustomSelect(hystLogLevelSelect);
         hystLogLevelSelect.addEventListener("change", async (e) => {
             const newLevel = e.target.value;
-            const st = getLogLevelStyle(newLevel);
-            hystLogLevelSelect.style.background = st.bg;
-            hystLogLevelSelect.style.color = st.color;
-            hystLogLevelSelect.style.border = st.border;
             const select = document.getElementById("hysteria-config-inbound-select");
             const selectedIdx = select ? parseInt(select.value) : 0;
             const item = window.hysteriaConfigs[selectedIdx];
