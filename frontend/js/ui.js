@@ -44,6 +44,8 @@ export function generateUUID() {
     });
 }
 
+import { enhanceAllSelects } from "./components/customSelect.js";
+
 const loadedComponents = new Set();
 
 export async function loadComponent(id, filePath, targetSelector) {
@@ -59,6 +61,9 @@ export async function loadComponent(id, filePath, targetSelector) {
             loadedComponents.add(id);
             try {
                 translatePage();
+            } catch (e) {}
+            try {
+                enhanceAllSelects(target);
             } catch (e) {}
             return true;
         }

@@ -185,10 +185,14 @@ export async function loadSettings() {
     }
 }
 
+import { enhanceAllSelects } from "../../components/customSelect.js";
+
 export function updateDecoyUI(decoyType) {
     const valGroup = document.getElementById("setting-decoy-value-group");
     const valLabel = document.getElementById("setting-decoy-value-label");
     const valDesc = document.getElementById("setting-decoy-value-desc");
+    
+    enhanceAllSelects();
     
     if (!valGroup) return;
     
