@@ -295,10 +295,11 @@ if __name__ == "__main__":
             port=settings.PANEL_PORT,
             ssl_keyfile=ssl_key,
             ssl_certfile=ssl_cert,
+            server_header=False,
             reload=False
         )  # nosec B104
     else:
         logging.warning("SSL certificates not found. Starting HTTP server...")
         logging.info(f"Starting server on port {settings.PANEL_PORT}...")
-        uvicorn.run("backend.main:app", host="0.0.0.0", port=settings.PANEL_PORT, reload=False)  # nosec B104
+        uvicorn.run("backend.main:app", host="0.0.0.0", port=settings.PANEL_PORT, server_header=False, reload=False)  # nosec B104
 
