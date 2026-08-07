@@ -181,7 +181,14 @@ app.add_middleware(GZipMiddleware, minimum_size=1000)
 # Middleware для отключения кэширования фронтенда
 @app.middleware("http")
 async def add_no_cache_headers(request: Request, call_next):
-    response = await call_next(request)
+    try:
+        response = await call_next(request)
+    except Exception as exc:
+        if "No response returned" in str(exc):
+            from backend.auth.decoy import RawDropResponse
+            return RawDropResponse()
+        raise exc
+
     path = request.url.path
     if path.startswith(f"/{settings.PANEL_SECRET_PATH}"):
         response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
