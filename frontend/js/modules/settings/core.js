@@ -192,7 +192,7 @@ export function updateDecoyUI(decoyType) {
     
     if (!valGroup) return;
     
-    if (decoyType === "none") {
+    if (decoyType === "none" || decoyType === "drop") {
         valGroup.style.display = "none";
     } else {
         valGroup.style.display = "block";

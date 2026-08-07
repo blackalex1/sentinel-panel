@@ -138,7 +138,7 @@ def decoy_response_html(request: Request = None):
 <hr><center>nginx</center>
 </body>
 </html>"""
-    return HTMLResponse(content=html_content, status_code=404)
+    return HTMLResponse(content=html_content, status_code=404, headers={"Server": "nginx/1.24.0 (Ubuntu)"})
 
 def decoy_response():
     """Возбуждает исключение для динамической маскировки"""
