@@ -7,6 +7,19 @@
     font-family: inherit;
 }
 
+.custom-select-container.open {
+    z-index: 9999 !important;
+}
+
+/* Ensure parent cards and containers allow dropdown popups to float freely */
+.settings-card,
+.glass-card,
+.setting-group,
+.form-group,
+.settings-section {
+    overflow: visible !important;
+}
+
 .custom-select-trigger {
     display: flex;
     align-items: center;
@@ -50,14 +63,14 @@
     top: calc(100% + 6px);
     left: 0;
     right: 0;
-    z-index: 1000;
-    background: rgba(13, 17, 30, 0.96);
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
-    border: 1px solid rgba(139, 92, 246, 0.35);
+    z-index: 99999 !important;
+    background: rgba(13, 17, 30, 0.98);
+    backdrop-filter: blur(25px);
+    -webkit-backdrop-filter: blur(25px);
+    border: 1px solid rgba(139, 92, 246, 0.4);
     border-radius: 12px;
     padding: 6px;
-    box-shadow: 0 14px 40px rgba(0, 0, 0, 0.7), 0 0 25px rgba(139, 92, 246, 0.15);
+    box-shadow: 0 18px 45px rgba(0, 0, 0, 0.8), 0 0 30px rgba(139, 92, 246, 0.2);
     opacity: 0;
     visibility: hidden;
     transform: translateY(-8px);
