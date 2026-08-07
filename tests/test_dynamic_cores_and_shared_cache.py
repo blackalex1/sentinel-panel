@@ -134,11 +134,13 @@ def test_dynamic_xray_start(monkeypatch):
     assert res is True
     assert is_xray_running() is False
     
-    # 2. Add an active xray inbound
+    # 2. Add an active xray inbound with a client
+    from tests.core_verifier import get_free_port
+    x_port = get_free_port()
     with db_session() as session:
         ib = Inbound(
             remark="Xray Test Inbound",
-            port=30999,
+            port=x_port,
             protocol="vless",
             settings="{}",
             stream_settings="{}",
@@ -147,8 +149,24 @@ def test_dynamic_xray_start(monkeypatch):
         )
         session.add(ib)
         session.commit()
+        session.refresh(ib)
         
-    res = start_xray()
+        cs = ClientStats(
+            inbound_id=ib.id,
+            email="dynamic_xray_client",
+            client_uuid_or_pwd="10000000-0000-4000-8000-000000000106",
+            enable=1
+        )
+        session.add(cs)
+        session.commit()
+        
+    res = False
+    for _ in range(5):
+        stop_xray()
+        time.sleep(0.3)
+        res = start_xray()
+        if res:
+            break
     assert res is True
     assert is_xray_running() is True
     stop_xray()
@@ -156,6 +174,7 @@ def test_dynamic_xray_start(monkeypatch):
 
 def test_dynamic_xray_start_via_hysteria_routing(monkeypatch):
     with db_session() as session:
+        session.query(ClientStats).delete()
         session.query(Inbound).delete()
         hys_stream = {
             "hysteria": {
@@ -262,6 +281,7 @@ def test_decoy_verify_ssl_false(monkeypatch):
         return default
         
     monkeypatch.setattr("backend.auth_utils.get_setting", mock_get_setting)
+    monkeypatch.setattr("backend.auth.decoy.get_setting", mock_get_setting)
     monkeypatch.setattr("socket.getaddrinfo", lambda host, port: [(2, 1, 6, '', ('198.51.100.214', 0))])
     
     # Build a mock request

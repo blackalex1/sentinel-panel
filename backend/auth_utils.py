@@ -1,6 +1,7 @@
 """
 Facade module re-exporting symbols from backend.auth package for backward compatibility.
 """
+from backend.database import get_setting
 from backend.auth import (
     is_safe_url,
     DbCsrfTokens,
@@ -20,6 +21,7 @@ from backend.auth import (
 )
 
 __all__ = [
+    "get_setting",
     "is_safe_url",
     "DbCsrfTokens",
     "DbActiveSessions",

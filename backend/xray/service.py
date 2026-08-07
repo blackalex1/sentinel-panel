@@ -26,7 +26,7 @@ def start_xray():
     """Запускает процесс Xray"""
     global xray_process, LAST_XRAY_ERROR
     LAST_XRAY_ERROR = ""
-    if backend.xray.is_xray_running():
+    if is_xray_running():
         logging.info("Xray is already running.")
         return True
         
@@ -52,13 +52,14 @@ def start_xray():
     if not has_active_xray:
         logging.info("No active Xray inbounds or Hysteria routing via Xray found. Xray core will not be started.")
         return True
-        
+
+    stop_xray()
     backend.xray.ensure_xray_installed()
     backend.xray.write_xray_config()
     
     logging.info("Verifying Xray configuration...")
     try:
-        test_cmd = [str(backend.xray.XRAY_BIN_PATH), "run", "-config", str(backend.xray.XRAY_CONFIG_PATH), "-test"]
+        test_cmd = [str(backend.xray.XRAY_BIN_PATH), "run", "-config", str(backend.config.XRAY_CONFIG_PATH), "-test"]
         test_res = subprocess.run(test_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, encoding="utf-8", timeout=5)  # nosec B603
         if test_res.returncode != 0:
             err_msg = test_res.stderr.strip() or test_res.stdout.strip()
@@ -72,7 +73,7 @@ def start_xray():
     logging.info(f"Starting Xray process: {backend.xray.XRAY_BIN_PATH}")
     try:
         xray_process = subprocess.Popen(
-            [str(backend.xray.XRAY_BIN_PATH), "run", "-config", str(backend.xray.XRAY_CONFIG_PATH)],
+            [str(backend.xray.XRAY_BIN_PATH), "run", "-config", str(backend.config.XRAY_CONFIG_PATH)],
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
             close_fds=True

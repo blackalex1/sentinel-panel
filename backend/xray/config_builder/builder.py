@@ -1,6 +1,6 @@
 import json
 import logging
-from backend.config import XRAY_LOG_PATH
+import backend.config
 import backend.xray.config as xray_config_facade
 from backend.xray.config_builder.sanitizer import clean_stream_settings
 
@@ -485,8 +485,8 @@ def generate_xray_config_json() -> dict:
 
     config = {
         "log": {
-            "access": str(XRAY_LOG_PATH),
-            "error": str(XRAY_LOG_PATH),
+            "access": str(backend.config.XRAY_LOG_PATH),
+            "error": str(backend.config.XRAY_LOG_PATH),
             "loglevel": "info"
         },
         "api": {

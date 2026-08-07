@@ -1,11 +1,11 @@
 import json
 import logging
-from backend.config import XRAY_CONFIG_PATH
+import backend.config
 from backend.xray.config_builder.builder import generate_xray_config_json
 
 def read_xray_config(config_path=None) -> dict:
     """Считывает имеющийся конфигурационный файл Xray с диска"""
-    path = config_path or XRAY_CONFIG_PATH
+    path = config_path or backend.config.XRAY_CONFIG_PATH
     if not path.exists():
         return {}
     try:
@@ -40,16 +40,17 @@ def write_xray_config(config_dict: dict = None) -> bool:
     """Записывает сгенерированный JSON конфиг в файл"""
     try:
         from backend.database import get_setting
+        cfg_path = backend.config.XRAY_CONFIG_PATH
         if config_dict is None:
-            if get_setting("use_custom_xray_config") == "true" and XRAY_CONFIG_PATH.exists():
+            if get_setting("use_custom_xray_config") == "true" and cfg_path.exists():
                 logging.info("Xray is using custom configuration. Skipping auto-generation.")
                 return True
             config_dict = generate_xray_config_json()
 
         config_dict = parse_xray_config(config_dict)
-        with open(XRAY_CONFIG_PATH, "w", encoding="utf-8") as f:
+        with open(cfg_path, "w", encoding="utf-8") as f:
             json.dump(config_dict, f, indent=2)
-        logging.info(f"Xray config rewritten to {XRAY_CONFIG_PATH}")
+        logging.info(f"Xray config rewritten to {cfg_path}")
         return True
     except Exception as e:
         logging.error(f"Failed to write Xray config: {e}")
