@@ -77,3 +77,4 @@ warp_mock.json
 # === Scratch & Helper Tools ===
 scratch/
 run_remote_tests.py
+security-audit-results/
