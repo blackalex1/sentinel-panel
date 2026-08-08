@@ -277,6 +277,22 @@ def find_email_and_ip_in_xray_log(client_ip: Optional[str], dst_ip: Optional[str
     from backend.config import SINGBOX_LOG_PATH
     from backend.utils import read_last_lines
     
+    # 0. Сначала опрашиваем Clash API Sing-box (если запущено)
+    try:
+        import requests
+        resp = requests.get("http://127.0.0.1:9090/connections", timeout=0.3)
+        if resp.status_code == 200:
+            for conn in resp.json().get("connections", []):
+                meta = conn.get("metadata", {})
+                c_dst = meta.get("destinationIP") or meta.get("host")
+                c_dpt = meta.get("destinationPort")
+                if (not dst_ip or c_dst == dst_ip) and str(c_dpt) == str(dst_port):
+                    user = meta.get("inboundUser") or meta.get("user") or conn.get("user")
+                    if user:
+                        return user, meta.get("sourceIP", client_ip)
+    except Exception:
+        pass
+
     paths_to_check = []
     if sec_facade.XRAY_LOG_PATH.exists():
         paths_to_check.append(sec_facade.XRAY_LOG_PATH)
@@ -292,19 +308,31 @@ def find_email_and_ip_in_xray_log(client_ip: Optional[str], dst_ip: Optional[str
     is_testing = "pytest" in sys.modules
     
     def extract_email_and_ip(line: str) -> Optional[tuple]:
-        # 1. email: ...
-        match_email = re.search(r"email:\s*(\S+)", line)
+        # 1. sing-box format: inbound/vless[inbound-8]: [test_client_alpha] inbound connection to 198.51.100.22:22
+        match_email = re.search(r"(?:inbound/[^:]+|inbound[^:]*):\s*\[([a-zA-Z0-9_\.\-]+)\]\s+inbound connection to", line)
         if not match_email:
-            # 2. [user: ...] or user: ... or username: ...
+            # 2. [test_client_alpha] inbound connection to ...
+            match_email = re.search(r"\[([a-zA-Z0-9_\.\-]+)\]\s+inbound connection to", line)
+        if not match_email:
+            # 3. email: ...
+            match_email = re.search(r"email:\s*(\S+)", line)
+        if not match_email:
+            # 4. accepted tcp:... [inbound >> outbound] username
+            match_email = re.search(r"accepted\s+(?:tcp|udp):\S+\s+\[[^\]]+\]\s+([a-zA-Z0-9_\.\-]+)", line)
+        if not match_email:
+            # 5. [user: ...] or user: ... or username: ...
             match_email = re.search(r"(?:user|username|clientUser|auth_user):\s*([^\s,\]]+)", line)
         if not match_email:
-            # 3. JSON "user": "..." or "id": "..." or "email": "..."
+            # 6. JSON "user": "..." or "id": "..." or "email": "..."
             match_email = re.search(r'"(?:user|username|id|email|auth)"\s*:\s*"([^"]+)"', line)
         if not match_email:
-            # 4. sing-box [user@domain.com] or [username] tag at the end
+            # 7. inbound connection to ... from ... [username]
+            match_email = re.search(r"inbound connection\s+.*?\s+\[([a-zA-Z0-9_\.\-]+)\]", line)
+        if not match_email:
+            # 8. sing-box [user@domain.com] or [username] tag at the end
             match_email = re.search(r"\[([a-zA-Z0-9_\.\-]+@[a-zA-Z0-9_\.\-]+|[a-zA-Z0-9_\.\-]+)\]\s*$", line)
         if not match_email:
-            # 5. Generic email pattern
+            # 9. Generic email pattern
             match_email = re.search(r"([a-zA-Z0-9_\.\-]+@[a-zA-Z0-9_\.\-]+)", line)
             
         if match_email:
