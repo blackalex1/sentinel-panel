@@ -263,9 +263,33 @@ def _stop_singbox_ws_stream():
     _singbox_ws_thread = None
     _singbox_ws_stop = None
 
+def kick_all_singbox_connections():
+    """Сбрасывает все активные сокеты и туннели клиентов через Clash API"""
+    try:
+        import requests
+        requests.delete("http://127.0.0.1:9090/connections", timeout=1)
+    except Exception:
+        pass
+
+def kick_singbox_user(username: str):
+    """Сбрасывает соединения конкретного пользователя через Clash API"""
+    try:
+        import requests
+        resp = requests.get("http://127.0.0.1:9090/connections", timeout=1)
+        if resp.status_code == 200:
+            for conn in resp.json().get("connections", []):
+                meta = conn.get("metadata", {})
+                user = meta.get("inboundUser") or meta.get("user") or conn.get("user")
+                c_id = conn.get("id")
+                if user == username and c_id:
+                    requests.delete(f"http://127.0.0.1:9090/connections/{c_id}", timeout=1)
+    except Exception:
+        pass
+
 def stop_singbox():
-    """Останавливает процесс sing-box"""
+    """Останавливает процесс sing-box и сбрасывает все активные туннели"""
     global singbox_process, _last_singbox_conn_stats
+    kick_all_singbox_connections()
     _stop_singbox_ws_stream()
     _last_singbox_conn_stats.clear()
     logging.info("Stopping sing-box process...")
@@ -274,7 +298,7 @@ def stop_singbox():
         try:
             singbox_process.terminate()
             try:
-                singbox_process.wait(timeout=5)
+                singbox_process.wait(timeout=2)
             except subprocess.TimeoutExpired:
                 singbox_process.kill()
         except Exception as e:
@@ -286,8 +310,11 @@ def stop_singbox():
         try:
             if os.name == "nt":
                 subprocess.run(["taskkill", "/F", "/IM", SINGBOX_BIN_PATH.name], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                subprocess.run(["taskkill", "/F", "/IM", "sing-box.exe"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             else:
-                subprocess.run(["pkill", "-f", str(SINGBOX_BIN_PATH)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                subprocess.run(["pkill", "-9", "-f", "sing-box"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                subprocess.run(["pkill", "-9", "sing-box"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                subprocess.run(["killall", "-9", "sing-box"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         except Exception as e:
             logging.error(f"Error terminating sing-box OS process: {e}")
 
@@ -296,7 +323,7 @@ def stop_singbox():
 def restart_singbox(force_generate: bool = True) -> bool:
     """Перезапускает процесс sing-box с регенерацией свежей конфигурации"""
     stop_singbox()
-    time.sleep(1)
+    time.sleep(0.5)
     write_singbox_config()
     return start_singbox(force_generate=False)
 
