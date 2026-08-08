@@ -146,10 +146,11 @@ def enforce_client_limits_and_rules():
     backend.scheduler.parse_recent_xray_ips()
     backend.scheduler.parse_recent_singbox_ips()
     try:
-        from backend.client_alerts import check_xray_inactivity_timeouts
+        from backend.client_alerts import check_xray_inactivity_timeouts, check_singbox_inactivity_timeouts
         check_xray_inactivity_timeouts()
+        check_singbox_inactivity_timeouts()
     except Exception as ex:
-        logging.error(f"[Scheduler] Error checking Xray inactivity: {ex}")
+        logging.error(f"[Scheduler] Error checking inactivity timeouts: {ex}")
     
     now_ts = time.time()
     now_ms = int(now_ts * 1000)

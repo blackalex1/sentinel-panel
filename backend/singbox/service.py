@@ -103,11 +103,55 @@ def start_singbox(force_generate: bool = False) -> bool:
             return False
 
         logging.info("Sing-box started successfully.")
+        threading.Thread(target=tail_singbox_logs, daemon=True).start()
+        _start_singbox_ws_stream()
         return True
     except Exception as e:
         logging.error(f"Failed to start sing-box: {e}")
         singbox_process = None
         return False
+
+_singbox_tailer_running = False
+
+def tail_singbox_logs():
+    """Background thread to tail singbox.log and print to stdout / trigger connect alerts."""
+    global _singbox_tailer_running
+    if _singbox_tailer_running:
+        return
+    _singbox_tailer_running = True
+    try:
+        for _ in range(10):
+            if SINGBOX_LOG_PATH.exists():
+                break
+            time.sleep(0.5)
+        if not SINGBOX_LOG_PATH.exists():
+            _singbox_tailer_running = False
+            return
+        with open(SINGBOX_LOG_PATH, "r", encoding="utf-8", errors="ignore") as f:
+            f.seek(0, 2)
+            while is_singbox_running():
+                try:
+                    if os.path.exists(SINGBOX_LOG_PATH):
+                        current_pos = f.tell()
+                        file_size = os.path.getsize(SINGBOX_LOG_PATH)
+                        if current_pos > file_size:
+                            f.seek(0)
+                except Exception:
+                    pass
+                line = f.readline()
+                if not line:
+                    time.sleep(0.5)
+                    continue
+                print(f"[Singbox] {line.strip()}", flush=True)
+                try:
+                    from backend.client_alerts import process_singbox_log_line
+                    process_singbox_log_line(line)
+                except Exception as ex:
+                    logging.error(f"Error processing Singbox log line: {ex}")
+    except Exception as e:
+        logging.error(f"Error tailing Singbox logs: {e}")
+    finally:
+        _singbox_tailer_running = False
 
 _last_singbox_conn_stats = {}
 _singbox_ws_thread = None
@@ -401,6 +445,12 @@ def _process_singbox_connection_data(data: dict):
                 if user not in ACTIVE_IP_CACHE:
                     ACTIVE_IP_CACHE[user] = {}
                 ACTIVE_IP_CACHE[user][src_ip] = now_ts
+            except Exception:
+                pass
+
+            try:
+                from backend.client_alerts import process_singbox_connection_event
+                process_singbox_connection_event(user, src_ip)
             except Exception:
                 pass
 

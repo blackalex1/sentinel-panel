@@ -63,8 +63,7 @@ def test_real_singbox_attack_mitigation_and_socket_termination():
     stop_singbox()
 
 
-@pytest.mark.asyncio
-async def test_bot_audit_monitor_catches_attack_event():
+def test_bot_audit_monitor_catches_attack_event():
     """
     Verifies that when a security event or autoblock occurs in panel audit logs,
     the controller bot receives the log, registers it in vpn_sessions, and prepares the admin alert.

@@ -11,6 +11,94 @@ from backend.hysteria.service import hysteria_processes
 # In-memory session states
 # active_xray_sessions = { (email, ip): { 'last_seen_at': float, 'started_at': float } }
 active_xray_sessions = {}
+# active_singbox_sessions = { (email, ip): { 'last_seen_at': float, 'started_at': float } }
+active_singbox_sessions = {}
+
+def get_singbox_user_traffic(email: str) -> tuple:
+    """Calculates cumulative uploaded (tx) and downloaded (rx) bytes for Sing-box email across all inbounds."""
+    tx, rx = 0, 0
+    try:
+        with db_session() as session:
+            records = session.query(ClientStats).filter_by(email=email).all()
+            for r in records:
+                tx += r.up
+                rx += r.down
+    except Exception as e:
+        logging.error(f"[Singbox Stats Alert] Error querying traffic: {e}")
+    return tx, rx
+
+def process_singbox_connection_event(username: str, client_ip: str):
+    """Processes new client connection on Sing-box and logs singbox_connect action."""
+    if not username or not client_ip:
+        return
+    client_ip = parse_ip_from_addr(client_ip)
+    key = (username, client_ip)
+    now = time.time()
+    if key not in active_singbox_sessions:
+        tx, rx = get_singbox_user_traffic(username)
+        log_action(
+            username="system",
+            action="singbox_connect",
+            target=client_ip,
+            details=json.dumps({"username": username, "tx": tx, "rx": rx})
+        )
+        active_singbox_sessions[key] = {
+            'started_at': now,
+            'last_seen_at': now
+        }
+    else:
+        active_singbox_sessions[key]['last_seen_at'] = now
+
+def process_singbox_log_line(line: str):
+    """Parses Singbox accepted log lines to track new connections."""
+    if "accepted" not in line:
+        return
+        
+    try:
+        email = None
+        if "email: " in line:
+            email_part = line.split("email: ")
+            if len(email_part) >= 2:
+                email = email_part[1].strip()
+        
+        match = re.search(r"(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}):\d+\s+accepted", line)
+        if not match:
+            match = re.search(r"from\s+\[([^\]]+)\]", line)
+        if not match:
+            match = re.search(r"from\s+(?:tcp:|udp:)?([^:\s]+)", line)
+        if not match:
+            return
+            
+        client_ip = match.group(1)
+        if email:
+            process_singbox_connection_event(email, client_ip)
+    except Exception as e:
+        logging.error(f"[Singbox Alert Tracker] Error parsing log line: {e}")
+
+def check_singbox_inactivity_timeouts():
+    """Checks active Singbox sessions. Triggers disconnect event if inactive for 3 minutes."""
+    now = time.time()
+    for (email, ip), session in list(active_singbox_sessions.items()):
+        if now - session['last_seen_at'] > 180.0:
+            del active_singbox_sessions[(email, ip)]
+            
+            duration_sec = int(now - session['started_at']) - 180
+            duration_sec = max(0, duration_sec)
+            
+            if duration_sec < 60:
+                duration_str = f"{duration_sec} сек"
+            elif duration_sec < 3600:
+                duration_str = f"{duration_sec // 60} мин {duration_sec % 60} сек"
+            else:
+                duration_str = f"{duration_sec // 3600} ч {(duration_sec % 3600) // 60} мин"
+                
+            tx, rx = get_singbox_user_traffic(email)
+            log_action(
+                username="system",
+                action="singbox_disconnect",
+                target=ip,
+                details=json.dumps({"username": email, "tx": tx, "rx": rx, "duration": duration_str})
+            )
 
 def get_xray_user_traffic(email: str) -> tuple:
     """Calculates cumulative uploaded (tx) and downloaded (rx) bytes for Xray email across all inbounds."""
