@@ -1,7 +1,7 @@
 import json
 import logging
 import sys
-from backend.config import SINGBOX_CONFIG_PATH
+from backend.config import SINGBOX_CONFIG_PATH, SINGBOX_LOG_PATH
 import backend.database as db
 from backend.singbox.inbounds import generate_singbox_inbounds
 from backend.singbox.outbounds import generate_singbox_outbounds, sanitize_singbox_config
