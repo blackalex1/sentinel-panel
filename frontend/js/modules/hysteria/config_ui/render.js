@@ -2,6 +2,7 @@ import { apiFetch } from "../../../api.js";
 import { showToast } from "../../../ui.js";
 import { t, translatePage } from "../../../i18n.js";
 import { saveHysteriaConfigToServer } from "./api.js";
+import { initCustomSelect } from "../../../components/customSelect.js";
 
 export function getLogLevelStyle(level) {
     const l = (level || "").toLowerCase();

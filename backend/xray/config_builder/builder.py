@@ -485,9 +485,9 @@ def generate_xray_config_json() -> dict:
 
     config = {
         "log": {
-            "access": str(backend.config.XRAY_LOG_PATH),
-            "error": str(backend.config.XRAY_LOG_PATH),
-            "loglevel": "info"
+            "access": str(xray_config_facade.XRAY_ACCESS_LOG_PATH),
+            "error": str(xray_config_facade.XRAY_ERROR_LOG_PATH),
+            "loglevel": "debug"
         },
         "api": {
             "tag": "api",

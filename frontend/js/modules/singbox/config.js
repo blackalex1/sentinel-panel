@@ -2,6 +2,9 @@ import { apiFetch } from "../../api.js";
 import { showToast } from "../../ui.js";
 import { t, translatePage } from "../../i18n.js";
 import { initCustomSelect } from "../../components/customSelect.js";
+import { initEditorModal } from "../xray/config_ui/editor_modal.js";
+
+initEditorModal();
 
 function getLogLevelStyle(level) {
     const l = (level || "").toLowerCase();
@@ -252,7 +255,58 @@ export function renderSingboxConfig(config) {
         });
     }
 
+    // Bind dynamically generated JSON edit buttons
+    parsedContainer.querySelectorAll(".edit-json-btn").forEach(btn => {
+        btn.addEventListener("click", () => {
+            const type = btn.getAttribute("data-type");
+            const idx = parseInt(btn.getAttribute("data-index"));
+
+            if (type === "singbox-log") {
+                window.openJsonEditModal(t("singbox_config_log_title", "Системные настройки и логирование"), config.log || {}, async (newObj) => {
+                    config.log = newObj;
+                    await saveSingboxConfigDirect(config);
+                });
+            } else if (type === "singbox-inbounds") {
+                window.openJsonEditModal(t("singbox_config_inbounds", "Входящие подключения (Inbounds)"), config.inbounds || [], async (newObj) => {
+                    config.inbounds = newObj;
+                    await saveSingboxConfigDirect(config);
+                });
+            } else if (type === "singbox-inbound") {
+                const ib = config.inbounds && config.inbounds[idx] ? config.inbounds[idx] : {};
+                window.openJsonEditModal(`${t("nav_inbounds", "Подключение")}: ${ib.type || "inbound"} (:${ib.listen_port || ib.port || ""})`, ib, async (newObj) => {
+                    if (!config.inbounds) config.inbounds = [];
+                    config.inbounds[idx] = newObj;
+                    await saveSingboxConfigDirect(config);
+                });
+            } else if (type === "singbox-outbounds") {
+                window.openJsonEditModal(t("singbox_config_outbounds", "Исходящие подключения (Outbounds)"), config.outbounds || [], async (newObj) => {
+                    config.outbounds = newObj;
+                    await saveSingboxConfigDirect(config);
+                });
+            } else if (type === "singbox-routing") {
+                window.openJsonEditModal(t("singbox_config_routing", "Маршрутизация (Routing Rules)"), config.route || {}, async (newObj) => {
+                    config.route = newObj;
+                    await saveSingboxConfigDirect(config);
+                });
+            }
+        });
+    });
+
     translatePage(parsedContainer);
+}
+
+async function saveSingboxConfigDirect(cfg) {
+    const res = await apiFetch("/api/singbox/config/save", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ config: cfg })
+    });
+    if (res && res.success) {
+        showToast(t("singbox_config_saved", "Конфигурация Sing-box сохранена"));
+        loadSingboxConfig();
+    } else {
+        showToast(res ? res.msg : t("singbox_config_save_error", "Ошибка сохранения конфигурации"), "error");
+    }
 }
 
 export function setupSingboxConfigListeners() {
