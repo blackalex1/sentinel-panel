@@ -97,11 +97,14 @@ async def disable_client(request: Request, email: str = Form(...)):
         
     from backend.xray import restart_xray, remove_client_api
     from backend.hysteria import restart_hysteria, kick_client_hysteria_api
+    from backend.singbox.service import restart_singbox
     
     client_exists = False
     disabled_count = 0
     with db_session() as session:
-        clients = session.query(ClientStats).filter_by(email=email).all()
+        clients = session.query(ClientStats).filter(
+            (ClientStats.email == email) | (ClientStats.client_uuid_or_pwd == email)
+        ).all()
         if clients:
             client_exists = True
         for c in clients:
@@ -116,7 +119,7 @@ async def disable_client(request: Request, email: str = Form(...)):
                         ib_settings = json.loads(inbound.settings or "{}")
                         ib_clients = ib_settings.get("clients", [])
                         for sc in ib_clients:
-                            if sc.get("email") == email:
+                            if sc.get("email") == email or sc.get("id") == email or sc.get("password") == email or sc.get("name") == email:
                                 sc["enable"] = False
                                 break
                         inbound.settings = json.dumps(ib_settings)
@@ -139,6 +142,7 @@ async def disable_client(request: Request, email: str = Form(...)):
         
     if disabled_count > 0:
         restart_xray()
+        restart_singbox()
         
         try:
             from backend.audit import log_action, get_actor_username
@@ -159,11 +163,14 @@ async def enable_client(request: Request, email: str = Form(...)):
         
     from backend.xray import restart_xray
     from backend.hysteria import restart_hysteria
+    from backend.singbox.service import restart_singbox
     
     client_exists = False
     enabled_count = 0
     with db_session() as session:
-        clients = session.query(ClientStats).filter_by(email=email).all()
+        clients = session.query(ClientStats).filter(
+            (ClientStats.email == email) | (ClientStats.client_uuid_or_pwd == email)
+        ).all()
         if clients:
             client_exists = True
         for c in clients:
@@ -178,7 +185,7 @@ async def enable_client(request: Request, email: str = Form(...)):
                         ib_settings = json.loads(inbound.settings or "{}")
                         ib_clients = ib_settings.get("clients", [])
                         for sc in ib_clients:
-                            if sc.get("email") == email:
+                            if sc.get("email") == email or sc.get("id") == email or sc.get("password") == email or sc.get("name") == email:
                                 sc["enable"] = True
                                 break
                         inbound.settings = json.dumps(ib_settings)
@@ -190,15 +197,16 @@ async def enable_client(request: Request, email: str = Form(...)):
         
     if enabled_count > 0:
         restart_xray()
+        restart_singbox()
         
         try:
             from backend.audit import log_action, get_actor_username
             actor = get_actor_username(request) or "IPS-Sentinel"
-            log_action(actor, "unblock_client_ips", target=email, details="IPS Auto-unblocked after investigation")
+            log_action(actor, "unblock_client_ips", target=email, details="Client unblocked via IPS Sentinel")
         except Exception:
             pass
             
-        return {"success": True, "msg": f"Client {email} unblocked and services reloaded."}
+        return {"success": True, "msg": f"Client {email} successfully enabled and unblocked."}
     if client_exists:
         return {"success": True, "msg": f"Client {email} is already active."}
     return {"success": False, "msg": f"Client {email} not found."}
