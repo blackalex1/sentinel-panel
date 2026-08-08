@@ -269,17 +269,21 @@ def find_client_ip_for_email_in_hysteria_log(email: str) -> Optional[str]:
 
 def find_email_and_ip_in_xray_log(client_ip: Optional[str], dst_ip: Optional[str], dst_port: int) -> Optional[tuple]:
     """
-    Ищет email и IP-адрес клиента Xray по параметрам соединения.
+    Ищет email и IP-адрес клиента Xray / Sing-box по параметрам соединения.
     Временной лимит: только лог-записи за последние 5 минут (отключается во время тестов).
     """
     import sys
     import backend.routes.security as sec_facade
-    if not sec_facade.XRAY_LOG_PATH.exists():
-        return None
+    from backend.config import SINGBOX_LOG_PATH
     from backend.utils import read_last_lines
-    try:
-        lines = read_last_lines(sec_facade.XRAY_LOG_PATH, 1000)
-    except Exception:
+    
+    paths_to_check = []
+    if sec_facade.XRAY_LOG_PATH.exists():
+        paths_to_check.append(sec_facade.XRAY_LOG_PATH)
+    if SINGBOX_LOG_PATH.exists():
+        paths_to_check.append(SINGBOX_LOG_PATH)
+        
+    if not paths_to_check:
         return None
         
     dst_port_str = f":{dst_port}"
@@ -287,49 +291,68 @@ def find_email_and_ip_in_xray_log(client_ip: Optional[str], dst_ip: Optional[str
     now_utc = datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None)
     is_testing = "pytest" in sys.modules
     
-    for line in reversed(lines):
-        log_time = parse_xray_timestamp(line)
-        if log_time and not is_testing:
-            diff_local = abs((now_local - log_time).total_seconds())
-            diff_utc = abs((now_utc - log_time).total_seconds())
-            if diff_local > 300 and diff_utc > 300:
-                continue
+    def extract_email_and_ip(line: str) -> Optional[tuple]:
+        # 1. email: ...
+        match_email = re.search(r"email:\s*(\S+)", line)
+        if not match_email:
+            # 2. [user: ...] or user: ... or username: ...
+            match_email = re.search(r"(?:user|username|clientUser|auth_user):\s*([^\s,\]]+)", line)
+        if not match_email:
+            # 3. JSON "user": "..." or "id": "..." or "email": "..."
+            match_email = re.search(r'"(?:user|username|id|email|auth)"\s*:\s*"([^"]+)"', line)
+        if not match_email:
+            # 4. sing-box [user@domain.com] or [username] tag at the end
+            match_email = re.search(r"\[([a-zA-Z0-9_\.\-]+@[a-zA-Z0-9_\.\-]+|[a-zA-Z0-9_\.\-]+)\]\s*$", line)
+        if not match_email:
+            # 5. Generic email pattern
+            match_email = re.search(r"([a-zA-Z0-9_\.\-]+@[a-zA-Z0-9_\.\-]+)", line)
             
-        if "email:" not in line:
+        if match_email:
+            email = match_email.group(1).strip("[]'\"")
+            match_ip = re.search(r"(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}):\d+\s+(?:accepted|inbound connection)", line)
+            if not match_ip:
+                match_ip = re.search(r"from\s+(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})", line)
+            ip = match_ip.group(1) if match_ip else client_ip
+            return email, ip
+        return None
+
+    for log_path in paths_to_check:
+        try:
+            lines = read_last_lines(log_path, 1000)
+        except Exception:
             continue
             
-        if dst_port_str in line:
-            if (dst_ip and dst_ip in line) or (client_ip and client_ip in line):
-                match_email = re.search(r"email:\s*(\S+)", line)
-                if match_email:
-                    email = match_email.group(1)
-                    match_ip = re.search(r"(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}):\d+\s+accepted", line)
-                    ip = match_ip.group(1) if match_ip else None
-                    return email, ip
-                    
-    for line in reversed(lines):
-        log_time = parse_xray_timestamp(line)
-        if log_time and not is_testing:
-            diff_local = abs((now_local - log_time).total_seconds())
-            diff_utc = abs((now_utc - log_time).total_seconds())
-            if diff_local > 300 and diff_utc > 300:
-                continue
-            
-        if "email:" not in line:
-            continue
-        if dst_port_str in line:
-            match_dest = re.search(r"accepted\s+(?:tcp|udp):([^:]+):", line)
-            if match_dest:
-                dest_host = match_dest.group(1)
-                if dst_ip and re.match(r"^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$", dest_host):
-                    if dest_host != dst_ip:
-                        continue
-                        
-            match_email = re.search(r"email:\s*(\S+)", line)
-            if match_email:
-                email = match_email.group(1)
-                match_ip = re.search(r"(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}):\d+\s+accepted", line)
-                ip = match_ip.group(1) if match_ip else None
-                return email, ip
+        for line in reversed(lines):
+            log_time = parse_xray_timestamp(line)
+            if log_time and not is_testing:
+                diff_local = abs((now_local - log_time).total_seconds())
+                diff_utc = abs((now_utc - log_time).total_seconds())
+                if diff_local > 300 and diff_utc > 300:
+                    continue
                 
+            if dst_port_str in line:
+                if (dst_ip and dst_ip in line) or (client_ip and client_ip in line) or not dst_ip:
+                    res = extract_email_and_ip(line)
+                    if res:
+                        return res
+                        
+        for line in reversed(lines):
+            log_time = parse_xray_timestamp(line)
+            if log_time and not is_testing:
+                diff_local = abs((now_local - log_time).total_seconds())
+                diff_utc = abs((now_utc - log_time).total_seconds())
+                if diff_local > 300 and diff_utc > 300:
+                    continue
+                
+            if dst_port_str in line:
+                match_dest = re.search(r"(?:accepted|connection)\s+(?:tcp|udp):([^:]+):", line)
+                if match_dest:
+                    dest_host = match_dest.group(1).strip("[]")
+                    if dst_ip and re.match(r"^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$", dest_host):
+                        if dest_host != dst_ip:
+                            continue
+                res = extract_email_and_ip(line)
+                if res:
+                    return res
+                    
     return None
