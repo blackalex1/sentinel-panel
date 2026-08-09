@@ -500,6 +500,21 @@ def _process_singbox_connection_data(data: dict):
                 except (ValueError, IndexError):
                     pass
 
+            outbound_tag = (
+                conn.get("outbound")
+                or conn.get("outboundName")
+                or metadata.get("outbound")
+                or metadata.get("outboundName")
+                or (isinstance(conn.get("chains"), list) and conn.get("chains") and conn.get("chains")[0])
+                or ""
+            )
+            if outbound_tag:
+                try:
+                    from backend.database import update_outbound_traffic
+                    update_outbound_traffic(outbound_tag, up_delta, down_delta)
+                except Exception:
+                    pass
+
     # Удаляем завершенные соединения из кэша
     stale_ids = set(_last_singbox_conn_stats.keys()) - active_conn_ids
     for s_id in stale_ids:
