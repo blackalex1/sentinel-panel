@@ -442,8 +442,10 @@ def generate_xray_config_json() -> dict:
         if "outboundTag" in rule:
             used_outbound_tags.add(rule["outboundTag"])
     for b in balancers:
-        for tag in b["selector"]:
+        for tag in b.get("selector", []):
             used_outbound_tags.add(tag)
+        if "fallbackTag" in b:
+            used_outbound_tags.add(b["fallbackTag"])
 
     filtered_xray_outbounds = [
         ob for ob in xray_outbounds
