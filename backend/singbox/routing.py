@@ -27,42 +27,7 @@ def generate_singbox_routing(get_all_routing_rules_fn=None, get_setting_fn=None)
             })
         return tag
 
-    # 1. Быстрая блокировка торрентов
-    try:
-        b_bit = get_setting_fn("block_bittorrent")
-        b_tor = get_setting_fn("block_torrents")
-        block_torrents = b_bit if b_bit is not None else b_tor
-        if block_torrents and str(block_torrents).lower() in ("true", "1"):
-            sb_rules.append({
-                "protocol": ["bittorrent"],
-                "outbound": "block"
-            })
-    except Exception as e:
-        logging.error(f"Error checking torrent block setting for sing-box: {e}")
-
-    # 2. Быстрая блокировка рекламы
-    try:
-        b_ads = get_setting_fn("block_ads")
-        if b_ads and str(b_ads).lower() in ("true", "1"):
-            sb_rules.append({
-                "rule_set": [add_singbox_rule_set("geosite", "category-ads-all")],
-                "outbound": "block"
-            })
-    except Exception as e:
-        logging.error(f"Error checking ads block setting for sing-box: {e}")
-
-    # 3. Быстрая блокировка по гео
-    try:
-        b_cn = get_setting_fn("block_cn")
-        if b_cn and str(b_cn).lower() in ("true", "1"):
-            sb_rules.append({
-                "rule_set": [add_singbox_rule_set("geoip", "cn")],
-                "outbound": "block"
-            })
-    except Exception as e:
-        logging.error(f"Error checking cn block setting for sing-box: {e}")
-
-    # 4. Пользовательские правила из БД
+    # 1. Routing rules from DB (includes synchronized quick security rules in exact user priority order)
     try:
         db_rules = get_all_routing_rules_fn()
         for rule in db_rules:
@@ -72,6 +37,8 @@ def generate_singbox_routing(get_all_routing_rules_fn=None, get_setting_fn=None)
             target_outbound = rule.get("outbound_tag")
             if not target_outbound:
                 continue
+            if target_outbound == "blocked":
+                target_outbound = "block"
 
             r_obj = {"outbound": target_outbound}
             rule_sets_needed = []
@@ -165,9 +132,6 @@ def generate_singbox_routing(get_all_routing_rules_fn=None, get_setting_fn=None)
                 if cidr_list:
                     r_obj["ip_cidr"] = cidr_list
 
-            if rule_sets_needed:
-                r_obj["rule_set"] = rule_sets_needed
-
             # Протоколы и сети
             protocols = rule.get("protocols")
             if isinstance(protocols, str):
@@ -175,13 +139,16 @@ def generate_singbox_routing(get_all_routing_rules_fn=None, get_setting_fn=None)
                     protocols = json.loads(protocols)
                 except Exception:
                     protocols = []
-            if protocols:
-                networks = [p.lower() for p in protocols if isinstance(p, str) and p.lower() in ("tcp", "udp")]
-                app_protos = [p for p in protocols if isinstance(p, str) and p.lower() not in ("tcp", "udp", "all")]
+            if protocols and isinstance(protocols, list):
+                networks = [str(p).lower() for p in protocols if isinstance(p, str) and str(p).lower() in ("tcp", "udp")]
+                app_protos = [str(p).lower() for p in protocols if isinstance(p, str) and str(p).lower() not in ("tcp", "udp", "all")]
                 if networks:
                     r_obj["network"] = networks
                 if app_protos:
                     r_obj["protocol"] = app_protos
+
+            if rule_sets_needed:
+                r_obj["rule_set"] = list(set(rule_sets_needed))
 
             if len(r_obj) > 1:
                 sb_rules.append(r_obj)

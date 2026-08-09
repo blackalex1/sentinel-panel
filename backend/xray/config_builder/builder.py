@@ -314,49 +314,7 @@ def generate_xray_config_json() -> dict:
         "outboundTag": "api"
     })
     
-    # 2. System Quick Block Rules
-    if get_setting("block_bittorrent") == "true":
-        rules.append({
-            "type": "field",
-            "outboundTag": "blocked",
-            "protocol": ["bittorrent"]
-        })
-        rules.append({
-            "type": "field",
-            "outboundTag": "blocked",
-            "domain": ["domain:torrent", "domain:tracker", "domain:peerexchange", "keyword:torrent"]
-        })
-        
-    if get_setting("block_ads") == "true":
-        rules.append({
-            "type": "field",
-            "outboundTag": "blocked",
-            "domain": ["geosite:category-ads-all"]
-        })
-        
-    blocked_countries = []
-    if get_setting("block_cn") == "true":
-        blocked_countries.append("cn")
-    if get_setting("block_ru") == "true":
-        blocked_countries.append("ru")
-    if get_setting("block_us") == "true":
-        blocked_countries.append("us")
-        
-    if blocked_countries:
-        geo_domains = []
-        for c in blocked_countries:
-            if c.lower() == "cn":
-                geo_domains.append("geosite:cn")
-            else:
-                geo_domains.append(f"regexp:.*\\.{c}$")
-        rules.append({
-            "type": "field",
-            "outboundTag": "blocked",
-            "ip": [f"geoip:{c}" for c in blocked_countries],
-            "domain": geo_domains
-        })
-
-    # 3. User Routing Rules from DB
+    # 3. Routing Rules from DB (includes synchronized quick security rules in exact user priority order)
     hysteria_outbound_tags = {
         ob["tag"] for ob in db_outbounds 
         if ob["enable"] == 1 and ob.get("protocol") in ("hysteria", "hysteria2")
@@ -368,20 +326,20 @@ def generate_xray_config_json() -> dict:
 
     db_rules = get_all_routing_rules()
     for r in db_rules:
-        if r["enable"] != 1:
+        if r.get("enable") != 1:
             continue
             
         rule_dict = {
             "type": "field",
-            "outboundTag": r["outbound_tag"]
+            "outboundTag": r.get("outbound_tag", "direct")
         }
         
-        if r["inbound_tags"]:
-            inbound_tags_list = r["inbound_tags"]
+        inbound_tags_list = r.get("inbound_tags")
+        if inbound_tags_list:
             active_xray_tags = {ib["tag"] for ib in xray_inbounds}
             if not any(t in active_xray_tags for t in inbound_tags_list):
                 continue
-            if r["outbound_tag"] in hysteria_outbound_tags:
+            if r.get("outbound_tag") in hysteria_outbound_tags:
                 inbound_tags_list = [
                     t for t in inbound_tags_list 
                     if not (t.startswith("inbound-") and t.endswith("-socks"))
@@ -389,18 +347,18 @@ def generate_xray_config_json() -> dict:
             if inbound_tags_list:
                 rule_dict["inboundTag"] = inbound_tags_list
         else:
-            if r["outbound_tag"] in hysteria_outbound_tags:
+            if r.get("outbound_tag") in hysteria_outbound_tags:
                 if active_non_socks_inbound_tags:
                     rule_dict["inboundTag"] = active_non_socks_inbound_tags
                 else:
                     continue
         if r.get("users"):
             rule_dict["user"] = r["users"]
-        if r["domains"]:
+        if r.get("domains"):
             rule_dict["domain"] = r["domains"]
-        if r["ips"]:
+        if r.get("ips"):
             rule_dict["ip"] = r["ips"]
-        if r["protocols"]:
+        if r.get("protocols"):
             protocols_list = r["protocols"]
             networks = [p.lower() for p in protocols_list if p.lower() in ("tcp", "udp")]
             app_protocols = [p for p in protocols_list if p.lower() not in ("tcp", "udp")]
@@ -485,8 +443,8 @@ def generate_xray_config_json() -> dict:
 
     config = {
         "log": {
-            "access": str(xray_config_facade.XRAY_ACCESS_LOG_PATH),
-            "error": str(xray_config_facade.XRAY_ERROR_LOG_PATH),
+            "access": str(backend.config.XRAY_LOG_PATH),
+            "error": str(backend.config.XRAY_LOG_PATH),
             "loglevel": "debug"
         },
         "api": {

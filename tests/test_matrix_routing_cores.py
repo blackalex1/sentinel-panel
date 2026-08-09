@@ -344,9 +344,16 @@ def test_system_quick_blocks_matrix(monkeypatch):
     monkeypatch.setattr("backend.singbox.config.get_all_inbounds", lambda: [])
     monkeypatch.setattr("backend.singbox.config.get_clients_for_inbound", lambda ib_id: [])
     monkeypatch.setattr("backend.xray.config.get_all_outbounds", lambda: [])
-    monkeypatch.setattr("backend.xray.config.get_all_routing_rules", lambda: [])
+    mock_quick_rules = [
+        {"id": 1, "remark": "Блокировка BitTorrent", "outbound_tag": "blocked", "protocols": ["bittorrent"], "domains": [], "ips": [], "enable": 1},
+        {"id": 2, "remark": "Блокировка рекламы", "outbound_tag": "blocked", "protocols": [], "domains": ["geosite:category-ads-all"], "ips": [], "enable": 1},
+        {"id": 3, "remark": "Блокировка Китая (CN)", "outbound_tag": "blocked", "protocols": [], "domains": ["geosite:cn"], "ips": ["geoip:cn"], "enable": 1},
+        {"id": 4, "remark": "Блокировка России (RU)", "outbound_tag": "blocked", "protocols": [], "domains": ["regexp:.*\\.ru$"], "ips": ["geoip:ru"], "enable": 1},
+        {"id": 5, "remark": "Блокировка США (US)", "outbound_tag": "blocked", "protocols": [], "domains": ["regexp:.*\\.us$"], "ips": ["geoip:us"], "enable": 1},
+    ]
+    monkeypatch.setattr("backend.xray.config.get_all_routing_rules", lambda: mock_quick_rules)
     monkeypatch.setattr("backend.database.get_all_outbounds", lambda: [])
-    monkeypatch.setattr("backend.database.get_all_routing_rules", lambda: [])
+    monkeypatch.setattr("backend.database.get_all_routing_rules", lambda: mock_quick_rules)
 
     # Enable all quick blocks
     settings_dict = {
@@ -418,6 +425,17 @@ def test_multi_split_routing_with_blocked_bittorrent(monkeypatch):
     ]
 
     mock_rules = [
+        {
+            "id": 0,
+            "remark": "Блокировка BitTorrent",
+            "outbound_tag": "blocked",
+            "inbound_tags": [],
+            "users": [],
+            "domains": ["domain:torrent", "domain:tracker", "domain:peerexchange", "keyword:torrent"],
+            "ips": [],
+            "protocols": ["bittorrent"],
+            "enable": 1
+        },
         {
             "id": 1,
             "remark": "Route AI Traffic to Hysteria 2",

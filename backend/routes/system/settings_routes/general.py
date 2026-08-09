@@ -21,40 +21,43 @@ async def get_settings_api(request: Request):
             totp_enabled = (user.totp_enabled == 1)
             admin_username = user.username
             
-    return {
-        "success": True,
-        "api_token": "••••••••" if settings.API_TOKEN else "",
-        "secret_path": settings.PANEL_SECRET_PATH,
-        "admin_username": admin_username,
-        "totp_enabled": totp_enabled,
-        "decoy_type": get_setting("decoy_type", "none"),
-        "decoy_value": get_setting("decoy_value", "company_landing"),
-        "ssl_domain": get_setting("ssl_domain", ""),
-        "ssl_email": get_setting("ssl_email", ""),
-        "language": get_setting("language", "ru"),
-        "session_timeout_days": int(get_setting("session_timeout_days", str(settings.SESSION_TIMEOUT_DAYS))),
-        "telegram_bot_token": "••••••••" if get_setting("telegram_bot_token", "") else "",
-        "telegram_admin_ids": get_setting("telegram_admin_ids", ""),
-        "telegram_2fa_enabled": get_setting("telegram_2fa_enabled", "false") == "true",
-        "telegram_bot_enabled": get_setting("telegram_bot_enabled", "true") == "true",
-        "login_max_attempts": int(get_setting("login_max_attempts", str(settings.LOGIN_MAX_ATTEMPTS))),
-        "login_attempts_period": int(get_setting("login_attempts_period", str(settings.LOGIN_ATTEMPTS_PERIOD))),
-        "login_fail_delay": float(get_setting("login_fail_delay", str(settings.LOGIN_FAIL_DELAY))),
-        "backup_enable": get_setting("backup_enable", "false") == "true",
-        "backup_interval": get_setting("backup_interval", "daily"),
-        "backup_rotation": int(get_setting("backup_rotation", "7")),
-        "backup_telegram": get_setting("backup_telegram", "false") == "true",
-        "backup_encrypt": get_setting("backup_encrypt", "false") == "true",
-        "backup_password_set": bool(get_setting("backup_password", "")),
-        "block_bittorrent": get_setting("block_bittorrent", "false") == "true",
-        "block_ads": get_setting("block_ads", "false") == "true",
-        "block_cn": get_setting("block_cn", "false") == "true",
-        "block_ru": get_setting("block_ru", "false") == "true",
-        "block_us": get_setting("block_us", "false") == "true",
-        "mux_enabled": get_setting("mux_enabled", "false") == "true",
-        "mux_concurrency": int(get_setting("mux_concurrency", "8")),
-        "mux_xver": get_setting("mux_xver", "0") == "1"
-    }
+        from backend.database import get_quick_security_rules_state
+        quick_states = get_quick_security_rules_state()
+
+        return {
+            "success": True,
+            "api_token": "••••••••" if settings.API_TOKEN else "",
+            "secret_path": settings.PANEL_SECRET_PATH,
+            "admin_username": admin_username,
+            "totp_enabled": totp_enabled,
+            "decoy_type": get_setting("decoy_type", "none"),
+            "decoy_value": get_setting("decoy_value", "company_landing"),
+            "ssl_domain": get_setting("ssl_domain", ""),
+            "ssl_email": get_setting("ssl_email", ""),
+            "language": get_setting("language", "ru"),
+            "session_timeout_days": int(get_setting("session_timeout_days", str(settings.SESSION_TIMEOUT_DAYS))),
+            "telegram_bot_token": "••••••••" if get_setting("telegram_bot_token", "") else "",
+            "telegram_admin_ids": get_setting("telegram_admin_ids", ""),
+            "telegram_2fa_enabled": get_setting("telegram_2fa_enabled", "false") == "true",
+            "telegram_bot_enabled": get_setting("telegram_bot_enabled", "true") == "true",
+            "login_max_attempts": int(get_setting("login_max_attempts", str(settings.LOGIN_MAX_ATTEMPTS))),
+            "login_attempts_period": int(get_setting("login_attempts_period", str(settings.LOGIN_ATTEMPTS_PERIOD))),
+            "login_fail_delay": float(get_setting("login_fail_delay", str(settings.LOGIN_FAIL_DELAY))),
+            "backup_enable": get_setting("backup_enable", "false") == "true",
+            "backup_interval": get_setting("backup_interval", "daily"),
+            "backup_rotation": int(get_setting("backup_rotation", "7")),
+            "backup_telegram": get_setting("backup_telegram", "false") == "true",
+            "backup_encrypt": get_setting("backup_encrypt", "false") == "true",
+            "backup_password_set": bool(get_setting("backup_password", "")),
+            "block_bittorrent": quick_states.get("block_bittorrent", get_setting("block_bittorrent", "false") == "true"),
+            "block_ads": quick_states.get("block_ads", get_setting("block_ads", "false") == "true"),
+            "block_cn": quick_states.get("block_cn", get_setting("block_cn", "false") == "true"),
+            "block_ru": quick_states.get("block_ru", get_setting("block_ru", "false") == "true"),
+            "block_us": quick_states.get("block_us", get_setting("block_us", "false") == "true"),
+            "mux_enabled": get_setting("mux_enabled", "false") == "true",
+            "mux_concurrency": int(get_setting("mux_concurrency", "8")),
+            "mux_xver": get_setting("mux_xver", "0") == "1"
+        }
 
 @router.post("/api/settings/update")
 async def update_settings_api(request: Request):
@@ -216,13 +219,14 @@ async def update_settings_api(request: Request):
  
         # 6. Quick Block Rules
         quick_block_changed = False
-        for key in ["block_bittorrent", "block_ads", "block_cn", "block_ru", "block_us"]:
-            if key in data:
-                old_val = get_setting(key, "false")
-                new_val = "true" if data.get(key) in (True, "true") else "false"
-                if old_val != new_val:
-                    set_setting(key, new_val)
-                    quick_block_changed = True
+        quick_keys = ["block_bittorrent", "block_ads", "block_cn", "block_ru", "block_us"]
+        if any(key in data for key in quick_keys):
+            from backend.database import sync_quick_security_rules
+            sync_quick_security_rules(data)
+            for key in quick_keys:
+                if key in data:
+                    set_setting(key, "true" if data.get(key) in (True, "true", 1, "1") else "false")
+            quick_block_changed = True
                     
         if quick_block_changed:
             from backend.xray import write_xray_config, restart_xray
@@ -230,6 +234,12 @@ async def update_settings_api(request: Request):
             write_xray_config()
             restart_xray()
             restart_hysteria()
+            try:
+                from backend.singbox import write_singbox_config, restart_singbox
+                write_singbox_config()
+                restart_singbox()
+            except Exception:
+                pass
 
         # 7. Client Multiplexing (Mux) Settings
         if "mux_enabled" in data:

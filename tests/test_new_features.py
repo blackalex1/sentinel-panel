@@ -126,12 +126,14 @@ def test_quick_block_rules_injection():
     from backend.xray.config import generate_xray_config_json
     from backend.database import set_setting
     
-    # 1. Enable blocking settings
-    set_setting("block_bittorrent", "true")
-    set_setting("block_ads", "true")
-    set_setting("block_cn", "true")
-    set_setting("block_ru", "false")
-    set_setting("block_us", "true")
+    from backend.database import sync_quick_security_rules
+    sync_quick_security_rules({
+        "block_bittorrent": "true",
+        "block_ads": "true",
+        "block_cn": "true",
+        "block_ru": "false",
+        "block_us": "true"
+    })
     
     try:
         config = generate_xray_config_json()
@@ -153,12 +155,16 @@ def test_quick_block_rules_injection():
         assert ads_rule["outboundTag"] == "blocked"
         
         # Verify country blocks (cn, us enabled; ru disabled)
-        country_rule = next((r for r in rules if any("cn" in ip for ip in r.get("ip", []))), None)
-        assert country_rule is not None
-        assert country_rule["outboundTag"] == "blocked"
-        assert "geoip:cn" in country_rule["ip"]
-        assert "geoip:us" in country_rule["ip"]
-        assert "geoip:ru" not in country_rule["ip"]
+        cn_rule = next((r for r in rules if "geoip:cn" in r.get("ip", [])), None)
+        assert cn_rule is not None
+        assert cn_rule["outboundTag"] == "blocked"
+
+        us_rule = next((r for r in rules if "geoip:us" in r.get("ip", [])), None)
+        assert us_rule is not None
+        assert us_rule["outboundTag"] == "blocked"
+
+        ru_rule = next((r for r in rules if "geoip:ru" in r.get("ip", [])), None)
+        assert ru_rule is None or ru_rule.get("enable") == 0
         
     finally:
         # Reset settings

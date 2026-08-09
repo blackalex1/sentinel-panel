@@ -168,7 +168,7 @@ def test_singbox_config_generation_with_hysteria_and_rules(monkeypatch):
 
     assert "route" in config
     rules = config["route"]["rules"]
-    assert len(rules) >= 3  # System blocks + user rule
+    assert len(rules) >= 2  # User rule + system API rule
 
     user_rule = next((r for r in rules if r.get("outbound") == "hysteria2-out"), None)
     assert user_rule is not None

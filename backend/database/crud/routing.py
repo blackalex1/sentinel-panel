@@ -82,3 +82,98 @@ def update_rules_priority(rule_ids_in_order: list):
             if rule:
                 rule.sort_order = idx + 1
         return True
+
+QUICK_SECURITY_RULES_SPECS = {
+    "block_bittorrent": {
+        "remark": "Блокировка BitTorrent",
+        "outbound_tag": "blocked",
+        "protocols": ["bittorrent"],
+        "domains": ["domain:torrent", "domain:tracker", "domain:peerexchange", "keyword:torrent"],
+        "ips": []
+    },
+    "block_ads": {
+        "remark": "Блокировка рекламы",
+        "outbound_tag": "blocked",
+        "protocols": [],
+        "domains": ["geosite:category-ads-all"],
+        "ips": []
+    },
+    "block_cn": {
+        "remark": "Блокировка сайтов Китая (CN)",
+        "outbound_tag": "blocked",
+        "protocols": [],
+        "domains": ["geosite:cn", "regexp:.*\\.cn$"],
+        "ips": ["geoip:cn"]
+    },
+    "block_ru": {
+        "remark": "Блокировка сайтов России (RU)",
+        "outbound_tag": "blocked",
+        "protocols": [],
+        "domains": ["regexp:.*\\.ru$", "regexp:.*\\.su$", "regexp:.*\\.рф$", "regexp:.*\\.xn--p1ai$", "geosite:yandex", "geosite:vk"],
+        "ips": ["geoip:ru"]
+    },
+    "block_us": {
+        "remark": "Блокировка сайтов США (US)",
+        "outbound_tag": "blocked",
+        "protocols": [],
+        "domains": ["regexp:.*\\.us$"],
+        "ips": ["geoip:us"]
+    }
+}
+
+def find_quick_rule(session, key: str):
+    spec = QUICK_SECURITY_RULES_SPECS.get(key)
+    if not spec:
+        return None
+    remark = spec["remark"]
+    rule = session.query(RoutingRule).filter(RoutingRule.remark.ilike(f"%{remark}%")).first()
+    if rule:
+        return rule
+    if key == "block_bittorrent":
+        rule = session.query(RoutingRule).filter(RoutingRule.protocols.like('%bittorrent%')).first()
+    elif key == "block_ads":
+        rule = session.query(RoutingRule).filter(RoutingRule.domains.like('%category-ads-all%')).first()
+    elif key == "block_ru":
+        rule = session.query(RoutingRule).filter(RoutingRule.ips.like('%geoip:ru%')).first()
+    elif key == "block_cn":
+        rule = session.query(RoutingRule).filter(RoutingRule.ips.like('%geoip:cn%')).first()
+    elif key == "block_us":
+        rule = session.query(RoutingRule).filter(RoutingRule.ips.like('%geoip:us%')).first()
+    return rule
+
+def sync_quick_security_rules(settings_dict: dict):
+    with backend.database.db_session() as session:
+        for key, spec in QUICK_SECURITY_RULES_SPECS.items():
+            if key in settings_dict:
+                enabled = 1 if settings_dict[key] in (True, "true", 1, "1") else 0
+                rule = find_quick_rule(session, key)
+                if rule:
+                    rule.enable = enabled
+                    rule.outbound_tag = spec["outbound_tag"]
+                    rule.domains = json.dumps(spec["domains"])
+                    rule.ips = json.dumps(spec["ips"])
+                    rule.protocols = json.dumps(spec["protocols"])
+                elif enabled:
+                    max_order = session.query(RoutingRule.sort_order).order_by(RoutingRule.sort_order.desc()).first()
+                    sort_order = (max_order[0] + 1) if max_order else 1
+                    new_rule = RoutingRule(
+                        remark=spec["remark"],
+                        outbound_tag=spec["outbound_tag"],
+                        inbound_tags="[]",
+                        users="[]",
+                        domains=json.dumps(spec["domains"]),
+                        ips=json.dumps(spec["ips"]),
+                        protocols=json.dumps(spec["protocols"]),
+                        enable=1,
+                        sort_order=sort_order
+                    )
+                    session.add(new_rule)
+
+def get_quick_security_rules_state() -> dict:
+    state = {}
+    with backend.database.db_session() as session:
+        for key in QUICK_SECURITY_RULES_SPECS.keys():
+            rule = find_quick_rule(session, key)
+            state[key] = bool(rule and rule.enable == 1)
+    return state
+

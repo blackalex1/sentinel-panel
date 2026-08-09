@@ -86,6 +86,9 @@ from backend.database.crud.routing import (
     update_routing_rule,
     delete_routing_rule,
     update_rules_priority,
+    sync_quick_security_rules,
+    get_quick_security_rules_state,
+    QUICK_SECURITY_RULES_SPECS,
 )
 
 from backend.database.crud.shared_cache import (

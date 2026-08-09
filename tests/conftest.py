@@ -1,5 +1,6 @@
 import os
 import sys
+import time
 import tempfile
 import urllib.parse
 from pathlib import Path
@@ -11,11 +12,12 @@ temp_dir = tempfile.TemporaryDirectory(ignore_cleanup_errors=True)
 temp_path = Path(temp_dir.name)
 
 # Patch configuration paths in sys.modules/backend.config
+worker_id = os.environ.get("PYTEST_XDIST_WORKER", "master")
 import backend.config
-backend.config.DB_PATH = temp_path / "test_panel.db"
-backend.config.XRAY_CONFIG_PATH = temp_path / "config.json"
-backend.config.XRAY_LOG_PATH = temp_path / "xray.log"
-backend.config.ENV_FILE = temp_path / ".env"
+backend.config.DB_PATH = temp_path / f"test_panel_{worker_id}.db"
+backend.config.XRAY_CONFIG_PATH = temp_path / f"config_{worker_id}.json"
+backend.config.XRAY_LOG_PATH = temp_path / f"xray_{worker_id}.log"
+backend.config.ENV_FILE = temp_path / f".env_{worker_id}"
 
 # Set test configuration settings
 backend.config.settings.PANEL_PORT = 12345
@@ -27,6 +29,12 @@ backend.config.settings.ADMIN_PASSWORD = "test_password"
 # --- Автоконфигурация тестовой базы данных PostgreSQL / SQLite ---
 test_admin_url = os.getenv("TEST_DATABASE_ADMIN_URL")
 test_app_url = os.getenv("TEST_DATABASE_URL")
+
+if worker_id != "master":
+    if test_app_url and not test_app_url.startswith("sqlite"):
+        test_app_url = f"{test_app_url}_{worker_id}"
+    if test_admin_url and not test_admin_url.startswith("sqlite"):
+        test_admin_url = f"{test_admin_url}_{worker_id}"
 
 def ensure_postgres_db_exists(admin_url: str):
     """Проверяет существование тестовой БД PostgreSQL и создает её при необходимости (IF NOT EXISTS)"""
@@ -114,24 +122,74 @@ if test_admin_url:
     finally:
         temp_admin_engine.dispose()
 
+class CrossProcessCoreLock:
+    def __init__(self):
+        self.lock_path = os.path.join(tempfile.gettempdir(), "spectre_real_core_test.lck")
+        self.f = None
+
+    def acquire(self):
+        self.f = open(self.lock_path, "w")
+        if sys.platform == "win32":
+            import msvcrt
+            start = time.time()
+            while True:
+                try:
+                    msvcrt.locking(self.f.fileno(), msvcrt.LK_NBLCK, 1)
+                    break
+                except (OSError, IOError):
+                    time.sleep(0.05)
+                    if time.time() - start > 60:
+                        break
+        else:
+            import fcntl
+            fcntl.flock(self.f.fileno(), fcntl.LOCK_EX)
+
+    def release(self):
+        if self.f:
+            try:
+                if sys.platform == "win32":
+                    import msvcrt
+                    msvcrt.locking(self.f.fileno(), msvcrt.LK_UNLCK, 1)
+                else:
+                    import fcntl
+                    fcntl.flock(self.f.fileno(), fcntl.LOCK_UN)
+            except Exception:
+                pass
+            try:
+                self.f.close()
+            except Exception:
+                pass
+            self.f = None
+
 @pytest.fixture(scope="function", autouse=True)
-def cleanup_real_core_processes():
-    yield
+def cleanup_real_core_processes(request):
+    node_path = getattr(request.node, "path", None) or getattr(request.node, "fspath", "")
+    test_file = Path(str(node_path)).name
+    needs_lock = any(k in test_file for k in ("test_live_socket_transfer", "test_dynamic_cores", "test_matrix_routing", "test_audit", "test_new_features", "test_routing_presets", "test_xray_config", "test_routing_tab", "test_real_core_investigation"))
+    lock = None
+    if needs_lock:
+        lock = CrossProcessCoreLock()
+        lock.acquire()
     try:
-        from backend.xray import stop_xray
-        stop_xray()
-    except Exception:
-        pass
-    try:
-        from backend.singbox import stop_singbox
-        stop_singbox()
-    except Exception:
-        pass
-    try:
-        from backend.hysteria import stop_hysteria
-        stop_hysteria()
-    except Exception:
-        pass
+        yield
+    finally:
+        try:
+            from backend.xray import stop_xray
+            stop_xray()
+        except Exception:
+            pass
+        try:
+            from backend.singbox import stop_singbox
+            stop_singbox()
+        except Exception:
+            pass
+        try:
+            from backend.hysteria import stop_hysteria
+            stop_hysteria()
+        except Exception:
+            pass
+        if lock:
+            lock.release()
 
 # 2.5 Mock Host Client
 import backend.host_client

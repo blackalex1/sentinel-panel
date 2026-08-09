@@ -216,7 +216,7 @@ export async function loadRoutingRules() {
                             remark: "Block Torrent Traffic",
                             outbound_tag: "blocked",
                             protocols: ["bittorrent"],
-                            domains: ["geosite:torrent"],
+                            domains: ["domain:torrent", "domain:tracker", "domain:peerexchange", "keyword:torrent"],
                             enable: 1
                         },
                         {
@@ -260,25 +260,22 @@ export async function loadRoutingRules() {
 
     // Load Quick Security Rules settings
     try {
-        const setRes = await fetch("/api/settings", {
-            headers: { "Authorization": `Bearer ${getCsrfToken()}` }
-        });
-        if (setRes.status === 200) {
-            const setObj = await setRes.json();
+        const setObj = await apiFetch("/api/settings");
+        if (setObj && setObj.success) {
             const bittorrentCb = document.getElementById("quick-block-bittorrent");
-            if (bittorrentCb) bittorrentCb.checked = setObj.block_bittorrent || false;
+            if (bittorrentCb) bittorrentCb.checked = Boolean(setObj.block_bittorrent);
             
             const adsCb = document.getElementById("quick-block-ads");
-            if (adsCb) adsCb.checked = setObj.block_ads || false;
+            if (adsCb) adsCb.checked = Boolean(setObj.block_ads);
             
             const cnCb = document.getElementById("quick-block-cn");
-            if (cnCb) cnCb.checked = setObj.block_cn || false;
+            if (cnCb) cnCb.checked = Boolean(setObj.block_cn);
             
             const ruCb = document.getElementById("quick-block-ru");
-            if (ruCb) ruCb.checked = setObj.block_ru || false;
+            if (ruCb) ruCb.checked = Boolean(setObj.block_ru);
             
             const usCb = document.getElementById("quick-block-us");
-            if (usCb) usCb.checked = setObj.block_us || false;
+            if (usCb) usCb.checked = Boolean(setObj.block_us);
         }
     } catch (err) {
         console.error("Failed to load quick security rules:", err);
