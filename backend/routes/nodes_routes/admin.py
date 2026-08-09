@@ -33,6 +33,7 @@ async def generate_join_code(request: Request):
     expires_at = created_at + 3600  # Valid for 1 hour
     
     from backend.database import get_setting
+    from backend.config import settings
     ssl_domain = get_setting("ssl_domain", "").strip()
     master_url = None
     if ssl_domain:

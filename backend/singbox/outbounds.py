@@ -66,13 +66,23 @@ def generate_singbox_outbounds(get_all_outbounds_fn=None) -> list:
             if tag in ("direct", "block"):
                 continue
 
-            proto = ob.get("protocol")
+            proto = ob.get("protocol") or ""
             ob_settings = parse_json_or_dict(ob.get("settings"))
             ob_stream = parse_json_or_dict(ob.get("stream_settings"))
 
+            proto_lower = proto.lower()
+            if proto_lower in ("blackhole", "block"):
+                sb_type = "block"
+            elif proto_lower in ("freedom", "direct"):
+                sb_type = "direct"
+            elif proto_lower in ("socks", "http", "wireguard", "vless", "vmess", "trojan", "shadowsocks", "hysteria", "hysteria2"):
+                sb_type = proto_lower
+            else:
+                sb_type = "direct"
+
             sb_outbound = {
                 "tag": tag,
-                "type": proto if proto in ("direct", "block", "socks", "http", "wireguard", "vless", "vmess", "trojan", "shadowsocks", "hysteria", "hysteria2") else "direct"
+                "type": sb_type
             }
 
             if proto in ("socks", "http"):
