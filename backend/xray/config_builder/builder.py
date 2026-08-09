@@ -329,7 +329,7 @@ def generate_xray_config_json() -> dict:
         if r.get("enable") != 1:
             continue
             
-        rule_dict = {
+        base_rule = {
             "type": "field",
             "outboundTag": r.get("outbound_tag", "direct")
         }
@@ -345,31 +345,46 @@ def generate_xray_config_json() -> dict:
                     if not (t.startswith("inbound-") and t.endswith("-socks"))
                 ]
             if inbound_tags_list:
-                rule_dict["inboundTag"] = inbound_tags_list
+                base_rule["inboundTag"] = inbound_tags_list
         else:
             if r.get("outbound_tag") in hysteria_outbound_tags:
                 if active_non_socks_inbound_tags:
-                    rule_dict["inboundTag"] = active_non_socks_inbound_tags
+                    base_rule["inboundTag"] = active_non_socks_inbound_tags
                 else:
                     continue
         if r.get("users"):
-            rule_dict["user"] = r["users"]
-        if r.get("domains"):
-            rule_dict["domain"] = r["domains"]
-        if r.get("ips"):
-            rule_dict["ip"] = r["ips"]
-        if r.get("protocols"):
-            protocols_list = r["protocols"]
-            networks = [p.lower() for p in protocols_list if p.lower() in ("tcp", "udp")]
-            app_protocols = [p for p in protocols_list if p.lower() not in ("tcp", "udp")]
-            
+            base_rule["user"] = r["users"]
+
+        domains = r.get("domains")
+        ips = r.get("ips")
+        protocols = r.get("protocols")
+
+        # В Xray атрибуты внутри одного объекта правила соединяются по логическому И (AND).
+        # Разделяем домены, IP и протоколы на отдельные правила Xray, чтобы они срабатывали по логическому ИЛИ (OR).
+        if domains:
+            rd = dict(base_rule)
+            rd["domain"] = domains
+            rules.append(rd)
+
+        if ips:
+            rd = dict(base_rule)
+            rd["ip"] = ips
+            rules.append(rd)
+
+        if protocols:
+            rd = dict(base_rule)
+            networks = [p.lower() for p in protocols if p.lower() in ("tcp", "udp")]
+            app_protocols = [p for p in protocols if p.lower() not in ("tcp", "udp")]
             if networks:
-                rule_dict["network"] = ",".join(networks)
+                rd["network"] = ",".join(networks)
             if app_protocols:
-                rule_dict["protocol"] = app_protocols
-            
-        if len(rule_dict) > 2:
-            rules.append(rule_dict)
+                rd["protocol"] = app_protocols
+            if "network" in rd or "protocol" in rd:
+                rules.append(rd)
+
+        if not domains and not ips and not protocols:
+            if len(base_rule) > 2:
+                rules.append(base_rule)
 
     # 4. Проверяем настройки резервирования для outbounds
     active_outbound_tags = {ob.get("tag") for ob in xray_outbounds if ob.get("tag")}

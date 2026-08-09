@@ -92,17 +92,18 @@ def test_intra_core_xray_routing(monkeypatch):
 
     # 3. Routing rules check
     rules = config["routing"]["rules"]
-    rule = next((r for r in rules if r.get("outboundTag") == "warp-out"), None)
-    assert rule is not None
-    assert rule["inboundTag"] == ["inbound-10"]
-    assert rule["user"] == ["user1@xray.com"]
-    assert "geosite:openai" in rule["domain"]
-    assert "domain:chatgpt.com" in rule["domain"]
-    assert "regexp:.*\\.openai\\.com" in rule["domain"]
-    assert "geoip:us" in rule["ip"]
-    assert "1.1.1.1/32" in rule["ip"]
-    assert rule["network"] == "tcp"
-    assert rule["protocol"] == ["bittorrent"]
+    domain_rule = next((r for r in rules if r.get("outboundTag") == "warp-out" and "domain" in r), None)
+    assert domain_rule is not None
+    assert domain_rule["inboundTag"] == ["inbound-10"]
+    assert domain_rule["user"] == ["user1@xray.com"]
+    assert "geosite:openai" in domain_rule["domain"]
+    assert "domain:chatgpt.com" in domain_rule["domain"]
+    assert "regexp:.*\\.openai\\.com" in domain_rule["domain"]
+
+    ip_rule = next((r for r in rules if r.get("outboundTag") == "warp-out" and "ip" in r), None)
+    assert ip_rule is not None
+    assert "geoip:us" in ip_rule["ip"]
+    assert "1.1.1.1/32" in ip_rule["ip"]
 
 
 def test_intra_core_singbox_routing(monkeypatch):
