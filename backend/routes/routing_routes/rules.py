@@ -43,7 +43,7 @@ async def create_rule_api(request: Request, payload: dict):
     restart_xray()
     try:
         from backend.singbox import write_singbox_config, restart_singbox
-        write_singbox_config()
+        write_singbox_config(force=True)
         restart_singbox()
     except Exception:
         pass
@@ -97,7 +97,7 @@ async def update_rule_api(request: Request, id: int, payload: dict):
     restart_xray()
     try:
         from backend.singbox import write_singbox_config, restart_singbox
-        write_singbox_config()
+        write_singbox_config(force=True)
         restart_singbox()
     except Exception:
         pass
@@ -128,7 +128,7 @@ async def delete_rule_api(request: Request, id: int):
     restart_xray()
     try:
         from backend.singbox import write_singbox_config, restart_singbox
-        write_singbox_config()
+        write_singbox_config(force=True)
         restart_singbox()
     except Exception:
         pass
@@ -154,7 +154,7 @@ async def sort_rules_api(request: Request, payload: dict):
     restart_xray()
     try:
         from backend.singbox import write_singbox_config, restart_singbox
-        write_singbox_config()
+        write_singbox_config(force=True)
         restart_singbox()
     except Exception:
         pass
@@ -241,7 +241,7 @@ async def import_rules_preset_api(request: Request, payload: dict):
     restart_xray()
     try:
         from backend.singbox import write_singbox_config, restart_singbox
-        write_singbox_config()
+        write_singbox_config(force=True)
         restart_singbox()
     except Exception:
         pass

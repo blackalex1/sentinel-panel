@@ -244,7 +244,7 @@ async def update_settings_api(request: Request):
             restart_hysteria()
             try:
                 from backend.singbox import write_singbox_config, restart_singbox
-                write_singbox_config()
+                write_singbox_config(force=True)
                 restart_singbox()
             except Exception:
                 pass

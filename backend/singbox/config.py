@@ -105,12 +105,12 @@ def parse_singbox_config(raw_input) -> dict:
 
     return sanitize_singbox_config(config_dict)
 
-def write_singbox_config(config_dict: dict = None) -> bool:
+def write_singbox_config(config_dict: dict = None, force: bool = False) -> bool:
     """Записывает конфигурационный файл sing-box в формате JSON"""
     try:
         setting_fn = getattr(sys.modules[__name__], "get_setting", db.get_setting)
         if config_dict is None:
-            if setting_fn("use_custom_singbox_config") == "true" and SINGBOX_CONFIG_PATH.exists():
+            if not force and setting_fn("use_custom_singbox_config") == "true" and SINGBOX_CONFIG_PATH.exists():
                 logging.info("Using existing custom Sing-box config from file.")
                 return True
             config_dict = generate_singbox_config_json()
