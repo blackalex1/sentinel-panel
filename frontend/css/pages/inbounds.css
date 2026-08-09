@@ -212,12 +212,12 @@ input:checked + .switch-slider:before {
 
 .modal-card {
     width: 95%;
-    max-width: 520px;
-    max-height: 88vh;
+    max-width: 540px;
+    max-height: 92vh;
     display: flex;
     flex-direction: column;
     margin: 20px auto;
-    padding: 32px;
+    padding: 28px 32px;
     transform: translateY(20px);
     transition: transform var(--transition-normal);
     background: rgba(14, 19, 36, 0.95) !important;
@@ -227,13 +227,35 @@ input:checked + .switch-slider:before {
     backdrop-filter: var(--blur-modal) !important;
     -webkit-backdrop-filter: var(--blur-modal) !important;
     box-sizing: border-box;
+    overflow: hidden !important;
 }
 
 .modal-body {
     overflow-y: auto;
+    overflow-x: hidden;
     flex: 1;
     min-height: 0;
-    padding-right: 4px;
+    max-height: calc(92vh - 100px);
+    padding-right: 6px;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 255, 255, 0.15) transparent;
+}
+
+.modal-body::-webkit-scrollbar {
+    width: 5px;
+}
+
+.modal-body::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.modal-body::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.15);
+    border-radius: 10px;
+}
+
+.modal-body::-webkit-scrollbar-thumb:hover {
+    background: rgba(139, 92, 246, 0.5);
 }
 
 .modal.active .modal-card {
@@ -241,14 +263,14 @@ input:checked + .switch-slider:before {
 }
 
 .large-card {
-    max-width: 900px;
+    max-width: 960px !important;
 }
 
 .modal-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 22px;
+    margin-bottom: 20px;
     border-bottom: 1px solid var(--border-color);
     padding-bottom: 14px;
     flex-shrink: 0;
@@ -304,10 +326,18 @@ input:checked + .switch-slider:before {
     padding-right: 4px;
     border-bottom: 1px solid var(--border-color);
     overflow-x: auto;
-    overflow-y: visible;
+    overflow-y: hidden;
     white-space: nowrap;
     align-items: flex-start;
     position: relative;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+}
+
+.modal-tabs::-webkit-scrollbar {
+    display: none;
+    height: 0;
+    width: 0;
 }
 
 .modal-tab-btn {
