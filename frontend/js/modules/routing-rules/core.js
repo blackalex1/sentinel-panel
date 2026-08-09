@@ -428,9 +428,7 @@ export async function openRoutingRuleModal(id = null) {
         const rule = rulesRes.obj.find(x => String(x.id) === String(id));
         if (rule) {
             const isApiRule = rule.inbound_tags && rule.inbound_tags.includes("api") && rule.outbound_tag === "api";
-            if (isApiRule) {
-                await populateOutboundDropdowns(true);
-            }
+            await populateOutboundDropdowns(isApiRule, rule.outbound_tag);
             document.getElementById("rule-id").value = rule.id;
             document.getElementById("rule-remark").value = rule.remark || "";
             document.getElementById("rule-outbound").value = rule.outbound_tag;

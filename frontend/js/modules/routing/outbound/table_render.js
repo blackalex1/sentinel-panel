@@ -100,11 +100,11 @@ export async function loadOutbounds() {
     populateOutboundDropdowns();
 }
 
-export async function populateOutboundDropdowns(showApi = false) {
+export async function populateOutboundDropdowns(showApi = false, targetVal = null) {
     const select = document.getElementById("rule-outbound");
     if (!select) return;
 
-    const currentVal = select.value;
+    const valToSet = targetVal !== null ? targetVal : select.value;
 
     if (!outboundsCache || outboundsCache.length === 0) {
         const res = await apiFetch("/api/routing/outbounds");
@@ -132,7 +132,7 @@ export async function populateOutboundDropdowns(showApi = false) {
         }
     });
 
-    if (currentVal) {
-        select.value = currentVal;
+    if (valToSet) {
+        select.value = valToSet;
     }
 }
