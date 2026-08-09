@@ -112,7 +112,6 @@ export async function loadCoreInfo() {
             }
         }
         
-        // Update top-bar badge
         const badge = document.getElementById("xray-status-badge");
         const statusText = badge ? badge.querySelector(".status-text") : null;
         if (badge && statusText) {
@@ -129,40 +128,81 @@ export async function loadCoreInfo() {
     await loadXrayConfig();
 }
 
-let lastXrayLogsStr = "";
+// ---------------------------------------------------------------------------
+// SSE-based log streaming — replaces 2-second setInterval polling
+// ---------------------------------------------------------------------------
 
-export async function loadLogs() {
-    const res = await apiFetch("/api/xray/logs");
-    if (!res || !res.success) return;
-    
-    const terminal = document.getElementById("logs-terminal");
-    if (terminal) {
-        const logsStr = JSON.stringify(res.logs);
-        if (logsStr === lastXrayLogsStr) {
-            return;
-        }
-        lastXrayLogsStr = logsStr;
-        
-        const currentScroll = terminal.scrollTop + terminal.clientHeight >= terminal.scrollHeight - 50;
-        
-        terminal.innerHTML = "";
-        res.logs.forEach(line => {
-            const div = document.createElement("div");
-            const cleanLine = line.replace(/[\u001b\u009b][[()#;?]*(?:[0-9]{1,4}(?:;[0-9]{0,4})*)?[0-9A-ORZcf-nqry=><]/g, '');
-            div.innerText = cleanLine;
-            
-            if (cleanLine.includes("[Warning]")) div.style.color = "var(--accent-orange)";
-            else if (cleanLine.includes("[Error]")) div.style.color = "var(--accent-rose)";
-            else if (cleanLine.includes("api:")) div.style.color = "var(--accent-blue)";
-            
-            terminal.appendChild(div);
-        });
-        
-        if (currentScroll) {
-            terminal.scrollTop = terminal.scrollHeight;
-        }
-    }
+const ANSI_RE = /[\u001b\u009b][[()#;?]*(?:[0-9]{1,4}(?:;[0-9]{0,4})*)?[0-9A-ORZcf-nqry=><]/g;
+const MAX_TERMINAL_LINES = 500;
+
+function makeLogDiv(rawLine) {
+    const div = document.createElement("div");
+    const clean = rawLine.replace(ANSI_RE, "");
+    div.innerText = clean;
+    if (clean.includes("[Warning]"))    div.style.color = "var(--accent-orange)";
+    else if (clean.includes("[Error]")) div.style.color = "var(--accent-rose)";
+    else if (clean.includes("api:"))   div.style.color = "var(--accent-blue)";
+    return div;
 }
+
+function appendToTerminal(terminal, lines) {
+    const atBottom = terminal.scrollTop + terminal.clientHeight >= terminal.scrollHeight - 50;
+    const frag = document.createDocumentFragment();
+    lines.forEach(l => frag.appendChild(makeLogDiv(l)));
+    terminal.appendChild(frag);
+    while (terminal.childElementCount > MAX_TERMINAL_LINES) {
+        terminal.removeChild(terminal.firstChild);
+    }
+    if (atBottom) terminal.scrollTop = terminal.scrollHeight;
+}
+
+let _xrayES = null;
+let _xrayReconnectTimer = null;
+let _xrayReconnectDelay = 1000;
+
+export function startLogsStream() {
+    stopLogsStream();
+    const terminal = document.getElementById("logs-terminal");
+    if (!terminal) return;
+
+    function connect() {
+        const es = new EventSource("/api/xray/logs/stream");
+        _xrayES = es;
+
+        es.addEventListener("history", (e) => {
+            try {
+                const lines = JSON.parse(e.data);
+                terminal.innerHTML = "";
+                appendToTerminal(terminal, lines);
+                _xrayReconnectDelay = 1000;
+            } catch (_) {}
+        });
+
+        es.addEventListener("line", (e) => {
+            try {
+                appendToTerminal(terminal, [JSON.parse(e.data)]);
+            } catch (_) {}
+        });
+
+        es.onerror = () => {
+            es.close();
+            _xrayES = null;
+            _xrayReconnectDelay = Math.min(_xrayReconnectDelay * 2, 30000);
+            _xrayReconnectTimer = setTimeout(connect, _xrayReconnectDelay);
+        };
+    }
+
+    connect();
+}
+
+export function stopLogsStream() {
+    if (_xrayReconnectTimer) { clearTimeout(_xrayReconnectTimer); _xrayReconnectTimer = null; }
+    if (_xrayES) { _xrayES.close(); _xrayES = null; }
+    _xrayReconnectDelay = 1000;
+}
+
+/** Kept for import compatibility with router.js — now a no-op since SSE handles streaming. */
+export async function loadLogs() {}
 
 export function setupXrayCoreListeners() {
     const prereleaseToggle = document.getElementById("xray-prerelease-toggle");
@@ -210,17 +250,14 @@ export function setupXrayCoreListeners() {
         updateBtn.addEventListener("click", async () => {
             const url = updateBtn.getAttribute("data-url");
             if (!url) return;
-            
             updateBtn.disabled = true;
             updateBtn.innerText = "Обновление...";
             showToast(t("xray_update_started", "Начался процесс обновления ядра Xray. Пожалуйста, подождите"), "info");
-            
             const res = await apiFetch("/api/xray/update", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ download_url: url })
             });
-            
             if (res && res.success) {
                 showToast(t("xray_update_success", "Ядро успешно обновлено до версии {version}!").replace("{version}", res.version));
                 loadCoreInfo();
@@ -236,9 +273,8 @@ export function setupXrayCoreListeners() {
         clearLogsBtn.addEventListener("click", async () => {
             const res = await apiFetch("/api/xray/logs/clear", { method: "POST" });
             if (res && res.success) {
-                lastXrayLogsStr = "[]";
                 const terminal = document.getElementById("logs-terminal");
-                if (terminal) terminal.innerText = "";
+                if (terminal) terminal.innerHTML = "";
                 showToast(t("logs_cleared", "Логи очищены"));
             } else {
                 showToast(t("logs_clear_error", "Ошибка при очистке логов"), "error");
@@ -251,10 +287,9 @@ export function setupXrayCoreListeners() {
         copyLogsBtn.addEventListener("click", () => {
             const terminal = document.getElementById("logs-terminal");
             if (terminal) {
-                const text = terminal.innerText;
-                navigator.clipboard.writeText(text).then(() => {
+                navigator.clipboard.writeText(terminal.innerText).then(() => {
                     showToast(t("logs_copied", "Логи скопированы в буфер обмена"));
-                }).catch(err => {
+                }).catch(() => {
                     showToast(t("logs_copy_error", "Не удалось скопировать логи"), "error");
                 });
             }

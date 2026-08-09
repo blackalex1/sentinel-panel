@@ -18,7 +18,7 @@ def check_auth(request: Request) -> bool:
     auth_header = request.headers.get("Authorization", "")
     if auth_header.startswith("Bearer "):
         token = auth_header.split(" ")[1]
-        if token == settings.API_TOKEN:
+        if hmac.compare_digest(token, settings.API_TOKEN):
             return True
             
     # 2. Проверка Session Cookie
@@ -101,7 +101,7 @@ def verify_telegram_webapp(init_data: str) -> Optional[dict]:
         # Вычисляем хэш
         calculated_hash = hmac.new(secret_key, data_check_string.encode(), hashlib.sha256).hexdigest()
         
-        if calculated_hash != received_hash:
+        if not hmac.compare_digest(calculated_hash, received_hash):
             logging.warning(
                 f"[verify_telegram_webapp] Signature hash mismatch! "
                 f"Check that the bot token set in the panel matches the bot you are using to open the WebApp. "

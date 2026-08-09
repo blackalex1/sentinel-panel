@@ -174,13 +174,7 @@ def test_download_xray_core_verification_failure_actual(monkeypatch, tmp_path):
     assert not (tmp_path / "xray_temp.zip").exists()
     assert not (tmp_path / "xray_temp_extract").exists()
     assert not (tmp_path / "xray").exists()
-    
-    # Restore global mocks
-    importlib.reload(backend.xray)
-    backend.xray.start_xray = lambda: True
-    backend.xray.stop_xray = lambda: None
-    backend.xray.restart_xray = lambda: True
-    backend.xray.is_xray_running = lambda: True
+    # monkeypatch automatically restores backend.xray after this test
 
 
 def test_vless_encryption_config():

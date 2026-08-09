@@ -57,6 +57,7 @@ from backend.database.crud.clients import (
 from backend.database.crud.settings import (
     get_setting,
     set_setting,
+    invalidate_settings_cache,
 )
 
 from backend.database.crud.sessions import (
@@ -96,6 +97,8 @@ from backend.database.crud.shared_cache import (
     set_shared_cache,
     delete_shared_cache,
     clean_expired_shared_cache,
+    atomic_increment_shared_cache,
+    get_int_shared_cache,
 )
 
 __all__ = [
@@ -141,6 +144,7 @@ __all__ = [
     "update_client_traffic_by_email",
     "get_setting",
     "set_setting",
+    "invalidate_settings_cache",
     "add_session_db",
     "get_session_db",
     "get_all_sessions_db",
@@ -165,4 +169,6 @@ __all__ = [
     "set_shared_cache",
     "delete_shared_cache",
     "clean_expired_shared_cache",
+    "atomic_increment_shared_cache",
+    "get_int_shared_cache",
 ]

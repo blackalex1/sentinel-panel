@@ -1,3 +1,4 @@
+import sys
 import json
 import logging
 import re
@@ -54,19 +55,38 @@ def parse_hysteria_timestamp(line: str) -> Optional[datetime.datetime]:
         pass
     return None
 
+def _get_hysteria_log_path():
+    import backend.config as b_cfg
+    try:
+        import backend.routes.security as sec_facade
+        if hasattr(sec_facade, "HYSTERIA_LOG_PATH") and sec_facade.HYSTERIA_LOG_PATH != b_cfg.BIN_DIR / "hysteria.log":
+            return sec_facade.HYSTERIA_LOG_PATH
+    except Exception:
+        pass
+    return b_cfg.HYSTERIA_LOG_PATH
+
+def _get_xray_log_path():
+    import backend.config as b_cfg
+    try:
+        import backend.routes.security as sec_facade
+        if hasattr(sec_facade, "XRAY_LOG_PATH") and sec_facade.XRAY_LOG_PATH != b_cfg.BIN_DIR / "xray.log":
+            return sec_facade.XRAY_LOG_PATH
+    except Exception:
+        pass
+    return b_cfg.XRAY_LOG_PATH
+
 def find_email_in_hysteria_log(dst_ip: Optional[str], dst_port: int) -> Optional[str]:
     """
     Парсит последние 1000 строк лога Hysteria 2 для поиска email (auth/id) по параметрам соединения.
     Временной лимит: только лог-записи за последние 5 минут (отключается во время тестов).
     """
-    import sys
-    import backend.routes.security as sec_facade
-    if not sec_facade.HYSTERIA_LOG_PATH.exists():
+    hys_path = _get_hysteria_log_path()
+    if not hys_path.exists():
         return None
         
     from backend.utils import read_last_lines
     try:
-        lines = read_last_lines(sec_facade.HYSTERIA_LOG_PATH, 1000)
+        lines = read_last_lines(hys_path, 1000)
     except Exception as e:
         logging.error(f"Error reading Hysteria logs for security search: {e}")
         return None
@@ -162,14 +182,13 @@ def find_email_in_xray_log(client_ip: Optional[str], dst_ip: Optional[str], dst_
     Парсит последние 1000 строк лога Xray для поиска email по параметрам соединения.
     Временной лимит: только лог-записи за последние 5 минут (отключается во время тестов).
     """
-    import sys
-    import backend.routes.security as sec_facade
-    if not sec_facade.XRAY_LOG_PATH.exists():
+    xray_path = _get_xray_log_path()
+    if not xray_path.exists():
         return None
         
     from backend.utils import read_last_lines
     try:
-        lines = read_last_lines(sec_facade.XRAY_LOG_PATH, 1000)
+        lines = read_last_lines(xray_path, 1000)
     except Exception as e:
         logging.error(f"Error reading Xray logs for security search: {e}")
         return None
@@ -227,13 +246,12 @@ def find_client_ip_for_email_in_hysteria_log(email: str) -> Optional[str]:
     Ищет последний зафиксированный IP-адрес подключения для конкретного email в логах Hysteria 2.
     Временной лимит: только лог-записи за последние 5 минут (отключается во время тестов).
     """
-    import sys
-    import backend.routes.security as sec_facade
-    if not sec_facade.HYSTERIA_LOG_PATH.exists():
+    hys_path = _get_hysteria_log_path()
+    if not hys_path.exists():
         return None
     from backend.utils import read_last_lines
     try:
-        lines = read_last_lines(sec_facade.HYSTERIA_LOG_PATH, 1000)
+        lines = read_last_lines(hys_path, 1000)
     except Exception:
         return None
         
@@ -272,8 +290,6 @@ def find_email_and_ip_in_xray_log(client_ip: Optional[str], dst_ip: Optional[str
     Ищет email и IP-адрес клиента Xray / Sing-box по параметрам соединения.
     Временной лимит: только лог-записи за последние 5 минут (отключается во время тестов).
     """
-    import sys
-    import backend.routes.security as sec_facade
     from backend.config import SINGBOX_LOG_PATH
     from backend.utils import read_last_lines
     
@@ -294,8 +310,9 @@ def find_email_and_ip_in_xray_log(client_ip: Optional[str], dst_ip: Optional[str
         pass
 
     paths_to_check = []
-    if sec_facade.XRAY_LOG_PATH.exists():
-        paths_to_check.append(sec_facade.XRAY_LOG_PATH)
+    xray_path = _get_xray_log_path()
+    if xray_path.exists():
+        paths_to_check.append(xray_path)
     if SINGBOX_LOG_PATH.exists():
         paths_to_check.append(SINGBOX_LOG_PATH)
         

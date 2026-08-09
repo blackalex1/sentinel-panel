@@ -1,10 +1,25 @@
 import os
 import logging
+import ipaddress
 from fastapi import APIRouter, Request
 
 from backend.auth_utils import check_auth, decoy_response
 
 router = APIRouter()
+
+def _is_valid_ip_or_cidr(val: str) -> bool:
+    """Returns True if val is a valid IPv4/IPv6 address or CIDR network."""
+    try:
+        ipaddress.ip_address(val)
+        return True
+    except ValueError:
+        pass
+    try:
+        ipaddress.ip_network(val, strict=False)
+        return True
+    except ValueError:
+        pass
+    return False
 
 @router.post("/api/security/block-ip")
 async def block_ip_api(request: Request, payload: dict = None):
@@ -23,6 +38,10 @@ async def block_ip_api(request: Request, payload: dict = None):
 
     if not ip:
         return {"success": False, "msg": "IP адрес обязателен"}
+
+    if not _is_valid_ip_or_cidr(ip):
+        logging.warning(f"[Block IP API] Rejected invalid IP format: {ip!r}")
+        return {"success": False, "msg": "Некорректный формат IP-адреса"}
 
     # 1. Add IP to OS firewall / ban table
     try:

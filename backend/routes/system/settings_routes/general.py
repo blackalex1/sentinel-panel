@@ -285,11 +285,8 @@ async def update_settings_api(request: Request):
 
 @router.get("/api/locales")
 async def get_locales_list_api(request: Request):
-    import backend.routes.system as system_facade
-    referer = request.headers.get("referer", "")
-    is_dev = "localhost" in referer or "127.0.0.1" in referer
-    if not system_facade.check_auth(request) and not is_dev and f"/{settings.PANEL_SECRET_PATH}" not in referer:
-        return system_facade.decoy_response()
+    # Public endpoint — only returns a list of available language codes.
+    # No sensitive data; accessible before login so the UI can load i18n.
     from backend.i18n import get_available_languages
     return {
         "success": True,
@@ -298,20 +295,16 @@ async def get_locales_list_api(request: Request):
 
 @router.get("/api/locales/{lang}")
 async def get_locale_dict_api(request: Request, lang: str):
-    import backend.routes.system as system_facade
-    referer = request.headers.get("referer", "")
-    is_dev = "localhost" in referer or "127.0.0.1" in referer
-    if not system_facade.check_auth(request) and not is_dev and f"/{settings.PANEL_SECRET_PATH}" not in referer:
-        return system_facade.decoy_response()
-    
+    # Public endpoint — only returns frontend UI translation strings.
+    # No sensitive data; accessible before login so the login page renders correctly.
     from backend.i18n import _translations
     lang_lower = lang.lower()
     lang_data = _translations.get(lang_lower)
-    
+
     # Fallback to English if requested is not found, then Russian
     if not lang_data:
         lang_data = _translations.get("en", _translations.get("ru", {}))
-        
+
     frontend_translations = lang_data.get("frontend", {})
     return {
         "success": True,

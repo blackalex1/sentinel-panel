@@ -98,7 +98,10 @@ def stop_xray():
     global xray_process, _last_session_stats
     _last_session_stats.clear()
     if xray_process:
-        logging.info("Stopping Xray process...")
+        try:
+            logging.info("Stopping Xray process...")
+        except Exception:
+            pass
         xray_process.terminate()
         try:
             xray_process.wait(timeout=5)
@@ -106,7 +109,10 @@ def stop_xray():
             xray_process.kill()
         xray_process = None
         time.sleep(0.2)
-        logging.info("Xray process stopped.")
+        try:
+            logging.info("Xray process stopped.")
+        except Exception:
+            pass
     elif "pytest" not in sys.modules:
         if backend.xray.IS_WINDOWS:
             taskkill_path = shutil.which("taskkill") or r"C:\Windows\System32\taskkill.exe"
@@ -114,7 +120,11 @@ def stop_xray():
         else:
             killall_path = shutil.which("killall") or "/usr/bin/killall"
             subprocess.run([killall_path, "xray"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)  # nosec B603
-        logging.info("Killed any orphan Xray processes.")
+        try:
+            logging.info("Killed any orphan Xray processes.")
+        except Exception:
+            pass
+
 
 def restart_xray():
     """Перезапускает процесс Xray с новым конфигом"""
@@ -291,9 +301,15 @@ def tail_xray_logs():
                     continue
                 print(f"[Xray] {line.strip()}", flush=True)
                 try:
+                    from backend.log_streamer import push_log_line
+                    push_log_line("xray", line)
+                except Exception:
+                    pass
+                try:
                     from backend.client_alerts import process_xray_log_line
                     process_xray_log_line(line)
                 except Exception as ex:
                     logging.error(f"Error processing Xray log line: {ex}")
     except Exception as e:
         logging.error(f"Error tailing Xray logs: {e}")
+

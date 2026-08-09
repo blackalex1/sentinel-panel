@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, BigInteger, ForeignKey, UniqueConstraint
+from sqlalchemy import Column, Integer, String, BigInteger, ForeignKey, UniqueConstraint, Index
 from sqlalchemy.orm import declarative_base, relationship
 
 Base = declarative_base()
@@ -79,6 +79,9 @@ class ClientTrafficDaily(Base):
     
     __table_args__ = (
         UniqueConstraint("email", "date", name="uq_client_email_date"),
+        # Отдельный индекс по date: планировщик каждые 30с делает filter_by(date=today)
+        # Составной уникальный индекс (email, date) не ускоряет запросы только по date.
+        Index("ix_client_traffic_daily_date", "date"),
     )
 
 

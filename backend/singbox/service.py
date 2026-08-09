@@ -144,6 +144,11 @@ def tail_singbox_logs():
                     continue
                 print(f"[Singbox] {line.strip()}", flush=True)
                 try:
+                    from backend.log_streamer import push_log_line
+                    push_log_line("singbox", line)
+                except Exception:
+                    pass
+                try:
                     from backend.client_alerts import process_singbox_log_line
                     process_singbox_log_line(line)
                 except Exception as ex:
@@ -292,7 +297,10 @@ def stop_singbox():
     kick_all_singbox_connections()
     _stop_singbox_ws_stream()
     _last_singbox_conn_stats.clear()
-    logging.info("Stopping sing-box process...")
+    try:
+        logging.info("Stopping sing-box process...")
+    except Exception:
+        pass
 
     if singbox_process is not None:
         try:
@@ -302,7 +310,10 @@ def stop_singbox():
             except subprocess.TimeoutExpired:
                 singbox_process.kill()
         except Exception as e:
-            logging.error(f"Error terminating sing-box process object: {e}")
+            try:
+                logging.error(f"Error terminating sing-box process object: {e}")
+            except Exception:
+                pass
         singbox_process = None
         time.sleep(0.2)
 
@@ -316,9 +327,16 @@ def stop_singbox():
                 subprocess.run(["pkill", "-9", "sing-box"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
                 subprocess.run(["killall", "-9", "sing-box"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         except Exception as e:
-            logging.error(f"Error terminating sing-box OS process: {e}")
+            try:
+                logging.error(f"Error terminating sing-box OS process: {e}")
+            except Exception:
+                pass
 
-    logging.info("Sing-box stopped.")
+    try:
+        logging.info("Sing-box stopped.")
+    except Exception:
+        pass
+
 
 def restart_singbox(force_generate: bool = True) -> bool:
     """Перезапускает процесс sing-box с регенерацией свежей конфигурации"""

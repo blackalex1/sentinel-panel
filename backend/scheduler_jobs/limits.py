@@ -106,6 +106,10 @@ def parse_recent_singbox_ips():
             return
 
         lines = read_last_lines(SINGBOX_LOG_PATH, 1000)
+
+        import re
+        # Pre-compile patterns once (not inside the loop)
+        ip_pattern = re.compile(r"(?:from|client)\s+(?:\[([^\]]+)\]|([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+))")
             
         for line in lines:
             if not line.strip():
@@ -124,18 +128,26 @@ def parse_recent_singbox_ips():
             if log_ts < cutoff_ts:
                 continue
 
-            for email in client_emails:
-                if email in line:
-                    import re
-                    match = re.search(r"(?:from|client)\s+(?:\[([^\]]+)\]|([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+))", line)
-                    if match:
-                        ip = match.group(1) or match.group(2)
-                    else:
-                        ip = "127.0.0.1"
+            # Find email directly in line — O(1) set lookup per found token
+            # instead of checking every client email against every line (O(n×m))
+            found_email = None
+            for token in line.split():
+                if token in client_emails:
+                    found_email = token
+                    break
 
-                    if email not in ACTIVE_IP_CACHE:
-                        ACTIVE_IP_CACHE[email] = {}
-                    ACTIVE_IP_CACHE[email][ip] = log_ts
+            if found_email is None:
+                continue
+
+            match = ip_pattern.search(line)
+            if match:
+                ip = match.group(1) or match.group(2)
+            else:
+                ip = "127.0.0.1"
+
+            if found_email not in ACTIVE_IP_CACHE:
+                ACTIVE_IP_CACHE[found_email] = {}
+            ACTIVE_IP_CACHE[found_email][ip] = log_ts
             
     except Exception as e:
         logging.error(f"[Scheduler] Error parsing Sing-box logs: {e}")

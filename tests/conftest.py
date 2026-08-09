@@ -163,16 +163,24 @@ class CrossProcessCoreLock:
 
 @pytest.fixture(scope="function", autouse=True)
 def cleanup_real_core_processes(request):
-    node_path = getattr(request.node, "path", None) or getattr(request.node, "fspath", "")
-    test_file = Path(str(node_path)).name
-    needs_lock = True
-    lock = None
-    if needs_lock:
-        lock = CrossProcessCoreLock()
-        lock.acquire()
+    """
+    Autouse fixture: cleanly stop any VPN core processes after every test.
+
+    CrossProcessCoreLock is intentionally NOT used here.
+    Each xdist worker has its own isolated SQLite DB (test_panel_{worker_id}.db)
+    and all subprocess.Popen calls are mocked in CI — no real cross-process
+    port conflicts occur, so a global file mutex would only serialize all workers
+    and cause timeouts.
+    """
     try:
         yield
     finally:
+        # Disable logging before calling stop functions.
+        # During xdist worker teardown pytest's log-capture StringIO is already
+        # closed; any logging.* call that reaches it raises ValueError which
+        # kills the worker subprocess via execnet stderr IPC.
+        import logging as _logging
+        _logging.disable(_logging.CRITICAL)
         try:
             from backend.xray import stop_xray
             stop_xray()
@@ -188,8 +196,7 @@ def cleanup_real_core_processes(request):
             stop_hysteria()
         except Exception:
             pass
-        if lock:
-            lock.release()
+        _logging.disable(_logging.NOTSET)
 
 # 2.5 Mock Host Client
 import backend.host_client
@@ -226,10 +233,15 @@ set_setting("telegram_admin_ids", "55555,66666")
 def clear_login_attempts():
     """Clear login rate-limiting attempts before each test."""
     try:
-        from backend.routes.auth import LOGIN_ATTEMPTS
+        from backend.routes.auth_routes.login import LOGIN_ATTEMPTS
         LOGIN_ATTEMPTS.clear()
     except Exception:
-        pass
+        try:
+            from backend.routes.auth import LOGIN_ATTEMPTS
+            LOGIN_ATTEMPTS.clear()
+        except Exception:
+            pass
+
 
 @pytest.fixture(scope="function")
 def client():

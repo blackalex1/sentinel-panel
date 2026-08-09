@@ -28,6 +28,7 @@ class NodeReportRequest(BaseModel):
     client_email: str
     tunnel_email: Optional[str] = None   # email инбаунда/туннеля который был забанен мастером
     details: Optional[str] = ""
+    timestamp: Optional[int] = None  # Unix timestamp (included in signature for replay protection)
     signature: str  # Hex-encoded signature of the JSON body (excluding this field)
 
 @router.post("/api/nodes/register", response_model=NodeRegisterResponse)
@@ -114,6 +115,15 @@ async def report_incident(request: Request, body: NodeReportRequest):
             except Exception:
                 logging.warning(f"[Nodes API] Cryptographic signature check failed for node {node_id}")
                 return nodes_facade.decoy_response()
+
+            # Replay protection: reject reports older than 90 seconds
+            if body.timestamp is not None:
+                age = abs(time.time() - body.timestamp)
+                if age > 90:
+                    logging.warning(f"[Nodes API] Rejected replayed report from node {node_id}: timestamp age {age:.1f}s > 90s")
+                    return nodes_facade.decoy_response()
+            else:
+                logging.warning(f"[Nodes API] Report from node {node_id} missing timestamp field — replay protection skipped")
                 
             logging.info(f"[Nodes API] Verified report from node {node_id}: {body.action} for client {body.client_email}")
             

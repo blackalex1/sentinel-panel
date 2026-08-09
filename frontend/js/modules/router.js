@@ -6,7 +6,7 @@ import { loadXrayConfig } from "./xray-config.js";
 import { loadOutbounds, loadRoutingRules } from "../routing.js";
 import { loadSettings, loadOptimizationStatus } from "./settings-ui.js";
 import { loadAuditLogs } from "./audit-logs.js";
-import { loadGeoInfo } from "./xray-core.js";
+import { loadGeoInfo, startLogsStream, stopLogsStream } from "./xray-core.js";
 import { t } from "../i18n.js";
 
 export let currentTab = "dashboard";
@@ -32,6 +32,9 @@ export function switchTab(tabId, loadInbounds, loadCoreInfo, loadLogs) {
         }
     });
     
+    // Stop any active SSE stream when switching away from xray tab
+    stopLogsStream();
+
     if (logsInterval) {
         clearInterval(logsInterval);
         logsInterval = null;
@@ -56,7 +59,7 @@ export function switchTab(tabId, loadInbounds, loadCoreInfo, loadLogs) {
         loadGeoInfo();
         loadXrayConfig();
         loadLogs();
-        logsInterval = setInterval(loadLogs, 2000);
+        startLogsStream();  // open SSE connection — replaces setInterval(loadLogs, 2000)
     } else if (tabId === "hysteria") {
         document.getElementById("current-tab-title").innerText = t("hysteria_title", "Логи и управление ядром Hysteria");
         loadHysteriaCoreInfo();

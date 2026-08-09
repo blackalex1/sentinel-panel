@@ -52,6 +52,11 @@ def tail_hysteria_logs():
                     continue
                 print(f"[Hysteria] {line.strip()}", flush=True)
                 try:
+                    from backend.log_streamer import push_log_line
+                    push_log_line("hysteria", line)
+                except Exception:
+                    pass
+                try:
                     from backend.client_alerts import process_hysteria_log_line
                     process_hysteria_log_line(line)
                 except Exception as ex:
@@ -214,7 +219,10 @@ def stop_hysteria():
     global hysteria_processes, _last_hysteria_stats
     _last_hysteria_stats.clear()
     for ib_id, process in list(hysteria_processes.items()):
-        logging.info(f"Stopping Hysteria 2 process for inbound {ib_id}...")
+        try:
+            logging.info(f"Stopping Hysteria 2 process for inbound {ib_id}...")
+        except Exception:
+            pass
         process.terminate()
         try:
             process.wait(timeout=3)
@@ -222,7 +230,7 @@ def stop_hysteria():
             process.kill()
         del hysteria_processes[ib_id]
     time.sleep(0.2)
-        
+
     if "pytest" not in sys.modules:
         if backend.hysteria.IS_WINDOWS:
             taskkill_path = shutil.which("taskkill") or r"C:\Windows\System32\taskkill.exe"

@@ -91,6 +91,9 @@ class Settings(BaseSettings):
     LOGIN_ATTEMPTS_PERIOD: int = 60
     LOGIN_FAIL_DELAY: float = 1.0
 
+    # Уровень логирования (DEBUG, INFO, WARNING, ERROR, CRITICAL)
+    LOG_LEVEL: str = "INFO"
+
 
 
 

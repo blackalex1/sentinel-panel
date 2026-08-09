@@ -16,8 +16,9 @@ from backend.singbox import start_singbox, stop_singbox, query_singbox_traffic
 from backend.api import router
 from backend.auth_utils import decoy_response, handle_decoy_route, DecoyException
 
-# Настройка логирования
-logging.basicConfig(level=logging.DEBUG, format="%(asctime)s - %(levelname)s - %(message)s")
+# Настройка логирования — уровень берётся из config/.env (LOG_LEVEL=INFO по умолчанию)
+_log_level = getattr(logging, settings.LOG_LEVEL.upper(), logging.INFO)
+logging.basicConfig(level=_log_level, format="%(asctime)s - %(levelname)s - %(message)s")
 
 # Фоновые задачи
 polling_task = None
@@ -194,6 +195,13 @@ async def add_no_cache_headers(request: Request, call_next):
         response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
         response.headers["Pragma"] = "no-cache"
         response.headers["Expires"] = "0"
+
+    # Mask real server technology — replace uvicorn header with nginx decoy on all responses
+    response.headers["Server"] = "nginx/1.24.0 (Ubuntu)"
+    try:
+        del response.headers["x-powered-by"]
+    except (KeyError, Exception):
+        pass
     return response
 
 # Подключаем API роутер

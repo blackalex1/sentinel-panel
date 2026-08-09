@@ -266,16 +266,7 @@ def test_download_hysteria_core_verification_failure_actual(monkeypatch, tmp_pat
     # Ensure temporary file is cleaned up and the binary doesn't exist
     assert not (tmp_path / "hysteria.tmp").exists()
     assert not (tmp_path / "hysteria").exists()
-    
-    # Now restore/reload and re-apply global mocks so other tests are not affected
-    importlib.reload(backend.hysteria)
-    backend.hysteria.start_hysteria = lambda: True
-    backend.hysteria.stop_hysteria = lambda: None
-    backend.hysteria.restart_hysteria = lambda: True
-    backend.hysteria.is_hysteria_running = lambda: True
-    backend.hysteria.get_installed_hysteria_version = lambda: "v2.5.0"
-    backend.hysteria.get_hysteria_logs = lambda: ["mock hysteria log line 1", "mock hysteria log line 2"]
-    backend.hysteria.download_hysteria_core = lambda url=None: "v2.5.0"
+    # monkeypatch automatically restores backend.hysteria after this test
 
 
 def test_update_online_emails_hysteria(monkeypatch):

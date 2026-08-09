@@ -51,44 +51,25 @@ def check_rate_limit(ip: str) -> bool:
     if is_ip_whitelisted_sync(ip):
         return True
     from backend.database import get_setting
-    from backend.database.crud.shared_cache import get_shared_cache
-    import json
+    from backend.database.crud.shared_cache import get_int_shared_cache
     now = time.time()
-    
+
     period = int(get_setting("login_attempts_period", str(settings.LOGIN_ATTEMPTS_PERIOD)))
     max_attempts = int(get_setting("login_max_attempts", str(settings.LOGIN_MAX_ATTEMPTS)))
-    
-    attempts_str = get_shared_cache(f"login_attempts:{ip}")
-    if attempts_str:
-        try:
-            attempts = json.loads(attempts_str)
-        except Exception:
-            attempts = []
-    else:
-        attempts = []
-        
-    attempts = [t for t in attempts if now - t < period]
-    return len(attempts) < max_attempts
+
+    count = get_int_shared_cache(f"login_attempts:{ip}")
+    return count < max_attempts
 
 def record_attempt(ip: str):
-    from backend.database.crud.shared_cache import get_shared_cache, set_shared_cache
+    """Atomically record one login attempt via a single SQL UPSERT.
+
+    Safe for concurrent multi-worker Uvicorn deployments: no read-modify-write,
+    the counter is incremented directly in the database engine.
+    """
+    from backend.database.crud.shared_cache import atomic_increment_shared_cache
     from backend.database import get_setting
-    import json
-    now = time.time()
-    
     period = int(get_setting("login_attempts_period", str(settings.LOGIN_ATTEMPTS_PERIOD)))
-    
-    attempts_str = get_shared_cache(f"login_attempts:{ip}")
-    if attempts_str:
-        try:
-            attempts = json.loads(attempts_str)
-        except Exception:
-            attempts = []
-    else:
-        attempts = []
-        
-    attempts.append(now)
-    set_shared_cache(f"login_attempts:{ip}", json.dumps(attempts), period)
+    atomic_increment_shared_cache(f"login_attempts:{ip}", period)
 
 class LoginRequest(BaseModel):
     username: str
@@ -174,9 +155,8 @@ async def login_api(request: Request, response: Response):
             telegram_active = get_setting("telegram_2fa_enabled", "false") == "true"
             
             if is_ip_whitelisted_sync(client_ip):
-                logging.info(f"[Auth Whitelist] Отключение 2FA для белого IP: {client_ip}")
-                totp_active = False
-                telegram_active = False
+                logging.info(f"[Auth Whitelist] Rate limiting bypassed for whitelisted IP: {client_ip}")
+                # NOTE: 2FA is NOT disabled for whitelisted IPs — rate-limit bypass only
             
             if totp_active or telegram_active:
                 code = None
@@ -330,6 +310,21 @@ async def telegram_webapp_auth(request: Request, response: Response, payload: di
         logging.warning(f"Unauthorized Telegram login attempt: ID {tg_id} ({user.get('username')})")
         log_action(username_tg, "login_telegram_failure", target=client_ip, details=f"Telegram ID {tg_id} not in whitelist")
         return JSONResponse(status_code=403, content={"success": False, "msg": "Ваш Telegram ID отсутствует в белом списке"})
+
+    # Проверяем статус TOTP 2FA для основного администратора.
+    # Если TOTP включён, вход через Telegram Mini App без кода недопустим.
+    from backend.models import User
+    from backend.database import db_session
+    with db_session() as db_s:
+        admin_user = db_s.query(User).first()
+        if admin_user and admin_user.totp_enabled == 1:
+            logging.warning(f"[Telegram Auth] Blocked: TOTP 2FA is active, Telegram login requires TOTP code (tg_id={tg_id})")
+            log_action(username_tg, "login_telegram_2fa_blocked", target=client_ip,
+                       details="Telegram Mini App login blocked: TOTP 2FA is enabled")
+            return JSONResponse(status_code=403, content={
+                "success": False,
+                "msg": "Вход через Telegram заблокирован: включена двухфакторная аутентификация (TOTP). Используйте форму входа."
+            })
         
     if not check_rate_limit(client_ip):
         from backend.audit import log_action

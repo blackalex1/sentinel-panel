@@ -102,17 +102,46 @@ def test_rate_limiting_shared_cache():
     LOGIN_ATTEMPTS.clear()
     assert check_rate_limit(ip) is True
 
-# Mock Process for subprocess tests
+# Mock Process for subprocess tests — implements the full Popen interface
 class MockProcess:
     returncode = 0
+    pid = 99999
+    stdin = None
+    stdout = None
+    stderr = None
+
     def wait(self, timeout=None):
+        """Raise TimeoutExpired when timeout given — simulates a running process.
+
+        start_xray() calls wait(timeout=0.5) and treats TimeoutExpired as
+        "process is alive" (success).  If wait() returns normally it means
+        the process died immediately (failure).
+
+        stop_xray() calls wait(timeout=5), gets TimeoutExpired, then calls
+        kill() which is a no-op here — the flow completes cleanly.
+        """
         if timeout is not None:
             raise subprocess.TimeoutExpired(cmd="mock", timeout=timeout)
         return 0
+
     def poll(self):
-        return None
+        return None  # None = process still running (start_xray checks this)
+
+    def terminate(self):
+        pass  # no-op, nothing to terminate
+
+    def kill(self):
+        pass  # no-op, nothing to kill
+
+    def send_signal(self, sig):
+        pass
+
+    def communicate(self, input=None, timeout=None):
+        return (b"", b"")
+
     def __enter__(self):
         return self
+
     def __exit__(self, exc_type, exc_val, exc_tb):
         pass
 
@@ -122,18 +151,23 @@ class MockCompletedProcess:
     stderr = ""
 
 def test_dynamic_xray_start(monkeypatch):
+    # Patch subprocess.Popen so we don't need the real xray binary in CI
+    import backend.xray.service as xray_svc
+    monkeypatch.setattr(xray_svc.subprocess, "Popen", lambda *a, **kw: MockProcess())
+    monkeypatch.setattr(xray_svc.subprocess, "run", lambda *a, **kw: MockCompletedProcess())
+
     # 1. No xray inbounds
     with db_session() as session:
         session.query(Inbound).delete()
         session.commit()
-        
+
     stop_xray()
-    
+
     # Start xray, should not start process because there are no inbounds
     res = start_xray()
     assert res is True
     assert is_xray_running() is False
-    
+
     # 2. Add an active xray inbound with a client
     from tests.core_verifier import get_free_port
     x_port = get_free_port()
@@ -150,7 +184,7 @@ def test_dynamic_xray_start(monkeypatch):
         session.add(ib)
         session.commit()
         session.refresh(ib)
-        
+
         cs = ClientStats(
             inbound_id=ib.id,
             email="dynamic_xray_client",
@@ -159,20 +193,20 @@ def test_dynamic_xray_start(monkeypatch):
         )
         session.add(cs)
         session.commit()
-        
-    res = False
-    for _ in range(5):
-        stop_xray()
-        time.sleep(0.3)
-        res = start_xray()
-        if res:
-            break
+
+    stop_xray()
+    res = start_xray()
     assert res is True
     assert is_xray_running() is True
     stop_xray()
     assert is_xray_running() is False
 
 def test_dynamic_xray_start_via_hysteria_routing(monkeypatch):
+    # Patch subprocess.Popen so we don't need the real xray binary in CI
+    import backend.xray.service as xray_svc
+    monkeypatch.setattr(xray_svc.subprocess, "Popen", lambda *a, **kw: MockProcess())
+    monkeypatch.setattr(xray_svc.subprocess, "run", lambda *a, **kw: MockCompletedProcess())
+
     with db_session() as session:
         session.query(ClientStats).delete()
         session.query(Inbound).delete()
@@ -195,7 +229,7 @@ def test_dynamic_xray_start_via_hysteria_routing(monkeypatch):
         session.add(ib)
         session.commit()
         session.refresh(ib)
-        
+
         cs = ClientStats(
             inbound_id=ib.id,
             email="hys_xray_client",
@@ -204,7 +238,7 @@ def test_dynamic_xray_start_via_hysteria_routing(monkeypatch):
         )
         session.add(cs)
         session.commit()
-        
+
     stop_xray()
     res = start_xray()
     assert res is True
@@ -213,17 +247,22 @@ def test_dynamic_xray_start_via_hysteria_routing(monkeypatch):
     assert is_xray_running() is False
 
 def test_dynamic_hysteria_start(monkeypatch):
+    # Patch subprocess.Popen so we don't need the real hysteria binary in CI
+    import backend.hysteria.service as hys_svc
+    monkeypatch.setattr(hys_svc.subprocess, "Popen", lambda *a, **kw: MockProcess())
+    monkeypatch.setattr(hys_svc.subprocess, "run", lambda *a, **kw: MockCompletedProcess())
+
     # 1. No active hysteria inbounds
     with db_session() as session:
         session.query(ClientStats).delete()
         session.query(Inbound).delete()
         session.commit()
-        
+
     stop_hysteria()
     res = start_hysteria()
     assert res is True
     assert is_hysteria_running() is False
-    
+
     # 2. Add active hysteria inbound
     from tests.core_verifier import get_free_port
     hys_port = get_free_port()
@@ -249,7 +288,7 @@ def test_dynamic_hysteria_start(monkeypatch):
         session.commit()
         from backend.hysteria import generate_self_signed_cert
         generate_self_signed_cert()
-        
+
     res = start_hysteria()
     assert res is True
     assert is_hysteria_running() is True

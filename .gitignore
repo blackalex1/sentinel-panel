@@ -78,3 +78,7 @@ warp_mock.json
 scratch/
 run_remote_tests.py
 security-audit-results/
+
+# === Generated Runtime Logs & Config Artifacts ===
+config/*.log
+config/*.sni
