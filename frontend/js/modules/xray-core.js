@@ -1,7 +1,9 @@
 export {
     loadCoreInfo,
     loadLogs,
-    setupXrayCoreListeners
+    setupXrayCoreListeners,
+    startLogsStream,
+    stopLogsStream
 } from "./xray/core.js";
 
 export {
