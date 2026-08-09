@@ -4,6 +4,7 @@ import { t } from "../../i18n.js";
 import { populateOutboundDropdowns } from "../routing-outbounds.js";
 
 export async function loadRoutingRules() {
+    loadQuickSecurityRules();
     const res = await apiFetch("/api/routing/rules");
     if (!res || !res.success) return;
     
