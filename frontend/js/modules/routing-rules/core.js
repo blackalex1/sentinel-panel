@@ -311,6 +311,29 @@ export async function loadQuickSecurityRules() {
             if (ruOut && setObj.block_ru_outbound) ruOut.value = setObj.block_ru_outbound;
             const usOut = document.getElementById("quick-outbound-us");
             if (usOut && setObj.block_us_outbound) usOut.value = setObj.block_us_outbound;
+
+            // Custom Config Warning Banner
+            const banner = document.getElementById("custom-config-warning-banner");
+            if (banner) {
+                const isCustomSingbox = setObj.use_custom_singbox_config === "true";
+                const isCustomXray = setObj.use_custom_xray_config === "true";
+                const isCustomHysteria = setObj.use_custom_hysteria_config === "true";
+
+                if (isCustomSingbox || isCustomXray || isCustomHysteria) {
+                    banner.style.display = "flex";
+                    const cores = [];
+                    if (isCustomSingbox) cores.push("Sing-box");
+                    if (isCustomXray) cores.push("Xray");
+                    if (isCustomHysteria) cores.push("Hysteria 2");
+                    const coresText = cores.join(", ");
+                    const titleEl = document.getElementById("custom-config-banner-title");
+                    const textEl = document.getElementById("custom-config-banner-text");
+                    if (titleEl) titleEl.innerText = `⚠️ Внимание: Активен ручной (кастомный) конфиг для ${coresText}!`;
+                    if (textEl) textEl.innerText = `Для ${coresText} включено ручное редактирование файла. Правила маршрутизации панели не применяются движком.`;
+                } else {
+                    banner.style.display = "none";
+                }
+            }
         }
     } catch (err) {
         console.error("Failed to load quick security rules:", err);

@@ -107,4 +107,19 @@ export function setupRoutingRulesListeners() {
             }
         });
     }
+
+    const btnResetCustom = document.getElementById("btn-reset-custom-config");
+    if (btnResetCustom) {
+        btnResetCustom.addEventListener("click", async () => {
+            btnResetCustom.disabled = true;
+            await Promise.all([
+                apiFetch("/api/singbox/config/reset", { method: "POST" }),
+                apiFetch("/api/xray/config/reset", { method: "POST" }),
+                apiFetch("/api/hysteria/config/reset", { method: "POST" })
+            ]);
+            btnResetCustom.disabled = false;
+            showToast("Конфигурация ядер успешно сброшена к авто-режиму панели!");
+            loadRoutingRules();
+        });
+    }
 }

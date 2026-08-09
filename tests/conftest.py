@@ -165,7 +165,7 @@ class CrossProcessCoreLock:
 def cleanup_real_core_processes(request):
     node_path = getattr(request.node, "path", None) or getattr(request.node, "fspath", "")
     test_file = Path(str(node_path)).name
-    needs_lock = any(k in test_file for k in ("test_live_socket_transfer", "test_dynamic_cores", "test_matrix_routing", "test_audit", "test_new_features", "test_routing_presets", "test_xray_config", "test_routing_tab", "test_real_core_investigation", "test_singbox_api"))
+    needs_lock = True
     lock = None
     if needs_lock:
         lock = CrossProcessCoreLock()
