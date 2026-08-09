@@ -399,7 +399,7 @@ export async function openRoutingRuleModal(id = null) {
     
     if (id && rulesRes && rulesRes.success) {
         document.getElementById("routing-rule-modal-title").innerText = t("routing_rule_modal_edit", "Редактирование правила маршрутизации");
-        const rule = rulesRes.obj.find(x => x.id === id);
+        const rule = rulesRes.obj.find(x => String(x.id) === String(id));
         if (rule) {
             const isApiRule = rule.inbound_tags && rule.inbound_tags.includes("api") && rule.outbound_tag === "api";
             if (isApiRule) {
