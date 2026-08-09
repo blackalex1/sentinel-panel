@@ -258,7 +258,9 @@ export async function loadRoutingRules() {
             }
         };
     }
+}
 
+export async function loadQuickSecurityRules() {
     // Load Quick Security Rules settings & outbound selections
     try {
         const [setObj, outboundsRes] = await Promise.all([
