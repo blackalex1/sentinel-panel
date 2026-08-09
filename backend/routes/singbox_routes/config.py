@@ -27,7 +27,9 @@ async def singbox_config(request: Request):
         except Exception as e:
             return {"success": False, "msg": f"Ошибка генерации конфигурации: {e}"}
 
-    return {"success": True, "config": config_dict}
+    from backend.database import get_setting
+    use_custom = get_setting("use_custom_singbox_config") == "true"
+    return {"success": True, "config": config_dict, "use_custom": use_custom}
 
 @router.post("/api/singbox/config")
 @router.post("/api/singbox/config/save")

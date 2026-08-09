@@ -101,6 +101,19 @@ export function setupHysteriaConfigListeners() {
             const index = parseInt(e.target.value);
             if (!isNaN(index) && window.hysteriaConfigs && window.hysteriaConfigs[index]) {
                 const item = window.hysteriaConfigs[index];
+                const modeBadge = document.getElementById("hysteria-config-mode-badge");
+                if (modeBadge) {
+                    const isCustom = item.use_custom === true;
+                    if (isCustom) {
+                        modeBadge.className = "tag-badge tag-badge-blocked";
+                        modeBadge.setAttribute("data-i18n", "config_mode_custom");
+                        modeBadge.innerText = t("config_mode_custom", "КАСТОМ");
+                    } else {
+                        modeBadge.className = "tag-badge tag-badge-direct";
+                        modeBadge.setAttribute("data-i18n", "config_mode_auto");
+                        modeBadge.innerText = t("config_mode_auto", "АВТО");
+                    }
+                }
                 renderSelectedHysteriaConfig(item.config, item.clients);
             }
         });

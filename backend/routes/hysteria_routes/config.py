@@ -47,12 +47,14 @@ async def hysteria_config(request: Request):
                     ib_id, ib["port"], active_clients, stream_settings
                 )
                 
+            use_custom = get_setting(f"use_custom_hysteria_config_{ib_id}") == "true"
             configs_list.append({
                 "inbound_id": ib_id,
                 "port": ib["port"],
                 "remark": ib["remark"],
                 "config": config_data,
-                "clients": active_clients
+                "clients": active_clients,
+                "use_custom": use_custom
             })
             
         return {"success": True, "configs": configs_list}

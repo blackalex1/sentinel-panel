@@ -3,6 +3,8 @@
     "name": "English"
   },
   "frontend": {
+    "config_mode_auto": "AUTO",
+    "config_mode_custom": "CUSTOM",
     "nav_dashboard": "Dashboard",
     "nav_inbounds": "Inbounds",
     "nav_xray": "Xray Core",

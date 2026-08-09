@@ -27,7 +27,9 @@ async def xray_config(request: Request):
         except Exception as e:
             return {"success": False, "msg": f"Ошибка генерации конфигурации: {e}"}
             
-    return {"success": True, "config": config_data}
+    from backend.database import get_setting
+    use_custom = get_setting("use_custom_xray_config") == "true"
+    return {"success": True, "config": config_data, "use_custom": use_custom}
 
 @router.post("/api/xray/config")
 async def save_xray_config(request: Request, payload: dict):

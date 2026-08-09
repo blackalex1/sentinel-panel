@@ -50,6 +50,21 @@ export async function loadSingboxConfig() {
     window.singboxConfig = res.config;
     const config = window.singboxConfig;
 
+    // Update config mode badge (Auto / Custom)
+    const modeBadge = document.getElementById("singbox-config-mode-badge");
+    if (modeBadge) {
+        const isCustom = res.use_custom === true;
+        if (isCustom) {
+            modeBadge.className = "tag-badge tag-badge-blocked";
+            modeBadge.setAttribute("data-i18n", "config_mode_custom");
+            modeBadge.innerText = t("config_mode_custom", "КАСТОМ");
+        } else {
+            modeBadge.className = "tag-badge tag-badge-direct";
+            modeBadge.setAttribute("data-i18n", "config_mode_auto");
+            modeBadge.innerText = t("config_mode_auto", "АВТО");
+        }
+    }
+
     const rawPre = document.getElementById("singbox-config-raw-pre");
     if (rawPre) {
         rawPre.value = JSON.stringify(config, null, 2);

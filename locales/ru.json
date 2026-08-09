@@ -3,6 +3,8 @@
     "name": "Русский"
   },
   "frontend": {
+    "config_mode_auto": "АВТО",
+    "config_mode_custom": "КАСТОМ",
     "nav_dashboard": "Панель",
     "nav_inbounds": "Подключения",
     "nav_xray": "Ядро Xray",
