@@ -144,12 +144,15 @@ def find_quick_rule(session, key: str):
 def sync_quick_security_rules(settings_dict: dict):
     with backend.database.db_session() as session:
         for key, spec in QUICK_SECURITY_RULES_SPECS.items():
-            if key in settings_dict:
-                enabled = 1 if settings_dict[key] in (True, "true", 1, "1") else 0
+            outbound_key = f"{key}_outbound"
+            desired_outbound = settings_dict.get(outbound_key)
+            if key in settings_dict or outbound_key in settings_dict:
+                enabled = 1 if settings_dict.get(key) in (True, "true", 1, "1") else 0
                 rule = find_quick_rule(session, key)
+                out_tag = desired_outbound if desired_outbound else (rule.outbound_tag if rule else spec["outbound_tag"])
                 if rule:
                     rule.enable = enabled
-                    rule.outbound_tag = spec["outbound_tag"]
+                    rule.outbound_tag = out_tag
                     rule.domains = json.dumps(spec["domains"])
                     rule.ips = json.dumps(spec["ips"])
                     rule.protocols = json.dumps(spec["protocols"])
@@ -158,7 +161,7 @@ def sync_quick_security_rules(settings_dict: dict):
                     sort_order = (max_order[0] + 1) if max_order else 1
                     new_rule = RoutingRule(
                         remark=spec["remark"],
-                        outbound_tag=spec["outbound_tag"],
+                        outbound_tag=out_tag,
                         inbound_tags="[]",
                         users="[]",
                         domains=json.dumps(spec["domains"]),
@@ -168,12 +171,13 @@ def sync_quick_security_rules(settings_dict: dict):
                         sort_order=sort_order
                     )
                     session.add(new_rule)
+        session.commit()
 
 def get_quick_security_rules_state() -> dict:
     state = {}
     with backend.database.db_session() as session:
-        for key in QUICK_SECURITY_RULES_SPECS.keys():
+        for key, spec in QUICK_SECURITY_RULES_SPECS.items():
             rule = find_quick_rule(session, key)
             state[key] = bool(rule and rule.enable == 1)
+            state[f"{key}_outbound"] = rule.outbound_tag if rule else spec["outbound_tag"]
     return state
-

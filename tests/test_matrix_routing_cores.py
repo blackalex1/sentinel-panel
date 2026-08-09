@@ -617,3 +617,96 @@ def test_outbounds_sorting_and_unused_filtering_all_cores(monkeypatch):
     # Verify sorting: direct #0
     assert singbox_config["outbounds"][0]["tag"] == "direct"
 
+
+def test_quick_security_rules_custom_outbounds_for_all_cores(monkeypatch):
+    """
+    Tests that quick security / country site rules with custom destination outbounds (DIRECT, BLOCKED, WARP)
+    are compiled properly and valid for both Xray and Sing-box real core binaries.
+    """
+    from backend.database import sync_quick_security_rules, get_all_routing_rules
+    from backend.xray.config import generate_xray_config_json
+    from backend.singbox.config import generate_singbox_config_json
+    from tests.core_verifier import validate_xray_config, validate_singbox_config
+
+    # Sync custom outbounds for quick rules
+    sync_quick_security_rules({
+        "block_ru": True,
+        "block_ru_outbound": "direct",
+        "block_cn": True,
+        "block_cn_outbound": "blocked",
+        "block_us": True,
+        "block_us_outbound": "warp_out",
+        "block_bittorrent": True,
+        "block_bittorrent_outbound": "blocked",
+        "block_ads": True,
+        "block_ads_outbound": "direct"
+    })
+
+    mock_inbounds = [
+        {
+            "id": 1,
+            "port": 10001,
+            "protocol": "vless",
+            "enable": 1,
+            "core": "all",
+            "settings": json.dumps({"decryption": "none"}),
+            "stream_settings": json.dumps({"security": "none"})
+        }
+    ]
+
+    mock_outbounds = [
+        {"id": 1, "remark": "Direct", "protocol": "freedom", "tag": "direct", "settings": "{}", "stream_settings": "{}", "enable": 1},
+        {"id": 2, "remark": "WARP", "protocol": "socks", "tag": "warp_out", "settings": json.dumps({"address": "127.0.0.1", "port": 40000}), "stream_settings": "{}", "enable": 1}
+    ]
+
+    rules = get_all_routing_rules()
+
+    monkeypatch.setattr("backend.xray.config.get_all_inbounds", lambda: mock_inbounds)
+    monkeypatch.setattr("backend.xray.config.get_clients_for_inbound", lambda ib_id: [])
+    monkeypatch.setattr("backend.xray.config.get_all_outbounds", lambda: mock_outbounds)
+    monkeypatch.setattr("backend.xray.config.get_all_routing_rules", lambda: rules)
+    monkeypatch.setattr("backend.xray.config.get_setting", lambda k: "false")
+
+    monkeypatch.setattr("backend.singbox.config.get_all_inbounds", lambda: mock_inbounds)
+    monkeypatch.setattr("backend.singbox.config.get_clients_for_inbound", lambda ib_id: [])
+    monkeypatch.setattr("backend.database.get_all_outbounds", lambda: mock_outbounds)
+    monkeypatch.setattr("backend.database.get_all_routing_rules", lambda: rules)
+    monkeypatch.setattr("backend.singbox.config.get_setting", lambda k: "false")
+
+    # 1. Validate Xray
+    xray_cfg = generate_xray_config_json()
+    valid_x, msg_x = validate_xray_config(xray_cfg)
+    assert valid_x is True, f"Real Xray binary validation failed: {msg_x}"
+
+    x_rules = xray_cfg["routing"]["rules"]
+    ru_rule_x = next((r for r in x_rules if "regexp:.*\\.ru$" in r.get("domain", [])), None)
+    assert ru_rule_x is not None
+    assert ru_rule_x["outboundTag"] == "direct"
+
+    cn_rule_x = next((r for r in x_rules if "geosite:cn" in r.get("domain", [])), None)
+    assert cn_rule_x is not None
+    assert cn_rule_x["outboundTag"] == "blocked"
+
+    us_rule_x = next((r for r in x_rules if "regexp:.*\\.us$" in r.get("domain", [])), None)
+    assert us_rule_x is not None
+    assert us_rule_x["outboundTag"] == "warp_out"
+
+    # 2. Validate Sing-box
+    sb_cfg = generate_singbox_config_json()
+    valid_s, msg_s = validate_singbox_config(sb_cfg)
+    assert valid_s is True, f"Real Sing-box binary validation failed: {msg_s}"
+
+    sb_rules = sb_cfg["route"]["rules"]
+    ru_rule_s = next((r for r in sb_rules if ".*\\.ru$" in r.get("domain_regex", [])), None)
+    assert ru_rule_s is not None
+    assert ru_rule_s["outbound"] == "direct"
+
+    cn_rule_s = next((r for r in sb_rules if "geosite-cn" in r.get("rule_set", [])), None)
+    assert cn_rule_s is not None
+    assert cn_rule_s["outbound"] == "block"
+
+    us_rule_s = next((r for r in sb_rules if ".*\\.us$" in r.get("domain_regex", [])), None)
+    assert us_rule_s is not None
+    assert us_rule_s["outbound"] == "warp_out"
+
+

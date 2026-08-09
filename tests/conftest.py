@@ -128,7 +128,7 @@ class CrossProcessCoreLock:
         self.f = None
 
     def acquire(self):
-        self.f = open(self.lock_path, "w")
+        self.f = open(self.lock_path, "a+")
         if sys.platform == "win32":
             import msvcrt
             start = time.time()
@@ -136,9 +136,9 @@ class CrossProcessCoreLock:
                 try:
                     msvcrt.locking(self.f.fileno(), msvcrt.LK_NBLCK, 1)
                     break
-                except (OSError, IOError):
-                    time.sleep(0.05)
-                    if time.time() - start > 60:
+                except (OSError, IOError, PermissionError):
+                    time.sleep(0.1)
+                    if time.time() - start > 120:
                         break
         else:
             import fcntl
@@ -165,7 +165,7 @@ class CrossProcessCoreLock:
 def cleanup_real_core_processes(request):
     node_path = getattr(request.node, "path", None) or getattr(request.node, "fspath", "")
     test_file = Path(str(node_path)).name
-    needs_lock = any(k in test_file for k in ("test_live_socket_transfer", "test_dynamic_cores", "test_matrix_routing", "test_audit", "test_new_features", "test_routing_presets", "test_xray_config", "test_routing_tab", "test_real_core_investigation"))
+    needs_lock = any(k in test_file for k in ("test_live_socket_transfer", "test_dynamic_cores", "test_matrix_routing", "test_audit", "test_new_features", "test_routing_presets", "test_xray_config", "test_routing_tab", "test_real_core_investigation", "test_singbox_api"))
     lock = None
     if needs_lock:
         lock = CrossProcessCoreLock()

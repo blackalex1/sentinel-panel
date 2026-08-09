@@ -1,74 +1,104 @@
 <!-- Quick Security Rules Section -->
 <div class="routing-section glass-card" style="margin-bottom: 25px;" id="quick-security-rules-card">
     <h3 data-i18n="routing_quick_rules_title" style="margin-top: 0; margin-bottom: 15px; font-size: 1.3rem;">
-        <i class="fa-solid fa-shield-halved" style="margin-right: 8px; color: var(--accent-color);"></i>
-        Быстрые правила безопасности
+        <i class="fa-solid fa-sliders" style="margin-right: 8px; color: var(--accent-color);"></i>
+        Параметры сайтов стран и категорий
     </h3>
     <p class="card-desc" data-i18n="routing_quick_rules_desc" style="font-size: 13px; color: var(--text-secondary); margin-bottom: 20px;">
-        Включение этих правил автоматически заблокирует соответствующие категории трафика (реклама, торренты, страны) для всех пользователей.
+        Включение этих правил позволяет перенаправлять соответствующие категории сайтов и трафика в выбранные выходящие подключения (BLOCKED, DIRECT, WARP или VPN).
     </p>
-    <div class="quick-rules-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 20px;">
-        <!-- Block Torrent -->
-        <label for="quick-block-bittorrent" style="display: flex; align-items: center; justify-content: space-between; background: var(--bg-input); border: 1px solid var(--border-color); border-radius: 12px; padding: 15px 20px; cursor: pointer; user-select: none;">
-            <div style="display: flex; flex-direction: column; gap: 4px;">
-                <span style="font-weight: 600; font-size: 14px;" data-i18n="routing_quick_block_bittorrent">Блокировать BitTorrent</span>
-                <span style="font-size: 11px; color: var(--text-secondary);" data-i18n="routing_quick_block_bittorrent_desc">Торрент-трафик и трекеры</span>
+    <div class="quick-rules-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 20px;">
+        <!-- Block/Route Torrent -->
+        <div style="background: var(--bg-input); border: 1px solid var(--border-color); border-radius: 12px; padding: 15px 20px; display: flex; flex-direction: column; gap: 10px;">
+            <label for="quick-block-bittorrent" style="display: flex; align-items: center; justify-content: space-between; cursor: pointer; user-select: none; margin: 0;">
+                <div style="display: flex; flex-direction: column; gap: 4px;">
+                    <span style="font-weight: 600; font-size: 14px;" data-i18n="routing_quick_block_bittorrent">BitTorrent трафик</span>
+                    <span style="font-size: 11px; color: var(--text-secondary);" data-i18n="routing_quick_block_bittorrent_desc">Торрент-трафик и трекеры</span>
+                </div>
+                <span class="switch-toggle">
+                    <input type="checkbox" id="quick-block-bittorrent">
+                    <span class="switch-slider"></span>
+                </span>
+            </label>
+            <div style="display: flex; align-items: center; justify-content: space-between; gap: 10px; border-top: 1px dashed var(--border-color); padding-top: 8px;">
+                <span style="font-size: 12px; color: var(--text-secondary);" data-i18n="routing_outbound_label">Назначение:</span>
+                <select id="quick-outbound-bittorrent" class="select-input quick-outbound-select" style="padding: 4px 8px; font-size: 12px; height: 30px; min-width: 130px;"></select>
             </div>
-            <span class="switch-toggle">
-                <input type="checkbox" id="quick-block-bittorrent">
-                <span class="switch-slider"></span>
-            </span>
-        </label>
+        </div>
         
-        <!-- Block Ads -->
-        <label for="quick-block-ads" style="display: flex; align-items: center; justify-content: space-between; background: var(--bg-input); border: 1px solid var(--border-color); border-radius: 12px; padding: 15px 20px; cursor: pointer; user-select: none;">
-            <div style="display: flex; flex-direction: column; gap: 4px;">
-                <span style="font-weight: 600; font-size: 14px;" data-i18n="routing_quick_block_ads">Блокировать рекламу</span>
-                <span style="font-size: 11px; color: var(--text-secondary);" data-i18n="routing_quick_block_ads_desc">AdBlock geosite категории</span>
+        <!-- Block/Route Ads -->
+        <div style="background: var(--bg-input); border: 1px solid var(--border-color); border-radius: 12px; padding: 15px 20px; display: flex; flex-direction: column; gap: 10px;">
+            <label for="quick-block-ads" style="display: flex; align-items: center; justify-content: space-between; cursor: pointer; user-select: none; margin: 0;">
+                <div style="display: flex; flex-direction: column; gap: 4px;">
+                    <span style="font-weight: 600; font-size: 14px;" data-i18n="routing_quick_block_ads">Реклама и трекеры</span>
+                    <span style="font-size: 11px; color: var(--text-secondary);" data-i18n="routing_quick_block_ads_desc">AdBlock geosite категории</span>
+                </div>
+                <span class="switch-toggle">
+                    <input type="checkbox" id="quick-block-ads">
+                    <span class="switch-slider"></span>
+                </span>
+            </label>
+            <div style="display: flex; align-items: center; justify-content: space-between; gap: 10px; border-top: 1px dashed var(--border-color); padding-top: 8px;">
+                <span style="font-size: 12px; color: var(--text-secondary);" data-i18n="routing_outbound_label">Назначение:</span>
+                <select id="quick-outbound-ads" class="select-input quick-outbound-select" style="padding: 4px 8px; font-size: 12px; height: 30px; min-width: 130px;"></select>
             </div>
-            <span class="switch-toggle">
-                <input type="checkbox" id="quick-block-ads">
-                <span class="switch-slider"></span>
-            </span>
-        </label>
+        </div>
 
-        <!-- Block China -->
-        <label for="quick-block-cn" style="display: flex; align-items: center; justify-content: space-between; background: var(--bg-input); border: 1px solid var(--border-color); border-radius: 12px; padding: 15px 20px; cursor: pointer; user-select: none;">
-            <div style="display: flex; flex-direction: column; gap: 4px;">
-                <span style="font-weight: 600; font-size: 14px;" data-i18n="routing_quick_block_cn">Блокировать сайты Китая (CN)</span>
-                <span style="font-size: 11px; color: var(--text-secondary);" data-i18n="routing_quick_block_cn_desc">Все IP и сайты Китая</span>
+        <!-- Route China -->
+        <div style="background: var(--bg-input); border: 1px solid var(--border-color); border-radius: 12px; padding: 15px 20px; display: flex; flex-direction: column; gap: 10px;">
+            <label for="quick-block-cn" style="display: flex; align-items: center; justify-content: space-between; cursor: pointer; user-select: none; margin: 0;">
+                <div style="display: flex; flex-direction: column; gap: 4px;">
+                    <span style="font-weight: 600; font-size: 14px;" data-i18n="routing_quick_block_cn">Сайты Китая (CN)</span>
+                    <span style="font-size: 11px; color: var(--text-secondary);" data-i18n="routing_quick_block_cn_desc">Все IP и сайты Китая</span>
+                </div>
+                <span class="switch-toggle">
+                    <input type="checkbox" id="quick-block-cn">
+                    <span class="switch-slider"></span>
+                </span>
+            </label>
+            <div style="display: flex; align-items: center; justify-content: space-between; gap: 10px; border-top: 1px dashed var(--border-color); padding-top: 8px;">
+                <span style="font-size: 12px; color: var(--text-secondary);" data-i18n="routing_outbound_label">Назначение:</span>
+                <select id="quick-outbound-cn" class="select-input quick-outbound-select" style="padding: 4px 8px; font-size: 12px; height: 30px; min-width: 130px;"></select>
             </div>
-            <span class="switch-toggle">
-                <input type="checkbox" id="quick-block-cn">
-                <span class="switch-slider"></span>
-            </span>
-        </label>
+        </div>
 
-        <!-- Block Russia -->
-        <label for="quick-block-ru" style="display: flex; align-items: center; justify-content: space-between; background: var(--bg-input); border: 1px solid var(--border-color); border-radius: 12px; padding: 15px 20px; cursor: pointer; user-select: none;">
-            <div style="display: flex; flex-direction: column; gap: 4px;">
-                <span style="font-weight: 600; font-size: 14px;" data-i18n="routing_quick_block_ru">Блокировать сайты России (RU)</span>
-                <span style="font-size: 11px; color: var(--text-secondary);" data-i18n="routing_quick_block_ru_desc">Все IP и сайты России</span>
+        <!-- Route Russia -->
+        <div style="background: var(--bg-input); border: 1px solid var(--border-color); border-radius: 12px; padding: 15px 20px; display: flex; flex-direction: column; gap: 10px;">
+            <label for="quick-block-ru" style="display: flex; align-items: center; justify-content: space-between; cursor: pointer; user-select: none; margin: 0;">
+                <div style="display: flex; flex-direction: column; gap: 4px;">
+                    <span style="font-weight: 600; font-size: 14px;" data-i18n="routing_quick_block_ru">Сайты России (RU)</span>
+                    <span style="font-size: 11px; color: var(--text-secondary);" data-i18n="routing_quick_block_ru_desc">Все IP и сайты России</span>
+                </div>
+                <span class="switch-toggle">
+                    <input type="checkbox" id="quick-block-ru">
+                    <span class="switch-slider"></span>
+                </span>
+            </label>
+            <div style="display: flex; align-items: center; justify-content: space-between; gap: 10px; border-top: 1px dashed var(--border-color); padding-top: 8px;">
+                <span style="font-size: 12px; color: var(--text-secondary);" data-i18n="routing_outbound_label">Назначение:</span>
+                <select id="quick-outbound-ru" class="select-input quick-outbound-select" style="padding: 4px 8px; font-size: 12px; height: 30px; min-width: 130px;"></select>
             </div>
-            <span class="switch-toggle">
-                <input type="checkbox" id="quick-block-ru">
-                <span class="switch-slider"></span>
-            </span>
-        </label>
+        </div>
 
-        <!-- Block US -->
-        <label for="quick-block-us" style="display: flex; align-items: center; justify-content: space-between; background: var(--bg-input); border: 1px solid var(--border-color); border-radius: 12px; padding: 15px 20px; cursor: pointer; user-select: none;">
-            <div style="display: flex; flex-direction: column; gap: 4px;">
-                <span style="font-weight: 600; font-size: 14px;" data-i18n="routing_quick_block_us">Блокировать сайты США (US)</span>
-                <span style="font-size: 11px; color: var(--text-secondary);" data-i18n="routing_quick_block_us_desc">Все IP и сайты США</span>
+        <!-- Route US -->
+        <div style="background: var(--bg-input); border: 1px solid var(--border-color); border-radius: 12px; padding: 15px 20px; display: flex; flex-direction: column; gap: 10px;">
+            <label for="quick-block-us" style="display: flex; align-items: center; justify-content: space-between; cursor: pointer; user-select: none; margin: 0;">
+                <div style="display: flex; flex-direction: column; gap: 4px;">
+                    <span style="font-weight: 600; font-size: 14px;" data-i18n="routing_quick_block_us">Сайты США (US)</span>
+                    <span style="font-size: 11px; color: var(--text-secondary);" data-i18n="routing_quick_block_us_desc">Все IP и сайты США</span>
+                </div>
+                <span class="switch-toggle">
+                    <input type="checkbox" id="quick-block-us">
+                    <span class="switch-slider"></span>
+                </span>
+            </label>
+            <div style="display: flex; align-items: center; justify-content: space-between; gap: 10px; border-top: 1px dashed var(--border-color); padding-top: 8px;">
+                <span style="font-size: 12px; color: var(--text-secondary);" data-i18n="routing_outbound_label">Назначение:</span>
+                <select id="quick-outbound-us" class="select-input quick-outbound-select" style="padding: 4px 8px; font-size: 12px; height: 30px; min-width: 130px;"></select>
             </div>
-            <span class="switch-toggle">
-                <input type="checkbox" id="quick-block-us">
-                <span class="switch-slider"></span>
-            </span>
-        </label>
+        </div>
     </div>
     <div style="margin-top: 20px; display: flex; justify-content: flex-end;">
-        <button id="btn-save-quick-rules" class="btn primary-btn" style="padding: 8px 16px;"><i class="fa-solid fa-floppy-disk" style="margin-right: 5px;"></i><span data-i18n="routing_save_quick_rules">Сохранить правила</span></button>
+        <button id="btn-save-quick-rules" class="btn primary-btn" style="padding: 8px 16px;"><i class="fa-solid fa-floppy-disk" style="margin-right: 5px;"></i><span data-i18n="routing_save_quick_rules">Сохранить параметры</span></button>
     </div>
 </div>

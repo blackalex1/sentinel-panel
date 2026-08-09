@@ -10,22 +10,22 @@ def test_global_traffic_details_api(monkeypatch):
     Verifies that global_traffic_details_api returns correct per-client consumption,
     percentage breakdown, and daily traffic totals.
     """
-    today_str = datetime.date.today().isoformat()
+    test_date_str = "2099-12-31"
     
     with db_session() as session:
-        session.query(ClientTrafficDaily).filter_by(date=today_str).delete()
+        session.query(ClientTrafficDaily).filter_by(date=test_date_str).delete()
         
         # Insert client 1: 700 MB down, 70 MB up
         rec1 = ClientTrafficDaily(
             email="user1@test.com",
-            date=today_str,
+            date=test_date_str,
             up=70 * 1024 * 1024,
             down=700 * 1024 * 1024
         )
         # Insert client 2: 300 MB down, 30 MB up
         rec2 = ClientTrafficDaily(
             email="user2@test.com",
-            date=today_str,
+            date=test_date_str,
             up=30 * 1024 * 1024,
             down=300 * 1024 * 1024
         )
@@ -37,10 +37,10 @@ def test_global_traffic_details_api(monkeypatch):
     monkeypatch.setattr("backend.routes.system.check_auth", lambda r: True)
 
     import asyncio
-    res = asyncio.run(global_traffic_details_api(req_mock, date=today_str))
+    res = asyncio.run(global_traffic_details_api(req_mock, date=test_date_str))
 
     assert res["success"] is True
-    assert res["date"] == today_str
+    assert res["date"] == test_date_str
     
     expected_total_down = (700 + 300) * 1024 * 1024
     expected_total_up = (70 + 30) * 1024 * 1024

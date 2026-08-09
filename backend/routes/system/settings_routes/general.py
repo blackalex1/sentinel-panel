@@ -50,10 +50,15 @@ async def get_settings_api(request: Request):
             "backup_encrypt": get_setting("backup_encrypt", "false") == "true",
             "backup_password_set": bool(get_setting("backup_password", "")),
             "block_bittorrent": quick_states.get("block_bittorrent", get_setting("block_bittorrent", "false") == "true"),
+            "block_bittorrent_outbound": quick_states.get("block_bittorrent_outbound", get_setting("block_bittorrent_outbound", "blocked")),
             "block_ads": quick_states.get("block_ads", get_setting("block_ads", "false") == "true"),
+            "block_ads_outbound": quick_states.get("block_ads_outbound", get_setting("block_ads_outbound", "blocked")),
             "block_cn": quick_states.get("block_cn", get_setting("block_cn", "false") == "true"),
+            "block_cn_outbound": quick_states.get("block_cn_outbound", get_setting("block_cn_outbound", "blocked")),
             "block_ru": quick_states.get("block_ru", get_setting("block_ru", "false") == "true"),
+            "block_ru_outbound": quick_states.get("block_ru_outbound", get_setting("block_ru_outbound", "blocked")),
             "block_us": quick_states.get("block_us", get_setting("block_us", "false") == "true"),
+            "block_us_outbound": quick_states.get("block_us_outbound", get_setting("block_us_outbound", "blocked")),
             "mux_enabled": get_setting("mux_enabled", "false") == "true",
             "mux_concurrency": int(get_setting("mux_concurrency", "8")),
             "mux_xver": get_setting("mux_xver", "0") == "1"
@@ -217,15 +222,18 @@ async def update_settings_api(request: Request):
                         return {"success": False, "msg": t("backup_current_password_incorrect", lang)}
             set_setting("backup_encrypt", new_encrypt)
  
-        # 6. Quick Block Rules
+        # 6. Quick Block Rules & Outbound Parameters
         quick_block_changed = False
         quick_keys = ["block_bittorrent", "block_ads", "block_cn", "block_ru", "block_us"]
-        if any(key in data for key in quick_keys):
+        quick_outbound_keys = [f"{k}_outbound" for k in quick_keys]
+        if any(key in data for key in quick_keys + quick_outbound_keys):
             from backend.database import sync_quick_security_rules
             sync_quick_security_rules(data)
             for key in quick_keys:
                 if key in data:
                     set_setting(key, "true" if data.get(key) in (True, "true", 1, "1") else "false")
+                if f"{key}_outbound" in data:
+                    set_setting(f"{key}_outbound", str(data.get(f"{key}_outbound")))
             quick_block_changed = True
                     
         if quick_block_changed:

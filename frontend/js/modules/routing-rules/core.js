@@ -258,9 +258,13 @@ export async function loadRoutingRules() {
         };
     }
 
-    // Load Quick Security Rules settings
+    // Load Quick Security Rules settings & outbound selections
     try {
-        const setObj = await apiFetch("/api/settings");
+        const [setObj, outboundsRes] = await Promise.all([
+            apiFetch("/api/settings"),
+            apiFetch("/api/routing/outbounds")
+        ]);
+
         if (setObj && setObj.success) {
             const bittorrentCb = document.getElementById("quick-block-bittorrent");
             if (bittorrentCb) bittorrentCb.checked = Boolean(setObj.block_bittorrent);
@@ -276,6 +280,34 @@ export async function loadRoutingRules() {
             
             const usCb = document.getElementById("quick-block-us");
             if (usCb) usCb.checked = Boolean(setObj.block_us);
+
+            const outbounds = (outboundsRes && outboundsRes.success) ? outboundsRes.obj : [];
+            const selectElements = document.querySelectorAll(".quick-outbound-select");
+            selectElements.forEach(select => {
+                select.innerHTML = `
+                    <option value="blocked">BLOCKED</option>
+                    <option value="direct">DIRECT</option>
+                `;
+                outbounds.forEach(ob => {
+                    if (ob.tag !== "blocked" && ob.tag !== "direct") {
+                        const opt = document.createElement("option");
+                        opt.value = ob.tag;
+                        opt.textContent = ob.remark ? `${ob.remark} (${ob.tag})` : ob.tag;
+                        select.appendChild(opt);
+                    }
+                });
+            });
+
+            const bittorrentOut = document.getElementById("quick-outbound-bittorrent");
+            if (bittorrentOut && setObj.block_bittorrent_outbound) bittorrentOut.value = setObj.block_bittorrent_outbound;
+            const adsOut = document.getElementById("quick-outbound-ads");
+            if (adsOut && setObj.block_ads_outbound) adsOut.value = setObj.block_ads_outbound;
+            const cnOut = document.getElementById("quick-outbound-cn");
+            if (cnOut && setObj.block_cn_outbound) cnOut.value = setObj.block_cn_outbound;
+            const ruOut = document.getElementById("quick-outbound-ru");
+            if (ruOut && setObj.block_ru_outbound) ruOut.value = setObj.block_ru_outbound;
+            const usOut = document.getElementById("quick-outbound-us");
+            if (usOut && setObj.block_us_outbound) usOut.value = setObj.block_us_outbound;
         }
     } catch (err) {
         console.error("Failed to load quick security rules:", err);

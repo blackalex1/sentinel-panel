@@ -70,10 +70,15 @@ export function setupRoutingRulesListeners() {
     if (btnSaveQuickRules) {
         btnSaveQuickRules.addEventListener("click", async () => {
             const block_bittorrent = document.getElementById("quick-block-bittorrent").checked;
+            const block_bittorrent_outbound = document.getElementById("quick-outbound-bittorrent")?.value || "blocked";
             const block_ads = document.getElementById("quick-block-ads").checked;
+            const block_ads_outbound = document.getElementById("quick-outbound-ads")?.value || "blocked";
             const block_cn = document.getElementById("quick-block-cn").checked;
+            const block_cn_outbound = document.getElementById("quick-outbound-cn")?.value || "blocked";
             const block_ru = document.getElementById("quick-block-ru").checked;
+            const block_ru_outbound = document.getElementById("quick-outbound-ru")?.value || "blocked";
             const block_us = document.getElementById("quick-block-us").checked;
+            const block_us_outbound = document.getElementById("quick-outbound-us")?.value || "blocked";
             
             btnSaveQuickRules.disabled = true;
             const res = await apiFetch("/api/settings/update", {
@@ -81,10 +86,15 @@ export function setupRoutingRulesListeners() {
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                     block_bittorrent,
+                    block_bittorrent_outbound,
                     block_ads,
+                    block_ads_outbound,
                     block_cn,
+                    block_cn_outbound,
                     block_ru,
-                    block_us
+                    block_ru_outbound,
+                    block_us,
+                    block_us_outbound
                 })
             });
             btnSaveQuickRules.disabled = false;
