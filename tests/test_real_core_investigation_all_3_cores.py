@@ -74,7 +74,8 @@ def test_investigation_on_real_singbox_logs():
         f"{now_str} [info] 192.168.1.104:41235 accepted tcp:203.0.113.77:3389 [vless-in >> direct] email: rdp_spammer@darkweb.org\n"
     ]
 
-    with open(sec_facade.XRAY_LOG_PATH, "w", encoding="utf-8") as f:
+    import backend.config as b_cfg
+    with open(b_cfg.XRAY_LOG_PATH, "w", encoding="utf-8") as f:
         f.writelines(logs)
 
     res_ssh = find_email_and_ip_in_xray_log(client_ip="192.168.1.104", dst_ip="198.51.100.50", dst_port=22)

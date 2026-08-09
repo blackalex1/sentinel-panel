@@ -104,6 +104,8 @@ export async function populateOutboundDropdowns(showApi = false) {
     const select = document.getElementById("rule-outbound");
     if (!select) return;
 
+    const currentVal = select.value;
+
     if (!outboundsCache || outboundsCache.length === 0) {
         const res = await apiFetch("/api/routing/outbounds");
         if (res && res.success) {
@@ -129,4 +131,8 @@ export async function populateOutboundDropdowns(showApi = false) {
             select.appendChild(option);
         }
     });
+
+    if (currentVal) {
+        select.value = currentVal;
+    }
 }
