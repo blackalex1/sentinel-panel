@@ -213,16 +213,27 @@ input:checked + .switch-slider:before {
 .modal-card {
     width: 95%;
     max-width: 520px;
-    margin: 30px auto;
+    max-height: 88vh;
+    display: flex;
+    flex-direction: column;
+    margin: 20px auto;
     padding: 32px;
     transform: translateY(20px);
     transition: transform var(--transition-normal);
-    background: rgba(14, 19, 36, 0.9) !important;
+    background: rgba(14, 19, 36, 0.95) !important;
     border: 1px solid var(--border-highlight);
     border-radius: var(--radius-xl);
     box-shadow: var(--shadow-card), 0 0 30px rgba(139, 92, 246, 0.18);
     backdrop-filter: var(--blur-modal) !important;
     -webkit-backdrop-filter: var(--blur-modal) !important;
+    box-sizing: border-box;
+}
+
+.modal-body {
+    overflow-y: auto;
+    flex: 1;
+    min-height: 0;
+    padding-right: 4px;
 }
 
 .modal.active .modal-card {
@@ -240,6 +251,7 @@ input:checked + .switch-slider:before {
     margin-bottom: 22px;
     border-bottom: 1px solid var(--border-color);
     padding-bottom: 14px;
+    flex-shrink: 0;
 }
 
 .modal-header h2 {
@@ -269,6 +281,7 @@ input:checked + .switch-slider:before {
     border-radius: var(--radius-md);
     padding: 18px;
     margin-bottom: 20px;
+    overflow: hidden;
 }
 
 .settings-subgroup h4 {
@@ -278,6 +291,40 @@ input:checked + .switch-slider:before {
     text-transform: uppercase;
     letter-spacing: 1px;
     font-weight: 700;
+}
+
+/* Навигационные вкладки в модальных окнах */
+.modal-tabs {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 22px;
+    padding-top: 4px;
+    padding-bottom: 12px;
+    padding-left: 4px;
+    padding-right: 4px;
+    border-bottom: 1px solid var(--border-color);
+    overflow-x: auto;
+    overflow-y: visible;
+    white-space: nowrap;
+    align-items: flex-start;
+    position: relative;
+}
+
+.modal-tab-btn {
+    position: relative;
+    z-index: 1;
+    transition: all var(--transition-fast);
+    flex-shrink: 0;
+}
+
+.modal-tab-btn:hover {
+    z-index: 5 !important;
+    transform: translateY(-1px);
+}
+
+.modal-tab-btn.active {
+    z-index: 10 !important;
+    box-shadow: 0 0 14px rgba(139, 92, 246, 0.35);
 }
 
 /* QRCode в модалке */

@@ -182,14 +182,21 @@ def test_vless_encryption_config():
     settings_dict = {
         "clients": [],
         "decryption": "mlkem768x25519plus.native.600s.mydecryptionkey",
-        "encryption": "mlkem768x25519plus.native.0rtt.myencryptionkey"
+        "encryption": "mlkem768x25519plus.native.0rtt.myencryptionkey",
+        "fallbacks": [{"dest": 33665, "xver": 0}]
+    }
+    stream_settings_dict = {
+        "network": "tcp",
+        "security": "reality",
+        "realitySettings": {"dest": "ya.ru:443"}
     }
     
     ib_id = add_inbound(
         remark="VLESS Encryption Inbound",
         port=60020,
         protocol="vless",
-        settings_dict=settings_dict
+        settings_dict=settings_dict,
+        stream_settings_dict=stream_settings_dict
     )
     
     try:
@@ -199,6 +206,7 @@ def test_vless_encryption_config():
         assert inbound is not None
         assert inbound["protocol"] == "vless"
         assert inbound["settings"]["decryption"] == "mlkem768x25519plus.native.600s.mydecryptionkey"
+        assert "fallbacks" not in inbound["settings"]
     finally:
         delete_inbound(ib_id)
 

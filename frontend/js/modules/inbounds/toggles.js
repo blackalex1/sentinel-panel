@@ -77,6 +77,10 @@ export function updateFormToggles() {
         // Exclusivity between VLESS Decryption and VLESS Fallbacks
         if (proto === "vless") {
             const decryptionInput = document.getElementById("ib-vless-decryption");
+            const encryptionInput = document.getElementById("ib-vless-encryption");
+            const genX25519Btn = document.getElementById("gen-vless-x25519-btn");
+            const genMlkemBtn = document.getElementById("gen-vless-mlkem-btn");
+
             const fallbackDestInput = document.getElementById("ib-fallback-dest");
             const fallbackPathInput = document.getElementById("ib-fallback-path");
             const fallbackXverSelect = document.getElementById("ib-fallback-xver");
@@ -84,47 +88,73 @@ export function updateFormToggles() {
             
             const decNote = document.getElementById("ib-vless-decryption-note");
             const fallNote = document.getElementById("ib-fallback-dest-note");
- 
+
             if (decryptionInput && fallbackDestInput) {
+                const hasDecryption = decryptionInput.value.trim() !== "" && decryptionInput.value.trim().toLowerCase() !== "none";
                 const hasFallback = fallbackDestInput.value.trim() !== "";
-                const hasDecryption = decryptionInput.value.trim() !== "" && decryptionInput.value.trim() !== "none";
- 
-                if (hasFallback) {
-                    decryptionInput.value = "none";
-                    decryptionInput.disabled = true;
-                    if (decNote) {
-                        decNote.style.color = "var(--accent-rose)";
-                        decNote.innerHTML = t("validation_inbound_vless_decryption_disabled_note", "🛑 Отключено: при использовании Fallbacks функция decryption не поддерживается.");
-                    }
-                } else {
-                    decryptionInput.disabled = false;
-                    if (decNote) {
-                        decNote.style.color = "var(--text-muted)";
-                        decNote.innerHTML = t("validation_inbound_vless_decryption_incompatible_note", "⚠️ Взаимоисключающая опция: несовместима с настройками Fallbacks (перенаправления).");
-                    }
-                }
- 
+
                 if (hasDecryption) {
                     fallbackDestInput.value = "";
-                    fallbackPathInput.value = "";
-                    fallbackXverSelect.value = "0";
-                    fallbackAlpnInput.value = "";
- 
+                    if (fallbackPathInput) fallbackPathInput.value = "";
+                    if (fallbackXverSelect) fallbackXverSelect.value = "0";
+                    if (fallbackAlpnInput) fallbackAlpnInput.value = "";
+
                     fallbackDestInput.disabled = true;
-                    fallbackPathInput.disabled = true;
-                    fallbackXverSelect.disabled = true;
-                    fallbackAlpnInput.disabled = true;
- 
+                    if (fallbackPathInput) fallbackPathInput.disabled = true;
+                    if (fallbackXverSelect) fallbackXverSelect.disabled = true;
+                    if (fallbackAlpnInput) fallbackAlpnInput.disabled = true;
+
                     if (fallNote) {
                         fallNote.style.color = "var(--accent-rose)";
                         fallNote.innerHTML = t("validation_inbound_vless_fallbacks_disabled_note", "🛑 Отключено: при использовании VLESS Decryption функция Fallbacks не поддерживается.");
                     }
-                } else {
+
+                    decryptionInput.disabled = false;
+                    if (encryptionInput) encryptionInput.disabled = false;
+                    if (genX25519Btn) genX25519Btn.disabled = false;
+                    if (genMlkemBtn) genMlkemBtn.disabled = false;
+                    if (decNote) {
+                        decNote.style.color = "var(--text-muted)";
+                        decNote.innerHTML = t("validation_inbound_vless_decryption_incompatible_note", "⚠️ Взаимоисключающая опция: несовместима с настройками Fallbacks (перенаправления).");
+                    }
+                } else if (hasFallback) {
+                    decryptionInput.value = "none";
+                    decryptionInput.disabled = true;
+                    if (encryptionInput) {
+                        encryptionInput.value = "none";
+                        encryptionInput.disabled = true;
+                    }
+                    if (genX25519Btn) genX25519Btn.disabled = true;
+                    if (genMlkemBtn) genMlkemBtn.disabled = true;
+
+                    if (decNote) {
+                        decNote.style.color = "var(--accent-rose)";
+                        decNote.innerHTML = t("validation_inbound_vless_decryption_disabled_note", "🛑 Отключено: при использовании Fallbacks функция decryption не поддерживается.");
+                    }
+
                     fallbackDestInput.disabled = false;
-                    fallbackPathInput.disabled = false;
-                    fallbackXverSelect.disabled = false;
-                    fallbackAlpnInput.disabled = false;
- 
+                    if (fallbackPathInput) fallbackPathInput.disabled = false;
+                    if (fallbackXverSelect) fallbackXverSelect.disabled = false;
+                    if (fallbackAlpnInput) fallbackAlpnInput.disabled = false;
+                    if (fallNote) {
+                        fallNote.style.color = "var(--text-muted)";
+                        fallNote.innerHTML = t("validation_inbound_vless_fallbacks_incompatible_note", "⚠️ Взаимоисключающая опция: несовместима с VLESS Decryption (Расшифрование).");
+                    }
+                } else {
+                    decryptionInput.disabled = false;
+                    if (encryptionInput) encryptionInput.disabled = false;
+                    if (genX25519Btn) genX25519Btn.disabled = false;
+                    if (genMlkemBtn) genMlkemBtn.disabled = false;
+
+                    fallbackDestInput.disabled = false;
+                    if (fallbackPathInput) fallbackPathInput.disabled = false;
+                    if (fallbackXverSelect) fallbackXverSelect.disabled = false;
+                    if (fallbackAlpnInput) fallbackAlpnInput.disabled = false;
+
+                    if (decNote) {
+                        decNote.style.color = "var(--text-muted)";
+                        decNote.innerHTML = t("validation_inbound_vless_decryption_incompatible_note", "⚠️ Взаимоисключающая опция: несовместима с настройками Fallbacks (перенаправления).");
+                    }
                     if (fallNote) {
                         fallNote.style.color = "var(--text-muted)";
                         fallNote.innerHTML = t("validation_inbound_vless_fallbacks_incompatible_note", "⚠️ Взаимоисключающая опция: несовместима с VLESS Decryption (Расшифрование).");

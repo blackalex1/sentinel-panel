@@ -10,7 +10,9 @@ export function compileXraySettings(protocol, security, network, streamSettings,
         settings.encryption = document.getElementById("ib-vless-encryption").value || "none";
     }
 
-    if (protocol === "vless" || protocol === "trojan") {
+    const hasDecryption = protocol === "vless" && settings.decryption && settings.decryption.trim() !== "" && settings.decryption.trim().toLowerCase() !== "none";
+
+    if ((protocol === "vless" || protocol === "trojan") && !hasDecryption) {
         const fallbackDest = document.getElementById("ib-fallback-dest").value || "";
         if (fallbackDest) {
             const fallbackPath = document.getElementById("ib-fallback-path").value || "";
@@ -26,6 +28,8 @@ export function compileXraySettings(protocol, security, network, streamSettings,
             
             settings.fallbacks = [fallback];
         }
+    } else if (hasDecryption) {
+        delete settings.fallbacks;
     }
 }
 

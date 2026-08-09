@@ -101,17 +101,19 @@ def generate_xray_config_json() -> dict:
                     "email": c["email"],
                     "flow": client_flow
                 })
+            decryption_val = db_settings.get("decryption", "none")
             xray_settings = {
                 "clients": clients_list,
-                "decryption": db_settings.get("decryption", "none")
+                "decryption": decryption_val
             }
-            fallbacks = db_settings.get("fallbacks")
-            if fallbacks:
-                xray_settings["fallbacks"] = fallbacks
-            elif stream_settings.get("security") in ("tls", "reality"):
-                from backend.config import settings
-                panel_port = getattr(settings, "PANEL_PORT", 8000)
-                xray_settings["fallbacks"] = [{"dest": panel_port, "xver": 0}]
+            if not decryption_val or str(decryption_val).strip().lower() == "none":
+                fallbacks = db_settings.get("fallbacks")
+                if fallbacks:
+                    xray_settings["fallbacks"] = fallbacks
+                elif stream_settings.get("security") in ("tls", "reality"):
+                    from backend.config import settings
+                    panel_port = getattr(settings, "PANEL_PORT", 8000)
+                    xray_settings["fallbacks"] = [{"dest": panel_port, "xver": 0}]
             
         elif protocol == "vmess":
             clients_list = []

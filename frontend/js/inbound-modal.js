@@ -133,6 +133,8 @@ export function setupInboundListeners(loadInboundsCallback) {
         if (res && res.success) {
             const keys = res[type];
             if (keys) {
+                const fallbackDestInput = document.getElementById("ib-fallback-dest");
+                if (fallbackDestInput) fallbackDestInput.value = "";
                 document.getElementById("ib-vless-decryption").value = keys.decryption || "none";
                 document.getElementById("ib-vless-encryption").value = keys.encryption || "none";
                 showToast(t("vless_enc_generated_success", "Ключи VLESS Encryption успешно сгенерированы!"));
