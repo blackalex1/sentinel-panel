@@ -38,8 +38,11 @@ select[data-custom-select-init="true"] {
 .settings-card:has(.custom-select-container.open),
 .glass-card:has(.custom-select-container.open),
 .input-group:has(.custom-select-container.open),
+.input-row:has(.custom-select-container.open),
 .form-group:has(.custom-select-container.open),
-.settings-section-panel:has(.custom-select-container.open) {
+.settings-subgroup:has(.custom-select-container.open),
+.settings-section-panel:has(.custom-select-container.open),
+.tab-panel:has(.custom-select-container.open) {
     z-index: 99999 !important;
     position: relative !important;
     overflow: visible !important;
@@ -49,10 +52,11 @@ select[data-custom-select-init="true"] {
 .settings-card,
 .glass-card,
 .setting-group,
+.settings-subgroup,
 .form-group,
 .settings-section,
 .settings-section-panel {
-    overflow: visible !important;
+    overflow: visible;
 }
 
 .custom-select-trigger {
