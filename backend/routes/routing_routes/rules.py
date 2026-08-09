@@ -78,6 +78,20 @@ async def update_rule_api(request: Request, id: int, payload: dict):
     success = update_routing_rule(id, remark, outbound_tag, inbound_tags, users, domains, ips, protocols, enable, sort_order)
     if not success:
         return {"success": False, "msg": "Правило маршрутизации не найдено"}
+
+    # Синхронизируем настройки быстрых правил, если редактировалось одно из них
+    try:
+        from backend.database.crud.routing import QUICK_SECURITY_RULES_SPECS, find_quick_rule
+        from backend.database import set_setting, db_session
+        with db_session() as session:
+            for key, spec in QUICK_SECURITY_RULES_SPECS.items():
+                q_rule = find_quick_rule(session, key)
+                if q_rule and q_rule.id == id:
+                    set_setting(key, "true" if enable == 1 else "false")
+                    set_setting(f"{key}_outbound", outbound_tag)
+                    break
+    except Exception:
+        pass
         
     write_xray_config()
     restart_xray()

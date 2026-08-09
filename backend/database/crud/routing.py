@@ -149,7 +149,7 @@ def sync_quick_security_rules(settings_dict: dict):
             if key in settings_dict or outbound_key in settings_dict:
                 enabled = 1 if settings_dict.get(key) in (True, "true", 1, "1") else 0
                 rule = find_quick_rule(session, key)
-                out_tag = desired_outbound if desired_outbound else (rule.outbound_tag if rule else spec["outbound_tag"])
+                out_tag = str(desired_outbound).strip() if (desired_outbound and str(desired_outbound).strip()) else (rule.outbound_tag if rule and rule.outbound_tag else spec["outbound_tag"])
                 if rule:
                     rule.enable = enabled
                     rule.outbound_tag = out_tag
