@@ -84,7 +84,7 @@ async def get_csrf_token(request: Request):
         
     session_id = request.cookies.get("session_id")
     if not session_id or session_id not in ACTIVE_SESSIONS:
-        return decoy_response()
+        return {"success": False, "msg": "No active session"}
         
     token = CSRF_TOKENS.get(session_id)
     if not token:

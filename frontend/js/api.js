@@ -30,7 +30,9 @@ export async function apiFetch(url, options = {}) {
         return await response.json();
     } catch (error) {
         console.error("API error:", error);
-        showToast("Ошибка соединения с API", "error");
+        if (!url.includes("csrf-token")) {
+            showToast("Ошибка соединения с API", "error");
+        }
         return null;
     }
 }
