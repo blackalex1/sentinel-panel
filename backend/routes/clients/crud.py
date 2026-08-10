@@ -87,8 +87,9 @@ async def add_client_api(request: Request, payload: Optional[ClientSettings] = N
                 inbound["enable"], inbound["total"], inbound["expiry_time"], core=inbound.get("core")
             )
             
-            # Перезапуск Xray
-            restart_xray()
+            # Перезапуск сервисов в фоне с debounce
+            from backend.utils.service_restart import restart_services_background
+            restart_services_background(delay=0.5)
             return {"success": True, "msg": "Клиент добавлен"}
             
         return {"success": False, "msg": "Клиент с таким email уже существует"}
@@ -221,7 +222,8 @@ async def update_client_api(request: Request, client_id: str, payload: Optional[
                 except Exception:
                     pass
 
-            restart_xray()
+            from backend.utils.service_restart import restart_services_background
+            restart_services_background(delay=0.5)
             return {"success": True, "msg": "Клиент обновлен"}
         return {"success": False, "msg": "Клиент не найден"}
     except Exception as e:
@@ -265,7 +267,8 @@ async def delete_client_api(request: Request, inbound_id: int, client_id: str):
             except Exception:
                 pass
 
-        restart_xray()
+        from backend.utils.service_restart import restart_services_background
+        restart_services_background(delay=0.5)
         return {"success": True, "msg": "Клиент удален"}
         
     return {"success": False, "msg": "Ошибка удаления"}

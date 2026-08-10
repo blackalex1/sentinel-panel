@@ -4,9 +4,11 @@ import secrets
 from backend.models import User
 import backend.database
 
+PBKDF2_ITERATIONS = 100000
+
 def hash_password(password: str) -> str:
     salt = os.urandom(16)
-    key = hashlib.pbkdf2_hmac('sha256', password.encode('utf-8'), salt, 100000)
+    key = hashlib.pbkdf2_hmac('sha256', password.encode('utf-8'), salt, PBKDF2_ITERATIONS)
     return salt.hex() + ":" + key.hex()
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
@@ -14,10 +16,11 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
         salt_hex, key_hex = hashed_password.split(":")
         salt = bytes.fromhex(salt_hex)
         key = bytes.fromhex(key_hex)
-        new_key = hashlib.pbkdf2_hmac('sha256', plain_password.encode('utf-8'), salt, 100000)
+        new_key = hashlib.pbkdf2_hmac('sha256', plain_password.encode('utf-8'), salt, PBKDF2_ITERATIONS)
         return secrets.compare_digest(key, new_key)
     except Exception:
         return False
+
 
 def authenticate_admin(username: str, password_plain: str) -> bool:
     with backend.database.db_session() as session:

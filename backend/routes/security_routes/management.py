@@ -141,8 +141,9 @@ async def disable_client(request: Request, email: str = Form(...)):
         session.commit()
         
     if disabled_count > 0:
-        restart_xray()
-        restart_singbox()
+        from backend.utils.service_restart import restart_services_background
+        restart_services_background(delay=0.5)
+
         
         try:
             from backend.audit import log_action, get_actor_username
@@ -196,8 +197,9 @@ async def enable_client(request: Request, email: str = Form(...)):
         session.commit()
         
     if enabled_count > 0:
-        restart_xray()
-        restart_singbox()
+        from backend.utils.service_restart import restart_services_background
+        restart_services_background(delay=0.5)
+
         
         try:
             from backend.audit import log_action, get_actor_username

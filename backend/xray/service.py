@@ -70,23 +70,32 @@ def start_xray():
     except Exception as e:
         logging.error(f"Failed to run Xray config test: {e}")
     
+    # Ensure port 10085 (Xray gRPC API) is released before starting
+    import socket
+    for _ in range(15):
+        try:
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+                s.bind(("127.0.0.1", 10085))
+                break
+        except OSError:
+            time.sleep(0.2)
+
     logging.info(f"Starting Xray process: {backend.xray.XRAY_BIN_PATH}")
     for _attempt in range(3):
         try:
             xray_process = subprocess.Popen(
                 [str(backend.xray.XRAY_BIN_PATH), "run", "-config", str(backend.config.XRAY_CONFIG_PATH)],
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                text=True,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
                 close_fds=True
             )  # nosec B603
 
-            try:
-                out, err = xray_process.communicate(timeout=0.5)
-                # If communicate returned, process exited!
-                logging.error(
-                    f"Xray exited immediately (code {xray_process.returncode}), attempt {_attempt + 1}/3\n"
-                    f"STDOUT: {out}\nSTDERR: {err}"
+            time.sleep(0.3)
+            ret = xray_process.poll()
+            if ret is not None:
+                logging.warning(
+                    f"Xray process exited immediately with code {ret}, attempt {_attempt + 1}/3"
                 )
                 xray_process = None
                 if _attempt < 2:
@@ -94,15 +103,15 @@ def start_xray():
                     continue
                 backend.xray.log_xray_errors()
                 return False
-            except subprocess.TimeoutExpired:
-                logging.info("Xray process started successfully.")
 
+            logging.info("Xray process started successfully.")
             threading.Thread(target=backend.xray.tail_xray_logs, daemon=True).start()
             return True
         except Exception as e:
             logging.error(f"Failed to start Xray process: {e}")
             return False
     return False
+
 
 
 

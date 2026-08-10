@@ -243,14 +243,9 @@ def enforce_client_limits_and_rules():
                 backend.scheduler.asyncio_notify_admin(c.email, block_reason, bot_token, tg_admin_ids)
                 
     if need_config_update:
-        backend.scheduler.write_xray_config()
-        backend.scheduler.restart_xray()
-        try:
-            from backend.singbox import write_singbox_config, restart_singbox
-            write_singbox_config()
-            restart_singbox()
-        except Exception as ex:
-            logging.error(f"[Scheduler] Failed to restart Sing-box after blocking client: {ex}")
+        from backend.utils.service_restart import restart_services_background
+        restart_services_background(delay=0.5)
+
 
     # Run Watchdog
     try:
