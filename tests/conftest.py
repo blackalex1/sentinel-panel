@@ -3,6 +3,7 @@ import sys
 import time
 import tempfile
 import urllib.parse
+from contextlib import contextmanager
 from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
@@ -244,8 +245,8 @@ def clear_login_attempts():
 
 
 @pytest.fixture(scope="function")
-def client():
-    """FastAPI TestClient fixture."""
+def client(isolated_db):
+    """FastAPI TestClient fixture backed by the test's isolated database."""
     from backend.main import app
     return TestClient(app)
 
@@ -254,3 +255,115 @@ def cleanup_db_connections():
     yield
     from backend.database import engine
     engine.dispose()
+
+
+@pytest.fixture(scope="session", autouse=True)
+def reset_port_allocator():
+    """
+    Reset the shared port-counter file once per pytest session.
+
+    In xdist parallel mode this session fixture runs once per *worker process*.
+    If every worker reset the counter we'd get a race: a late-starting worker
+    resets to 49000 while an early worker has already allocated and is using
+    those ports, causing the next get_free_port() call to return a port that
+    is already bound by xray.
+
+    Fix: only the first worker (gw0) or sequential-mode master resets.
+    """
+    _worker_id = os.environ.get("PYTEST_XDIST_WORKER", "master")
+    if _worker_id in ("master", "gw0"):
+        try:
+            from tests.core_verifier import reset_port_counter
+            reset_port_counter()
+        except Exception:
+            pass  # Non-fatal: allocator will self-heal on first get_free_port() call
+    yield
+
+
+
+@pytest.fixture(scope="session", autouse=True)
+def mock_restart_services_background():
+    """
+    Globally replace restart_services_background with a no-op for all tests.
+
+    Without this, every routing/inbound mutation endpoint would spawn a
+    daemon timer thread that tries to restart Xray/Sing-box/Hysteria binaries
+    which don't exist in the test environment. The no-op keeps tests fast,
+    isolated, and free from background thread noise.
+    """
+    import unittest.mock as mock
+    import backend.utils.service_restart as _restart_mod
+    with mock.patch.object(_restart_mod, "restart_services_background", return_value=None):
+        yield
+
+
+@pytest.fixture(scope="function", autouse=True)
+def isolated_db(tmp_path, monkeypatch):
+    """
+    Give every test its own fresh SQLite database.
+
+    Patches ONLY session_factory (+ engine / Session) in
+    backend.database.connection.  The original db_session() function reads
+    session_factory from that module's __dict__ at *call time*, so patching
+    session_factory alone is sufficient to redirect all DB access.
+
+    We intentionally do NOT patch db_session itself.  If we did, any module
+    that lazily does `from backend.database import db_session` (e.g. backend.audit
+    pulled in by backend.client_alerts during a test body) would permanently capture
+    the per-test closure.  After teardown that module's local reference still points
+    to the previous test's disposed engine, so the next test's log_action() silently
+    writes to the dead engine while the test reads from the new one.
+    """
+    from sqlalchemy import create_engine, event
+    from sqlalchemy.orm import sessionmaker, scoped_session
+    import backend.database.connection as db_conn
+    import backend.database as db_module
+    from backend.models import Base
+    from backend.database.seeding import init_db
+    from backend.database import set_setting
+    from backend.database.crud.settings import invalidate_settings_cache
+
+    # Flush stale TTL-cached settings from any previous test before we switch engines.
+    invalidate_settings_cache()
+
+    db_file = tmp_path / "test_isolated.db"
+    new_engine = create_engine(
+        f"sqlite:///{db_file}",
+        connect_args={"check_same_thread": False, "timeout": 15.0},
+    )
+
+    @event.listens_for(new_engine, "connect")
+    def _pragmas(dbapi_conn, _record):
+        cur = dbapi_conn.cursor()
+        cur.execute("PRAGMA journal_mode=WAL")
+        cur.execute("PRAGMA synchronous=NORMAL")
+        cur.execute("PRAGMA busy_timeout=10000")
+        cur.close()
+
+    Base.metadata.create_all(new_engine)
+    new_factory = sessionmaker(bind=new_engine)
+    new_scoped  = scoped_session(new_factory)
+
+    # Patch engine + session_factory + Session — NOT db_session.
+    monkeypatch.setattr(db_conn, "engine",          new_engine)
+    monkeypatch.setattr(db_conn, "session_factory", new_factory)
+    monkeypatch.setattr(db_conn, "Session",         new_scoped)
+
+    monkeypatch.setattr(db_module, "engine",          new_engine)
+    monkeypatch.setattr(db_module, "session_factory", new_factory)
+    monkeypatch.setattr(db_module, "Session",         new_scoped)
+
+
+    # Seed with standard data
+    init_db()
+    set_setting("telegram_bot_token", "123456:ABC-DEF1234ghIkl-zyx")
+    set_setting("telegram_admin_ids",  "55555,66666")
+
+    yield
+
+    # Prevent stale TTL values from leaking into the next test.
+    invalidate_settings_cache()
+    new_scoped.remove()
+    new_engine.dispose()
+
+

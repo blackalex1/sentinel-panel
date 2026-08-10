@@ -71,27 +71,40 @@ def start_xray():
         logging.error(f"Failed to run Xray config test: {e}")
     
     logging.info(f"Starting Xray process: {backend.xray.XRAY_BIN_PATH}")
-    try:
-        xray_process = subprocess.Popen(
-            [str(backend.xray.XRAY_BIN_PATH), "run", "-config", str(backend.config.XRAY_CONFIG_PATH)],
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-            close_fds=True
-        )  # nosec B603
-        
+    for _attempt in range(3):
         try:
-            xray_process.wait(timeout=0.5)
-            logging.error(f"Xray process exited immediately with code {xray_process.returncode}!")
-            backend.xray.log_xray_errors()
+            xray_process = subprocess.Popen(
+                [str(backend.xray.XRAY_BIN_PATH), "run", "-config", str(backend.config.XRAY_CONFIG_PATH)],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                close_fds=True
+            )  # nosec B603
+
+            try:
+                out, err = xray_process.communicate(timeout=0.5)
+                # If communicate returned, process exited!
+                logging.error(
+                    f"Xray exited immediately (code {xray_process.returncode}), attempt {_attempt + 1}/3\n"
+                    f"STDOUT: {out}\nSTDERR: {err}"
+                )
+                xray_process = None
+                if _attempt < 2:
+                    time.sleep(0.5)
+                    continue
+                backend.xray.log_xray_errors()
+                return False
+            except subprocess.TimeoutExpired:
+                logging.info("Xray process started successfully.")
+
+            threading.Thread(target=backend.xray.tail_xray_logs, daemon=True).start()
+            return True
+        except Exception as e:
+            logging.error(f"Failed to start Xray process: {e}")
             return False
-        except subprocess.TimeoutExpired:
-            logging.info("Xray process started successfully.")
-        
-        threading.Thread(target=backend.xray.tail_xray_logs, daemon=True).start()
-        return True
-    except Exception as e:
-        logging.error(f"Failed to start Xray process: {e}")
-        return False
+    return False
+
+
 
 def stop_xray():
     """Останавливает процесс Xray"""
@@ -108,7 +121,7 @@ def stop_xray():
         except subprocess.TimeoutExpired:
             xray_process.kill()
         xray_process = None
-        time.sleep(0.2)
+        time.sleep(0.5)   # give Windows time to release ports before next bind
         try:
             logging.info("Xray process stopped.")
         except Exception:

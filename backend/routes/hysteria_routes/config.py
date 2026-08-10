@@ -1,7 +1,7 @@
 import json
 import logging
 from fastapi import APIRouter, Request
-from backend.database import get_all_inbounds, get_clients_for_inbound, set_setting
+from backend.database import get_all_inbounds, get_clients_for_inbound, get_setting, set_setting
 import backend.hysteria
 import backend.routes.hysteria as hysteria_facade
 from backend.hysteria import restart_hysteria

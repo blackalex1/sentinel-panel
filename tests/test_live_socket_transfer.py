@@ -11,6 +11,7 @@ from backend.config import XRAY_BIN_PATH, XRAY_CONFIG_PATH, SINGBOX_BIN_PATH, SI
 
 _xray_available = os.path.isfile(str(XRAY_BIN_PATH))
 
+@pytest.mark.xdist_group("core_ops")
 @pytest.mark.skipif(
     not _xray_available,
     reason="Real xray binary not found at bin/xray.exe — integration test skipped in CI"

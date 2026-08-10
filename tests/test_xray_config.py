@@ -278,14 +278,20 @@ def test_xray_routing_geoip_scenarios():
         assert rule_ru["outboundTag"] == "direct"
         
         # Check rule 3: geoip:us
-        rule_us = next((r for r in routing_rules if "geoip:us" in r.get("ip", [])), None)
-        assert rule_us is not None
-        assert rule_us["outboundTag"] == "warp"
+        rule_us = next(
+            (r for r in routing_rules
+             if "geoip:us" in r.get("ip", []) and r.get("outboundTag") == "warp"),
+            None
+        )
+        assert rule_us is not None, "Expected a rule geoip:us -> warp in xray config"
         
         # Check rule 4: catch-all
-        rule_ca = next((r for r in routing_rules if "0.0.0.0/0" in r.get("ip", [])), None)
-        assert rule_ca is not None
-        assert rule_ca["outboundTag"] == "warp"
+        rule_ca = next(
+            (r for r in routing_rules
+             if "0.0.0.0/0" in r.get("ip", []) and r.get("outboundTag") == "warp"),
+            None
+        )
+        assert rule_ca is not None, "Expected catch-all 0.0.0.0/0 -> warp in xray config"
         assert "::/0" in rule_ca["ip"]
         
     finally:

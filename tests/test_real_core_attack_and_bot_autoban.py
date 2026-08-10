@@ -10,6 +10,7 @@ from backend.scheduler_jobs.limits import enforce_client_limits_and_rules, ACTIV
 from backend.routes.security_routes.firewall import block_ip_api
 
 
+@pytest.mark.xdist_group("core_ops")
 def test_real_singbox_attack_mitigation_and_socket_termination():
     """
     Launches the REAL Sing-box process, simulates an abusive client exceeding limits / attacking,

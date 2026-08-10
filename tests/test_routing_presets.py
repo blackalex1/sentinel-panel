@@ -47,8 +47,6 @@ def test_routing_rules_export_import_api(client, monkeypatch):
     """Test exporting and importing routing rules presets via API."""
     import backend.routes.routing_routes.rules
     monkeypatch.setattr(backend.routes.routing_routes.rules, "check_auth", lambda r: True)
-    monkeypatch.setattr("backend.routes.routing_routes.rules.write_xray_config", lambda: None)
-    monkeypatch.setattr("backend.routes.routing_routes.rules.restart_xray", lambda: None)
 
     # 1. Export rules
     res_export = client.get("/api/routing/rules/export")

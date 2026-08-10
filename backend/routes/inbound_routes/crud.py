@@ -11,6 +11,7 @@ from backend.hysteria import restart_hysteria
 from backend.singbox import restart_singbox
 from backend.auth_utils import check_auth, decoy_response
 from backend.routes.inbound_routes.validation import validate_inbound_port_collision
+from backend.utils.service_restart import restart_services_background
 
 router = APIRouter()
 
@@ -234,8 +235,6 @@ async def delete_inbound_ui(request: Request, inbound_id: int):
         from backend.audit import log_action, get_actor_username
         actor = get_actor_username(request)
         log_action(actor, "delete_inbound", target=f"id:{inbound_id}")
-        restart_xray()
-        restart_hysteria()
-        restart_singbox()
+        restart_services_background()
         return {"success": True}
     return {"success": False, "msg": "Inbound не найден"}

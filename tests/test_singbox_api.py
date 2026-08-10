@@ -1,9 +1,13 @@
 import json
 import pytest
+
+pytestmark = pytest.mark.xdist_group("core_ops")
+
 from backend.singbox import (
     is_singbox_running, start_singbox, stop_singbox, restart_singbox,
     get_installed_singbox_version, get_latest_singbox_version_info
 )
+
 
 def test_singbox_version_info_fetching(monkeypatch):
     """Test fetching sing-box stable vs pre-release version info."""

@@ -1,6 +1,10 @@
 import json
 import subprocess
+import pytest
 from backend.xray import remove_client_api
+
+pytestmark = pytest.mark.xdist_group("core_ops")
+
 
 def test_instant_disconnect_xray_api(monkeypatch):
     """Test calling gRPC api removeclient function."""

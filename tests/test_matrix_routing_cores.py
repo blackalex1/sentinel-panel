@@ -3,6 +3,8 @@ import pytest
 from backend.xray.config import generate_xray_config_json
 from backend.singbox.config import generate_singbox_config_json
 
+pytestmark = pytest.mark.xdist_group("core_ops")
+
 def test_intra_core_xray_routing(monkeypatch):
     """Test Xray intra-core routing: Xray inbound to Xray outbounds with complex routing rules."""
     mock_inbounds = [

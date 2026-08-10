@@ -2,6 +2,9 @@ import pytest
 import requests
 import subprocess
 import importlib
+
+pytestmark = pytest.mark.xdist_group("core_ops")
+
 from backend.database import add_inbound, add_client_db, get_clients_for_inbound, delete_inbound
 from backend.hysteria import generate_hysteria_config, kick_client_hysteria_api, get_latest_hysteria_version_info, download_hysteria_core
 

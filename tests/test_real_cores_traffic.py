@@ -1,6 +1,9 @@
 import pytest
 import time
 import datetime
+
+pytestmark = pytest.mark.xdist_group("core_ops")
+
 from unittest.mock import patch, MagicMock
 from backend.database import db_session, Inbound, ClientStats
 from backend.models import ClientTrafficDaily

@@ -4,8 +4,8 @@ from backend.database import (
     update_routing_rule, delete_routing_rule, update_rules_priority
 )
 from backend.auth_utils import check_auth, decoy_response
-from backend.xray import write_xray_config, restart_xray
 from backend.audit import log_action, get_actor_username
+from backend.utils.service_restart import restart_services_background
 
 router = APIRouter()
 
@@ -38,16 +38,9 @@ async def create_rule_api(request: Request, payload: dict):
         return {"success": False, "msg": "Необходимо указать хотя бы одно условие (домены, IP, протоколы, пользователи или входящие теги)"}
         
     rule_id = add_routing_rule(remark, outbound_tag, inbound_tags, users, domains, ips, protocols, enable)
-    
-    write_xray_config()
-    restart_xray()
-    try:
-        from backend.singbox import write_singbox_config, restart_singbox
-        write_singbox_config(force=True)
-        restart_singbox()
-    except Exception:
-        pass
-    
+
+    restart_services_background()
+
     actor = get_actor_username(request)
     log_action(actor, "create_routing_rule", target=remark or f"rule-{rule_id}", details=f"outbound:{outbound_tag}")
     
@@ -93,15 +86,8 @@ async def update_rule_api(request: Request, id: int, payload: dict):
     except Exception:
         pass
         
-    write_xray_config()
-    restart_xray()
-    try:
-        from backend.singbox import write_singbox_config, restart_singbox
-        write_singbox_config(force=True)
-        restart_singbox()
-    except Exception:
-        pass
-    
+    restart_services_background()
+
     actor = get_actor_username(request)
     log_action(actor, "update_routing_rule", target=remark or f"rule-{id}", details=f"outbound:{outbound_tag}, enable:{enable}")
     
@@ -123,16 +109,9 @@ async def delete_rule_api(request: Request, id: int):
     success = delete_routing_rule(id)
     if not success:
         return {"success": False, "msg": "Не удалось удалить правило маршрутизации"}
-        
-    write_xray_config()
-    restart_xray()
-    try:
-        from backend.singbox import write_singbox_config, restart_singbox
-        write_singbox_config(force=True)
-        restart_singbox()
-    except Exception:
-        pass
-    
+
+    restart_services_background()
+
     actor = get_actor_username(request)
     log_action(actor, "delete_routing_rule", target=rule.get("remark") or f"rule-{id}")
     
@@ -149,16 +128,9 @@ async def sort_rules_api(request: Request, payload: dict):
         return {"success": False, "msg": "Список ID правил пуст"}
         
     success = update_rules_priority(rule_ids)
-    
-    write_xray_config()
-    restart_xray()
-    try:
-        from backend.singbox import write_singbox_config, restart_singbox
-        write_singbox_config(force=True)
-        restart_singbox()
-    except Exception:
-        pass
-    
+
+    restart_services_background()
+
     actor = get_actor_username(request)
     log_action(actor, "sort_routing_rules", details=f"order:{rule_ids}")
     
@@ -237,14 +209,7 @@ async def import_rules_preset_api(request: Request, payload: dict):
         )
         imported_count += 1
 
-    write_xray_config()
-    restart_xray()
-    try:
-        from backend.singbox import write_singbox_config, restart_singbox
-        write_singbox_config(force=True)
-        restart_singbox()
-    except Exception:
-        pass
+    restart_services_background()
 
     actor = get_actor_username(request)
     log_action(actor, "import_routing_rules_preset", details=f"mode:{mode}, count:{imported_count}")

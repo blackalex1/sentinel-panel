@@ -5,6 +5,8 @@ import httpx
 import subprocess
 from fastapi.testclient import TestClient
 
+pytestmark = pytest.mark.xdist_group("core_ops")
+
 from backend.database import db_session, get_session_db, add_session_db, delete_session_db
 from backend.models import Inbound, SharedCache, UserSession, ClientStats
 from backend.database.crud.shared_cache import (
@@ -102,73 +104,29 @@ def test_rate_limiting_shared_cache():
     LOGIN_ATTEMPTS.clear()
     assert check_rate_limit(ip) is True
 
-# Mock Process for subprocess tests — implements the full Popen interface
-class MockProcess:
-    returncode = 0
-    pid = 99999
-    stdin = None
-    stdout = None
-    stderr = None
+from tests.core_verifier import get_xray_bin, get_hysteria_bin
 
-    def wait(self, timeout=None):
-        """Raise TimeoutExpired when timeout given — simulates a running process.
+_skip_no_xray     = pytest.mark.skipif(get_xray_bin() is None,     reason="xray binary not found")
+_skip_no_hysteria = pytest.mark.skipif(get_hysteria_bin() is None, reason="hysteria binary not found")
 
-        start_xray() calls wait(timeout=0.5) and treats TimeoutExpired as
-        "process is alive" (success).  If wait() returns normally it means
-        the process died immediately (failure).
 
-        stop_xray() calls wait(timeout=5), gets TimeoutExpired, then calls
-        kill() which is a no-op here — the flow completes cleanly.
-        """
-        if timeout is not None:
-            raise subprocess.TimeoutExpired(cmd="mock", timeout=timeout)
-        return 0
-
-    def poll(self):
-        return None  # None = process still running (start_xray checks this)
-
-    def terminate(self):
-        pass  # no-op, nothing to terminate
-
-    def kill(self):
-        pass  # no-op, nothing to kill
-
-    def send_signal(self, sig):
-        pass
-
-    def communicate(self, input=None, timeout=None):
-        return (b"", b"")
-
-    def __enter__(self):
-        return self
-
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        pass
-
-class MockCompletedProcess:
-    returncode = 0
-    stdout = ""
-    stderr = ""
-
-def test_dynamic_xray_start(monkeypatch):
-    # Patch subprocess.Popen so we don't need the real xray binary in CI
-    import backend.xray.service as xray_svc
-    monkeypatch.setattr(xray_svc.subprocess, "Popen", lambda *a, **kw: MockProcess())
-    monkeypatch.setattr(xray_svc.subprocess, "run", lambda *a, **kw: MockCompletedProcess())
-
-    # 1. No xray inbounds
+@_skip_no_xray
+@pytest.mark.xdist_group("core_ops")
+@pytest.mark.timeout(30)
+def test_dynamic_xray_start():
+    """Real xray binary: start/stop behaviour driven by DB state."""
+    # 1. No xray inbounds — xray should stay stopped
     with db_session() as session:
         session.query(Inbound).delete()
         session.commit()
 
     stop_xray()
 
-    # Start xray, should not start process because there are no inbounds
     res = start_xray()
     assert res is True
     assert is_xray_running() is False
 
-    # 2. Add an active xray inbound with a client
+    # 2. Add a valid VLESS inbound + client — xray should start
     from tests.core_verifier import get_free_port
     x_port = get_free_port()
     with db_session() as session:
@@ -176,10 +134,11 @@ def test_dynamic_xray_start(monkeypatch):
             remark="Xray Test Inbound",
             port=x_port,
             protocol="vless",
-            settings="{}",
-            stream_settings="{}",
+            # Minimal settings required by real xray: decryption must be "none"
+            settings=json.dumps({"clients": [], "decryption": "none"}),
+            stream_settings=json.dumps({"network": "tcp"}),
             sniffing="{}",
-            enable=1
+            enable=1,
         )
         session.add(ib)
         session.commit()
@@ -189,7 +148,7 @@ def test_dynamic_xray_start(monkeypatch):
             inbound_id=ib.id,
             email="dynamic_xray_client",
             client_uuid_or_pwd="10000000-0000-4000-8000-000000000106",
-            enable=1
+            enable=1,
         )
         session.add(cs)
         session.commit()
@@ -201,20 +160,16 @@ def test_dynamic_xray_start(monkeypatch):
     stop_xray()
     assert is_xray_running() is False
 
-def test_dynamic_xray_start_via_hysteria_routing(monkeypatch):
-    # Patch subprocess.Popen so we don't need the real xray binary in CI
-    import backend.xray.service as xray_svc
-    monkeypatch.setattr(xray_svc.subprocess, "Popen", lambda *a, **kw: MockProcess())
-    monkeypatch.setattr(xray_svc.subprocess, "run", lambda *a, **kw: MockCompletedProcess())
 
+@_skip_no_xray
+@pytest.mark.xdist_group("core_ops")
+@pytest.mark.timeout(30)
+def test_dynamic_xray_start_via_hysteria_routing():
+    """Real xray binary: starts when a Hysteria 2 inbound routes via xray."""
     with db_session() as session:
         session.query(ClientStats).delete()
         session.query(Inbound).delete()
-        hys_stream = {
-            "hysteria": {
-                "routingViaXray": True
-            }
-        }
+        hys_stream = {"hysteria": {"routingViaXray": True}}
         from tests.core_verifier import get_free_port
         xray_hys_port = get_free_port()
         ib = Inbound(
@@ -246,12 +201,11 @@ def test_dynamic_xray_start_via_hysteria_routing(monkeypatch):
     stop_xray()
     assert is_xray_running() is False
 
-def test_dynamic_hysteria_start(monkeypatch):
-    # Patch subprocess.Popen so we don't need the real hysteria binary in CI
-    import backend.hysteria.service as hys_svc
-    monkeypatch.setattr(hys_svc.subprocess, "Popen", lambda *a, **kw: MockProcess())
-    monkeypatch.setattr(hys_svc.subprocess, "run", lambda *a, **kw: MockCompletedProcess())
-
+@_skip_no_hysteria
+@pytest.mark.xdist_group("core_ops")
+@pytest.mark.timeout(30)
+def test_dynamic_hysteria_start():
+    """Real hysteria binary: start/stop behaviour driven by DB state."""
     # 1. No active hysteria inbounds
     with db_session() as session:
         session.query(ClientStats).delete()
