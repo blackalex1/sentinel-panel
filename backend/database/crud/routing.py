@@ -77,8 +77,10 @@ def delete_routing_rule(rule_id: int):
 
 def update_rules_priority(rule_ids_in_order: list):
     with backend.database.db_session() as session:
+        rules = session.query(RoutingRule).all()
+        rule_map = {r.id: r for r in rules}
         for idx, rule_id in enumerate(rule_ids_in_order):
-            rule = session.query(RoutingRule).filter_by(id=int(rule_id)).first()
+            rule = rule_map.get(int(rule_id))
             if rule:
                 rule.sort_order = idx + 1
         return True

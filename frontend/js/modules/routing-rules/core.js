@@ -61,22 +61,24 @@ export async function loadRoutingRules() {
             ? `<button class="table-action-btn delete-btn" disabled><i class="fa-regular fa-trash-can"></i></button>`
             : `<button class="table-action-btn delete-btn" onclick="window.deleteRoutingRule(${rule.id})" title="${t("routing_btn_delete", "Удалить")}"><i class="fa-regular fa-trash-can"></i></button>`;
 
-        tr.setAttribute("draggable", "true");
         tr.setAttribute("data-rule-id", rule.id);
-        tr.style.cursor = "grab";
+
+        tr.addEventListener("mousedown", (e) => {
+            if (e.target && e.target.closest && e.target.closest(".drag-handle")) {
+                tr.setAttribute("draggable", "true");
+            } else {
+                tr.removeAttribute("draggable");
+            }
+        });
 
         // Drag and drop event listeners
         tr.addEventListener("dragstart", (e) => {
-            const handle = (e.target && e.target.closest) ? e.target.closest(".drag-handle") : null;
-            if (!handle) {
-                e.preventDefault();
-                return false;
-            }
             tr.classList.add("dragging");
-            e.dataTransfer.setData("text/plain", rule.id);
+            e.dataTransfer.setData("text/plain", String(rule.id));
             e.dataTransfer.effectAllowed = "move";
         });
         tr.addEventListener("dragend", () => {
+            tr.removeAttribute("draggable");
             tr.classList.remove("dragging");
             document.querySelectorAll("#routing-rules-tbody tr").forEach(r => r.classList.remove("drag-over"));
         });
