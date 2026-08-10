@@ -118,6 +118,24 @@ QUICK_SECURITY_RULES_SPECS = {
         "protocols": [],
         "domains": ["regexp:.*\\.us$"],
         "ips": ["geoip:us"]
+    },
+    "ip_checkers": {
+        "remark": "Сервисы определения IP",
+        "outbound_tag": "direct",
+        "protocols": [],
+        "domains": [
+            "api.ipify.org", "ipify.org", "checkip.amazonaws.com", "ifconfig.me", "ifconfig.co", "ifconfig.io",
+            "telega.me", "domain:ipinfo.io", "domain:2ip.ru", "domain:2ip.io", "domain:2ip.ua", "domain:2ip.me",
+            "domain:myip.ru", "domain:myip.com", "domain:icanhazip.com", "domain:wtfismyip.com", "domain:ip.sb",
+            "domain:ipapi.co", "domain:ip-api.com", "domain:ipapi.com", "domain:db-ip.com", "domain:whoer.net",
+            "domain:ipwhois.io", "domain:ipwho.is", "domain:ipaddress.my", "domain:ipaddress.com", "domain:check-host.net",
+            "domain:browserleaks.com", "domain:ip2location.com", "domain:ip2location.io", "domain:showmyip.com",
+            "domain:whatsmyip.org", "domain:whatismyip.com", "domain:whatsmyipaddress.com", "domain:whatismyipaddress.com",
+            "domain:dnsleaktest.com", "domain:ipleak.net", "domain:ip.me", "domain:ip.cn", "domain:ip138.com",
+            "domain:ident.me", "domain:curlmyip.org", "domain:eth0.me", "domain:myexternalip.com", "domain:ip.nf",
+            "domain:trackip.net", "domain:checkip.dyndns.org"
+        ],
+        "ips": []
     }
 }
 
@@ -139,6 +157,8 @@ def find_quick_rule(session, key: str):
         rule = session.query(RoutingRule).filter(RoutingRule.ips.like('%geoip:cn%')).first()
     elif key == "block_us":
         rule = session.query(RoutingRule).filter(RoutingRule.ips.like('%geoip:us%')).first()
+    elif key == "ip_checkers":
+        rule = session.query(RoutingRule).filter(RoutingRule.domains.like('%ipify%')).first()
     return rule
 
 def sync_quick_security_rules(settings_dict: dict):

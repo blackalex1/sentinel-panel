@@ -284,6 +284,9 @@ export async function loadQuickSecurityRules() {
             const usCb = document.getElementById("quick-block-us");
             if (usCb) usCb.checked = Boolean(setObj.block_us);
 
+            const ipCheckersCb = document.getElementById("quick-block-ip-checkers");
+            if (ipCheckersCb) ipCheckersCb.checked = Boolean(setObj.ip_checkers);
+
             const outbounds = (outboundsRes && outboundsRes.success) ? outboundsRes.obj : [];
             const selectElements = document.querySelectorAll(".quick-outbound-select");
             selectElements.forEach(select => {
@@ -311,6 +314,8 @@ export async function loadQuickSecurityRules() {
             if (ruOut && setObj.block_ru_outbound) ruOut.value = setObj.block_ru_outbound;
             const usOut = document.getElementById("quick-outbound-us");
             if (usOut && setObj.block_us_outbound) usOut.value = setObj.block_us_outbound;
+            const ipCheckersOut = document.getElementById("quick-outbound-ip-checkers");
+            if (ipCheckersOut && setObj.ip_checkers_outbound) ipCheckersOut.value = setObj.ip_checkers_outbound;
 
             // Custom Config Warning Banner
             const banner = document.getElementById("custom-config-warning-banner");

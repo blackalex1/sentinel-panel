@@ -79,6 +79,8 @@ export function setupRoutingRulesListeners() {
             const block_ru_outbound = document.getElementById("quick-outbound-ru")?.value || "blocked";
             const block_us = document.getElementById("quick-block-us").checked;
             const block_us_outbound = document.getElementById("quick-outbound-us")?.value || "blocked";
+            const ip_checkers = document.getElementById("quick-block-ip-checkers").checked;
+            const ip_checkers_outbound = document.getElementById("quick-outbound-ip-checkers")?.value || "direct";
             
             btnSaveQuickRules.disabled = true;
             const res = await apiFetch("/api/settings/update", {
@@ -94,7 +96,9 @@ export function setupRoutingRulesListeners() {
                     block_ru,
                     block_ru_outbound,
                     block_us,
-                    block_us_outbound
+                    block_us_outbound,
+                    ip_checkers,
+                    ip_checkers_outbound
                 })
             });
             btnSaveQuickRules.disabled = false;

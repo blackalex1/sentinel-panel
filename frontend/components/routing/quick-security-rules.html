@@ -115,6 +115,24 @@
                 <select id="quick-outbound-us" class="select-input quick-outbound-select" style="padding: 4px 8px; font-size: 12px; height: 30px; min-width: 130px;"></select>
             </div>
         </div>
+
+        <!-- Route IP Checkers -->
+        <div style="background: var(--bg-input); border: 1px solid var(--border-color); border-radius: 12px; padding: 15px 20px; display: flex; flex-direction: column; gap: 10px;">
+            <label for="quick-block-ip-checkers" style="display: flex; align-items: center; justify-content: space-between; cursor: pointer; user-select: none; margin: 0;">
+                <div style="display: flex; flex-direction: column; gap: 4px;">
+                    <span style="font-weight: 600; font-size: 14px;" data-i18n="routing_quick_ip_checkers">Сервисы определения IP</span>
+                    <span style="font-size: 11px; color: var(--text-secondary);" data-i18n="routing_quick_ip_checkers_desc">ipify, 2ip, ifconfig, ipinfo и др.</span>
+                </div>
+                <span class="switch-toggle">
+                    <input type="checkbox" id="quick-block-ip-checkers">
+                    <span class="switch-slider"></span>
+                </span>
+            </label>
+            <div style="display: flex; align-items: center; justify-content: space-between; gap: 10px; border-top: 1px dashed var(--border-color); padding-top: 8px;">
+                <span style="font-size: 12px; color: var(--text-secondary);" data-i18n="routing_outbound_label">Назначение:</span>
+                <select id="quick-outbound-ip-checkers" class="select-input quick-outbound-select" style="padding: 4px 8px; font-size: 12px; height: 30px; min-width: 130px;"></select>
+            </div>
+        </div>
     </div>
     <div style="margin-top: 20px; display: flex; justify-content: flex-end;">
         <button id="btn-save-quick-rules" class="btn primary-btn" style="padding: 8px 16px;"><i class="fa-solid fa-floppy-disk" style="margin-right: 5px;"></i><span data-i18n="routing_save_quick_rules">Сохранить параметры</span></button>

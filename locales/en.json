@@ -293,6 +293,8 @@
     "routing_quick_block_ru_desc": "All IPs & domains in Russia",
     "routing_quick_block_us": "USA Sites (US)",
     "routing_quick_block_us_desc": "All IPs & domains in USA",
+    "routing_quick_ip_checkers": "IP Checkers",
+    "routing_quick_ip_checkers_desc": "ipify, 2ip, ifconfig, ipinfo etc.",
     "routing_save_quick_rules": "Save Rules",
     "routing_add_rule": "Add Rule",
     "routing_rules_desc": "Rules are evaluated from top to bottom. You can change the order (priority) of rules using the arrow buttons.",

@@ -59,6 +59,8 @@ async def get_settings_api(request: Request):
             "block_ru_outbound": quick_states.get("block_ru_outbound", get_setting("block_ru_outbound", "blocked")),
             "block_us": quick_states.get("block_us", get_setting("block_us", "false") == "true"),
             "block_us_outbound": quick_states.get("block_us_outbound", get_setting("block_us_outbound", "blocked")),
+            "ip_checkers": quick_states.get("ip_checkers", get_setting("ip_checkers", "false") == "true"),
+            "ip_checkers_outbound": quick_states.get("ip_checkers_outbound", get_setting("ip_checkers_outbound", "direct")),
             "mux_enabled": get_setting("mux_enabled", "false") == "true",
             "mux_concurrency": int(get_setting("mux_concurrency", "8")),
             "mux_xver": get_setting("mux_xver", "0") == "1"
@@ -224,7 +226,7 @@ async def update_settings_api(request: Request):
  
         # 6. Quick Block Rules & Outbound Parameters
         quick_block_changed = False
-        quick_keys = ["block_bittorrent", "block_ads", "block_cn", "block_ru", "block_us"]
+        quick_keys = ["block_bittorrent", "block_ads", "block_cn", "block_ru", "block_us", "ip_checkers"]
         quick_outbound_keys = [f"{k}_outbound" for k in quick_keys]
         if any(key in data for key in quick_keys + quick_outbound_keys):
             from backend.database import sync_quick_security_rules

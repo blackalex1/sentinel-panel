@@ -293,6 +293,8 @@
     "routing_quick_block_ru_desc": "Все IP и сайты России",
     "routing_quick_block_us": "Сайты США (US)",
     "routing_quick_block_us_desc": "Все IP и сайты США",
+    "routing_quick_ip_checkers": "Сервисы определения IP",
+    "routing_quick_ip_checkers_desc": "ipify, 2ip, ifconfig, ipinfo и др.",
     "routing_save_quick_rules": "Сохранить правила",
     "routing_add_rule": "Добавить правило",
     "routing_rules_desc": "Правила проверяются сверху вниз. Вы можете менять порядок (приоритет) правил с помощью стрелок.",
