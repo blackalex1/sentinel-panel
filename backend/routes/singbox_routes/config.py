@@ -45,7 +45,14 @@ async def singbox_config_save(request: Request, payload: dict):
         else:
             config_dict = raw_config
 
-        set_setting("use_custom_singbox_config", "true")
+        if isinstance(config_dict, dict) and "log" in config_dict and isinstance(config_dict["log"], dict):
+            new_level = config_dict["log"].get("level")
+            if new_level:
+                set_setting("singbox_loglevel", str(new_level))
+
+        if payload.get("is_custom") is True:
+            set_setting("use_custom_singbox_config", "true")
+
         success = write_singbox_config(config_dict)
         if success and is_singbox_running():
             restart_singbox()

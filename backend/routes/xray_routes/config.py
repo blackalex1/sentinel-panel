@@ -45,10 +45,16 @@ async def save_xray_config(request: Request, payload: dict):
         from backend.xray import restart_xray
         from backend.database import set_setting
         
+        if isinstance(config, dict) and "log" in config and isinstance(config["log"], dict):
+            new_loglevel = config["log"].get("loglevel")
+            if new_loglevel:
+                set_setting("xray_loglevel", str(new_loglevel))
+
         with open(XRAY_CONFIG_PATH, "w", encoding="utf-8") as f:
             json.dump(config, f, indent=2)
             
-        set_setting("use_custom_xray_config", "true")
+        if payload.get("is_custom") is True:
+            set_setting("use_custom_xray_config", "true")
         
         success = restart_xray()
         return {"success": success}

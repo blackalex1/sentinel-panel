@@ -51,7 +51,7 @@ export function setupHysteriaConfigListeners() {
             const res = await apiFetch("/api/hysteria/config", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ inbound_id: inboundId, config: parsed })
+                body: JSON.stringify({ inbound_id: inboundId, config: parsed, is_custom: true })
             });
             saveBtn.disabled = false;
             

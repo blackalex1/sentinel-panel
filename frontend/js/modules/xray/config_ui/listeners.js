@@ -43,7 +43,7 @@ export function setupXrayConfigListeners() {
             const res = await apiFetch("/api/xray/config", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ config: parsed })
+                body: JSON.stringify({ config: parsed, is_custom: true })
             });
             xraySaveBtn.disabled = false;
             

@@ -362,7 +362,7 @@ export function setupSingboxConfigListeners() {
                 const res = await apiFetch("/api/singbox/config/save", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ config: configObj })
+                    body: JSON.stringify({ config: configObj, is_custom: true })
                 });
                 if (res && res.success) {
                     showToast(t("singbox_config_saved", "Конфигурация sing-box сохранена"));

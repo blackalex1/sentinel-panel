@@ -73,11 +73,17 @@ async def save_hysteria_config(request: Request, payload: dict):
         return {"success": False, "msg": "Неверные параметры"}
         
     try:
+        if isinstance(config, dict) and "log" in config and isinstance(config["log"], dict):
+            new_level = config["log"].get("level")
+            if new_level:
+                set_setting("hysteria_loglevel", str(new_level))
+
         config_path = backend.hysteria.BIN_DIR / f"hysteria_{inbound_id}.json"
         with open(config_path, "w", encoding="utf-8") as f:
             json.dump(config, f, indent=2)
             
-        set_setting(f"use_custom_hysteria_config_{inbound_id}", "true")
+        if payload.get("is_custom") is True:
+            set_setting(f"use_custom_hysteria_config_{inbound_id}", "true")
         
         success = restart_hysteria()
         if not success:

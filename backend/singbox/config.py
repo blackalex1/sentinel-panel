@@ -47,7 +47,7 @@ def generate_singbox_config_json() -> dict:
 
     config = {
         "log": {
-            "level": "debug",
+            "level": setting_fn("singbox_loglevel", "info"),
             "output": str(SINGBOX_LOG_PATH).replace("\\", "/"),
             "timestamp": True
         },
