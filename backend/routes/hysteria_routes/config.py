@@ -64,8 +64,8 @@ async def hysteria_config(request: Request):
 
 @router.post("/api/hysteria/config")
 async def save_hysteria_config(request: Request, payload: dict):
-    if not check_auth(request):
-        return decoy_response()
+    if not hysteria_facade.check_auth(request):
+        return hysteria_facade.decoy_response()
         
     inbound_id = payload.get("inbound_id")
     config = payload.get("config")
