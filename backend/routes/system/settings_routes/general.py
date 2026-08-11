@@ -24,6 +24,12 @@ async def get_settings_api(request: Request):
         from backend.database import get_quick_security_rules_state
         quick_states = get_quick_security_rules_state()
 
+        from backend.models import Inbound
+        has_custom_hysteria = any(
+            get_setting(f"use_custom_hysteria_config_{ib.id}") == "true"
+            for ib in session.query(Inbound).filter(Inbound.enable == 1, Inbound.protocol == "hysteria2").all()
+        )
+
         return {
             "success": True,
             "api_token": "••••••••" if settings.API_TOKEN else "",
@@ -63,7 +69,10 @@ async def get_settings_api(request: Request):
             "ip_checkers_outbound": quick_states.get("ip_checkers_outbound", get_setting("ip_checkers_outbound", "direct")),
             "mux_enabled": get_setting("mux_enabled", "false") == "true",
             "mux_concurrency": int(get_setting("mux_concurrency", "8")),
-            "mux_xver": get_setting("mux_xver", "0") == "1"
+            "mux_xver": get_setting("mux_xver", "0") == "1",
+            "use_custom_xray_config": get_setting("use_custom_xray_config", "false"),
+            "use_custom_singbox_config": get_setting("use_custom_singbox_config", "false"),
+            "use_custom_hysteria_config": "true" if has_custom_hysteria else "false"
         }
 
 @router.post("/api/settings/update")

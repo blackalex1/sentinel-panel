@@ -1,11 +1,12 @@
 <!-- Модальное окно добавления/редактирования Outbound -->
 <div id="outbound-modal" class="modal" style="z-index: 1100;">
-    <div class="glass-card modal-card" style="background: hsl(223, 47%, 11%) !important;">
+    <div class="glass-card modal-card large-card" style="background: hsl(223, 47%, 11%) !important;">
         <div class="modal-header">
             <h3 id="outbound-modal-title">Создание исходящего подключения</h3>
             <button class="btn icon-btn close-modal-btn"><i class="fa-solid fa-xmark"></i></button>
         </div>
-        <form id="outbound-form">
+        <div class="modal-body">
+            <form id="outbound-form">
             <input type="hidden" id="ob-id">
             <div class="input-group" id="ob-import-group">
                 <label for="ob-import-link" data-i18n="routing_modal_import_link">Импортировать из ссылки (vless, ss, socks, http, hysteria)</label>
@@ -280,5 +281,6 @@
                 </div>
             </div>
         </form>
+        </div>
     </div>
 </div>

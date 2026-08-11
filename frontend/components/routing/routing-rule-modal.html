@@ -1,11 +1,12 @@
 <!-- Модальное окно добавления/редактирования Правила маршрутизации -->
 <div id="routing-rule-modal" class="modal" style="z-index: 1100;">
-    <div class="glass-card modal-card" style="background: hsl(223, 47%, 11%) !important; width: 500px; max-width: 95%;">
+    <div class="glass-card modal-card" style="background: hsl(223, 47%, 11%) !important; width: 550px; max-width: 95%;">
         <div class="modal-header">
             <h3 id="routing-rule-modal-title">Создание правила маршрутизации</h3>
             <button class="btn icon-btn close-modal-btn"><i class="fa-solid fa-xmark"></i></button>
         </div>
-        <form id="routing-rule-form">
+        <div class="modal-body">
+            <form id="routing-rule-form">
             <input type="hidden" id="rule-id">
             <div class="input-group">
                 <label for="rule-remark" data-i18n="routing_rule_modal_remark">Описание / Название</label>
@@ -62,5 +63,6 @@
 
             <button type="submit" class="btn primary-btn"><i class="fa-solid fa-floppy-disk" style="margin-right: 5px;"></i><span data-i18n="routing_modal_save">Сохранить</span></button>
         </form>
+        </div>
     </div>
 </div>

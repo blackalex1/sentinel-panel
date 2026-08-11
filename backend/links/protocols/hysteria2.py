@@ -36,6 +36,10 @@ def build_hysteria2_link(inbound: dict, client: dict, host: str, port: int, disp
     obfs_password = hysteria_opts.get('obfsPassword', '')
     hop = hysteria_opts.get('hop', '')
 
+    up_mbps = hysteria_opts.get('upMbps') or hysteria_opts.get('up_mbps')
+    down_mbps = hysteria_opts.get('downMbps') or hysteria_opts.get('down_mbps')
+    ignore_bw = hysteria_opts.get('ignoreClientBandwidth', False)
+
     sni = hysteria_opts.get('sni') or stream_settings.get('sni')
     params = []
     
@@ -56,6 +60,18 @@ def build_hysteria2_link(inbound: dict, client: dict, host: str, port: int, disp
     if cert_mode == 'self' or not fp_hash:
         params.append("insecure=1")
         
+    if not ignore_bw:
+        try:
+            if up_mbps and int(up_mbps) > 0:
+                params.append(f"up={up_mbps}")
+        except ValueError:
+            pass
+        try:
+            if down_mbps and int(down_mbps) > 0:
+                params.append(f"down={down_mbps}")
+        except ValueError:
+            pass
+
     if obfs_password:
         params.append("obfs=salamander")
         params.append(f"obfs-password={quote(obfs_password, safe='')}")
@@ -78,6 +94,10 @@ def build_hysteria2_mihomo_proxy(inbound: dict, client: dict, host: str, port: i
     obfs_password = hysteria_opts.get('obfsPassword', '')
     hop = hysteria_opts.get('hop', '')
 
+    up_mbps = hysteria_opts.get('upMbps') or hysteria_opts.get('up_mbps')
+    down_mbps = hysteria_opts.get('downMbps') or hysteria_opts.get('down_mbps')
+    ignore_bw = hysteria_opts.get('ignoreClientBandwidth', False)
+
     sni = hysteria_opts.get('sni') or stream_settings.get('sni')
     if not sni and not is_ip(host):
         sni = host
@@ -92,6 +112,18 @@ def build_hysteria2_mihomo_proxy(inbound: dict, client: dict, host: str, port: i
         "skip-cert-verify": True,
         "tfo": False
     }
+
+    if not ignore_bw:
+        try:
+            if up_mbps and int(up_mbps) > 0:
+                proxy["up"] = f"{up_mbps} Mbps"
+        except ValueError:
+            pass
+        try:
+            if down_mbps and int(down_mbps) > 0:
+                proxy["down"] = f"{down_mbps} Mbps"
+        except ValueError:
+            pass
 
     if hop:
         proxy["ports"] = hop

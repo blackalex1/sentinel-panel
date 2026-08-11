@@ -87,16 +87,20 @@ async def save_hysteria_config(request: Request, payload: dict):
         return {"success": False, "msg": str(e)}
 
 @router.post("/api/hysteria/config/reset")
-async def reset_hysteria_config(request: Request, payload: dict):
-    if not check_auth(request):
-        return decoy_response()
+async def reset_hysteria_config(request: Request, payload: dict = None):
+    if not hysteria_facade.check_auth(request):
+        return hysteria_facade.decoy_response()
         
+    payload = payload or {}
     inbound_id = payload.get("inbound_id")
-    if inbound_id is None:
-        return {"success": False, "msg": "Не указан inbound_id"}
         
     try:
-        set_setting(f"use_custom_hysteria_config_{inbound_id}", "false")
+        if inbound_id is not None:
+            set_setting(f"use_custom_hysteria_config_{inbound_id}", "false")
+        else:
+            inbounds = get_all_inbounds()
+            for ib in inbounds:
+                set_setting(f"use_custom_hysteria_config_{ib['id']}", "false")
         success = restart_hysteria()
         return {"success": success}
     except Exception as e:
