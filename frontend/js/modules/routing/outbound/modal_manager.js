@@ -279,7 +279,17 @@ export async function openOutboundModal(id = null) {
         document.getElementById("ob-health-url").value = "";
         document.getElementById("ob-health-interval").value = "";
     }
-    
+
+    if (protocolSelect) protocolSelect.dispatchEvent(new Event("change"));
+    const secSelect = document.getElementById("ob-security");
+    if (secSelect) secSelect.dispatchEvent(new Event("change"));
+    const obfsSelect = document.getElementById("ob-hysteria-obfs");
+    if (obfsSelect) obfsSelect.dispatchEvent(new Event("change"));
+    const ssMethodSelect = document.getElementById("ob-ss-method");
+    if (ssMethodSelect) ssMethodSelect.dispatchEvent(new Event("change"));
+    const fallbackStratSelect = document.getElementById("ob-fallback-strategy");
+    if (fallbackStratSelect) fallbackStratSelect.dispatchEvent(new Event("change"));
+
     const btnWarp = document.getElementById("btn-generate-warp-profile");
     if (btnWarp && !btnWarp.dataset.bound) {
         btnWarp.dataset.bound = "true";
