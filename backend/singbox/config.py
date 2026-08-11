@@ -45,9 +45,13 @@ def generate_singbox_config_json() -> dict:
     singbox_outbounds = generate_singbox_outbounds(outbounds_fn)
     route_config = generate_singbox_routing(rules_fn, setting_fn)
 
+    sb_loglevel = setting_fn("singbox_loglevel")
+    if sb_loglevel not in ("trace", "debug", "info", "warn", "error", "fatal", "panic"):
+        sb_loglevel = "info"
+
     config = {
         "log": {
-            "level": setting_fn("singbox_loglevel", "info"),
+            "level": sb_loglevel,
             "output": str(SINGBOX_LOG_PATH).replace("\\", "/"),
             "timestamp": True
         },

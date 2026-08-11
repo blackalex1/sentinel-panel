@@ -460,11 +460,15 @@ def generate_xray_config_json() -> dict:
     if balancers:
         routing_dict["balancers"] = balancers
 
+    xr_loglevel = get_setting("xray_loglevel")
+    if xr_loglevel not in ("debug", "info", "warning", "error", "none"):
+        xr_loglevel = "info"
+
     config = {
         "log": {
             "access": str(backend.config.XRAY_LOG_PATH),
             "error": str(backend.config.XRAY_LOG_PATH),
-            "loglevel": get_setting("xray_loglevel", "info")
+            "loglevel": xr_loglevel
         },
         "api": {
             "tag": "api",

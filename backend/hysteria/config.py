@@ -303,8 +303,11 @@ def ensure_hysteria_quic_and_log(config: dict) -> dict:
 
     if "log" not in config or not isinstance(config["log"], dict):
         from backend.database import get_setting
+        hy_loglevel = get_setting("hysteria_loglevel")
+        if hy_loglevel not in ("debug", "info", "warn", "error"):
+            hy_loglevel = "info"
         config["log"] = {
-            "level": get_setting("hysteria_loglevel", "info")
+            "level": hy_loglevel
         }
     return config
 
