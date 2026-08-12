@@ -234,7 +234,7 @@
     "links_mihomo_label": "Конфигурация Mihomo / Clash Meta (YAML):",
     "links_copy_mihomo_btn": "Скопировать Mihomo YAML",
     "links_qr_desc": "Отсканируйте этот QR-код в клиенте v2ray/v2rayN/NekoBox/Sing-box для быстрого импорта.",
-    "login_title": "Вход в Spectre Panel",
+    "login_title": "Вход в Sentinel Control Panel",
     "login_username": "Имя пользователя",
     "login_password": "Пароль",
     "login_btn": "Войти в систему",

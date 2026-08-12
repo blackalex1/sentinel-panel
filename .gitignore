@@ -1,4 +1,5 @@
-# === Environments and Secrets ===
+.agents/
+.gemini/
 .env
 config/.env
 *.pem
@@ -8,8 +9,6 @@ config/.env
 secret/
 secrets/
 /backups/
-
-# === IDEs and Editors ===
 .idea/
 .vscode/
 *.suo
@@ -18,13 +17,9 @@ secrets/
 *.sln
 *.swp
 *~
-
-# === OS Files ===
 .DS_Store
 Thumbs.db
 desktop.ini
-
-# === Python Caches and Virtual Envs ===
 __pycache__/
 *.pyc
 *.pyo
@@ -39,8 +34,6 @@ htmlcov/
 .tox/
 .poetry/
 .pip-cache/
-
-# === Databases ===
 *.db
 *.db-journal
 *.db-shm
@@ -48,8 +41,6 @@ htmlcov/
 *.sqlite
 *.sqlite3
 pgdata/
-
-# === Core Binaries & Generated Assets ===
 bin/xray
 bin/xray.exe
 bin/sing-box
@@ -70,15 +61,9 @@ bin/wintun.dll
 bin/LICENSE
 bin/LICENSE-*.txt
 bin/README.md
-
-# === Mock Files ===
 warp_mock.json
-
-# === Scratch & Helper Tools ===
 scratch/
 run_remote_tests.py
 security-audit-results/
-
-# === Generated Runtime Logs & Config Artifacts ===
 config/*.log
 config/*.sni

@@ -1,15 +1,15 @@
 <div align="center">
 
 [![License](https://img.shields.io/badge/License-MIT-blue.svg?logo=open-source-initiative&logoColor=white)](LICENSE)
-[![Latest Release](https://img.shields.io/badge/Release-Latest-brightgreen?logo=github)](https://github.com/blackalex1/Spectre-panel/releases)
+[![Latest Release](https://img.shields.io/badge/Release-Latest-brightgreen?logo=github)](https://github.com/blackalex1/sentinel-panel/releases)
 [![Language](https://img.shields.io/badge/Language-English-009688?logo=google-translate&logoColor=white)](README.en.md)
 [![Made with ❤️](https://img.shields.io/badge/Made%20with-%E2%9D%A4-red)](#)
 
-# 🚀 Spectre Panel
+# 🚀 Sentinel Control Panel
 
 </div>
 
-**Spectre Panel** — это современная, быстрая и незаметная (Stealth) веб-панель управления серверами VPN для обхода блокировок. Проект объединяет мощь ядер **Xray** и **Hysteria 2** с удобным веб-интерфейсом, богатыми визуальными эффектами и широкими возможностями автоматизации.
+**Sentinel Control Panel** — это современная, быстрая и незаметная (Stealth) веб-панель управления серверами VPN для обхода блокировок. Проект объединяет мощь ядер **Xray**, **Sing-box** и **Hysteria 2** с удобным веб-интерфейсом, богатыми визуальными эффектами и широкими возможностями автоматизации.
 
 ---
 
@@ -18,7 +18,7 @@
 Для автоматической установки зависимостей, настройки ядра и запуска панели выполните команду:
 
 ```bash
-bash <(curl -fsSL https://raw.githubusercontent.com/ReturnFI/spectre-panel/main/installation/install_with_docker.sh)
+bash <(curl -fsSL https://raw.githubusercontent.com/blackalex1/sentinel-panel/main/installation/install_with_docker.sh)
 ```
 
 > [!NOTE]
@@ -28,8 +28,10 @@ bash <(curl -fsSL https://raw.githubusercontent.com/ReturnFI/spectre-panel/main/
 
 ## 💎 Возможности
 
-* **Ядро Xray**: Поддержка протоколов VLESS (сReality классическим X25519 и пост-квантовым `ML-KEM-768` шифрованием), VMess, Trojan, ShadowSocks, SOCKS5.
-* **Ядро Hysteria 2**: Сверхскоростной протокол на базе QUIC с поддержкой Маскировки (Masquerade) и Обфускации (Salamander).
+- **Мульти-ядерная поддержка**: Xray-core, Sing-box, Hysteria 2.
+- **Поддержка современных протоколов**: VLESS (REALITY, Vision), VMess, Trojan, Shadowsocks, Hysteria 2, TUIC.
+- **Интеграция с ПК и Мобильными клиентами**: Единая экосистема **Sentinel Ecosystem** (`sentinel-desktop`, `sentinel-mobile`).
+- **Расширенные правила маршрутизации**: Поддержка 47 сервисов определения IP, гео-фильтров (RU, CN, US) и блокировки рекламы/торрентов.
 * **Скрытность (Stealth)**: Маскировка веб-панели (Decoy) под Nginx 404, сайт-визитку, проксирование или редирект для защиты от сканирования.
 * **Маршрутизация**: Проверка пинга (TCP) и транзита (HTTP) для исходящих подключений, автоимпорт прокси-ссылок из буфера обмена.
 * **Управление лимитами**: Блокировка клиентов по трафику, сроку действия или лимиту одновременно используемых IP-адресов.
