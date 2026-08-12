@@ -126,8 +126,8 @@ QUICK_SECURITY_RULES_SPECS = {
         "outbound_tag": "direct",
         "protocols": [],
         "domains": [
-            "api.ipify.org", "ipify.org", "checkip.amazonaws.com", "ifconfig.me", "ifconfig.co", "ifconfig.io",
-            "telega.me", "domain:ipinfo.io", "domain:2ip.ru", "domain:2ip.io", "domain:2ip.ua", "domain:2ip.me",
+            "domain:ipify.org", "domain:api.ipify.org", "domain:checkip.amazonaws.com", "domain:ifconfig.me", "domain:ifconfig.co", "domain:ifconfig.io",
+            "domain:telega.me", "domain:ipinfo.io", "domain:2ip.ru", "domain:2ip.io", "domain:2ip.ua", "domain:2ip.me",
             "domain:myip.ru", "domain:myip.com", "domain:icanhazip.com", "domain:wtfismyip.com", "domain:ip.sb",
             "domain:ipapi.co", "domain:ip-api.com", "domain:ipapi.com", "domain:db-ip.com", "domain:whoer.net",
             "domain:ipwhois.io", "domain:ipwho.is", "domain:ipaddress.my", "domain:ipaddress.com", "domain:check-host.net",
@@ -135,9 +135,10 @@ QUICK_SECURITY_RULES_SPECS = {
             "domain:whatsmyip.org", "domain:whatismyip.com", "domain:whatsmyipaddress.com", "domain:whatismyipaddress.com",
             "domain:dnsleaktest.com", "domain:ipleak.net", "domain:ip.me", "domain:ip.cn", "domain:ip138.com",
             "domain:ident.me", "domain:curlmyip.org", "domain:eth0.me", "domain:myexternalip.com", "domain:ip.nf",
-            "domain:trackip.net", "domain:checkip.dyndns.org"
+            "domain:trackip.net", "domain:checkip.dyndns.org",
+            "keyword:ipify", "keyword:2ip", "keyword:ipwhois", "keyword:icanhazip", "keyword:ifconfig", "keyword:checkip", "keyword:browserleaks", "keyword:whoer", "keyword:ipleak"
         ],
-        "ips": []
+        "ips": ["1.1.1.1/32", "1.0.0.1/32"]
     }
 }
 
