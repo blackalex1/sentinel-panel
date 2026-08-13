@@ -23,11 +23,11 @@ if database_url.startswith("sqlite"):
         "check_same_thread": False,
         "timeout": 15.0
     }
+    engine = create_engine(database_url, connect_args=connect_args, pool_pre_ping=True)
 elif database_url.startswith("postgresql"):
+    import time
     connect_args = {
-        # Не зависать бесконечно если PostgreSQL недоступен
-        "connect_timeout": 10,
-        # Видно в pg_stat_activity — удобно для дебага
+        "connect_timeout": 5,
         "application_name": "sentinel-panel",
     }
     pool_args = {
@@ -35,25 +35,25 @@ elif database_url.startswith("postgresql"):
         "max_overflow": 10,
         "pool_timeout": 30,
         "pool_recycle": 1800,
-        # CRITICAL: проверяет живость соединения через SELECT 1 перед каждым checkout.
-        # Без этого устаревшее соединение (после рестарта PG или firewall timeout)
-        # приведёт к ошибке у первого запроса, который её получит.
         "pool_pre_ping": True,
     }
-
-try:
-    engine = create_engine(database_url, connect_args=connect_args, **pool_args)
-    if database_url.startswith("postgresql"):
-        with engine.connect() as conn:
-            pass
-except Exception as e:
-    if database_url.startswith("postgresql"):
-        logging.warning(f"PostgreSQL server not available ({e}). Falling back to local SQLite database.")
+    engine = None
+    last_err = None
+    for attempt in range(12):
+        try:
+            temp_engine = create_engine(database_url, connect_args=connect_args, **pool_args)
+            with temp_engine.connect() as conn:
+                engine = temp_engine
+                break
+        except Exception as e:
+            last_err = e
+            time.sleep(1)
+            
+    if engine is None:
+        logging.warning(f"PostgreSQL server not available after retries ({last_err}). Falling back to local SQLite database.")
         database_url = f"sqlite:///{DB_PATH}"
         connect_args = {"check_same_thread": False, "timeout": 15.0}
         engine = create_engine(database_url, connect_args=connect_args, pool_pre_ping=True)
-    else:
-        raise e
 
 # SQLite performance tuning: applied on every new connection via event hook.
 # WAL mode: readers never block the writer; writer never blocks readers.

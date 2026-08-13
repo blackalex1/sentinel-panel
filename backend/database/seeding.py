@@ -27,19 +27,26 @@ def init_db():
     if admin_url.startswith("sqlite"):
         connect_args_admin = {"check_same_thread": False}
         
-    try:
-        admin_engine = create_engine(admin_url, connect_args=connect_args_admin)
-        if admin_url.startswith("postgresql"):
-            with admin_engine.connect() as conn:
-                pass
-    except Exception as e:
-        if admin_url.startswith("postgresql"):
-            logging.warning(f"PostgreSQL admin connection failed ({e}). Falling back to SQLite: {DB_PATH}")
+    if admin_url.startswith("postgresql"):
+        admin_engine = None
+        last_admin_err = None
+        for attempt in range(12):
+            try:
+                temp_engine = create_engine(admin_url, connect_args={"connect_timeout": 5})
+                with temp_engine.connect() as conn:
+                    admin_engine = temp_engine
+                    break
+            except Exception as e:
+                last_admin_err = e
+                time.sleep(1)
+        
+        if admin_engine is None:
+            logging.warning(f"PostgreSQL admin connection failed after retries ({last_admin_err}). Falling back to SQLite: {DB_PATH}")
             admin_url = f"sqlite:///{DB_PATH}"
             connect_args_admin = {"check_same_thread": False}
             admin_engine = create_engine(admin_url, connect_args=connect_args_admin)
-        else:
-            raise e
+    else:
+        admin_engine = create_engine(admin_url, connect_args=connect_args_admin)
 
     try:
         Base.metadata.create_all(admin_engine)
