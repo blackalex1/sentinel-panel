@@ -33,6 +33,8 @@ fi
 
 # 2. Rebuild and restart Docker containers
 echo "[+] Rebuilding and restarting Docker containers..."
+pkill -9 -f "sing-box" 2>/dev/null || true
+pkill -9 -f "xray" 2>/dev/null || true
 docker ps -a --filter "name=spectre" -q | xargs -r docker rm -f 2>/dev/null || true
 docker ps -a --filter "name=sentinel" -q | xargs -r docker rm -f 2>/dev/null || true
 docker compose down --remove-orphans 2>/dev/null || true
