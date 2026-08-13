@@ -49,10 +49,11 @@ for v in spectre-panel_pgdata panel_pgdata installation_pgdata; do
 done
 
 if [ -n "$LEGACY_VOL" ]; then
-    echo "[+] Detected legacy database volume '$LEGACY_VOL'. Auto-migrating data to 'sentinel-panel_pgdata'..."
+    echo "[+] Detected legacy database volume '$LEGACY_VOL'. Overwriting 'sentinel-panel_pgdata' with original database..."
+    docker volume rm -f sentinel-panel_pgdata 2>/dev/null || true
     docker volume create sentinel-panel_pgdata >/dev/null 2>&1
-    docker run --rm -v "$LEGACY_VOL":/from -v sentinel-panel_pgdata:/to postgres:16-alpine cp -a /from/. /to/
-    echo "[+] Database volume migrated to sentinel-panel_pgdata successfully!"
+    docker run --rm -v "$LEGACY_VOL":/from -v sentinel-panel_pgdata:/to postgres:16-alpine sh -c "rm -rf /to/* 2>/dev/null || true; cp -a /from/. /to/"
+    echo "[+] Original database volume migrated to sentinel-panel_pgdata successfully!"
 fi
 
 if docker compose up -d --build; then
