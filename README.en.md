@@ -1,16 +1,16 @@
 <div align="center">
 
-[![Telegram](https://img.shields.io/badge/Telegram-Join%20Chat-26A5E4?logo=telegram&logoColor=white)](https://t.me/spectre_panel)
+[![Telegram](https://img.shields.io/badge/Telegram-Join%20Chat-26A5E4?logo=telegram&logoColor=white)](https://t.me/sentinel_panel)
 [![License](https://img.shields.io/badge/License-MIT-blue.svg?logo=open-source-initiative&logoColor=white)](LICENSE)
-[![Latest Release](https://img.shields.io/badge/Release-Latest-brightgreen?logo=github)](https://github.com/blackalex1/Spectre-panel/releases)
+[![Latest Release](https://img.shields.io/badge/Release-Latest-brightgreen?logo=github)](https://github.com/blackalex1/sentinel-panel/releases)
 [![Language](https://img.shields.io/badge/Language-Russian-009688?logo=google-translate&logoColor=white)](README.md)
 [![Made with ❤️](https://img.shields.io/badge/Made%20with-%E2%9D%A4-red)](#)
 
-# 🚀 Spectre Panel
+# 🚀 Sentinel Control Panel
 
 </div>
 
-**Spectre Panel** is a modern, high-performance, and stealth VPN web control panel designed to bypass internet censorship. It integrates the power of **Xray** and **Hysteria 2** cores with a user-friendly web interface, rich visual effects, and extensive automation capabilities.
+**Sentinel Control Panel** is a modern, high-performance, and stealth VPN web control panel designed to bypass internet censorship. It integrates the power of **Xray**, **Sing-box**, and **Hysteria 2** cores with a user-friendly web interface, rich visual effects, and extensive automation capabilities.
 
 ---
 
@@ -19,7 +19,7 @@
 To automatically install dependencies, configure cores, and launch the panel, run the following command:
 
 ```bash
-bash <(curl -fsSL https://raw.githubusercontent.com/ReturnFI/spectre-panel/main/installation/install_with_docker.sh)
+bash <(curl -fsSL https://raw.githubusercontent.com/blackalex1/sentinel-panel/main/installation/install_with_docker.sh)
 ```
 
 > [!NOTE]
@@ -43,21 +43,21 @@ bash <(curl -fsSL https://raw.githubusercontent.com/ReturnFI/spectre-panel/main/
 The panel runs in Docker containers and interacts with the host-agent (a system service on the server).
 
 ### 📋 One-Click Automatic Installation (Recommended)
-To automatically install Docker, configure system services, and start Spectre Panel:
+To automatically install Docker, configure system services, and start Sentinel Panel:
 
 ```bash
-bash <(curl -fsSL https://raw.githubusercontent.com/blackalex1/Spectre-panel/main/installation/install_with_docker.sh)
+bash <(curl -fsSL https://raw.githubusercontent.com/blackalex1/sentinel-panel/main/installation/install_with_docker.sh)
 ```
 
 ### 🐳 Build from Local Repository
 To build and run the panel from local source files:
 
 ```bash
-git clone https://github.com/blackalex1/Spectre-panel.git && cd Spectre-panel && docker compose up -d --build
+git clone https://github.com/blackalex1/sentinel-panel.git && cd sentinel-panel && docker compose up -d --build
 ```
 To view the secret path, port, and token generated on initial startup:
 ```bash
-docker compose logs vpn-panel
+docker compose logs -f sentinel-panel
 ```
 
 ---

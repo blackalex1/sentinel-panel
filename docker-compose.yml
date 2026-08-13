@@ -1,7 +1,7 @@
 services:
   db:
     image: postgres:16-alpine
-    container_name: spectre-db
+    container_name: sentinel-db
     restart: always
     network_mode: host
     command: postgres -c listen_addresses='127.0.0.1'
@@ -11,9 +11,9 @@ services:
       - pgdata:/var/lib/postgresql/data
       - ./config/init-roles.sh:/docker-entrypoint-initdb.d/init-roles.sh:ro
 
-  spectre-panel:
+  sentinel-panel:
     build: .
-    container_name: spectre-panel
+    container_name: sentinel-panel
     restart: always
     network_mode: host
     cap_add:
@@ -25,7 +25,7 @@ services:
       - ./bin:/app/bin
       - ./backups:/app/backups
       - ./frontend/decoy:/app/frontend/decoy
-      - /var/run/spectre:/var/run/spectre
+      - /var/run/sentinel:/var/run/sentinel
     environment:
       - PYTHONUNBUFFERED=1
     env_file:

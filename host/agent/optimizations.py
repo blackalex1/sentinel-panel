@@ -49,7 +49,7 @@ def enable_bbr() -> tuple[bool, str]:
         modified = False
         with open(sysctl_path, "a") as f:
             if not has_qdisc:
-                f.write("\n# Enabled by Spectre Host Agent\nnet.core.default_qdisc=fq\n")
+                f.write("\n# Enabled by Sentinel Host Agent\nnet.core.default_qdisc=fq\n")
                 modified = True
             if not has_bbr:
                 f.write("net.ipv4.tcp_congestion_control=bbr\n")
@@ -125,9 +125,9 @@ def apply_network_optimizations() -> tuple[bool, str]:
     try:
         sysctl_conf_dir = Path("/etc/sysctl.d")
         sysctl_conf_dir.mkdir(parents=True, exist_ok=True)
-        conf_file = sysctl_conf_dir / "99-spectre-profile.conf"
+        conf_file = sysctl_conf_dir / "99-sentinel-profile.conf"
         
-        presets = """# Tuning for high throughput Spectre profile
+        presets = """# Tuning for high throughput Sentinel profile
 fs.file-max = 65535000
 net.core.somaxconn = 32768
 net.ipv4.tcp_max_syn_backlog = 16384
@@ -150,13 +150,13 @@ net.ipv4.tcp_fastopen = 3
             # sysctl --system can exit with 1 if there are unsupported/invalid keys in other/existing config files.
             # We check if our FastOpen setting is active, which indicates that our sysctl presets were applied.
             if get_optimization_status():
-                logging.warning(f"sysctl --system returned non-zero code ({e}), but our spectre settings are active.")
+                logging.warning(f"sysctl --system returned non-zero code ({e}), but our sentinel settings are active.")
             else:
                 logging.warning(f"sysctl --system failed: {e}. If this is a container, optimizations should be applied on the host.")
         
         limits_conf_dir = Path("/etc/security/limits.d")
         limits_conf_dir.mkdir(parents=True, exist_ok=True)
-        limits_file = limits_conf_dir / "99-spectre-profile.conf"
+        limits_file = limits_conf_dir / "99-sentinel-profile.conf"
         
         limits_content = """# Open file limits for high load
 root soft nofile 1000000

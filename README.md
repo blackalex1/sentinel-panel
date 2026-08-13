@@ -44,21 +44,21 @@ bash <(curl -fsSL https://raw.githubusercontent.com/blackalex1/sentinel-panel/ma
 Панель работает в Docker-контейнерах и взаимодействует с хост-агентом (системной службой на сервере).
 
 ### 📋 Автоматическая установка (Рекомендуется)
-Для автоматической установки Docker, настройки системных служб и запуска Spectre Panel выполните одну команду:
+Для автоматической установки Docker, настройки системных служб и запуска Sentinel Panel выполните одну команду:
 
 ```bash
-bash <(curl -fsSL https://raw.githubusercontent.com/blackalex1/Spectre-panel/main/installation/install_with_docker.sh)
+bash <(curl -fsSL https://raw.githubusercontent.com/blackalex1/sentinel-panel/main/installation/install_with_docker.sh)
 ```
 
 ### 🐳 Сборка из локального репозитория
 Для сборки и запуска панели из локальных исходных файлов:
 
 ```bash
-git clone https://github.com/blackalex1/Spectre-panel.git && cd Spectre-panel && docker compose up -d --build
+git clone https://github.com/blackalex1/sentinel-panel.git && cd sentinel-panel && docker compose up -d --build
 ```
 Для просмотра сгенерированного при первом старте секретного пути доступа, порта и токена:
 ```bash
-docker compose logs vpn-panel
+docker compose logs -f sentinel-panel
 ```
 
 ---

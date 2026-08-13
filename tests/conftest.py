@@ -73,7 +73,7 @@ def ensure_postgres_db_exists(admin_url: str):
 
     # Даем приложению (DML пользователю) права в тестовой базе
     try:
-        app_user = "spectre_app"
+        app_user = "sentinel_app"
         if test_app_url:
             parsed_app = urllib.parse.urlparse(test_app_url)
             if parsed_app.username:
@@ -130,7 +130,7 @@ if test_admin_url:
 
 class CrossProcessCoreLock:
     def __init__(self):
-        self.lock_path = os.path.join(tempfile.gettempdir(), "spectre_real_core_test.lck")
+        self.lock_path = os.path.join(tempfile.gettempdir(), "sentinel_real_core_test.lck")
         self.f = None
 
     def acquire(self):

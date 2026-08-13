@@ -11,8 +11,8 @@ from backend.hysteria import HYSTERIA_BIN_PATH
 
 # ── Cross-process atomic port allocator ──────────────────────────────────────
 # Shared state lives in two temp files visible to all xdist worker processes:
-#   spectre_pytest_ports.json  – JSON counter {"next_port": N}
-#   spectre_pytest_ports.lock  – exclusive file lock (never written)
+#   sentinel_pytest_ports.json  – JSON counter {"next_port": N}
+#   sentinel_pytest_ports.lock  – exclusive file lock (never written)
 #
 # Algorithm:
 #   1. Acquire exclusive OS-level file lock  (msvcrt on Win, fcntl on Linux)
@@ -23,8 +23,8 @@ from backend.hysteria import HYSTERIA_BIN_PATH
 # This is safe under parallel pytest-xdist because the lock is held for the
 # entire read-find-write cycle.
 
-_COUNTER_FILE = os.path.join(tempfile.gettempdir(), "spectre_pytest_ports.json")
-_LOCK_FILE    = os.path.join(tempfile.gettempdir(), "spectre_pytest_ports.lock")
+_COUNTER_FILE = os.path.join(tempfile.gettempdir(), "sentinel_pytest_ports.json")
+_LOCK_FILE    = os.path.join(tempfile.gettempdir(), "sentinel_pytest_ports.lock")
 _PORT_START   = 49000
 _PORT_END     = 62000   # >13 000 slots — plenty for any test suite
 

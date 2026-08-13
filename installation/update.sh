@@ -11,11 +11,12 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$SCRIPT_DIR"
 
 echo "===================================================="
-echo "🔄 UPDATING SPECTRE PANEL"
+echo "🔄 UPDATING SENTINEL PANEL"
 echo "===================================================="
 
 # 1. Pull latest updates from Git
 echo "[+] Pulling latest updates from Git..."
+git remote set-url origin https://github.com/blackalex1/sentinel-panel.git 2>/dev/null
 OLD_HEAD=$(git rev-parse HEAD 2>/dev/null)
 if git fetch origin main && git reset --hard origin/main; then
     NEW_HEAD=$(git rev-parse HEAD 2>/dev/null)
@@ -39,24 +40,23 @@ else
     echo "[!] Failed to rebuild or start Docker containers."
 fi
 
-# 3. Restart spectre-agent service
-echo "[+] Restarting spectre-agent system service..."
-if systemctl is-active --quiet spectre-agent; then
-    systemctl restart spectre-agent
-    echo "[+] spectre-agent service restarted successfully!"
+# 3. Restart sentinel-agent service
+echo "[+] Restarting sentinel-agent system service..."
+if systemctl is-active --quiet sentinel-agent; then
+    systemctl restart sentinel-agent
+    echo "[+] sentinel-agent service restarted successfully!"
 else
-    # If the service is not active, try starting it or warn if not installed
-    if [ -f "/etc/systemd/system/spectre-agent.service" ]; then
+    if [ -f "/etc/systemd/system/sentinel-agent.service" ]; then
         systemctl daemon-reload
-        systemctl enable spectre-agent
-        systemctl start spectre-agent
-        echo "[+] spectre-agent service enabled and started!"
+        systemctl enable sentinel-agent
+        systemctl start sentinel-agent
+        echo "[+] sentinel-agent service enabled and started!"
     else
-        echo "[!] spectre-agent service is not installed on this host."
+        echo "[!] sentinel-agent service is not installed on this host."
     fi
 fi
 
 echo "===================================================="
-echo "[+] Update process complete! Showing logs for spectre-panel (Ctrl+C to exit)..."
+echo "[+] Update process complete! Showing logs for sentinel-panel (Ctrl+C to exit)..."
 echo "===================================================="
-docker logs -f spectre-panel
+docker logs -f sentinel-panel

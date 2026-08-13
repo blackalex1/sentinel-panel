@@ -60,7 +60,7 @@ if psutil is not None:
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - [HostClient] - %(levelname)s - %(message)s")
 
-SOCKET_PATH = "/var/run/spectre/agent.sock"
+SOCKET_PATH = "/var/run/sentinel/agent.sock"
 
 class HostClient:
     def __init__(self, socket_path: str = SOCKET_PATH):

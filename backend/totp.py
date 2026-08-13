@@ -68,7 +68,7 @@ def verify_totp_token(secret: str, token: str, window: int = 1) -> bool:
             
     return False
 
-def get_totp_uri(secret: str, username: str, issuer: str = "Spectre Panel") -> str:
+def get_totp_uri(secret: str, username: str, issuer: str = "Sentinel Panel") -> str:
     """Generates the standard otpauth:// URI to generate QR codes for Authenticator apps."""
     label = f"{issuer}:{username}"
     return f"otpauth://totp/{quote(label)}?secret={secret}&issuer={quote(issuer)}"

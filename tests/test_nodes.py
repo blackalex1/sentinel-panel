@@ -108,7 +108,7 @@ def test_nodes_lifecycle_and_stealth(client, monkeypatch):
     report_payload = {
         "incident_id": "inc-100",
         "action": "client_banned",
-        "client_email": "attacker@spectre.vpn",
+        "client_email": "attacker@sentinel.vpn",
         "details": "Brute-force attacker blocked locally."
     }
     
@@ -119,11 +119,11 @@ def test_nodes_lifecycle_and_stealth(client, monkeypatch):
     # Set up client to block in database so we verify block action
     with db_session() as session:
         # Clear existing
-        session.query(ClientStats).filter_by(email="attacker@spectre.vpn").delete()
+        session.query(ClientStats).filter_by(email="attacker@sentinel.vpn").delete()
         # Add client
         client_stats = ClientStats(
             inbound_id=1,  # Assuming default inbound has ID 1 or just using mock
-            email="attacker@spectre.vpn",
+            email="attacker@sentinel.vpn",
             client_uuid_or_pwd="some_password_or_uuid",
             enable=1
         )
@@ -139,7 +139,7 @@ def test_nodes_lifecycle_and_stealth(client, monkeypatch):
     
     # Verify client is blocked on Master after node report
     with db_session() as session:
-        db_client = session.query(ClientStats).filter_by(email="attacker@spectre.vpn").first()
+        db_client = session.query(ClientStats).filter_by(email="attacker@sentinel.vpn").first()
         assert db_client is not None
         assert db_client.enable == 0
         assert "Cooperative ban" in db_client.block_reason

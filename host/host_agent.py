@@ -29,7 +29,7 @@ from agent.warp import (
 # Setup logging
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - [HostAgent] - %(levelname)s - %(message)s")
 
-SOCKET_DIR = Path("/var/run/spectre")
+SOCKET_DIR = Path("/var/run/sentinel")
 SOCKET_PATH = SOCKET_DIR / "agent.sock"
 
 def handle_client(conn):

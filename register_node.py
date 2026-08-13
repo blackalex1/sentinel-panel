@@ -4,7 +4,7 @@ import sys
 from backend.node_agent import register_with_master
 
 def main():
-    parser = argparse.ArgumentParser(description="Spectre Panel Edge Node Registration Utility")
+    parser = argparse.ArgumentParser(description="Sentinel Panel Edge Node Registration Utility")
     parser.add_argument(
         "--master", 
         required=True, 

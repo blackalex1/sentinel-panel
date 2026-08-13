@@ -145,7 +145,7 @@ async def export_rules_preset_api(request: Request):
     rules = get_all_routing_rules()
     export_data = {
         "version": 1,
-        "generator": "Spectre-Panel",
+        "generator": "Sentinel-Panel",
         "description": "Routing Rules Preset Template",
         "rules": rules
     }

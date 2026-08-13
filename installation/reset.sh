@@ -11,7 +11,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$SCRIPT_DIR"
 
 echo "===================================================="
-echo "⚠️  WARNING: COMPLETE RESET OF SPECTRE PANEL"
+echo "⚠️  WARNING: COMPLETE RESET OF SENTINEL PANEL"
 echo "===================================================="
 echo "This script will completely erase:"
 echo " 1. All PostgreSQL database data (users, clients, history)"
@@ -29,16 +29,16 @@ fi
 echo "[+] Stopping Docker containers and removing volumes/images..."
 docker compose down -v --rmi all --remove-orphans
 
-echo "[+] Stopping and disabling spectre-agent service..."
-systemctl stop spectre-agent 2>/dev/null
-systemctl disable spectre-agent 2>/dev/null
-rm -f /etc/systemd/system/spectre-agent.service
+echo "[+] Stopping and disabling sentinel-agent service..."
+systemctl stop sentinel-agent 2>/dev/null
+systemctl disable sentinel-agent 2>/dev/null
+rm -f /etc/systemd/system/sentinel-agent.service
 systemctl daemon-reload
 
 echo "[+] Deleting configurations and database files..."
 rm -f config/.env
 rm -f panel.db test_panel.db
-rm -rf /var/run/spectre
+rm -rf /var/run/sentinel
 
 echo "[+] Cleanup complete!"
 echo "===================================================="

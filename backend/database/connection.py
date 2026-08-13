@@ -28,7 +28,7 @@ elif database_url.startswith("postgresql"):
         # Не зависать бесконечно если PostgreSQL недоступен
         "connect_timeout": 10,
         # Видно в pg_stat_activity — удобно для дебага
-        "application_name": "spectre-panel",
+        "application_name": "sentinel-panel",
     }
     pool_args = {
         "pool_size": 20,

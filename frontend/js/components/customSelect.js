@@ -1,5 +1,5 @@
 /**
- * Premium Glassmorphism Custom Select Component for Spectre Panel
+ * Premium Glassmorphism Custom Select Component for Sentinel Panel
  * Converts standard HTML <select> elements into modern animated glassmorphism dropdowns.
  */
 

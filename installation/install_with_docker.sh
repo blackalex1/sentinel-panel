@@ -8,30 +8,49 @@ fi
 
 # Get the absolute path of the directory containing this script
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
+# If run via curl pipe (BASH_SOURCE is /dev/fd/..), check if current directory or /opt/sentinel-panel has the repo
+if [ ! -f "$SCRIPT_DIR/docker-compose.yml" ]; then
+    if [ -f "./docker-compose.yml" ]; then
+        SCRIPT_DIR="$(pwd)"
+    elif [ -f "/opt/sentinel-panel/docker-compose.yml" ]; then
+        SCRIPT_DIR="/opt/sentinel-panel"
+    else
+        echo "[+] Installing git if missing..."
+        which git &>/dev/null || (apt-get update && apt-get install -y git)
+        SCRIPT_DIR="/opt/sentinel-panel"
+        echo "[+] Cloning sentinel-panel into $SCRIPT_DIR..."
+        git clone https://github.com/blackalex1/sentinel-panel.git "$SCRIPT_DIR"
+    fi
+fi
+cd "$SCRIPT_DIR" || exit 1
 echo "[+] Project directory detected: $SCRIPT_DIR"
 
-# 1. Update spectre-agent.service configuration dynamically
-SERVICE_TEMPLATE="$SCRIPT_DIR/host/spectre-agent.service"
-SERVICE_DEST="/etc/systemd/system/spectre-agent.service"
+# Ensure git remote URL points to the repository
+git -C "$SCRIPT_DIR" remote set-url origin https://github.com/blackalex1/sentinel-panel.git 2>/dev/null
+
+# 1. Update sentinel-agent.service configuration dynamically
+SERVICE_TEMPLATE="$SCRIPT_DIR/host/sentinel-agent.service"
+SERVICE_DEST="/etc/systemd/system/sentinel-agent.service"
 
 echo "[+] Configuring systemd service at $SERVICE_DEST..."
 
-# Create service file using sed to replace the default /opt/spectre/host paths with SCRIPT_DIR
-sed "s|/opt/spectre|$SCRIPT_DIR|g" "$SERVICE_TEMPLATE" > "$SERVICE_DEST"
+# Create service file using sed to replace default paths with SCRIPT_DIR
+sed "s|/opt/sentinel-panel|$SCRIPT_DIR|g" "$SERVICE_TEMPLATE" > "$SERVICE_DEST"
 
 # 2. Reload systemd and start Host Agent
 echo "[+] Reloading systemd..."
 systemctl daemon-reload
-echo "[+] Enabling spectre-agent service..."
-systemctl enable spectre-agent
-echo "[+] Starting spectre-agent service..."
-systemctl restart spectre-agent
+echo "[+] Enabling sentinel-agent service..."
+systemctl enable sentinel-agent
+echo "[+] Starting sentinel-agent service..."
+systemctl restart sentinel-agent
 
 # Verify Host Agent
-if systemctl is-active --quiet spectre-agent; then
-    echo "[+] spectre-agent service started successfully!"
+if systemctl is-active --quiet sentinel-agent; then
+    echo "[+] sentinel-agent service started successfully!"
 else
-    echo "[!] Failed to start spectre-agent service. Check logs: journalctl -u spectre-agent"
+    echo "[!] Failed to start sentinel-agent service. Check logs: journalctl -u sentinel-agent"
 fi
 
 # 3. Interactive Configuration for config/.env
@@ -100,16 +119,16 @@ ADMIN_PASSWORD=$ADMIN_PASS
 API_TOKEN=$RAND_API_TOKEN
 
 # Настройки СУБД PostgreSQL (Параметры безопасности)
-POSTGRES_DB=spectre_db
+POSTGRES_DB=sentinel_db
 POSTGRES_USER=postgres
 POSTGRES_PASSWORD=$DB_ADMIN_PASS
 
-DB_APP_USER=spectre_app
+DB_APP_USER=sentinel_app
 DB_APP_PASSWORD=$DB_APP_PASS
 
 # Строки подключения к БД (Администратор DDL / Приложение DML)
-DATABASE_ADMIN_URL=postgresql://postgres:$DB_ADMIN_PASS@127.0.0.1:5432/spectre_db
-DATABASE_URL=postgresql://spectre_app:$DB_APP_PASS@127.0.0.1:5432/spectre_db
+DATABASE_ADMIN_URL=postgresql://postgres:$DB_ADMIN_PASS@127.0.0.1:5432/sentinel_db
+DATABASE_URL=postgresql://sentinel_app:$DB_APP_PASS@127.0.0.1:5432/sentinel_db
 EOF
     chmod 600 "$ENV_FILE"
 
@@ -145,7 +164,7 @@ docker compose up -d
 if [ -n "$TG_TOKEN" ] || [ -n "$TG_IDS" ]; then
     echo "[+] Saving Telegram settings to the database..."
     for i in {1..10}; do
-        if docker compose exec -T spectre-panel python -c "from backend.database import set_setting; set_setting('telegram_bot_token', '$TG_TOKEN'); set_setting('telegram_admin_ids', '$TG_IDS')" &>/dev/null; then
+        if docker compose exec -T sentinel-panel python -c "from backend.database import set_setting; set_setting('telegram_bot_token', '$TG_TOKEN'); set_setting('telegram_admin_ids', '$TG_IDS')" &>/dev/null; then
             echo "[+] Telegram settings successfully saved to database."
             break
         fi
@@ -163,7 +182,7 @@ FINAL_ADMIN_PASS=$(grep -E "^ADMIN_PASSWORD=" "$ENV_FILE" | cut -d'=' -f2 | tr -
 # Query backup password from database (wait up to 30s for database readiness if needed)
 FINAL_BACKUP_PASS=""
 for i in {1..15}; do
-    FINAL_BACKUP_PASS=$(docker compose exec -T spectre-panel python -c "from backend.database import get_setting; print(get_setting('backup_password', ''))" 2>/dev/null | tr -d '\r\n ')
+    FINAL_BACKUP_PASS=$(docker compose exec -T sentinel-panel python -c "from backend.database import get_setting; print(get_setting('backup_password', ''))" 2>/dev/null | tr -d '\r\n ')
     if [ -n "$FINAL_BACKUP_PASS" ]; then
         break
     fi
@@ -190,5 +209,5 @@ fi
 echo "===================================================="
 echo "⚠️  Please copy and save these credentials securely!"
 echo "   Use 'docker compose logs -f' to view logs."
-echo "   Use 'systemctl status spectre-agent' for agent status."
+echo "   Use 'systemctl status sentinel-agent' for agent status."
 echo "===================================================="

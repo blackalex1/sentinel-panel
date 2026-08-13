@@ -33,7 +33,7 @@ def get_installed_singbox_version() -> str:
         logging.error(f"Error getting installed sing-box version: {e}")
     return "Unknown"
 
-HEADERS = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 SpectrePanel/1.0"}
+HEADERS = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 SentinelPanel/1.0"}
 
 def get_latest_singbox_version_info(include_prerelease: bool = False):
     """Получает информацию о последнем релизе sing-box с GitHub (SagerNet/sing-box)"""

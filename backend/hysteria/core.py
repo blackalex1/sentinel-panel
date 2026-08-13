@@ -10,7 +10,7 @@ def _get_bin_suffix():
     arch = platform.machine().lower()
     return "arm64" if ("arm64" in arch or "aarch64" in arch) else "amd64"
 
-HEADERS = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 SpectrePanel/1.0"}
+HEADERS = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 SentinelPanel/1.0"}
 
 def get_latest_hysteria_version_info():
     """Получает последний релиз Hysteria с GitHub"""

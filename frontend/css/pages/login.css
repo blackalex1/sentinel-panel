@@ -66,7 +66,7 @@
     -webkit-background-clip: text !important;
     background-clip: text !important;
     -webkit-text-fill-color: transparent !important;
-    animation: spectreTextShimmer 5s linear infinite;
+    animation: sentinelTextShimmer 5s linear infinite;
     display: inline-block;
 }
 
