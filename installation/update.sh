@@ -40,20 +40,26 @@ else
     echo "[!] Failed to rebuild or start Docker containers."
 fi
 
-# 3. Restart sentinel-agent service
-echo "[+] Restarting sentinel-agent system service..."
-if systemctl is-active --quiet sentinel-agent; then
+# 3. Update and restart host agent system service (sentinel-agent)
+echo "[+] Configuring and restarting sentinel-agent system service..."
+if systemctl is-active --quiet spectre-agent 2>/dev/null || [ -f "/etc/systemd/system/spectre-agent.service" ]; then
+    echo "[+] Cleaning up legacy spectre-agent service..."
+    systemctl stop spectre-agent 2>/dev/null || true
+    systemctl disable spectre-agent 2>/dev/null || true
+    rm -f /etc/systemd/system/spectre-agent.service
+fi
+
+SERVICE_TEMPLATE="$SCRIPT_DIR/host/sentinel-agent.service"
+SERVICE_DEST="/etc/systemd/system/sentinel-agent.service"
+
+if [ -f "$SERVICE_TEMPLATE" ]; then
+    sed "s|/opt/sentinel-panel|$SCRIPT_DIR|g" "$SERVICE_TEMPLATE" > "$SERVICE_DEST"
+    systemctl daemon-reload
+    systemctl enable sentinel-agent
     systemctl restart sentinel-agent
-    echo "[+] sentinel-agent service restarted successfully!"
+    echo "[+] sentinel-agent service configured and started successfully!"
 else
-    if [ -f "/etc/systemd/system/sentinel-agent.service" ]; then
-        systemctl daemon-reload
-        systemctl enable sentinel-agent
-        systemctl start sentinel-agent
-        echo "[+] sentinel-agent service enabled and started!"
-    else
-        echo "[!] sentinel-agent service is not installed on this host."
-    fi
+    echo "[!] Service template $SERVICE_TEMPLATE not found."
 fi
 
 echo "===================================================="
