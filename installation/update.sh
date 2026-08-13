@@ -38,6 +38,23 @@ pkill -9 -f "xray" 2>/dev/null || true
 docker ps -a --filter "name=spectre" -q | xargs -r docker rm -f 2>/dev/null || true
 docker ps -a --filter "name=sentinel" -q | xargs -r docker rm -f 2>/dev/null || true
 docker compose down --remove-orphans 2>/dev/null || true
+
+# Auto-migrate legacy database volume (spectre-panel_pgdata / panel_pgdata / installation_pgdata -> sentinel-panel_pgdata)
+LEGACY_VOL=""
+for v in spectre-panel_pgdata panel_pgdata installation_pgdata; do
+    if docker volume inspect "$v" &>/dev/null; then
+        LEGACY_VOL="$v"
+        break
+    fi
+done
+
+if [ -n "$LEGACY_VOL" ]; then
+    echo "[+] Detected legacy database volume '$LEGACY_VOL'. Auto-migrating data to 'sentinel-panel_pgdata'..."
+    docker volume create sentinel-panel_pgdata >/dev/null 2>&1
+    docker run --rm -v "$LEGACY_VOL":/from -v sentinel-panel_pgdata:/to postgres:16-alpine cp -a /from/. /to/
+    echo "[+] Database volume migrated to sentinel-panel_pgdata successfully!"
+fi
+
 if docker compose up -d --build; then
     echo "[+] Docker containers rebuilt and started successfully!"
 else
