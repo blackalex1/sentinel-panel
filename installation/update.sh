@@ -33,9 +33,9 @@ fi
 
 # 2. Rebuild and restart Docker containers
 echo "[+] Rebuilding and restarting Docker containers..."
-docker stop spectre-panel spectre-db 2>/dev/null || true
-docker rm spectre-panel spectre-db 2>/dev/null || true
-docker compose down --remove-orphans
+docker ps -a --filter "name=spectre" -q | xargs -r docker rm -f 2>/dev/null || true
+docker ps -a --filter "name=sentinel" -q | xargs -r docker rm -f 2>/dev/null || true
+docker compose down --remove-orphans 2>/dev/null || true
 if docker compose up -d --build; then
     echo "[+] Docker containers rebuilt and started successfully!"
 else
