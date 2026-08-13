@@ -255,11 +255,14 @@ def query_hysteria_traffic():
     
     for ib in hysteria_inbounds:
         ib_id = ib["id"]
+        if ib_id not in hysteria_processes:
+            continue
+            
         admin_port = 10100 + ib_id
         url = f"http://127.0.0.1:{admin_port}/traffic"
         
         try:
-            response = requests.get(url, timeout=2)
+            response = requests.get(url, timeout=0.2)
             if response.status_code != 200:
                 continue
                 
@@ -283,15 +286,20 @@ def query_hysteria_traffic():
                     update_inbound_traffic(ib_id, up_delta, down_delta)
                     
         except Exception as e:
-            logging.debug(f"Hysteria traffic stats poll error (process might not be ready yet): {e}")
+            try:
+                logging.debug(f"Hysteria traffic stats poll error (process might not be ready yet): {e}")
+            except Exception:
+                pass
 
 def kick_client_hysteria_api(inbound_id: int, email: str) -> bool:
     """Динамически сбрасывает QUIC-сессию клиента в Hysteria 2 без перезапуска процесса"""
+    if inbound_id not in hysteria_processes:
+        return False
     admin_port = 10100 + inbound_id
     url = f"http://127.0.0.1:{admin_port}/kick"
     try:
         payload = [email]
-        response = requests.post(url, json=payload, timeout=3)
+        response = requests.post(url, json=payload, timeout=0.5)
         if response.status_code == 200:
             logging.info(f"Successfully kicked client {email} from Hysteria 2 inbound {inbound_id} via Admin API.")
             return True
@@ -299,5 +307,8 @@ def kick_client_hysteria_api(inbound_id: int, email: str) -> bool:
             logging.warning(f"Failed to kick client {email} in Hysteria 2: Status {response.status_code}, {response.text}")
             return False
     except Exception as e:
-        logging.error(f"Error calling Hysteria 2 kick API for client {email}: {e}")
+        try:
+            logging.error(f"Error calling Hysteria 2 kick API for client {email}: {e}")
+        except Exception:
+            pass
         return False

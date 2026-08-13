@@ -278,15 +278,18 @@ def kick_all_singbox_connections():
 
 def kick_singbox_user(username: str):
     """Сбрасывает соединения конкретного пользователя через Clash API"""
+    if not username:
+        return
     try:
         import requests
+        target = str(username).strip().lower()
         resp = requests.get("http://127.0.0.1:9090/connections", timeout=1)
         if resp.status_code == 200:
             for conn in resp.json().get("connections", []):
                 meta = conn.get("metadata", {})
-                user = meta.get("inboundUser") or meta.get("user") or conn.get("user")
+                user = str(meta.get("inboundUser") or meta.get("user") or conn.get("user") or "").strip().lower()
                 c_id = conn.get("id")
-                if user == username and c_id:
+                if c_id and user and (user == target or target in user or user in target):
                     requests.delete(f"http://127.0.0.1:9090/connections/{c_id}", timeout=1)
     except Exception:
         pass

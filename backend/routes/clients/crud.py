@@ -222,6 +222,13 @@ async def update_client_api(request: Request, client_id: str, payload: Optional[
                 except Exception:
                     pass
 
+            if not bool(enable):
+                try:
+                    from backend.singbox.service import kick_singbox_user
+                    kick_singbox_user(email)
+                except Exception:
+                    pass
+
             from backend.utils.service_restart import restart_services_background
             restart_services_background(delay=0.5)
             return {"success": True, "msg": "Клиент обновлен"}
@@ -266,6 +273,12 @@ async def delete_client_api(request: Request, inbound_id: int, client_id: str):
                 kick_client_hysteria_api(inbound_id, email)
             except Exception:
                 pass
+        
+        try:
+            from backend.singbox.service import kick_singbox_user
+            kick_singbox_user(email)
+        except Exception:
+            pass
 
         from backend.utils.service_restart import restart_services_background
         restart_services_background(delay=0.5)

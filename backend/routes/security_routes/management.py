@@ -97,7 +97,7 @@ async def disable_client(request: Request, email: str = Form(...)):
         
     from backend.xray import restart_xray, remove_client_api
     from backend.hysteria import restart_hysteria, kick_client_hysteria_api
-    from backend.singbox.service import restart_singbox
+    from backend.singbox.service import restart_singbox, kick_singbox_user
     
     client_exists = False
     disabled_count = 0
@@ -136,6 +136,11 @@ async def disable_client(request: Request, email: str = Form(...)):
                             remove_client_api(ib_id, email)
                         except Exception as e:
                             logging.error(f"Failed to remove Xray client: {e}")
+                            
+                    try:
+                        kick_singbox_user(email)
+                    except Exception as e:
+                        logging.error(f"Failed to kick Sing-box user: {e}")
                             
                 disabled_count += 1
         session.commit()

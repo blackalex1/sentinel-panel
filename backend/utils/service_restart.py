@@ -47,20 +47,23 @@ def _do_restart() -> None:
         logging.exception("service_restart: ошибка при рестарте Hysteria")
 
 
-def restart_services_background() -> None:
+def restart_services_background(delay: float = DEBOUNCE_SECONDS) -> None:
     """
     Планирует перезапуск сервисов в фоне и возвращает управление немедленно.
 
     Дебаунс DEBOUNCE_SECONDS: повторный вызов в течение этого интервала
     отменяет предыдущий таймер и ставит новый — итоговый рестарт будет
-    ровно один, через DEBOUNCE_SECONDS после последнего вызова.
+    ровно один, через delay после последнего вызова.
     """
     global _pending_timer
+
+    if delay is None or delay < 0:
+        delay = DEBOUNCE_SECONDS
 
     with _lock:
         if _pending_timer is not None:
             _pending_timer.cancel()
 
-        _pending_timer = threading.Timer(DEBOUNCE_SECONDS, _do_restart)
+        _pending_timer = threading.Timer(delay, _do_restart)
         _pending_timer.daemon = True
         _pending_timer.start()
