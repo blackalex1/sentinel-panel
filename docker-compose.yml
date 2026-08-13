@@ -39,3 +39,4 @@ services:
 
 volumes:
   pgdata:
+    name: spectre-panel_pgdata
