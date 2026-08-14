@@ -234,22 +234,22 @@ export function updateTabVisibility(proto) {
         }
         tabStream.style.display = "inline-block";
         tabSecurity.style.display = "inline-block";
-        tabSniffing.style.display = (core === "xray") ? "inline-block" : "none";
+        tabSniffing.style.display = "inline-block";
     } else if (proto === "shadowsocks") {
         tabProtocol.style.display = "inline-block";
         tabStream.style.display = "none";
         tabSecurity.style.display = "none";
-        tabSniffing.style.display = "none";
+        tabSniffing.style.display = "inline-block";
     } else if (proto === "hysteria2") {
         tabProtocol.style.display = "none";
         tabStream.style.display = "inline-block";
         tabSecurity.style.display = "none";
-        tabSniffing.style.display = "none";
+        tabSniffing.style.display = "inline-block";
     } else if (proto === "socks" || proto === "http") {
         tabProtocol.style.display = "none";
         tabStream.style.display = "none";
         tabSecurity.style.display = "none";
-        tabSniffing.style.display = "none";
+        tabSniffing.style.display = "inline-block";
     }
     
     // Auto switch to Basic if current active tab is hidden
