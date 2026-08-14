@@ -104,9 +104,7 @@ def generate_singbox_inbounds(get_all_inbounds_fn=None, get_clients_fn=None) -> 
                 "tag": f"inbound-{ib_id}",
                 "listen": "::",
                 "listen_port": port,
-                "users": users_list,
-                "sniff": True,
-                "sniff_override_destination": True
+                "users": users_list
             }
 
             if sb_proto == "shadowsocks":

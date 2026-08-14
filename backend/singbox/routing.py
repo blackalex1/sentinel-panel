@@ -162,6 +162,11 @@ def generate_singbox_routing(get_all_routing_rules_fn=None, get_setting_fn=None)
         "outbound": "api"
     })
 
+    # 6. Автоматическое правило сниффинга SNI/HTTP для Sing-box 1.11+
+    sb_rules.insert(0, {
+        "action": "sniff"
+    })
+
     route_config = {
         "rules": sb_rules,
         "auto_detect_interface": True
