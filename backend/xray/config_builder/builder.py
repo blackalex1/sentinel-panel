@@ -223,6 +223,12 @@ def generate_xray_config_json() -> dict:
         
         if sniffing:
             xray_inbound["sniffing"] = sniffing
+        else:
+            xray_inbound["sniffing"] = {
+                "enabled": True,
+                "destOverride": ["http", "tls", "quic"],
+                "metadataOnly": False
+            }
             
         xray_inbounds.append(xray_inbound)
         
