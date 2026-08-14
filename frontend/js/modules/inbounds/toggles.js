@@ -34,6 +34,9 @@ export function updateFormToggles() {
         });
     }
 
+    // Ensure tab visibility is synchronized with protocol and core
+    updateTabVisibility(proto);
+
     // Toggle Sniffing Overrides display
     const sniffingChecked = document.getElementById("ib-sniffing").checked;
     const sniffingOverrides = document.getElementById("sniffing-overrides");
