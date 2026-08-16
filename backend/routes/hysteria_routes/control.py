@@ -114,3 +114,22 @@ async def clear_hysteria_logs(request: Request):
         return {"success": True}
     except Exception as e:
         return {"success": False, "msg": str(e)}
+
+@router.get("/api/hysteria/certificate/status")
+async def hysteria_certificate_status(request: Request):
+    """Returns detailed status and validation results for the active Hysteria 2 SSL certificate."""
+    if not check_auth(request):
+        return decoy_response()
+    from backend.hysteria import get_hysteria_cert_status
+    status = get_hysteria_cert_status()
+    return {"success": True, "obj": status}
+
+@router.post("/api/hysteria/certificate/regenerate")
+async def hysteria_certificate_regenerate(request: Request, payload: dict = None):
+    """Explicitly re-issues Hysteria 2 SSL certificate and updates all hashes upon user confirmation."""
+    if not check_auth(request):
+        return decoy_response()
+    from backend.hysteria import reissue_hysteria_cert, get_hysteria_cert_status
+    success, msg = reissue_hysteria_cert()
+    status = get_hysteria_cert_status()
+    return {"success": success, "msg": msg, "obj": status}

@@ -13,6 +13,8 @@ from backend.hysteria.core import (
     ensure_hysteria_installed,
     get_installed_hysteria_version,
     generate_self_signed_cert,
+    get_hysteria_cert_status,
+    reissue_hysteria_cert,
 )
 from backend.hysteria.config import (
     generate_hysteria_config,
@@ -45,6 +47,8 @@ __all__ = [
     "ensure_hysteria_installed",
     "get_installed_hysteria_version",
     "generate_self_signed_cert",
+    "get_hysteria_cert_status",
+    "reissue_hysteria_cert",
     "generate_hysteria_config",
     "ensure_hysteria_quic_and_log",
     "hysteria_processes",

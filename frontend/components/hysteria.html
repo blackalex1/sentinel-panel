@@ -29,6 +29,54 @@
 <button class="btn danger-btn" id="hysteria-stop-btn"><i class="fa-solid fa-stop"></i> <span data-i18n="hysteria_btn_stop"></span></button>
 </div>
 </div>
+
+<div class="core-controls glass-card" id="hysteria-cert-card" style="margin-top: 20px;">
+  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; flex-wrap: wrap; gap: 10px;">
+    <h3 style="margin: 0; display: flex; align-items: center; gap: 8px; font-size: 15px;">
+      <i class="fa-solid fa-shield-halved" style="color: var(--accent-blue);"></i>
+      <span data-i18n="hysteria_cert_card_title"></span>
+      <span class="tag-badge" id="hysteria-cert-status-badge" style="font-size: 11px; padding: 2px 8px; border-radius: 6px; font-weight: 600;" data-i18n="hysteria_cert_status_checking"></span>
+    </h3>
+    <button class="btn secondary-btn" id="hysteria-reissue-cert-btn" style="padding: 6px 14px; font-size: 12px;">
+      <i class="fa-solid fa-arrows-rotate"></i>
+      <span data-i18n="hysteria_cert_btn_reissue"></span>
+    </button>
+  </div>
+
+  <!-- Warning Banner (shown only when certificate is invalid / needs reissue) -->
+  <div id="hysteria-cert-alert-box" style="display: none; background: rgba(239, 68, 68, 0.12); border: 1px solid rgba(239, 68, 68, 0.3); border-radius: 8px; padding: 12px 14px; margin-bottom: 14px; color: #fca5a5;">
+    <div style="display: flex; align-items: flex-start; gap: 10px;">
+      <i class="fa-solid fa-triangle-exclamation" style="color: #ef4444; font-size: 16px; margin-top: 2px;"></i>
+      <div>
+        <div style="font-weight: 600; font-size: 13px; color: #f87171; margin-bottom: 4px;" data-i18n="hysteria_cert_alert_title"></div>
+        <ul id="hysteria-cert-alert-list" style="margin: 0; padding-left: 18px; font-size: 12px; line-height: 1.5;"></ul>
+        <div style="font-size: 11px; color: var(--text-secondary); margin-top: 6px;" data-i18n="hysteria_cert_alert_warning"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Certificate Metadata Grid -->
+  <div class="core-info-row" style="grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px;">
+    <div>
+      <p class="label" style="font-size: 11px; color: var(--text-secondary); margin: 0 0 4px 0;" data-i18n="hysteria_cert_label_fp"></p>
+      <div style="display: flex; align-items: center; gap: 6px;">
+        <span class="value" id="hysteria-cert-fingerprint" style="font-family: monospace; font-size: 11px; word-break: break-all; color: var(--accent-blue);">—</span>
+        <button class="btn icon-btn" id="hysteria-copy-fp-btn" data-i18n-title="hysteria_cert_copy_fp_title" title="" style="padding: 2px 6px; font-size: 11px;"><i class="fa-regular fa-copy"></i></button>
+      </div>
+    </div>
+    <div>
+      <p class="label" style="font-size: 11px; color: var(--text-secondary); margin: 0 0 4px 0;" data-i18n="hysteria_cert_label_cn"></p>
+      <p class="value" id="hysteria-cert-cn" style="font-size: 12px; font-family: monospace; margin: 0;">—</p>
+    </div>
+    <div>
+      <p class="label" style="font-size: 11px; color: var(--text-secondary); margin: 0 0 4px 0;" data-i18n="hysteria_cert_label_sans"></p>
+      <p class="value" id="hysteria-cert-sans" style="font-size: 11px; font-family: monospace; margin: 0; word-break: break-word;">—</p>
+    </div>
+    <div>
+      <p class="label" style="font-size: 11px; color: var(--text-secondary); margin: 0 0 4px 0;" data-i18n="hysteria_cert_label_expiry"></p>
+      <p class="value" id="hysteria-cert-expiry" style="font-size: 12px; margin: 0;">—</p>
+    </div>
+  </div>
 </div>
 
 <div class="terminal-card glass-card">

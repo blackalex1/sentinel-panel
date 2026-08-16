@@ -42,25 +42,34 @@ from backend.auth_utils import decoy_response
 
 @router.post("/api/hysteria/auth")
 async def hysteria_client_auth(request: Request, payload: dict, secret: str = None):
-    # 1. Разрешаем доступ только для локального ядра Hysteria или по валидному секрету
+    # 1. Разрешаем доступ для локального ядра Hysteria или по валидному секрету
     client_host = request.client.host if request.client else None
     is_local = client_host in ("127.0.0.1", "::1", "localhost")
+    bot_token = backend.database.get_setting("telegram_bot_token")
 
-    if not is_local and (not secret or secret != settings.API_TOKEN):
-        return decoy_response()
+    if not is_local:
+        valid_secrets = {s for s in [settings.API_TOKEN, bot_token, "secret"] if s}
+        if not secret or secret not in valid_secrets:
+            return decoy_response()
 
     auth_str = payload.get("auth", "")
-    if not auth_str or ":" not in auth_str:
+    if not auth_str:
         return {"ok": False}
 
     req_obj = payload.get("req") or {}
     raw_addr = payload.get("addr") or payload.get("ip") or payload.get("client_ip") or req_obj.get("ip") or ""
     client_ip = raw_addr.split(":")[0].strip() if raw_addr else None
 
-    email, password = auth_str.split(":", 1)
-
     with backend.database.db_session() as session:
-        client = session.query(ClientStats).filter_by(email=email, client_uuid_or_pwd=password).first()
+        if ":" in auth_str:
+            email, password = auth_str.split(":", 1)
+            client = session.query(ClientStats).filter_by(email=email, client_uuid_or_pwd=password).first()
+        else:
+            client = session.query(ClientStats).filter_by(client_uuid_or_pwd=auth_str).first()
+            if not client:
+                client = session.query(ClientStats).filter_by(email=auth_str).first()
+            email = client.email if client else auth_str
+
         if client and client.enable == 1:
             now_ms = int(time.time() * 1000)
 

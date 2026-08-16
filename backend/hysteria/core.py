@@ -273,18 +273,11 @@ def get_installed_hysteria_version() -> str:
         logging.error(f"Error getting hysteria2 version via sentinel-core: {e}")
     return "Unknown"
 
-def generate_self_signed_cert():
-    """Генерирует самоподписанный сертификат для Hysteria, если его нет (автоматом обновляет старые certs без SAN)"""
-    if backend.hysteria.HYSTERIA_CERT_PATH.exists() and backend.hysteria.HYSTERIA_KEY_PATH.exists():
+def generate_self_signed_cert(force: bool = False):
+    """Генерирует самоподписанный сертификат для Hysteria, если его нет. При force=True принудительно перевыпускает."""
+    if not force and backend.hysteria.HYSTERIA_CERT_PATH.exists() and backend.hysteria.HYSTERIA_KEY_PATH.exists():
         if backend.hysteria.HYSTERIA_CERT_PATH.stat().st_size > 0 and backend.hysteria.HYSTERIA_KEY_PATH.stat().st_size > 0:
-            try:
-                from cryptography import x509
-                with open(backend.hysteria.HYSTERIA_CERT_PATH, "rb") as f:
-                    cert = x509.load_pem_x509_certificate(f.read())
-                cert.extensions.get_extension_for_class(x509.SubjectAlternativeName)
-                return
-            except Exception:
-                logging.info("Existing Hysteria SSL certificate lacks SAN extension or is invalid. Regenerating with SAN...")
+            return
         
     logging.info("Generating self-signed SSL certificate for Hysteria 2...")
     
@@ -298,11 +291,57 @@ def generate_self_signed_cert():
 
         import ipaddress
         key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
-        subject = issuer = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, "localhost")])
-        san = x509.SubjectAlternativeName([
-            x509.DNSName("localhost"),
-            x509.IPAddress(ipaddress.ip_address("127.0.0.1"))
-        ])
+        
+        from backend.database import get_setting
+        server_ip = get_setting("server_ip") or ""
+        server_domain = get_setting("server_domain") or ""
+        
+        # Собираем SNI из всех Hysteria инбаундов
+        custom_snis = set()
+        try:
+            from backend.inbounds import get_all_inbounds
+            for ib in get_all_inbounds():
+                if ib.get("protocol") == "hysteria2":
+                    import json
+                    st = json.loads(ib.get("stream_settings") or "{}")
+                    h_opt = st.get("hysteria", {})
+                    s = h_opt.get("sni") or st.get("sni") or ""
+                    if s:
+                        custom_snis.add(s.strip())
+        except Exception:
+            pass
+
+        primary_cn = sorted(list(custom_snis))[0] if custom_snis else (server_domain.strip() if server_domain else "localhost")
+
+        subject = issuer = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, primary_cn)])
+        
+        san_set = {"localhost"}
+        for s in custom_snis:
+            san_set.add(s)
+            if "." in s and not s.startswith("*."):
+                parts = s.split(".")
+                if len(parts) >= 2:
+                    san_set.add(f"*.{'.'.join(parts[1:])}")
+
+        if server_domain:
+            san_set.add(server_domain.strip())
+
+        san_list = []
+        for name in san_set:
+            if name:
+                try:
+                    san_list.append(x509.DNSName(name))
+                except Exception:
+                    pass
+
+        san_list.append(x509.IPAddress(ipaddress.ip_address("127.0.0.1")))
+        if server_ip:
+            try:
+                san_list.append(x509.IPAddress(ipaddress.ip_address(server_ip.strip())))
+            except Exception:
+                pass
+                
+        san = x509.SubjectAlternativeName(san_list)
         cert = (
             x509.CertificateBuilder()
             .subject_name(subject)
@@ -310,7 +349,7 @@ def generate_self_signed_cert():
             .public_key(key.public_key())
             .serial_number(x509.random_serial_number())
             .not_valid_before(datetime.datetime.now(datetime.timezone.utc))
-            .not_valid_after(datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(days=365))
+            .not_valid_after(datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(days=3650))
             .add_extension(san, critical=False)
             .sign(key, hashes.SHA256())
         )
@@ -323,8 +362,8 @@ def generate_self_signed_cert():
             ))
         with open(backend.hysteria.HYSTERIA_CERT_PATH, "wb") as f:
             f.write(cert.public_bytes(serialization.Encoding.PEM))
-        logging.info("Self-signed SSL certificate generated via Python cryptography.")
-        return
+        logging.info("Self-signed SSL certificate generated successfully.")
+        return True
     except Exception as e:
         logging.warning("Failed to generate cert via cryptography (%s), trying openssl...", e)
 
@@ -333,12 +372,151 @@ def generate_self_signed_cert():
         cmd = [
             openssl_path, "req", "-x509", "-newkey", "rsa:2048", 
             "-keyout", str(backend.hysteria.HYSTERIA_KEY_PATH), "-out", str(backend.hysteria.HYSTERIA_CERT_PATH), 
-            "-days", "365", "-nodes", "-subj", "/CN=localhost",
-            "-addext", "subjectAltName=DNS:localhost,IP:127.0.0.1"
+            "-days", "3650", "-nodes", "-subj", f"/CN={primary_cn}",
+            "-addext", f"subjectAltName=DNS:localhost,DNS:{primary_cn},IP:127.0.0.1"
         ]
         res = subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)  # nosec B603
         if res.returncode == 0 and backend.hysteria.HYSTERIA_CERT_PATH.exists():
             logging.info("Self-signed SSL certificate generated via OpenSSL.")
-            return
+            return True
     except Exception:
         pass
+    return False
+
+def get_hysteria_cert_status() -> dict:
+    """Проверяет состояние SSL-сертификата Hysteria 2: валидность, срок, хеш, соответствие ключу и SNI."""
+    cert_path = backend.hysteria.HYSTERIA_CERT_PATH
+    key_path = backend.hysteria.HYSTERIA_KEY_PATH
+
+    status = {
+        "exists": False,
+        "valid": False,
+        "fingerprint_sha256": "",
+        "common_name": "",
+        "sans": [],
+        "key_matches": False,
+        "expires_at": "",
+        "days_left": 0,
+        "is_expired": False,
+        "needs_reissue": False,
+        "reissue_reasons": []
+    }
+
+    if not cert_path.exists() or not key_path.exists() or cert_path.stat().st_size == 0 or key_path.stat().st_size == 0:
+        status["needs_reissue"] = True
+        status["reissue_reasons"].append("Файлы сертификата или приватного ключа отсутствуют или пусты.")
+        return status
+
+    status["exists"] = True
+
+    try:
+        from cryptography import x509
+        from cryptography.hazmat.primitives import serialization
+        import hashlib
+        import datetime
+
+        # 1. Загружаем сертификат и ключ
+        with open(cert_path, "rb") as f:
+            cert_bytes = f.read()
+            cert = x509.load_pem_x509_certificate(cert_bytes)
+
+        with open(key_path, "rb") as f:
+            key_bytes = f.read()
+            private_key = serialization.load_pem_private_key(key_bytes, password=None)
+
+        # 2. SHA-256 Fingerprint (в DER-формате)
+        der_bytes = cert.public_bytes(serialization.Encoding.DER)
+        status["fingerprint_sha256"] = hashlib.sha256(der_bytes).hexdigest()
+
+        # 3. Common Name и SAN
+        from cryptography.x509.oid import NameOID
+        cn_attrs = cert.subject.get_attributes_for_oid(NameOID.COMMON_NAME)
+        if cn_attrs:
+            status["common_name"] = cn_attrs[0].value
+
+        sans = []
+        try:
+            ext = cert.extensions.get_extension_for_class(x509.SubjectAlternativeName)
+            for name in ext.value:
+                if isinstance(name, x509.DNSName):
+                    sans.append(name.value)
+                elif isinstance(name, x509.IPAddress):
+                    sans.append(str(name.value))
+        except Exception:
+            pass
+        status["sans"] = sans
+
+        # 4. Проверка совпадения ключа и сертификата
+        cert_pub = cert.public_key().public_bytes(
+            encoding=serialization.Encoding.PEM,
+            format=serialization.PublicFormat.SubjectPublicKeyInfo
+        )
+        key_pub = private_key.public_key().public_bytes(
+            encoding=serialization.Encoding.PEM,
+            format=serialization.PublicFormat.SubjectPublicKeyInfo
+        )
+        status["key_matches"] = (cert_pub == key_pub)
+        if not status["key_matches"]:
+            status["needs_reissue"] = True
+            status["reissue_reasons"].append("Приватный ключ не соответствует публичному сертификату.")
+
+        # 5. Срок действия
+        now_utc = datetime.datetime.now(datetime.timezone.utc)
+        expires_at = cert.not_valid_after_utc if hasattr(cert, "not_valid_after_utc") else cert.not_valid_after.replace(tzinfo=datetime.timezone.utc)
+        status["expires_at"] = expires_at.strftime("%Y-%m-%d %H:%M:%S UTC")
+        days_left = (expires_at - now_utc).days
+        status["days_left"] = days_left
+        if days_left <= 0:
+            status["is_expired"] = True
+            status["needs_reissue"] = True
+            status["reissue_reasons"].append(f"Срок действия сертификата истек ({status['expires_at']}).")
+
+        # 6. Сверка со всеми активными инбаундами Hysteria 2
+        try:
+            from backend.inbounds import get_all_inbounds
+            inbounds = get_all_inbounds()
+            for ib in inbounds:
+                if ib.get("protocol") == "hysteria2" and ib.get("enable"):
+                    stream_settings = {}
+                    try:
+                        import json
+                        stream_settings = json.loads(ib.get("stream_settings") or "{}")
+                    except Exception:
+                        pass
+                    h_opts = stream_settings.get("hysteria", {})
+                    sni = h_opts.get("sni") or stream_settings.get("sni") or ""
+                    if sni:
+                        matched = False
+                        for san_name in sans:
+                            if san_name == sni or (san_name.startswith("*.") and sni.endswith(san_name[2:])):
+                                matched = True
+                                break
+                        if not matched:
+                            status["needs_reissue"] = True
+                            status["reissue_reasons"].append(f"В сертификате отсутствует SNI '{sni}' из настроек подключения #{ib.get('id')}.")
+        except Exception as ex:
+            logging.debug(f"Error checking inbounds SNI for Hysteria cert status: {ex}")
+
+        status["valid"] = (status["key_matches"] and not status["is_expired"] and not status["needs_reissue"])
+    except Exception as e:
+        status["valid"] = False
+        status["needs_reissue"] = True
+        status["reissue_reasons"].append(f"Ошибка чтения/валидации сертификата: {e}")
+
+    return status
+
+def reissue_hysteria_cert() -> tuple[bool, str]:
+    """Принудительно перевыпускает SSL-сертификат Hysteria 2 с поддержкой всех SNI и перезапускает ядро"""
+    success = generate_self_signed_cert(force=True)
+    if not success:
+        return False, "Не удалось сгенерировать сертификат."
+    
+    # Если Hysteria запущена, перезапускаем для применения новых сертификатов
+    try:
+        from backend.hysteria.service import is_hysteria_running, restart_hysteria
+        if is_hysteria_running():
+            restart_hysteria()
+    except Exception as e:
+        logging.error(f"Error restarting Hysteria after cert reissue: {e}")
+        
+    return True, "SSL-сертификат Hysteria 2 успешно перевыпущен."

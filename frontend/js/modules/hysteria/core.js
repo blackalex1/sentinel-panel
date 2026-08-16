@@ -4,6 +4,7 @@ import { t } from "../../i18n.js";
 import { loadHysteriaConfig } from "./config.js";
 
 export async function loadHysteriaCoreInfo() {
+    loadHysteriaCertStatus();
     const currEl = document.getElementById("hysteria-curr-version");
     const latestEl = document.getElementById("hysteria-latest-version");
 
@@ -372,5 +373,102 @@ export function setupHysteriaCoreListeners() {
                 loadHysteriaCoreInfo();
             }
         });
+    }
+
+    const reissueBtn = document.getElementById("hysteria-reissue-cert-btn");
+    if (reissueBtn) {
+        reissueBtn.addEventListener("click", async () => {
+            const confirmed = window.confirm(t("hysteria_cert_reissue_confirm", 
+                "Внимание!\n\nПеревыпуск SSL-сертификата изменит SHA-256 хеш (pinSHA256).\n" +
+                "Все клиенты с жесткой проверкой пина потеряют доступ, пока не обновят свои ключи/подписку.\n\n" +
+                "Вы действительно хотите перевыпустить сертификат?"
+            ));
+            if (!confirmed) return;
+
+            reissueBtn.disabled = true;
+            showToast(t("hysteria_cert_reissuing_toast", "Перевыпуск сертификата Hysteria 2..."), "info");
+
+            const res = await apiFetch("/api/hysteria/certificate/regenerate", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ force: true })
+            });
+
+            reissueBtn.disabled = false;
+            if (res && res.success) {
+                showToast(t("hysteria_cert_reissue_success", "SSL-сертификат Hysteria 2 успешно перевыпущен!"));
+                loadHysteriaCertStatus();
+                loadHysteriaCoreInfo();
+            } else {
+                showToast(res && res.msg ? res.msg : t("hysteria_cert_reissue_error", "Ошибка при перевыпуске сертификата"), "error");
+            }
+        });
+    }
+
+    const copyFpBtn = document.getElementById("hysteria-copy-fp-btn");
+    if (copyFpBtn) {
+        copyFpBtn.addEventListener("click", () => {
+            const fpEl = document.getElementById("hysteria-cert-fingerprint");
+            if (fpEl && fpEl.innerText && fpEl.innerText !== "—") {
+                navigator.clipboard.writeText(fpEl.innerText).then(() => {
+                    showToast(t("hysteria_cert_fp_copied", "SHA-256 хеш скопирован в буфер обмена"));
+                }).catch(() => {
+                    showToast(t("hysteria_cert_fp_copy_error", "Не удалось скопировать хеш"), "error");
+                });
+            }
+        });
+    }
+}
+
+export async function loadHysteriaCertStatus() {
+    const res = await apiFetch("/api/hysteria/certificate/status");
+    if (!res || !res.success || !res.obj) return;
+    const cert = res.obj;
+
+    const badgeEl = document.getElementById("hysteria-cert-status-badge");
+    const alertBox = document.getElementById("hysteria-cert-alert-box");
+    const alertList = document.getElementById("hysteria-cert-alert-list");
+    const fpEl = document.getElementById("hysteria-cert-fingerprint");
+    const cnEl = document.getElementById("hysteria-cert-cn");
+    const sansEl = document.getElementById("hysteria-cert-sans");
+    const expiryEl = document.getElementById("hysteria-cert-expiry");
+
+    if (fpEl) fpEl.innerText = cert.fingerprint_sha256 || "—";
+    if (cnEl) cnEl.innerText = cert.common_name || "—";
+    if (sansEl) sansEl.innerText = cert.sans && cert.sans.length > 0 ? cert.sans.join(", ") : "—";
+    if (expiryEl) {
+        if (cert.expires_at) {
+            const daysText = t("hysteria_cert_days_left", "{days} дн.").replace("{days}", cert.days_left);
+            expiryEl.innerText = `${cert.expires_at} (${daysText})`;
+            expiryEl.style.color = cert.days_left > 30 ? "var(--text-primary)" : "#f87171";
+        } else {
+            expiryEl.innerText = "—";
+        }
+    }
+
+    if (cert.needs_reissue || !cert.valid) {
+        if (badgeEl) {
+            badgeEl.innerText = t("hysteria_cert_status_needs_reissue", "Требуется перевыпуск");
+            badgeEl.style.background = "rgba(239, 68, 68, 0.15)";
+            badgeEl.style.color = "#ef4444";
+            badgeEl.style.border = "1px solid rgba(239, 68, 68, 0.3)";
+        }
+        if (alertBox) alertBox.style.display = "block";
+        if (alertList) {
+            alertList.innerHTML = "";
+            (cert.reissue_reasons || [t("hysteria_cert_status_needs_reissue", "Сертификат не соответствует конфигурации")]).forEach(reason => {
+                const li = document.createElement("li");
+                li.innerText = reason;
+                alertList.appendChild(li);
+            });
+        }
+    } else {
+        if (badgeEl) {
+            badgeEl.innerText = t("hysteria_cert_status_valid", "Валиден");
+            badgeEl.style.background = "rgba(16, 185, 129, 0.15)";
+            badgeEl.style.color = "#10b981";
+            badgeEl.style.border = "1px solid rgba(16, 185, 129, 0.3)";
+        }
+        if (alertBox) alertBox.style.display = "none";
     }
 }

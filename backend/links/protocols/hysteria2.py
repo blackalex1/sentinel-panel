@@ -8,24 +8,15 @@ def get_hysteria2_cert_path(inbound: dict, stream_settings: dict, sni: str) -> s
     if cert_mode == 'custom':
         cert_path = hysteria_opts.get('certPath', '')
     else:
-        if cert_mode == 'self' and sni:
-            from backend.config import CONFIG_DIR
-            from backend.ssl_utils import generate_custom_self_signed_cert
-            custom_cert = CONFIG_DIR / f"hysteria_{inbound.get('id')}.crt"
-            custom_key = CONFIG_DIR / f"hysteria_{inbound.get('id')}.key"
-            
-            # Ensure cert is generated to get the correct pinSHA256 fingerprint
-            generate_custom_self_signed_cert(custom_cert, custom_key, sni)
-            cert_path = str(custom_cert)
+        import backend.hysteria
+        backend.hysteria.generate_self_signed_cert()
+        p = backend.hysteria.HYSTERIA_CERT_PATH
+        if p.exists():
+            cert_path = str(p)
         else:
             from backend.ssl_utils import SSL_CERT_PATH
             if SSL_CERT_PATH.exists():
                 cert_path = str(SSL_CERT_PATH)
-            else:
-                from backend.config import BIN_DIR
-                p = BIN_DIR / "hysteria.crt"
-                if p.exists():
-                    cert_path = str(p)
     return cert_path
 
 
