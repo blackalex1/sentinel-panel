@@ -276,7 +276,7 @@ async def update_settings_api(request: Request):
         # Log action
         from backend.audit import log_action, get_actor_username
         actor = get_actor_username(request)
-        log_action(actor, "update_settings", details=f"Keys: {list(data.keys())}")
+        log_action(actor, "update_settings", target="general", details=f"Keys: {list(data.keys())}")
         
         # Trigger Telegram bot restart if settings changed
         if tg_changed:

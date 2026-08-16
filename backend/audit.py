@@ -43,7 +43,12 @@ def log_action(username: str, action: str, target: str = None, details: str = No
                 details=details
             )
             session.add(log_entry)
-        logging.info(f"[AuditLog] {username} executed '{action}' on target '{target}'")
+        msg = f"[AuditLog] {username} executed '{action}'"
+        if target:
+            msg += f" on target '{target}'"
+        if details:
+            msg += f" ({details})"
+        logging.info(msg)
         
         # Отправка Telegram-уведомления при необходимости
         from backend.telegram_alerts import trigger_telegram_alert
