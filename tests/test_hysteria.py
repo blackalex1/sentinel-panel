@@ -167,7 +167,7 @@ def test_hysteria_config_port_hopping():
     """Test Hysteria 2 configuration listen address generation under various port range scenarios."""
     clients = [{"email": "test@mail.com", "client_uuid_or_pwd": "pass", "enable": True}]
     
-    # Scenario 1: Contiguous range starting with primary port
+    # Scenario 1: Port hopping range specified
     config1 = generate_hysteria_config(999, 20000, clients, {"hysteria": {"hop": "20000-30000"}})
     assert config1["listen"] == ":20000-30000"
     

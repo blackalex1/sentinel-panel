@@ -32,17 +32,7 @@ def generate_hysteria_config(inbound_id: int, port: int, clients: list, stream_s
         masq_type = hysteria_opts.get("masqType", "")
         masq_value = hysteria_opts.get("masqValue", "")
         masq_status_code = hysteria_opts.get("masqStatusCode", 0)
-        if not masq_type:
-            if not hysteria_opts.get("obfsPassword"):
-                central_decoy_type = get_setting("decoy_type") or "none"
-                central_decoy_val = get_setting("decoy_value") or ""
-                if central_decoy_type == "drop":
-                    masq_type = "drop"
-                    masq_status_code = 444
-                elif central_decoy_type == "proxy" and central_decoy_val:
-                    masq_type = "proxy"
-                    masq_value = central_decoy_val
-        elif not masq_status_code and masq_type == "status" and masq_value:
+        if masq_type and not masq_status_code and masq_type == "status" and masq_value:
             try:
                 masq_status_code = int(masq_value)
             except Exception:
@@ -91,17 +81,10 @@ def generate_hysteria_config(inbound_id: int, port: int, clients: list, stream_s
             if "config" in res:
                 cfg = res["config"]
                 if isinstance(cfg, str):
-                    cfg_dict = json.loads(cfg)
+                    return json.loads(cfg)
                 elif isinstance(cfg, dict):
-                    cfg_dict = cfg
-            else:
-                cfg_dict = res
-
-        if isinstance(cfg_dict, dict) and "listen" in cfg_dict:
-            listen_val = str(cfg_dict["listen"]).strip()
-            if "-" in listen_val:
-                cfg_dict["listen"] = listen_val.split("-")[0]
-        return cfg_dict
+                    return cfg
+            return res
     except Exception as e:
         logging.error(f"Error compiling hysteria2 config via sentinel-core: {e}")
     return {}
