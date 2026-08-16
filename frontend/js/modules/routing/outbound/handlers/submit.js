@@ -7,10 +7,13 @@ import { getCurrentOutboundValues } from "../modal_manager.js";
 
 export function bindSubmitListener() {
     const outboundForm = document.getElementById("outbound-form");
-    if (!outboundForm) return;
+    const submitBtn = document.getElementById("ob-submit-btn");
 
-    outboundForm.addEventListener("submit", async (e) => {
-        e.preventDefault();
+    async function handleSave(e) {
+        if (e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
         
         if (!validateOutboundForm()) {
             return;
@@ -236,5 +239,12 @@ export function bindSubmitListener() {
         } else {
             showToast(res ? res.msg : "Error", "error");
         }
-    });
+    }
+
+    if (outboundForm) {
+        outboundForm.addEventListener("submit", handleSave);
+    }
+    if (submitBtn) {
+        submitBtn.addEventListener("click", handleSave);
+    }
 }
