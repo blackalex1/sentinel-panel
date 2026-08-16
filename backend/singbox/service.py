@@ -93,9 +93,8 @@ def start_singbox(force_generate: bool = False) -> bool:
         logging.error(f"Sing-box binary not found at {SINGBOX_BIN_PATH}")
         return False
 
-    if force_generate or not SINGBOX_CONFIG_PATH.exists():
-        logging.info("Writing fresh Sing-box config before start...")
-        write_singbox_config()
+    logging.info("Writing fresh Sing-box config before start...")
+    write_singbox_config(force=force_generate)
 
     logging.info("Verifying Sing-box configuration...")
     try:
@@ -156,9 +155,9 @@ def stop_singbox():
 def restart_singbox(force_generate: bool = True) -> bool:
     """Перезапускает процесс sing-box с регенерацией свежей конфигурации"""
     stop_singbox()
-    time.sleep(0.5)
-    write_singbox_config()
-    return start_singbox(force_generate=False)
+    time.sleep(0.3)
+    write_singbox_config(force=force_generate)
+    return start_singbox(force_generate=force_generate)
 
 def get_singbox_logs(lines_count: int = 100) -> list[str]:
     """Считывает последние строки из файла логов sing-box через sentinel-core supervisor"""
