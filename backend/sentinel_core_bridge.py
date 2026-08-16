@@ -801,9 +801,8 @@ def compile_node_server_config(target_core: str) -> Dict[str, Any]:
         }
         
         clash_api = "127.0.0.1:9090" if target_core in ("singbox", "sing-box") else ""
-        from backend.config import XRAY_LOG_PATH, SINGBOX_LOG_PATH
         from backend.database import get_setting
-        log_path = str(XRAY_LOG_PATH) if target_core == "xray" else (str(SINGBOX_LOG_PATH) if target_core in ("singbox", "sing-box") else "")
+        log_path = ""
         
         setting_key = "xray_loglevel" if target_core == "xray" else ("singbox_loglevel" if target_core in ("singbox", "sing-box") else "hysteria_loglevel")
         db_lvl = (get_setting(setting_key) or "").lower()
