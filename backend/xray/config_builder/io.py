@@ -37,7 +37,7 @@ def parse_xray_config(raw_input) -> dict:
     return config_dict
 
 def write_xray_config(config_dict: dict = None) -> bool:
-    """Записывает сгенерированный JSON конфиг в файл"""
+    """Записывает сгенерированный JSON конфиг в файл через sentinel-core"""
     try:
         from backend.database import get_setting
         cfg_path = backend.config.XRAY_CONFIG_PATH
@@ -45,7 +45,19 @@ def write_xray_config(config_dict: dict = None) -> bool:
             if get_setting("use_custom_xray_config") == "true" and cfg_path.exists():
                 logging.info("Xray is using custom configuration. Skipping auto-generation.")
                 return True
-            config_dict = generate_xray_config_json()
+            try:
+                from backend.sentinel_core_bridge import compile_node_server_config
+                core_cfg = compile_node_server_config("xray")
+                if isinstance(core_cfg, dict) and core_cfg.get("config"):
+                    raw_cfg = core_cfg["config"]
+                    if isinstance(raw_cfg, str):
+                        config_dict = json.loads(raw_cfg)
+                    elif isinstance(raw_cfg, dict):
+                        config_dict = raw_cfg
+            except Exception as e:
+                logging.debug(f"Falling back to python xray generator: {e}")
+            if config_dict is None:
+                config_dict = generate_xray_config_json()
 
         config_dict = parse_xray_config(config_dict)
         with open(cfg_path, "w", encoding="utf-8") as f:

@@ -81,15 +81,22 @@ def find_email_in_hysteria_log(dst_ip: Optional[str], dst_port: int) -> Optional
     Временной лимит: только лог-записи за последние 5 минут (отключается во время тестов).
     """
     hys_path = _get_hysteria_log_path()
-    if not hys_path.exists():
-        return None
-        
-    from backend.utils import read_last_lines
+    lines = []
     try:
-        lines = read_last_lines(hys_path, 1000)
-    except Exception as e:
-        logging.error(f"Error reading Hysteria logs for security search: {e}")
-        return None
+        from backend.sentinel_core_bridge import get_core_logs
+        lines = get_core_logs(str(hys_path), 1000)
+    except Exception:
+        pass
+        
+    if not lines:
+        if not hys_path.exists():
+            return None
+        from backend.utils import read_last_lines
+        try:
+            lines = read_last_lines(hys_path, 1000)
+        except Exception as e:
+            logging.error(f"Error reading Hysteria logs for security search: {e}")
+            return None
         
     dst_port_str = f":{dst_port}"
     now_local = datetime.datetime.now()
@@ -182,21 +189,39 @@ def find_email_in_xray_log(client_ip: Optional[str], dst_ip: Optional[str], dst_
     Парсит последние 1000 строк лога Xray для поиска email по параметрам соединения.
     Временной лимит: только лог-записи за последние 5 минут (отключается во время тестов).
     """
+    is_testing = "pytest" in sys.modules
+    if not is_testing and client_ip:
+        try:
+            from backend.sentinel_core_bridge import get_unified_traffic
+            traffic = get_unified_traffic()
+            if traffic and isinstance(traffic, dict):
+                for email, stats in traffic.items():
+                    if isinstance(stats, dict) and client_ip in stats.get("activeIPs", []):
+                        return email
+        except Exception:
+            pass
+
     xray_path = _get_xray_log_path()
-    if not xray_path.exists():
-        return None
-        
-    from backend.utils import read_last_lines
+    lines = []
     try:
-        lines = read_last_lines(xray_path, 1000)
-    except Exception as e:
-        logging.error(f"Error reading Xray logs for security search: {e}")
-        return None
+        from backend.sentinel_core_bridge import get_core_logs
+        lines = get_core_logs(str(xray_path), 1000)
+    except Exception:
+        pass
+        
+    if not lines:
+        if not xray_path.exists():
+            return None
+        from backend.utils import read_last_lines
+        try:
+            lines = read_last_lines(xray_path, 1000)
+        except Exception as e:
+            logging.error(f"Error reading Xray logs for security search: {e}")
+            return None
         
     dst_port_str = f":{dst_port}"
     now_local = datetime.datetime.now()
     now_utc = datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None)
-    is_testing = "pytest" in sys.modules
     
     # Проход с конца к началу лога для поиска самого свежего совпадения
     for line in reversed(lines):
@@ -246,18 +271,37 @@ def find_client_ip_for_email_in_hysteria_log(email: str) -> Optional[str]:
     Ищет последний зафиксированный IP-адрес подключения для конкретного email в логах Hysteria 2.
     Временной лимит: только лог-записи за последние 5 минут (отключается во время тестов).
     """
+    is_testing = "pytest" in sys.modules
+    if not is_testing:
+        try:
+            from backend.sentinel_core_bridge import get_unified_traffic
+            traffic = get_unified_traffic()
+            if traffic and isinstance(traffic, dict) and email in traffic:
+                stats = traffic[email]
+                if isinstance(stats, dict) and stats.get("activeIPs"):
+                    return stats["activeIPs"][-1]
+        except Exception:
+            pass
+
     hys_path = _get_hysteria_log_path()
-    if not hys_path.exists():
-        return None
-    from backend.utils import read_last_lines
+    lines = []
     try:
-        lines = read_last_lines(hys_path, 1000)
+        from backend.sentinel_core_bridge import get_core_logs
+        lines = get_core_logs(str(hys_path), 1000)
     except Exception:
-        return None
+        pass
+        
+    if not lines:
+        if not hys_path.exists():
+            return None
+        from backend.utils import read_last_lines
+        try:
+            lines = read_last_lines(hys_path, 1000)
+        except Exception:
+            return None
         
     now_local = datetime.datetime.now()
     now_utc = datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None)
-    is_testing = "pytest" in sys.modules
     
     for line in reversed(lines):
         log_time = parse_hysteria_timestamp(line)
@@ -293,21 +337,19 @@ def find_email_and_ip_in_xray_log(client_ip: Optional[str], dst_ip: Optional[str
     from backend.config import SINGBOX_LOG_PATH
     from backend.utils import read_last_lines
     
-    # 0. Сначала опрашиваем Clash API Sing-box (если запущено)
-    try:
-        import requests
-        resp = requests.get("http://127.0.0.1:9090/connections", timeout=0.3)
-        if resp.status_code == 200:
-            for conn in resp.json().get("connections", []):
-                meta = conn.get("metadata", {})
-                c_dst = meta.get("destinationIP") or meta.get("host")
-                c_dpt = meta.get("destinationPort")
-                if (not dst_ip or c_dst == dst_ip) and str(c_dpt) == str(dst_port):
-                    user = meta.get("inboundUser") or meta.get("user") or conn.get("user")
-                    if user:
-                        return user, meta.get("sourceIP", client_ip)
-    except Exception:
-        pass
+    is_testing = "pytest" in sys.modules
+
+    # 0. Check unified traffic / active clients from sentinel-core (production runtime only)
+    if not is_testing:
+        try:
+            from backend.sentinel_core_bridge import get_unified_traffic
+            traffic = get_unified_traffic()
+            if traffic and isinstance(traffic, dict):
+                for email, stats in traffic.items():
+                    if isinstance(stats, dict) and client_ip and client_ip in stats.get("activeIPs", []):
+                        return email, client_ip
+        except Exception:
+            pass
 
     paths_to_check = []
     xray_path = _get_xray_log_path()
@@ -362,10 +404,17 @@ def find_email_and_ip_in_xray_log(client_ip: Optional[str], dst_ip: Optional[str
         return None
 
     for log_path in paths_to_check:
+        lines = []
         try:
-            lines = read_last_lines(log_path, 1000)
+            from backend.sentinel_core_bridge import get_core_logs
+            lines = get_core_logs(str(log_path), 1000)
         except Exception:
-            continue
+            pass
+        if not lines:
+            try:
+                lines = read_last_lines(log_path, 1000)
+            except Exception:
+                continue
             
         for line in reversed(lines):
             log_time = parse_xray_timestamp(line)
@@ -374,30 +423,25 @@ def find_email_and_ip_in_xray_log(client_ip: Optional[str], dst_ip: Optional[str
                 diff_utc = abs((now_utc - log_time).total_seconds())
                 if diff_local > 300 and diff_utc > 300:
                     continue
-                
-            if dst_port_str in line:
-                if (dst_ip and dst_ip in line) or (client_ip and client_ip in line) or not dst_ip:
-                    res = extract_email_and_ip(line)
-                    if res:
-                        return res
-                        
-        for line in reversed(lines):
-            log_time = parse_xray_timestamp(line)
-            if log_time and not is_testing:
-                diff_local = abs((now_local - log_time).total_seconds())
-                diff_utc = abs((now_utc - log_time).total_seconds())
-                if diff_local > 300 and diff_utc > 300:
+
+            # Ensure dst_ip matches if provided
+            if dst_ip and dst_ip not in line:
+                continue
+
+            # Ensure client_ip matches if provided
+            if client_ip and client_ip not in line:
+                continue
+
+            # Ensure destination port matches in connection context
+            dest_port_match = re.search(r"(?:tcp|udp|to|->)\s*[:\w\.\-]*:(\d+)", line)
+            if dest_port_match:
+                if int(dest_port_match.group(1)) != dst_port:
                     continue
-                
-            if dst_port_str in line:
-                match_dest = re.search(r"(?:accepted|connection)\s+(?:tcp|udp):([^:]+):", line)
-                if match_dest:
-                    dest_host = match_dest.group(1).strip("[]")
-                    if dst_ip and re.match(r"^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$", dest_host):
-                        if dest_host != dst_ip:
-                            continue
-                res = extract_email_and_ip(line)
-                if res:
-                    return res
+            elif dst_port_str not in line:
+                continue
+
+            res = extract_email_and_ip(line)
+            if res:
+                return res
                     
     return None

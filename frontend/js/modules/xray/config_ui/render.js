@@ -83,7 +83,7 @@ export async function loadXrayConfig() {
     const currLevel = config.log.loglevel || "info";
     html += `<div style="margin-bottom: 25px;">
         <h4 style="margin-top: 0; margin-bottom: 12px; font-size: 15px; font-weight: 600; color: var(--accent-orange); display: flex; align-items: center; gap: 8px; width: 100%;">
-            <i class="fa-solid fa-file-invoice"></i> <span data-i18n="config_log_title">Системные настройки и логирование</span>
+            <i class="fa-solid fa-file-invoice"></i> <span data-i18n="config_log_title">${t("config_log_title", "Системные настройки и логирование")}</span>
             <button class="btn secondary-btn edit-json-btn" data-type="xray-log" style="margin-left: auto; padding: 4px 8px; font-size: 11px; display: inline-flex; align-items: center; gap: 4px; height: auto;"><i class="fa-regular fa-pen-to-square"></i> JSON</button>
         </h4>
         <div class="glass-card" style="padding: 15px; border-radius: 10px; background: rgba(255,255,255,0.015);">
@@ -108,9 +108,9 @@ export async function loadXrayConfig() {
     html += `<div style="margin-bottom: 25px;">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 10px;">
             <h4 style="margin: 0; font-size: 15px; font-weight: 600; color: var(--accent-blue); display: flex; align-items: center; gap: 8px;">
-                <i class="fa-solid fa-arrow-right-to-bracket"></i> <span data-i18n="xray_config_inbounds">Входящие подключения (Inbounds)</span>
+                <i class="fa-solid fa-arrow-right-to-bracket"></i> <span data-i18n="xray_config_inbounds">${t("xray_config_inbounds", "Входящие подключения (Inbounds)")}</span>
             </h4>
-            <button class="btn primary-btn" id="xray-config-add-inbound-btn" style="padding: 4px 10px; font-size: 11px; display: inline-flex; align-items: center; gap: 4px; height: auto;"><i class="fa-solid fa-plus"></i> <span data-i18n="config_add_inbound">Добавить Inbound</span></button>
+            <button class="btn primary-btn" id="xray-config-add-inbound-btn" style="padding: 4px 10px; font-size: 11px; display: inline-flex; align-items: center; gap: 4px; height: auto;"><i class="fa-solid fa-plus"></i> <span data-i18n="config_add_inbound">${t("config_add_inbound", "Добавить Inbound")}</span></button>
         </div>`;
                 
     if (config.inbounds && config.inbounds.length > 0) {
@@ -201,7 +201,7 @@ export async function loadXrayConfig() {
             </div>`;
         });
     } else {
-        html += `<div class="glass-card" style="padding: 20px; text-align: center; color: var(--text-muted);" data-i18n="config_no_inbounds">Входящие подключения отсутствуют</div>`;
+        html += `<div class="glass-card" style="padding: 20px; text-align: center; color: var(--text-muted);" data-i18n="config_no_inbounds">${t("config_no_inbounds", "Входящие подключения отсутствуют")}</div>`;
     }
     html += `</div>`;
     
@@ -209,9 +209,9 @@ export async function loadXrayConfig() {
     html += `<div style="margin-bottom: 25px;">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 10px;">
             <h4 style="margin: 0; font-size: 15px; font-weight: 600; color: var(--accent-green); display: flex; align-items: center; gap: 8px;">
-                <i class="fa-solid fa-arrow-right-from-bracket"></i> <span data-i18n="xray_config_outbounds">Исходящие подключения (Outbounds)</span>
+                <i class="fa-solid fa-arrow-right-from-bracket"></i> <span data-i18n="xray_config_outbounds">${t("xray_config_outbounds", "Исходящие подключения (Outbounds)")}</span>
             </h4>
-            <button class="btn primary-btn" id="xray-config-add-outbound-btn" style="padding: 4px 10px; font-size: 11px; display: inline-flex; align-items: center; gap: 4px; height: auto;"><i class="fa-solid fa-plus"></i> <span data-i18n="config_add_outbound">Добавить Outbound</span></button>
+            <button class="btn primary-btn" id="xray-config-add-outbound-btn" style="padding: 4px 10px; font-size: 11px; display: inline-flex; align-items: center; gap: 4px; height: auto;"><i class="fa-solid fa-plus"></i> <span data-i18n="config_add_outbound">${t("config_add_outbound", "Добавить Outbound")}</span></button>
         </div>`;
                 
     if (config.outbounds && config.outbounds.length > 0) {
@@ -236,9 +236,9 @@ export async function loadXrayConfig() {
                     details += `<div>Server: <strong style="color: var(--text-primary);">${address}:${port}</strong></div>`;
                 });
             } else if (ob.protocol === "freedom") {
-                details = `<span style="color: var(--accent-green);" data-i18n="xray_outbound_direct">Прямое подключение (Direct)</span>`;
+                details = `<span style="color: var(--accent-green);" data-i18n="xray_outbound_direct">${t("xray_outbound_direct", "Прямое подключение (Direct)")}</span>`;
             } else if (ob.protocol === "blackhole") {
-                details = `<span style="color: var(--accent-rose);" data-i18n="xray_outbound_blocked">Блокировка трафика (Blocked)</span>`;
+                details = `<span style="color: var(--accent-rose);" data-i18n="xray_outbound_blocked">${t("xray_outbound_blocked", "Блокировка трафика (Blocked)")}</span>`;
             } else {
                 details = `<span style="color: var(--text-muted); font-style: italic;">—</span>`;
             }
@@ -272,7 +272,7 @@ export async function loadXrayConfig() {
             </div>`;
         });
     } else {
-        html += `<div class="glass-card" style="padding: 20px; text-align: center; color: var(--text-muted);" data-i18n="config_no_outbounds">Исходящие подключения отсутствуют</div>`;
+        html += `<div class="glass-card" style="padding: 20px; text-align: center; color: var(--text-muted);" data-i18n="config_no_outbounds">${t("config_no_outbounds", "Исходящие подключения отсутствуют")}</div>`;
     }
     html += `</div>`;
     
@@ -280,7 +280,7 @@ export async function loadXrayConfig() {
     html += `<div>
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
             <h4 style="margin: 0; font-size: 15px; font-weight: 600; color: var(--accent-purple); display: flex; align-items: center; gap: 8px;">
-                <i class="fa-solid fa-route"></i> <span data-i18n="xray_config_rules">Правила маршрутизации (Routing Rules)</span>
+                <i class="fa-solid fa-route"></i> <span data-i18n="xray_config_rules">${t("xray_config_rules", "Правила маршрутизации (Routing Rules)")}</span>
             </h4>
             <button class="btn secondary-btn edit-json-btn" data-type="xray-routing" style="padding: 4px 8px; font-size: 11px; display: inline-flex; align-items: center; gap: 4px; height: auto;"><i class="fa-regular fa-pen-to-square"></i> JSON</button>
         </div>
@@ -288,8 +288,8 @@ export async function loadXrayConfig() {
             <table class="glass-table">
                 <thead>
                     <tr>
-                        <th data-i18n="xray_config_th_rules_details">Правило / Фильтр (Rule Match)</th>
-                        <th data-i18n="xray_config_th_outbound">Назначение (Target Outbound)</th>
+                        <th data-i18n="xray_config_th_rules_details">${t("xray_config_th_rules_details", "Правило / Фильтр (Rule Match)")}</th>
+                        <th data-i18n="xray_config_th_outbound">${t("xray_config_th_outbound", "Назначение (Target Outbound)")}</th>
                     </tr>
                 </thead>
                 <tbody>`;
@@ -310,12 +310,12 @@ export async function loadXrayConfig() {
             else if (rule.outboundTag !== "direct") badgeClass = "tag-badge-proxy";
             
             html += `<tr>
-                <td style="font-size: 13px; line-height: 1.5; color: var(--text-secondary);">${ruleDetails.join(" | ") || '<span style="color: var(--text-muted); font-style: italic;" data-i18n="config_any_traffic">Любой трафик</span>'}</td>
+                <td style="font-size: 13px; line-height: 1.5; color: var(--text-secondary);">${ruleDetails.join(" | ") || '<span style="color: var(--text-muted); font-style: italic;" data-i18n="config_any_traffic">' + t("config_any_traffic", "Любой трафик") + '</span>'}</td>
                 <td><span class="tag-badge ${badgeClass}">${rule.outboundTag}</span></td>
             </tr>`;
         });
     } else {
-        html += `<tr><td colspan="2" style="text-align: center; color: var(--text-muted);" data-i18n="config_no_rules">Правила маршрутизации отсутствуют</td></tr>`;
+        html += `<tr><td colspan="2" style="text-align: center; color: var(--text-muted);" data-i18n="config_no_rules">${t("config_no_rules", "Правила маршрутизации отсутствуют")}</td></tr>`;
     }
     html += `</tbody></table></div></div>`;
     

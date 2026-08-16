@@ -201,14 +201,14 @@ export function updateDecoyUI(decoyType) {
     } else {
         valGroup.style.display = "block";
         if (decoyType === "proxy") {
-            if (valLabel) valLabel.innerText = "Адрес внешнего сайта (URL)";
-            if (valDesc) valDesc.innerText = "Укажите полный адрес сайта для проксирования, включая протокол (например: https://github.com).";
+            if (valLabel) valLabel.innerText = t("settings_decoy_proxy_label", "Адрес внешнего сайта (URL)");
+            if (valDesc) valDesc.innerText = t("settings_decoy_proxy_desc", "Укажите полный адрес сайта для проксирования, включая протокол (например: https://github.com).");
         } else if (decoyType === "redirect") {
-            if (valLabel) valLabel.innerText = "Адрес перенаправления (URL)";
-            if (valDesc) valDesc.innerText = "Укажите полный URL-адрес внешнего сайта, на который будут перенаправляться все публичные запросы (например: https://google.com).";
+            if (valLabel) valLabel.innerText = t("settings_decoy_redirect_label", "Адрес перенаправления (URL)");
+            if (valDesc) valDesc.innerText = t("settings_decoy_redirect_desc", "Укажите полный URL-адрес внешнего сайта, на который будут перенаправляться все публичные запросы (например: https://google.com).");
         } else {
-            if (valLabel) valLabel.innerText = "Имя шаблона заглушки";
-            if (valDesc) valDesc.innerText = "Название HTML-файла шаблона в папке frontend/decoy/ (по умолчанию: company_landing).";
+            if (valLabel) valLabel.innerText = t("settings_decoy_template_label", "Имя шаблона заглушки");
+            if (valDesc) valDesc.innerText = t("settings_decoy_template_desc", "Название HTML-файла шаблона в папке frontend/decoy/ (по умолчанию: company_landing).");
         }
     }
 }

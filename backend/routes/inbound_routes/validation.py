@@ -7,6 +7,7 @@ from fastapi import APIRouter, Request
 from backend.database import get_all_inbounds
 from backend.auth_utils import check_auth, decoy_response
 from backend.config import settings
+from backend.i18n import t, get_lang
 
 router = APIRouter()
 
@@ -42,7 +43,8 @@ def validate_inbound_port_collision(
     port: int,
     protocol: str,
     stream_settings: dict,
-    exclude_inbound_id: int = None
+    exclude_inbound_id: int = None,
+    lang: str = "ru"
 ) -> Optional[str]:
     all_ibs = get_all_inbounds()
     
@@ -51,13 +53,13 @@ def validate_inbound_port_collision(
         if exclude_inbound_id and ib["id"] == exclude_inbound_id:
             continue
         if ib["port"] == port:
-            return f"Порт {port} уже занят подключением '{ib['remark']}'"
+            return t("validate_port_already_used_by_inbound", lang=lang, category="backend", port=port, remark=ib["remark"])
             
     # 2. Check conflict with system/API/panel ports
     if port == 10085:
-        return "Порт 10085 зарезервирован для Xray API"
+        return t("validate_port_reserved_for_xray_api", lang=lang, category="backend")
     if port == settings.PANEL_PORT:
-        return f"Порт {port} занят веб-панелью управления"
+        return t("validate_port_occupied_by_panel", lang=lang, category="backend", port=port)
         
     # 3. Check conflict with Hysteria SOCKS routing ports
     for ib in all_ibs:
@@ -69,7 +71,7 @@ def validate_inbound_port_collision(
                 if ib_stream.get("hysteria", {}).get("routingViaXray"):
                     socks_port = 20000 + ib["id"]
                     if port == socks_port:
-                        return f"Порт {port} зарезервирован для SOCKS-маршрутизации подключения Hysteria 2 '{ib['remark']}'"
+                        return t("validate_port_reserved_for_hysteria_socks", lang=lang, category="backend", port=port, remark=ib["remark"])
             except Exception:
                 pass
 
@@ -89,25 +91,25 @@ def validate_inbound_port_collision(
                 ib_hop_str = ib_stream.get("hysteria", {}).get("hop", "")
                 ib_hop_ports = parse_hop_ports(ib_hop_str)
                 if port in ib_hop_ports:
-                    return f"Порт {port} пересекается с hop-портами подключения Hysteria 2 '{ib['remark']}'"
+                    return t("validate_port_overlap_hysteria_hops", lang=lang, category="backend", port=port, remark=ib["remark"])
                 
                 # Check if our new hop ports conflict with this existing inbound's main port
                 if new_hop_ports and ib["port"] in new_hop_ports:
-                    return f"Hop-порт {ib['port']} уже занят подключением '{ib['remark']}'"
+                    return t("validate_hop_port_already_used_by_inbound", lang=lang, category="backend", port=ib["port"], remark=ib["remark"])
                     
                 # Check if our new hop ports conflict with this existing inbound's hop ports
                 overlap = new_hop_ports.intersection(ib_hop_ports)
                 if overlap:
                     first_overlap = next(iter(overlap))
-                    return f"Hop-порт {first_overlap} пересекается с hop-портами Hysteria 2 '{ib['remark']}'"
+                    return t("validate_hop_port_overlap_hysteria_hops", lang=lang, category="backend", port=first_overlap, remark=ib["remark"])
             except Exception:
                 pass
 
     # Check if the new hop ports conflict with Xray API or panel ports
     if 10085 in new_hop_ports:
-        return "Hop-порт 10085 зарезервирован для Xray API"
+        return t("validate_hop_port_reserved_for_xray_api", lang=lang, category="backend")
     if settings.PANEL_PORT in new_hop_ports:
-        return f"Hop-порт {settings.PANEL_PORT} занят веб-панелью управления"
+        return t("validate_hop_port_occupied_by_panel", lang=lang, category="backend", port=settings.PANEL_PORT)
 
     # 5. OS Socket Bind Check
     # We collect all ports currently used by this inbound (main, hop, and socks ports)
@@ -135,13 +137,13 @@ def validate_inbound_port_collision(
                     s.settimeout(0.5)
                     s.bind(("0.0.0.0", port))
             except OSError:
-                return f"Порт {port} (TCP) уже занят другим процессом в ОС (например, Nginx/SSH)"
+                return t("validate_port_tcp_busy_os", lang=lang, category="backend", port=port)
         try:
             with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
                 s.settimeout(0.5)
                 s.bind(("0.0.0.0", port))
         except OSError:
-            return f"Порт {port} (UDP) уже занят другим процессом в ОС"
+            return t("validate_port_udp_busy_os", lang=lang, category="backend", port=port)
 
     # Validate the hop ports
     for hp in new_hop_ports:
@@ -152,7 +154,7 @@ def validate_inbound_port_collision(
                 s.settimeout(0.5)
                 s.bind(("0.0.0.0", hp))
         except OSError:
-            return f"Hop-порт {hp} (UDP) уже занят другим процессом в ОС"
+            return t("validate_hop_port_udp_busy_os", lang=lang, category="backend", port=hp)
 
     return None
 
@@ -160,11 +162,41 @@ def validate_inbound_port_collision(
 async def get_free_port(request: Request):
     if not check_auth(request):
         return decoy_response()
+    lang = get_lang(request)
     start_port = random.randint(20000, 50000)
     for p in range(start_port, 65536):
-        if validate_inbound_port_collision(p, "vless", {}) is None:
+        if validate_inbound_port_collision(p, "vless", {}, lang=lang) is None:
             return {"success": True, "port": p}
     for p in range(20000, start_port):
-        if validate_inbound_port_collision(p, "vless", {}) is None:
+        if validate_inbound_port_collision(p, "vless", {}, lang=lang) is None:
             return {"success": True, "port": p}
-    return {"success": False, "msg": "Не удалось подобрать свободный порт"}
+    return {"success": False, "msg": t("failed_to_find_free_port", lang=lang, category="backend")}
+
+
+from backend.i18n import t
+
+
+def validate_vless_encryption_settings(settings: dict, lang: str = "ru") -> Optional[str]:
+    """Validates VLESS Encryption fields (decryption and encryption keys) if provided."""
+    if not isinstance(settings, dict):
+        return None
+    dec = str(settings.get("decryption", "") or "").strip()
+    enc = str(settings.get("encryption", "") or "").strip()
+
+    if not dec:
+        dec = "none"
+    if not enc:
+        enc = "none"
+
+    if dec != "none":
+        if not dec.startswith("mlkem768x25519plus."):
+            return t("validation_inbound_vless_dec_format", lang=lang, category="backend")
+
+    if enc != "none":
+        if not enc.startswith("mlkem768x25519plus."):
+            return t("validation_inbound_vless_enc_format", lang=lang, category="backend")
+
+    if (dec != "none" and enc == "none") or (dec == "none" and enc != "none"):
+        return t("validation_inbound_vless_enc_pair", lang=lang, category="backend")
+
+    return None

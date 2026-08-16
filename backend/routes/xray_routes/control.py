@@ -1,12 +1,14 @@
 import asyncio
 import json
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Request, WebSocket, status
 from fastapi.responses import StreamingResponse
+from backend.auth_utils import check_ws_auth
 
 from backend.xray import (
     restart_xray, get_xray_logs, is_xray_running, stop_xray, start_xray
 )
 from backend.hysteria import restart_hysteria
+from backend.i18n import t, get_lang
 
 router = APIRouter()
 
@@ -23,6 +25,7 @@ async def xray_action(request: Request, payload: dict):
     if not xray_facade.check_auth(request):
         return xray_facade.decoy_response()
         
+    lang = get_lang(request)
     action = payload.get("action")
     if action == "restart":
         success = restart_xray()
@@ -33,7 +36,7 @@ async def xray_action(request: Request, payload: dict):
     elif action == "start":
         success = start_xray()
     else:
-        return {"success": False, "msg": "Неверное действие"}
+        return {"success": False, "msg": t("xray_invalid_action", lang=lang, category="backend")}
         
     return {"success": success}
 
@@ -47,13 +50,7 @@ async def xray_logs(request: Request):
 
 @router.get("/api/xray/logs/stream")
 async def xray_logs_stream(request: Request):
-    """Server-Sent Events endpoint for real-time Xray log streaming.
-
-    Protocol:
-      - On connect: sends all cached recent lines as a single 'history' event.
-      - Then streams each new line as a 'line' event in real-time.
-      - When the client disconnects, the server cleans up the subscription.
-    """
+    """Server-Sent Events endpoint for real-time Xray log streaming."""
     import backend.routes.xray as xray_facade
     if not xray_facade.check_auth(request):
         return xray_facade.decoy_response()
@@ -61,13 +58,11 @@ async def xray_logs_stream(request: Request):
     from backend.log_streamer import get_history, subscribe, unsubscribe
 
     async def event_generator():
-        # 1. Send history burst so the terminal fills immediately on connect
         history = get_history("xray")
         if history:
             payload = json.dumps(history, ensure_ascii=False)
             yield f"event: history\ndata: {payload}\n\n"
 
-        # 2. Subscribe and stream live lines
         q = subscribe("xray")
         try:
             while True:
@@ -78,7 +73,6 @@ async def xray_logs_stream(request: Request):
                     payload = json.dumps(line, ensure_ascii=False)
                     yield f"event: line\ndata: {payload}\n\n"
                 except asyncio.TimeoutError:
-                    # Keepalive comment to prevent proxy/browser timeout
                     yield ": keepalive\n\n"
         finally:
             unsubscribe("xray", q)
@@ -88,10 +82,33 @@ async def xray_logs_stream(request: Request):
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",
-            "X-Accel-Buffering": "no",   # Disable nginx buffering for SSE
+            "X-Accel-Buffering": "no",
             "Connection": "keep-alive",
         },
     )
+
+@router.websocket("/api/xray/logs/ws")
+async def xray_logs_ws(websocket: WebSocket):
+    """Secure real-time WebSocket stream for Xray logs with strict authorization."""
+    if not check_ws_auth(websocket):
+        await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
+        return
+
+    await websocket.accept()
+    from backend.log_streamer import get_history, subscribe, unsubscribe
+    history = get_history("xray")
+    if history:
+        await websocket.send_json({"event": "history", "data": history})
+
+    q = subscribe("xray")
+    try:
+        while True:
+            line = await q.get()
+            await websocket.send_json({"event": "line", "data": line})
+    except Exception:
+        pass
+    finally:
+        unsubscribe("xray", q)
 
 @router.post("/api/xray/logs/clear")
 async def clear_xray_logs(request: Request):
@@ -100,9 +117,12 @@ async def clear_xray_logs(request: Request):
         return xray_facade.decoy_response()
     try:
         from backend.config import XRAY_LOG_PATH
+        from backend.sentinel_core_bridge import clear_in_memory_core_logs
+        clear_in_memory_core_logs("xray")
         if XRAY_LOG_PATH.exists():
             with open(XRAY_LOG_PATH, "w", encoding="utf-8") as f:
                 f.truncate(0)
         return {"success": True}
     except Exception as e:
         return {"success": False, "msg": str(e)}
+

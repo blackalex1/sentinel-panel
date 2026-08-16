@@ -31,10 +31,10 @@ export function setupNetworkListeners() {
     if (enableBbrBtn) {
         enableBbrBtn.addEventListener("click", async () => {
             enableBbrBtn.disabled = true;
-            enableBbrBtn.innerText = "Включение...";
+            enableBbrBtn.innerText = t("dashboard_enabling_bbr", "Включение...");
             const res = await apiFetch("/api/system/bbr/enable", { method: "POST" });
             enableBbrBtn.disabled = false;
-            enableBbrBtn.innerText = "Включить";
+            enableBbrBtn.innerText = t("dashboard_enable_bbr", "Включить");
             if (res && res.success) {
                 showToast(t("bbr_enabled", "BBR ускорение успешно включено на хост-системе!"));
                 loadBbrStatus();

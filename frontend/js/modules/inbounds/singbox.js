@@ -2,21 +2,21 @@
 
 export function compileSingboxSettings(protocol, security, network, streamSettings, settings) {
     if (security === "reality") {
-        const dest = document.getElementById("ib-reality-dest").value || "yahoo.com:443";
-        const sni = document.getElementById("ib-reality-sni").value || "yahoo.com";
-        const pbk = document.getElementById("ib-reality-pbk").value;
-        const priv = document.getElementById("ib-reality-priv").value;
-        const shortIdsInput = document.getElementById("ib-reality-shortids").value;
+        const dest = document.getElementById("ib-reality-dest").value.trim();
+        const sni = document.getElementById("ib-reality-sni").value.trim();
+        const pbk = document.getElementById("ib-reality-pbk").value.trim();
+        const priv = document.getElementById("ib-reality-priv").value.trim();
+        const shortIdsInput = document.getElementById("ib-reality-shortids").value.trim();
         const shortIds = shortIdsInput ? shortIdsInput.split(",").map(s => s.trim()).filter(Boolean) : [];
         const maxTimeDiffInput = document.getElementById("ib-reality-max-time-diff").value.trim();
         
         streamSettings.realitySettings = {
             dest: dest,
             serverName: sni,
-            serverNames: [sni],
+            serverNames: sni ? sni.split(",").map(s => s.trim()).filter(Boolean) : [],
             privateKey: priv,
             publicKey: pbk,
-            shortIds: shortIds.length ? shortIds : ["8f9c2d1b"]
+            shortIds: shortIds
         };
 
         if (maxTimeDiffInput && maxTimeDiffInput !== "0s" && maxTimeDiffInput !== "0") {
@@ -69,8 +69,8 @@ export function compileSingboxSettings(protocol, security, network, streamSettin
 export function populateSingboxSettings(protocol, security, network, streamSettings, settings) {
     if (security === "reality") {
         const rs = streamSettings.realitySettings || {};
-        document.getElementById("ib-reality-dest").value = rs.dest || "yahoo.com:443";
-        document.getElementById("ib-reality-sni").value = rs.serverName || (rs.serverNames && rs.serverNames[0]) || "yahoo.com";
+        document.getElementById("ib-reality-dest").value = rs.dest || "";
+        document.getElementById("ib-reality-sni").value = rs.serverName || (rs.serverNames && rs.serverNames.join(", ")) || "";
         document.getElementById("ib-reality-pbk").value = rs.publicKey || "";
         document.getElementById("ib-reality-priv").value = rs.privateKey || "";
         document.getElementById("ib-reality-shortids").value = (rs.shortIds || []).join(", ");

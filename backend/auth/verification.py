@@ -50,6 +50,29 @@ def check_auth(request: Request) -> bool:
         
     return False
 
+def check_ws_auth(websocket) -> bool:
+    """Криптографически проверяет авторизацию WebSocket-соединения перед accept()"""
+    # 1. Проверка Bearer Token
+    token = websocket.query_params.get("token") or ""
+    auth_header = websocket.headers.get("Authorization", "")
+    if auth_header.startswith("Bearer "):
+        token = auth_header.split(" ")[1]
+    if token and hmac.compare_digest(token, settings.API_TOKEN):
+        return True
+
+    # 2. Проверка Session Cookie
+    session_id = websocket.cookies.get("session_id")
+    if session_id:
+        from backend.database import get_session_db, delete_session_db
+        db_sess = get_session_db(session_id)
+        if db_sess:
+            if db_sess.get("expires_at", 0) > int(time.time()):
+                return True
+            else:
+                delete_session_db(session_id)
+                ACTIVE_SESSIONS.discard(session_id)
+    return False
+
 def verify_node_token(request: Request) -> bool:
     """Проверяет токен ноды (Edge-сервера) во избежание получения decoy заглушки"""
     node_id = request.headers.get("X-Node-ID")

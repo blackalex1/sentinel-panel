@@ -149,22 +149,18 @@ def test_hysteria_endpoints(client):
 
 
 def test_instant_disconnect_hysteria_api(monkeypatch):
-    """Test calling Hysteria kick client API."""
-    called_post = []
-    class MockResponse:
-        def __init__(self, status_code=200):
-            self.status_code = status_code
-            self.text = "OK"
-            
-    def mock_post(url, **kwargs):
-        called_post.append(url)
-        return MockResponse(200)
-        
-    monkeypatch.setattr(requests, "post", mock_post)
+    """Test calling Hysteria kick client via sentinel_core_bridge kick_client."""
+    kicked_emails = []
+    def mock_kick(email: str) -> bool:
+        kicked_emails.append(email)
+        return True
+
+    monkeypatch.setattr("backend.sentinel_core_bridge.kick_client", mock_kick)
     
     res = kick_client_hysteria_api(1, "test@client.com")
     assert res is True
-    assert "10101/kick" in called_post[0]
+    assert "test@client.com" in kicked_emails
+
 
 
 def test_hysteria_config_port_hopping():
@@ -193,6 +189,10 @@ def test_hysteria_version_api(client, monkeypatch):
     import backend.routes.hysteria
     monkeypatch.setattr(backend.routes.hysteria, "check_auth", lambda r: True)
     
+    # Clear any previous cached release info
+    from backend.hysteria.core import _HYSTERIA_RELEASES_CACHE
+    _HYSTERIA_RELEASES_CACHE.clear()
+
     # Mock requests.get for GitHub API
     class MockResponse:
         status_code = 200
@@ -273,7 +273,7 @@ def test_download_hysteria_core_verification_failure_actual(monkeypatch, tmp_pat
 
 
 def test_update_online_emails_hysteria(monkeypatch):
-    """Test update_online_emails properly queries Hysteria 2 /traffic and /online endpoints."""
+    """Test update_online_emails properly queries Hysteria 2 online users via sentinel_core_bridge get_unified_traffic."""
     from backend.routes.clients.actions import update_online_emails
     import backend.routes.clients.actions
     
@@ -308,45 +308,24 @@ def test_update_online_emails_hysteria(monkeypatch):
 
     monkeypatch.setattr("backend.database.db_session", mock_db_session)
     
-    # 2. Mock is_xray_running to return False so Xray query is skipped
-    monkeypatch.setattr("backend.xray.is_xray_running", lambda: False)
+    # 2. Mock sentinel_core_bridge.get_unified_traffic
+    monkeypatch.setattr("backend.sentinel_core_bridge.get_unified_traffic", lambda: {
+        "user_traffic@mail.com": {"online": True, "up": 100, "down": 200},
+        "user_online@mail.com": {"connections": 2, "up": 50, "down": 50},
+        "user_zero_conn@mail.com": {"connections": 0, "online": False}
+    })
     
-    # 3. Mock requests.get to return fake data for Hysteria endpoints
-    called_urls = []
-    
-    class MockGetResponse:
-        def __init__(self, url):
-            self.url = url
-            self.status_code = 200
-            
-        def json(self):
-            if "traffic" in self.url:
-                return {"user_traffic@mail.com": {"up": 100, "down": 200}}
-            elif "online" in self.url:
-                return {"user_online@mail.com": 2, "user_zero_conn@mail.com": 0}
-            return {}
-            
-    def mock_get(url, **kwargs):
-        called_urls.append(url)
-        return MockGetResponse(url)
-        
-    import requests
-    monkeypatch.setattr(requests, "get", mock_get)
-    
-    # 4. Clear existing _online_emails
+    # 3. Clear existing _online_emails
     backend.routes.clients.actions._online_emails = []
     
-    # 5. Call update_online_emails
+    # 4. Call update_online_emails
     update_online_emails()
     
-    # 6. Verify correct API endpoints were queried and results compiled
-    assert "http://127.0.0.1:10101/traffic" in called_urls
-    assert "http://127.0.0.1:10101/online" in called_urls
-    
-    # Verify both traffic and online users (with count > 0) are in the list
+    # 5. Verify results
     assert "user_traffic@mail.com" in backend.routes.clients.actions._online_emails
     assert "user_online@mail.com" in backend.routes.clients.actions._online_emails
     assert "user_zero_conn@mail.com" not in backend.routes.clients.actions._online_emails
+
 
 
 def test_hysteria_auth_endpoint(client, monkeypatch):
@@ -506,4 +485,29 @@ def test_hysteria_auth_endpoint(client, monkeypatch):
         "req": {"ip": "99.99.99.99"}
     })
     assert res_denied.json() == {"ok": False}
+
+
+def test_hysteria_bridge_methods():
+    """Verify sentinel_core_bridge methods: build_server_config, validate_core_config, get_core_version."""
+    from backend.sentinel_core_bridge import (
+        build_server_config,
+        validate_core_config,
+        get_core_version
+    )
+    from backend.hysteria import HYSTERIA_BIN_PATH
+
+    inbounds = [{
+        "id": 1,
+        "port": 443,
+        "protocol": "hysteria2",
+        "tag": "inbound-1",
+        "settings": {},
+        "streamSettings": {"security": "tls"}
+    }]
+    compiled = build_server_config("hysteria2", inbounds)
+    assert isinstance(compiled, dict)
+
+    ver = get_core_version("hysteria2", str(HYSTERIA_BIN_PATH))
+    assert isinstance(ver, str)
+
 

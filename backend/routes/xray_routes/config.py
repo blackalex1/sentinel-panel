@@ -2,6 +2,7 @@ import json
 from fastapi import APIRouter, Request
 
 from backend.config import XRAY_CONFIG_PATH
+from backend.i18n import t, get_lang
 
 router = APIRouter()
 
@@ -11,6 +12,7 @@ async def xray_config(request: Request):
     if not xray_facade.check_auth(request):
         return xray_facade.decoy_response()
     
+    lang = get_lang(request)
     from backend.xray.config import generate_xray_config_json
     
     config_data = None
@@ -19,13 +21,13 @@ async def xray_config(request: Request):
             with open(XRAY_CONFIG_PATH, "r", encoding="utf-8") as f:
                 config_data = json.load(f)
         except Exception as e:
-            return {"success": False, "msg": f"Ошибка чтения конфигурационного файла: {e}"}
+            return {"success": False, "msg": t("xray_read_config_error", lang=lang, category="backend", error=str(e))}
             
     if not config_data:
         try:
             config_data = generate_xray_config_json()
         except Exception as e:
-            return {"success": False, "msg": f"Ошибка генерации конфигурации: {e}"}
+            return {"success": False, "msg": t("xray_generate_config_error", lang=lang, category="backend", error=str(e))}
             
     from backend.database import get_setting
     use_custom = get_setting("use_custom_xray_config") == "true"
@@ -37,9 +39,10 @@ async def save_xray_config(request: Request, payload: dict):
     if not xray_facade.check_auth(request):
         return xray_facade.decoy_response()
         
+    lang = get_lang(request)
     config = payload.get("config")
     if not config:
-        return {"success": False, "msg": "Не указана конфигурация"}
+        return {"success": False, "msg": t("xray_config_not_specified", lang=lang, category="backend")}
         
     try:
         from backend.xray import restart_xray

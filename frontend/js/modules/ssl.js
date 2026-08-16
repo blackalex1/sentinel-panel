@@ -15,7 +15,7 @@ export function setupSslListeners() {
             }
             
             btnGenerateSsl.disabled = true;
-            btnGenerateSsl.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Выпускается...';
+            btnGenerateSsl.innerHTML = `<i class="fa-solid fa-circle-notch fa-spin"></i> ${t("ssl_btn_issuing", "Выпускается...")}`;
             showToast(t("ssl_issue_started", "Запущен процесс автоматического выпуска SSL. Это может занять до 1 минуты."), "info");
             
             const res = await apiFetch("/api/ssl/generate", {
@@ -25,7 +25,7 @@ export function setupSslListeners() {
             });
             
             btnGenerateSsl.disabled = false;
-            btnGenerateSsl.innerHTML = '<i class="fa-solid fa-shield-halved"></i> Выпустить сертификат';
+            btnGenerateSsl.innerHTML = `<i class="fa-solid fa-shield-halved"></i> ${t("ssl_btn_issue", "Выпустить сертификат")}`;
             
             if (res && res.success) {
                 showToast(t("ssl_issue_success", "SSL-сертификат успешно выпущен и установлен!"));

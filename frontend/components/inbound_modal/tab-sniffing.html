@@ -1,35 +1,34 @@
-<!-- Tab panel 5: Sniffing (Сниффинг) -->
-<div id="tab-panel-sniffing" class="tab-panel" style="display: none;">
-    <div class="input-group">
-        <label class="checkbox-container" style="display: flex; align-items: center; gap: 10px; cursor: pointer; color: var(--text-secondary);">
-            <input type="checkbox" id="ib-sniffing">
-            <span data-i18n="ib_label_sniffing">Включить Сниффинг (Sniffing)</span>
-        </label>
-    </div>
-    
-    <div id="sniffing-overrides" class="settings-subgroup" style="display: none; margin-top: 15px; flex-direction: column; gap: 10px;">
-        <h4 data-i18n="ib_title_sniffing_protocols">Протоколы перехвата</h4>
-        <label class="checkbox-container" style="display: flex; align-items: center; gap: 10px;">
-            <input type="checkbox" id="ib-sniffing-http" checked>
-            <span data-i18n="ib_label_sniffing_http">HTTP</span>
-        </label>
-        <label class="checkbox-container" style="display: flex; align-items: center; gap: 10px;">
-            <input type="checkbox" id="ib-sniffing-tls" checked>
-            <span data-i18n="ib_label_sniffing_tls">TLS (HTTPS)</span>
-        </label>
-        <label class="checkbox-container" style="display: flex; align-items: center; gap: 10px;">
-            <input type="checkbox" id="ib-sniffing-quic" checked>
-            <span data-i18n="ib_label_sniffing_quic">QUIC</span>
-        </label>
-        <label class="checkbox-container" style="display: flex; align-items: center; gap: 10px;">
-            <input type="checkbox" id="ib-sniffing-fakedns">
-            <span data-i18n="ib_label_sniffing_fakedns">fakedns</span>
-        </label>
-        <div style="border-top: 1px solid var(--border-color); margin-top: 10px; padding-top: 10px;">
-            <label class="checkbox-container" style="display: flex; align-items: center; gap: 10px;">
-                <input type="checkbox" id="ib-sniffing-routeonly">
-                <span data-i18n="ib_label_sniffing_routeonly">Только для маршрутизации (Route Only)</span>
-            </label>
-        </div>
-    </div>
+
+<div class="tab-panel" id="tab-panel-sniffing" style="display: none;">
+<div class="input-group">
+<label class="checkbox-container" style="display: flex; align-items: center; gap: 10px; cursor: pointer; color: var(--text-secondary);">
+<input id="ib-sniffing" type="checkbox"/>
+<span data-i18n="ib_label_sniffing"></span>
+</label>
+</div>
+<div class="settings-subgroup" id="sniffing-overrides" style="display: none; margin-top: 15px; flex-direction: column; gap: 10px;">
+<h4 data-i18n="ib_title_sniffing_protocols"></h4>
+<label class="checkbox-container" style="display: flex; align-items: center; gap: 10px;">
+<input checked="" id="ib-sniffing-http" type="checkbox"/>
+<span data-i18n="ib_label_sniffing_http"></span>
+</label>
+<label class="checkbox-container" style="display: flex; align-items: center; gap: 10px;">
+<input checked="" id="ib-sniffing-tls" type="checkbox"/>
+<span data-i18n="ib_label_sniffing_tls"></span>
+</label>
+<label class="checkbox-container" style="display: flex; align-items: center; gap: 10px;">
+<input checked="" id="ib-sniffing-quic" type="checkbox"/>
+<span data-i18n="ib_label_sniffing_quic"></span>
+</label>
+<label class="checkbox-container" style="display: flex; align-items: center; gap: 10px;">
+<input id="ib-sniffing-fakedns" type="checkbox"/>
+<span data-i18n="ib_label_sniffing_fakedns"></span>
+</label>
+<div style="border-top: 1px solid var(--border-color); margin-top: 10px; padding-top: 10px;">
+<label class="checkbox-container" style="display: flex; align-items: center; gap: 10px;">
+<input id="ib-sniffing-routeonly" type="checkbox"/>
+<span data-i18n="ib_label_sniffing_routeonly"></span>
+</label>
+</div>
+</div>
 </div>

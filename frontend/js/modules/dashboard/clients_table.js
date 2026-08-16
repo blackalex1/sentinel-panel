@@ -159,7 +159,7 @@ export function filterAndRenderClients() {
         let statusHtml = "";
         if (!c.enable) {
             const reasonStr = c.blockReason || t("client_status_blocked", "Заблокирован");
-            statusHtml = `<span class="badge inactive" title="Причина: ${reasonStr}" style="cursor: help;">${t("client_status_blocked", "Бан ⚠️")}</span>`;
+            statusHtml = `<span class="badge inactive" title="${t("client_block_reason_title", "Причина")}: ${reasonStr}" style="cursor: help;">${t("client_status_blocked", "Бан ⚠️")}</span>`;
         } else if (isOnline) {
             statusHtml = `<span class="badge" style="background: rgba(16, 185, 129, 0.15); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.3); box-shadow: 0 0 10px rgba(16, 185, 129, 0.2);"><span style="display: inline-block; width: 7px; height: 7px; background: #10b981; border-radius: 50%; margin-right: 6px; vertical-align: middle; box-shadow: 0 0 6px #10b981;"></span>${t("client_status_online", "Онлайн")}</span>`;
         } else {

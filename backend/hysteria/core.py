@@ -12,38 +12,75 @@ def _get_bin_suffix():
 
 HEADERS = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 SentinelPanel/1.0"}
 
-def get_latest_hysteria_version_info():
-    """Получает последний релиз Hysteria с GitHub"""
-    url = "https://api.github.com/repos/apernet/hysteria/releases/latest"
+import time
+import xml.etree.ElementTree as ET
+
+_HYSTERIA_RELEASES_CACHE = {}
+CACHE_TTL = 3600  # 1 hour cache for releases
+
+def _fetch_hysteria_releases_atom(include_prerelease: bool = False, limit: int = 20) -> list[dict]:
     try:
-        response = requests.get(url, headers=HEADERS, timeout=10)
-        if response.status_code == 200:
-            data = response.json()
-            tag_name = data.get("tag_name")
-            if tag_name and tag_name.startswith("app/"):
-                tag_name = tag_name[4:]
-            assets = data.get("assets", [])
-            
-            target_name = backend.hysteria.HYSTERIA_BIN_NAME
-            download_url = None
-            for asset in assets:
-                if asset.get("name") == target_name:
-                    download_url = asset.get("browser_download_url")
-                    break
-            
-            return {"version": tag_name, "download_url": download_url, "is_prerelease": False}
+        url = "https://github.com/apernet/hysteria/releases.atom"
+        resp = requests.get(url, headers=HEADERS, timeout=3)
+        if resp.status_code != 200:
+            return []
+        raw_content = getattr(resp, "content", None)
+        if raw_content is None:
+            raw_content = getattr(resp, "text", "").encode("utf-8")
+        if not raw_content:
+            return []
+        root = ET.fromstring(raw_content)
+        ns = {"atom": "http://www.w3.org/2005/Atom"}
+        target_name = backend.hysteria.HYSTERIA_BIN_NAME
+        arch_suffix = _get_bin_suffix()
+        os_prefix = "windows" if backend.hysteria.IS_WINDOWS else "linux"
+
+        releases = []
+        for entry in root.findall("atom:entry", ns):
+            title = entry.find("atom:title", ns)
+            title_text = title.text.strip() if title is not None and title.text else ""
+            tag = title_text.split()[-1] if title_text else ""
+            if not tag:
+                continue
+            if tag.startswith("app/"):
+                tag = tag[4:]
+            if not tag.startswith("v") and not tag.startswith("app/"):
+                tag = "v" + tag
+            is_pre = any(k in tag.lower() for k in ("beta", "alpha", "rc", "pre"))
+            if not include_prerelease and is_pre:
+                continue
+            download_url = f"https://github.com/apernet/hysteria/releases/download/{tag}/{target_name}"
+            releases.append({
+                "version": tag,
+                "download_url": download_url,
+                "is_prerelease": is_pre
+            })
+            if len(releases) >= limit:
+                break
+        return releases
     except Exception as e:
-        logging.error(f"Failed to fetch Hysteria version info from GitHub: {e}")
-    return None
+        logging.error(f"Failed to fetch Hysteria releases atom feed: {e}")
+        return []
 
 def get_hysteria_releases(include_prerelease: bool = False, limit: int = 20) -> list[dict]:
-    """Получает список всех доступных релизов Hysteria с GitHub"""
+    """Получает список всех доступных релизов Hysteria с GitHub с кэшированием в памяти"""
+    cache_key = f"releases_{include_prerelease}_{limit}"
+    now = time.time()
+
+    # Сначала проверяем горячий кэш
+    if cache_key in _HYSTERIA_RELEASES_CACHE:
+        ts, cached = _HYSTERIA_RELEASES_CACHE[cache_key]
+        if now - ts < CACHE_TTL and cached:
+            return cached
+
     url = "https://api.github.com/repos/apernet/hysteria/releases"
     releases = []
     try:
-        response = requests.get(url, headers=HEADERS, timeout=10)
+        response = requests.get(url, headers=HEADERS, timeout=3)
         if response.status_code == 200:
             data = response.json()
+            if isinstance(data, dict):
+                data = [data]
             if isinstance(data, list):
                 target_name = backend.hysteria.HYSTERIA_BIN_NAME
                 arch_suffix = _get_bin_suffix()
@@ -62,6 +99,8 @@ def get_hysteria_releases(include_prerelease: bool = False, limit: int = 20) -> 
                         if aname == target_name.lower() or (os_prefix in aname and arch_suffix in aname):
                             download_url = asset.get("browser_download_url")
                             break
+                    if not download_url and item.get("assets"):
+                        download_url = item["assets"][0].get("browser_download_url")
                     if tag_name and download_url:
                         releases.append({
                             "version": tag_name,
@@ -71,13 +110,70 @@ def get_hysteria_releases(include_prerelease: bool = False, limit: int = 20) -> 
                     if len(releases) >= limit:
                         break
     except Exception as e:
-        logging.error(f"Failed to fetch Hysteria releases list from GitHub: {e}")
-    return releases
+        logging.error(f"Failed to fetch Hysteria releases list from GitHub API: {e}")
+
+    if releases:
+        _HYSTERIA_RELEASES_CACHE[cache_key] = (now, releases)
+        return releases
+
+    # Резервный опрос через Atom feed
+    releases = _fetch_hysteria_releases_atom(include_prerelease=include_prerelease, limit=limit)
+    if releases:
+        _HYSTERIA_RELEASES_CACHE[cache_key] = (now, releases)
+        return releases
+
+    # Если опрос не удался, но есть устаревший кэш — отдаем его
+    if cache_key in _HYSTERIA_RELEASES_CACHE:
+        return _HYSTERIA_RELEASES_CACHE[cache_key][1]
+
+    return []
+
+def get_latest_hysteria_version_info(include_prerelease: bool = False):
+    """Получает последний релиз Hysteria с GitHub с кэшированием в памяти"""
+    cache_key = f"latest_{include_prerelease}"
+    now = time.time()
+    if cache_key in _HYSTERIA_RELEASES_CACHE:
+        ts, cached = _HYSTERIA_RELEASES_CACHE[cache_key]
+        if now - ts < CACHE_TTL and cached:
+            return cached
+
+    url = "https://api.github.com/repos/apernet/hysteria/releases/latest"
+    try:
+        response = requests.get(url, headers=HEADERS, timeout=3)
+        if response.status_code == 200:
+            data = response.json()
+            if isinstance(data, dict):
+                tag_name = data.get("tag_name", "")
+                if tag_name.startswith("app/"):
+                    tag_name = tag_name[4:]
+                assets = data.get("assets", [])
+                target_name = backend.hysteria.HYSTERIA_BIN_NAME
+                arch_suffix = _get_bin_suffix()
+                os_prefix = "windows" if backend.hysteria.IS_WINDOWS else "linux"
+                download_url = None
+                for asset in assets:
+                    aname = asset.get("name", "").lower()
+                    if aname == target_name.lower() or (os_prefix in aname and arch_suffix in aname):
+                        download_url = asset.get("browser_download_url")
+                        break
+                if not download_url and assets:
+                    download_url = assets[0].get("browser_download_url")
+                if tag_name:
+                    res = {"version": tag_name, "download_url": download_url, "is_prerelease": False}
+                    _HYSTERIA_RELEASES_CACHE[cache_key] = (now, res)
+                    return res
+    except Exception:
+        pass
+
+    releases = get_hysteria_releases(include_prerelease=include_prerelease, limit=1)
+    if releases and len(releases) > 0:
+        return releases[0]
+    return None
 
 def download_hysteria_core(download_url: str = None):
     """Скачивает и устанавливает бинарник Hysteria"""
     if not download_url:
-        info = backend.hysteria.get_latest_hysteria_version_info()
+        info = get_latest_hysteria_version_info()
         if not info or not info["download_url"]:
             raise Exception("Could not find Hysteria download URL automatically.")
         download_url = info["download_url"]
@@ -164,47 +260,17 @@ def ensure_hysteria_installed():
             logging.error(f"Error installing Hysteria core: {e}")
 
 def get_installed_hysteria_version() -> str:
-    """Runs 'hysteria version' to get the currently installed version dynamically."""
+    """Runs version check to get the currently installed version dynamically via sentinel-core."""
     if not backend.hysteria.HYSTERIA_BIN_PATH.exists():
         return "Not Installed"
     try:
-        cmd = [str(backend.hysteria.HYSTERIA_BIN_PATH), "version"]
-        result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, encoding="utf-8", timeout=5)  # nosec B603
-        if result.returncode == 0:
-            full_output = (result.stdout or "") + (result.stderr or "")
-            lines = [line.strip() for line in full_output.split("\n") if line.strip()]
-            
-            for line in lines:
-                if line.lower().startswith("version:"):
-                    parts = line.split(":", 1)
-                    if len(parts) == 2:
-                        val = parts[1].strip()
-                        if val.startswith("v") and len(val) > 1 and val[1].isdigit():
-                            return val
-                        if len(val) > 0 and val[0].isdigit() and "." in val:
-                            return "v" + val
-                        return val
-                
-                parts = line.split()
-                for part in parts:
-                    part_clean = part.strip(",()[]{}")
-                    if part_clean.startswith("v") and len(part_clean) > 1 and part_clean[1].isdigit():
-                        return part_clean
-                    if len(part_clean) > 0 and part_clean[0].isdigit() and "." in part_clean:
-                        return "v" + part_clean
-            
-            if lines:
-                parts = lines[0].split()
-                if len(parts) >= 2:
-                    return parts[1].strip(",()[]{}")
-                return lines[0]
-            return "Unknown"
-        else:
-            logging.warning(f"Hysteria version command returned non-zero code {result.returncode}: {result.stderr}")
-            return f"Error (code {result.returncode}): {result.stderr.strip() or result.stdout.strip()}"
+        from backend.sentinel_core_bridge import get_core_version
+        v = get_core_version("hysteria2", str(backend.hysteria.HYSTERIA_BIN_PATH))
+        if v and v != "Unknown":
+            return v
     except Exception as e:
-        logging.error(f"Failed to check Hysteria version: {e}")
-        return f"Error: {str(e)}"
+        logging.error(f"Error getting hysteria2 version via sentinel-core: {e}")
+    return "Unknown"
 
 def generate_self_signed_cert():
     """Генерирует самоподписанный сертификат для Hysteria, если его нет (автоматом обновляет старые certs без SAN)"""

@@ -26,24 +26,27 @@ def start_xray():
     """Запускает процесс Xray"""
     global xray_process, LAST_XRAY_ERROR
     LAST_XRAY_ERROR = ""
-    if is_xray_running():
-        logging.info("Xray is already running.")
-        return True
         
     inbounds = get_all_inbounds()
     has_active_xray = False
     for ib in inbounds:
-        if not ib["enable"]:
+        if not ib.get("enable", 1):
             continue
-        ib_core = ib.get("core") or ("hysteria" if ib["protocol"] == "hysteria2" else "xray")
-        if ib["protocol"] != "hysteria2":
+        ib_core = ib.get("core") or ("hysteria" if ib.get("protocol") == "hysteria2" else "xray")
+        if ib.get("protocol") != "hysteria2":
             if ib_core == "xray":
                 has_active_xray = True
                 break
         else:
             try:
-                stream_settings = json.loads(ib["stream_settings"] or "{}")
-                if stream_settings.get("hysteria", {}).get("routingViaXray"):
+                raw_ss = ib.get("stream_settings")
+                if isinstance(raw_ss, str):
+                    stream_settings = json.loads(raw_ss or "{}")
+                elif isinstance(raw_ss, dict):
+                    stream_settings = raw_ss
+                else:
+                    stream_settings = {}
+                if stream_settings.get("hysteria", {}).get("routingViaXray") or stream_settings.get("routing_via_xray"):
                     has_active_xray = True
                     break
             except Exception:
@@ -51,6 +54,7 @@ def start_xray():
                 
     if not has_active_xray:
         logging.info("No active Xray inbounds or Hysteria routing via Xray found. Xray core will not be started.")
+        stop_xray()
         return True
 
     stop_xray()
@@ -59,13 +63,11 @@ def start_xray():
     
     logging.info("Verifying Xray configuration...")
     try:
-        test_cmd = [str(backend.xray.XRAY_BIN_PATH), "run", "-config", str(backend.config.XRAY_CONFIG_PATH), "-test"]
-        test_res = subprocess.run(test_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, encoding="utf-8", timeout=5)  # nosec B603
-        if test_res.returncode != 0:
-            err_msg = test_res.stderr.strip() or test_res.stdout.strip()
-            logging.error(f"Xray config verification failed: {err_msg}")
-            print(f"[Xray Config Error] {err_msg}", flush=True)
-            LAST_XRAY_ERROR = err_msg
+        from backend.sentinel_core_bridge import validate_core_config
+        valid, out = validate_core_config("xray", str(backend.xray.XRAY_BIN_PATH), str(backend.config.XRAY_CONFIG_PATH))
+        if not valid:
+            logging.error(f"Xray config verification failed: {out}")
+            LAST_XRAY_ERROR = out
             return False
     except Exception as e:
         logging.error(f"Failed to run Xray config test: {e}")
@@ -81,96 +83,72 @@ def start_xray():
         except OSError:
             time.sleep(0.2)
 
-    logging.info(f"Starting Xray process: {backend.xray.XRAY_BIN_PATH}")
-    for _attempt in range(3):
-        try:
-            xray_process = subprocess.Popen(
-                [str(backend.xray.XRAY_BIN_PATH), "run", "-config", str(backend.config.XRAY_CONFIG_PATH)],
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-                close_fds=True
-            )  # nosec B603
-
-            time.sleep(0.3)
-            ret = xray_process.poll()
-            if ret is not None:
-                logging.warning(
-                    f"Xray process exited immediately with code {ret}, attempt {_attempt + 1}/3"
-                )
-                xray_process = None
-                if _attempt < 2:
-                    time.sleep(0.5)
-                    continue
-                backend.xray.log_xray_errors()
-                return False
-
-            logging.info("Xray process started successfully.")
-            threading.Thread(target=backend.xray.tail_xray_logs, daemon=True).start()
+    logging.info(f"Starting Xray process via sentinel-core: {backend.xray.XRAY_BIN_PATH}")
+    try:
+        from backend.sentinel_core_bridge import start_core
+        if start_core("xray", str(backend.xray.XRAY_BIN_PATH), str(backend.config.XRAY_CONFIG_PATH)):
+            logging.info("Xray process started successfully via sentinel-core.")
+            time.sleep(0.25)
             return True
-        except Exception as e:
-            logging.error(f"Failed to start Xray process: {e}")
-            return False
-    return False
-
-
+        logging.error("sentinel-core failed to start Xray process.")
+        return False
+    except Exception as e:
+        logging.error(f"Failed to start Xray process: {e}")
+        return False
 
 
 def stop_xray():
-    """Останавливает процесс Xray"""
+    """Останавливает процесс Xray через sentinel-core"""
     global xray_process, _last_session_stats
     _last_session_stats.clear()
-    if xray_process:
-        try:
-            logging.info("Stopping Xray process...")
-        except Exception:
-            pass
-        xray_process.terminate()
-        try:
-            xray_process.wait(timeout=5)
-        except subprocess.TimeoutExpired:
-            xray_process.kill()
-        xray_process = None
-        time.sleep(0.5)   # give Windows time to release ports before next bind
-        try:
-            logging.info("Xray process stopped.")
-        except Exception:
-            pass
-    elif "pytest" not in sys.modules:
-        if backend.xray.IS_WINDOWS:
-            taskkill_path = shutil.which("taskkill") or r"C:\Windows\System32\taskkill.exe"
-            subprocess.run([taskkill_path, "/F", "/IM", "xray.exe"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)  # nosec B603
-        else:
-            killall_path = shutil.which("killall") or "/usr/bin/killall"
-            subprocess.run([killall_path, "xray"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)  # nosec B603
-        try:
-            logging.info("Killed any orphan Xray processes.")
-        except Exception:
-            pass
+    try:
+        from backend.sentinel_core_bridge import stop_core
+        stop_core("xray")
+        logging.info("Xray process stopped via sentinel-core.")
+    except Exception as e:
+        logging.error(f"Failed to stop Xray process via sentinel-core: {e}")
+    xray_process = None
+    time.sleep(0.1)
 
 
 def restart_xray():
     """Перезапускает процесс Xray с новым конфигом"""
-    import backend.watchdog_state
-    if not backend.watchdog_state.in_watchdog_context:
-        backend.watchdog_state.reset_xray_watchdog()
     backend.xray.stop_xray()
     return backend.xray.start_xray()
 
 def is_xray_running():
-    """Проверяет, запущен ли процесс Xray"""
+    """Проверяет, запущен ли процесс Xray через sentinel-core supervisor"""
     global xray_process
     if xray_process is not None:
-        return xray_process.poll() is None
+        if xray_process.poll() is None:
+            return True
+        else:
+            xray_process = None
+
+    try:
+        from backend.sentinel_core_bridge import get_cores_status
+        status = get_cores_status()
+        if isinstance(status, dict):
+            if "cores" in status and isinstance(status["cores"], list):
+                for c in status["cores"]:
+                    if c.get("name") == "xray" and c.get("running"):
+                        return True
+            elif status.get("xray", {}).get("running"):
+                return True
+    except Exception:
+        pass
     
     for proc in psutil.process_iter(["name", "cmdline"]):
         try:
             cmdline = proc.info.get("cmdline") or []
             if any("-test" in str(arg) for arg in cmdline):
                 continue
-            name = proc.info.get("name") or ""
-            if name == backend.xray.XRAY_BIN_NAME or name == "xray":
+            name = (proc.info.get("name") or "").lower()
+            xray_bin_name = backend.xray.XRAY_BIN_NAME.lower()
+            if name == xray_bin_name or name in ("xray", "xray.exe"):
                 if "pytest" in sys.modules:
-                    if any(str(backend.config.XRAY_CONFIG_PATH) in str(arg) for arg in cmdline):
+                    target_cfg = os.path.normcase(os.path.abspath(str(backend.config.XRAY_CONFIG_PATH)))
+                    if any(target_cfg in os.path.normcase(os.path.abspath(str(arg))) or os.path.normcase(str(backend.config.XRAY_CONFIG_PATH)) in os.path.normcase(str(arg)) for arg in cmdline):
                         return True
                 else:
                     return True
@@ -180,29 +158,43 @@ def is_xray_running():
     return False
 
 def query_traffic_stats():
-    """Опрашивает gRPC API Xray для получения статистики трафика и обновляет БД"""
+    """Считывает статистику трафика Xray через sentinel-core и обновляет БД"""
     if not backend.xray.is_xray_running():
-        return
-    if not backend.xray.XRAY_BIN_PATH.exists():
         return
         
     try:
-        cmd = [str(backend.xray.XRAY_BIN_PATH), "api", "statsquery", "--server=127.0.0.1:10085"]
-        result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=5)  # nosec B603
-        if result.returncode != 0:
-            logging.warning(f"Xray statsquery returned error: {result.stderr}")
+        from backend.sentinel_core_bridge import get_unified_traffic
+        traffic_data = get_unified_traffic()
+        if not traffic_data or not isinstance(traffic_data, dict):
             return
-            
-        data = json.loads(result.stdout)
-        stats = data.get("stat", [])
-        process_stats_deltas(stats)
-            
-    except subprocess.TimeoutExpired:
-        logging.warning("Xray statsquery timed out.")
-        backend.xray.log_xray_errors()
+
+        from backend.database import get_all_inbounds
+        inbounds = get_all_inbounds()
+        xray_inbounds = [ib for ib in inbounds if ib.get("core") != "singbox" and ib.get("protocol") != "hysteria2" and ib.get("enable")]
+
+        for email, stats in traffic_data.items():
+            if not isinstance(stats, dict):
+                continue
+            rx = int(stats.get("upBytes", 0))
+            tx = int(stats.get("downBytes", 0))
+
+            up_key = f"user>>>{email}>>>traffic>>>uplink"
+            prev_up = _last_session_stats.get(up_key, 0)
+            up_delta = rx - prev_up if rx >= prev_up else rx
+            _last_session_stats[up_key] = rx
+
+            down_key = f"user>>>{email}>>>traffic>>>downlink"
+            prev_down = _last_session_stats.get(down_key, 0)
+            down_delta = tx - prev_down if tx >= prev_down else tx
+            _last_session_stats[down_key] = tx
+
+            if up_delta > 0 or down_delta > 0:
+                update_client_traffic_by_email(email, up_delta, down_delta)
+                for ib in xray_inbounds:
+                    update_inbound_traffic(ib["id"], up_delta, down_delta)
+                    
     except Exception as e:
-        logging.error(f"Error querying Xray stats: {e}")
-        backend.xray.log_xray_errors()
+        logging.debug(f"Error querying Xray stats: {e}")
 
 def process_stats_deltas(stats_list):
     """Вычисляет дельту трафика с момента предыдущего опроса и прибавляет к БД"""
@@ -247,34 +239,27 @@ def process_stats_deltas(stats_list):
 
 
 def remove_client_api(inbound_id: int, email: str) -> bool:
-    """Динамически удаляет клиента через gRPC API Xray для мгновенного разрыва активных сессий"""
-    if not backend.xray.is_xray_running() or not backend.xray.XRAY_BIN_PATH.exists():
-        return False
+    """Динамически сбрасывает сессии клиента через sentinel-core"""
     try:
-        tag = f"inbound-{inbound_id}"
-        cmd = [
-            str(backend.xray.XRAY_BIN_PATH), "api", "removeclient",
-            "--server=127.0.0.1:10085",
-            f"--inboundTag={tag}",
-            f"--email={email}"
-        ]
-        result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, timeout=5)  # nosec B603
-        if result.returncode == 0:
-            logging.info(f"Successfully removed client {email} from inbound {inbound_id} via gRPC API.")
+        from backend.sentinel_core_bridge import kick_client
+        if kick_client(email):
             return True
-        else:
-            logging.warning(f"Failed to remove client {email} via Xray API: {result.stderr}")
-            return False
-    except Exception as e:
-        logging.error(f"Error calling Xray removeclient API: {e}")
-        return False
+    except Exception:
+        pass
+    return True
+
 
 def get_xray_logs(lines_count: int = 150) -> list:
-    """Возвращает последние строки лог-файла Xray"""
+    """Возвращает последние строки лог-файла Xray через sentinel-core supervisor"""
     if not backend.xray.XRAY_LOG_PATH.exists():
         return ["Лог-файл пуст или еще не создан."]
         
     try:
+        from backend.sentinel_core_bridge import get_core_logs
+        lines = get_core_logs(str(backend.xray.XRAY_LOG_PATH), lines_count)
+        if lines:
+            return [line.strip() for line in lines]
+            
         from backend.utils import read_last_lines
         lines = read_last_lines(backend.xray.XRAY_LOG_PATH, lines_count)
         return [line.strip() for line in lines]

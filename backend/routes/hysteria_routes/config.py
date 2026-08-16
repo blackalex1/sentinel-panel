@@ -5,6 +5,7 @@ from backend.database import get_all_inbounds, get_clients_for_inbound, get_sett
 import backend.hysteria
 import backend.routes.hysteria as hysteria_facade
 from backend.hysteria import restart_hysteria
+from backend.i18n import t, get_lang
 
 router = APIRouter()
 
@@ -13,6 +14,7 @@ async def hysteria_config(request: Request):
     if not hysteria_facade.check_auth(request):
         return hysteria_facade.decoy_response()
     
+    lang = get_lang(request)
     try:
         inbounds = get_all_inbounds()
         hysteria_inbounds = [
@@ -30,9 +32,9 @@ async def hysteria_config(request: Request):
                 try:
                     with open(config_path, "r", encoding="utf-8") as f:
                         config_data = json.load(f)
-                except Exception:
-                    pass
-            
+                except Exception as e:
+                    logging.warning(f"Failed to read custom config for hysteria inbound {ib_id}: {e}")
+                    
             clients = get_clients_for_inbound(ib_id)
             active_clients = [c for c in clients if c and c.get("enable")]
 
@@ -46,7 +48,7 @@ async def hysteria_config(request: Request):
                 config_data = backend.hysteria.generate_hysteria_config(
                     ib_id, ib["port"], active_clients, stream_settings
                 )
-                
+            
             use_custom = get_setting(f"use_custom_hysteria_config_{ib_id}") == "true"
             configs_list.append({
                 "inbound_id": ib_id,
@@ -60,17 +62,18 @@ async def hysteria_config(request: Request):
         return {"success": True, "configs": configs_list}
     except Exception as e:
         logging.error(f"Error in hysteria_config API: {e}", exc_info=True)
-        return {"success": False, "msg": f"Ошибка: {e}"}
+        return {"success": False, "msg": t("generic_error", lang=lang, category="backend", error=str(e))}
 
 @router.post("/api/hysteria/config")
 async def save_hysteria_config(request: Request, payload: dict):
     if not hysteria_facade.check_auth(request):
         return hysteria_facade.decoy_response()
         
+    lang = get_lang(request)
     inbound_id = payload.get("inbound_id")
     config = payload.get("config")
     if inbound_id is None or not config:
-        return {"success": False, "msg": "Неверные параметры"}
+        return {"success": False, "msg": t("invalid_params", lang=lang, category="backend")}
         
     try:
         if isinstance(config, dict) and "log" in config and isinstance(config["log"], dict):
@@ -87,7 +90,7 @@ async def save_hysteria_config(request: Request, payload: dict):
         
         success = restart_hysteria()
         if not success:
-            return {"success": False, "msg": "Не удалось перезапустить ядро Hysteria 2. Проверьте параметры конфигурации."}
+            return {"success": False, "msg": t("hysteria_restart_failed", lang=lang, category="backend")}
         return {"success": True}
     except Exception as e:
         return {"success": False, "msg": str(e)}

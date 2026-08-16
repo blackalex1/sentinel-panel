@@ -2,6 +2,7 @@ from fastapi import APIRouter, Request
 
 from backend.config import settings
 from backend.database import get_setting, set_setting
+from backend.i18n import t, get_lang
 
 router = APIRouter()
 
@@ -81,6 +82,7 @@ async def update_settings_api(request: Request):
     if not system_facade.check_auth(request):
         return system_facade.decoy_response()
     
+    lang = get_lang(request)
     try:
         data = await request.json()
         
@@ -88,7 +90,7 @@ async def update_settings_api(request: Request):
         if "secret_path" in data:
             secret_path = data.get("secret_path")
             if not secret_path or not secret_path.isalnum():
-                return {"success": False, "msg": "Неверный секретный путь (разрешены только буквы и цифры)"}
+                return {"success": False, "msg": t("settings_secret_path_invalid", lang=lang, category="backend")}
             system_facade.save_settings_to_env({
                 "PANEL_SECRET_PATH": secret_path,
             })
@@ -102,7 +104,7 @@ async def update_settings_api(request: Request):
                     raise ValueError()
                 set_setting("session_timeout_days", str(session_timeout_days))
             except ValueError:
-                return {"success": False, "msg": "Неверный срок действия сессии (должно быть целое положительное число дней)"}
+                return {"success": False, "msg": t("settings_session_timeout_invalid", lang=lang, category="backend")}
  
         if "login_max_attempts" in data:
             try:
@@ -111,7 +113,7 @@ async def update_settings_api(request: Request):
                     raise ValueError()
                 set_setting("login_max_attempts", str(login_max_attempts))
             except ValueError:
-                return {"success": False, "msg": "Неверный максимум попыток входа (должно быть целое положительное число)"}
+                return {"success": False, "msg": t("settings_login_max_attempts_invalid", lang=lang, category="backend")}
  
         if "login_attempts_period" in data:
             try:
@@ -120,7 +122,7 @@ async def update_settings_api(request: Request):
                     raise ValueError()
                 set_setting("login_attempts_period", str(login_attempts_period))
             except ValueError:
-                return {"success": False, "msg": "Неверный период проверки (должно быть целое положительное число секунд)"}
+                return {"success": False, "msg": t("settings_login_attempts_period_invalid", lang=lang, category="backend")}
  
         if "login_fail_delay" in data:
             try:
@@ -129,7 +131,7 @@ async def update_settings_api(request: Request):
                     raise ValueError()
                 set_setting("login_fail_delay", str(login_fail_delay))
             except ValueError:
-                return {"success": False, "msg": "Неверное время задержки после неверного ввода (должно быть положительным числом)"}
+                return {"success": False, "msg": t("settings_login_fail_delay_invalid", lang=lang, category="backend")}
  
         # 2. Telegram Integration Card
         tg_changed = False
@@ -159,7 +161,7 @@ async def update_settings_api(request: Request):
         if "decoy_type" in data:
             decoy_type = data.get("decoy_type")
             if decoy_type not in ("none", "static", "proxy", "redirect", "drop"):
-                return {"success": False, "msg": "Неверный тип маскировки"}
+                return {"success": False, "msg": t("settings_decoy_type_invalid", lang=lang, category="backend")}
             set_setting("decoy_type", decoy_type)
             decoy_updated = True
             
@@ -167,7 +169,7 @@ async def update_settings_api(request: Request):
             decoy_type = data.get("decoy_type", get_setting("decoy_type", "none"))
             decoy_value = data.get("decoy_value")
             if decoy_type in ("proxy", "redirect") and not decoy_value.startswith("http"):
-                return {"success": False, "msg": "Для выбранного типа маскировки необходимо указать полный URL (http/https)"}
+                return {"success": False, "msg": t("settings_decoy_url_required", lang=lang, category="backend")}
             set_setting("decoy_value", decoy_value)
             decoy_updated = True
 
@@ -217,7 +219,7 @@ async def update_settings_api(request: Request):
                         except Exception:
                             pass
             except ValueError:
-                return {"success": False, "msg": "Количество бэкапов для ротации должно быть целым положительным числом"}
+                return {"success": False, "msg": t("settings_backup_rotation_invalid", lang=lang, category="backend")}
         if "backup_telegram" in data:
             set_setting("backup_telegram", "true" if data.get("backup_telegram") in (True, "true") else "false")
         if "backup_encrypt" in data:
@@ -227,24 +229,21 @@ async def update_settings_api(request: Request):
                 stored_password = get_setting("backup_password", "")
                 if stored_password:
                     verify_password = data.get("verify_password", "").strip()
-                    lang = get_setting("language", "ru")
-                    from backend.i18n import t
                     if not verify_password or verify_password != stored_password:
-                        return {"success": False, "msg": t("backup_current_password_incorrect", lang)}
+                        return {"success": False, "msg": t("backup_current_password_incorrect", lang=lang, category="backend")}
             set_setting("backup_encrypt", new_encrypt)
  
-        # 6. Quick Block Rules & Outbound Parameters
+        # 6. Quick Block Rules & Outbound Parameters (Dynamic from sentinel-core presets)
         quick_block_changed = False
-        quick_keys = ["block_bittorrent", "block_ads", "block_cn", "block_ru", "block_us", "ip_checkers"]
-        quick_outbound_keys = [f"{k}_outbound" for k in quick_keys]
-        if any(key in data for key in quick_keys + quick_outbound_keys):
+        dynamic_quick_keys = [k for k in data.keys() if k.startswith("block_") or k == "ip_checkers" or k == "ip_checkers_outbound"]
+        if dynamic_quick_keys:
             from backend.database import sync_quick_security_rules
             sync_quick_security_rules(data)
-            for key in quick_keys:
-                if key in data:
+            for key in dynamic_quick_keys:
+                if key.endswith("_outbound"):
+                    set_setting(key, str(data.get(key)))
+                else:
                     set_setting(key, "true" if data.get(key) in (True, "true", 1, "1") else "false")
-                if f"{key}_outbound" in data:
-                    set_setting(f"{key}_outbound", str(data.get(f"{key}_outbound")))
             quick_block_changed = True
                     
         if quick_block_changed:
@@ -270,9 +269,7 @@ async def update_settings_api(request: Request):
                     raise ValueError()
                 set_setting("mux_concurrency", str(concurrency))
             except ValueError:
-                lang = get_setting("language", "ru")
-                from backend.i18n import t
-                return {"success": False, "msg": t("invalid_mux_concurrency", lang)}
+                return {"success": False, "msg": t("invalid_mux_concurrency", lang=lang, category="backend")}
         if "mux_xver" in data:
             set_setting("mux_xver", "1" if data.get("mux_xver") in (True, "true", "1", 1) else "0")
 
@@ -289,10 +286,10 @@ async def update_settings_api(request: Request):
         return {
             "success": True,
             "obj": None,
-            "msg": "Настройки успешно сохранены!"
+            "msg": t("settings_saved_success", lang=lang, category="backend")
         }
     except Exception as e:
-        return {"success": False, "msg": f"Ошибка сохранения настроек: {str(e)}"}
+        return {"success": False, "msg": t("settings_save_error", lang=lang, category="backend", error=str(e))}
 
 @router.get("/api/locales")
 async def get_locales_list_api(request: Request):

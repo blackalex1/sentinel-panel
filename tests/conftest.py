@@ -181,28 +181,27 @@ def cleanup_real_core_processes(request):
     try:
         yield
     finally:
-        # Disable logging before calling stop functions.
-        # During xdist worker teardown pytest's log-capture StringIO is already
-        # closed; any logging.* call that reaches it raises ValueError which
-        # kills the worker subprocess via execnet stderr IPC.
-        import logging as _logging
-        _logging.disable(_logging.CRITICAL)
-        try:
-            from backend.xray import stop_xray
-            stop_xray()
-        except Exception:
-            pass
-        try:
-            from backend.singbox import stop_singbox
-            stop_singbox()
-        except Exception:
-            pass
-        try:
-            from backend.hysteria import stop_hysteria
-            stop_hysteria()
-        except Exception:
-            pass
-        _logging.disable(_logging.NOTSET)
+        # Only clean up real cores if this test actually belonged to core_ops group
+        marker = request.node.get_closest_marker("xdist_group")
+        if marker and marker.args and marker.args[0] == "core_ops":
+            import logging as _logging
+            _logging.disable(_logging.CRITICAL)
+            try:
+                from backend.xray import stop_xray
+                stop_xray()
+            except Exception:
+                pass
+            try:
+                from backend.singbox import stop_singbox
+                stop_singbox()
+            except Exception:
+                pass
+            try:
+                from backend.hysteria import stop_hysteria
+                stop_hysteria()
+            except Exception:
+                pass
+            _logging.disable(_logging.NOTSET)
 
 # 2.5 Mock Host Client
 import backend.host_client

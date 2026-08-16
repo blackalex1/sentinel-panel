@@ -29,9 +29,8 @@ def test_singbox_traffic_calculation_per_connection(monkeypatch):
     monkeypatch.setattr("backend.singbox.service.is_singbox_running", lambda: True)
 
     # 2. Poll 1: Active Connection 1 (100MB down, 10MB up)
-    mock_resp_1 = MagicMock()
-    mock_resp_1.status_code = 200
-    mock_resp_1.json.return_value = {
+    from backend.singbox.service import _process_singbox_connection_data
+    mock_data_1 = {
         "connections": [
             {
                 "id": "conn-1",
@@ -41,9 +40,7 @@ def test_singbox_traffic_calculation_per_connection(monkeypatch):
             }
         ]
     }
-
-    with patch("requests.get", return_value=mock_resp_1):
-        query_singbox_traffic()
+    _process_singbox_connection_data(mock_data_1)
 
     with db_session() as session:
         c = session.query(ClientStats).filter_by(email=email).first()
@@ -51,9 +48,7 @@ def test_singbox_traffic_calculation_per_connection(monkeypatch):
         assert c.up == 10 * 1024 * 1024
 
     # 3. Poll 2: Connection 1 updates to (300MB down, 30MB up)
-    mock_resp_2 = MagicMock()
-    mock_resp_2.status_code = 200
-    mock_resp_2.json.return_value = {
+    mock_data_2 = {
         "connections": [
             {
                 "id": "conn-1",
@@ -63,9 +58,7 @@ def test_singbox_traffic_calculation_per_connection(monkeypatch):
             }
         ]
     }
-
-    with patch("requests.get", return_value=mock_resp_2):
-        query_singbox_traffic()
+    _process_singbox_connection_data(mock_data_2)
 
     with db_session() as session:
         c = session.query(ClientStats).filter_by(email=email).first()
@@ -73,9 +66,7 @@ def test_singbox_traffic_calculation_per_connection(monkeypatch):
         assert c.up == 30 * 1024 * 1024
 
     # 4. Poll 3: Connection 1 CLOSED, new Connection 2 opens (50MB down, 5MB up)
-    mock_resp_3 = MagicMock()
-    mock_resp_3.status_code = 200
-    mock_resp_3.json.return_value = {
+    mock_data_3 = {
         "connections": [
             {
                 "id": "conn-2",
@@ -85,9 +76,7 @@ def test_singbox_traffic_calculation_per_connection(monkeypatch):
             }
         ]
     }
-
-    with patch("requests.get", return_value=mock_resp_3):
-        query_singbox_traffic()
+    _process_singbox_connection_data(mock_data_3)
 
     # The user's total traffic must be 300MB (from closed conn-1) + 50MB (from conn-2) = 350MB!
     with db_session() as session:
@@ -96,6 +85,7 @@ def test_singbox_traffic_calculation_per_connection(monkeypatch):
         assert c.up == 35 * 1024 * 1024
 
     stop_singbox()
+
 
 def test_xray_traffic_calculation_single_update_per_email():
     """

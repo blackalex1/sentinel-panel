@@ -15,6 +15,19 @@ def clean_stream_settings(stream_settings: dict) -> dict:
             del reality_opts["allowInsecure"]
         if "fingerprint" in reality_opts and reality_opts["fingerprint"] in ("randomized", "random"):
             del reality_opts["fingerprint"]
+        if "serverNames" in reality_opts:
+            raw_sns = reality_opts["serverNames"]
+            if isinstance(raw_sns, str):
+                raw_sns = [raw_sns]
+            if isinstance(raw_sns, list):
+                cleaned_names = []
+                for sn in raw_sns:
+                    if isinstance(sn, str):
+                        for part in sn.split(","):
+                            p = part.strip()
+                            if p and p not in cleaned_names:
+                                cleaned_names.append(p)
+                reality_opts["serverNames"] = cleaned_names
         for key in ["maxTimeDiff", "max_time_difference"]:
             if key in reality_opts:
                 val = reality_opts[key]

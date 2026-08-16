@@ -12,6 +12,7 @@ from backend.database import authenticate_admin
 from backend.auth_utils import (
     ACTIVE_SESSIONS, CSRF_TOKENS, decoy_response, verify_telegram_webapp, check_auth
 )
+from backend.i18n import t, get_lang
 
 router = APIRouter()
 
@@ -97,11 +98,12 @@ async def get_csrf_token(request: Request):
 async def login_api(request: Request, response: Response):
     """Login with username and password (JSON & Form)."""
     client_ip = request.client.host if request.client else "unknown"
+    lang = get_lang(request)
     
     from backend.database import get_setting
     banned_ips = get_setting("banned_login_ips", "")
     if client_ip in [ip.strip() for ip in banned_ips.split(",") if ip.strip()]:
-        return JSONResponse(status_code=403, content={"success": False, "msg": "Ваш IP-адрес заблокирован."})
+        return JSONResponse(status_code=403, content={"success": False, "msg": t("login_ip_banned", lang=lang, category="backend")})
         
     content_type = request.headers.get("content-type", "")
     uname = None
@@ -132,7 +134,7 @@ async def login_api(request: Request, response: Response):
         from backend.audit import log_action
         period = int(get_setting("login_attempts_period", str(settings.LOGIN_ATTEMPTS_PERIOD)))
         log_action("system", "login_rate_limited", target=client_ip, details=f"IP {client_ip} exceeded max login attempts. Blocked for {period}s.")
-        return JSONResponse(status_code=429, content={"success": False, "msg": f"Слишком много попыток входа. Пожалуйста, подождите {period} сек."})
+        return JSONResponse(status_code=429, content={"success": False, "msg": t("login_rate_limited", lang=lang, category="backend", period=period)})
         
     record_attempt(client_ip)
         
@@ -182,7 +184,7 @@ async def login_api(request: Request, response: Response):
                 if not totp_verified:
                     if totp_active and code:
                         log_action(uname, "login_2fa_failure", target=client_ip, details="Invalid 2FA code")
-                        return {"success": False, "msg": "Неверный код двухфакторной аутентификации"}
+                        return {"success": False, "msg": t("login_invalid_2fa_code", lang=lang, category="backend")}
                         
                     if telegram_active:
                         tg_token = secrets.token_hex(16)
@@ -224,8 +226,8 @@ async def login_api(request: Request, response: Response):
                             temp_bot = Bot(token=bot_token)
                             kb = InlineKeyboardMarkup(inline_keyboard=[
                                 [
-                                    InlineKeyboardButton(text="✅ Да, разрешить", callback_data=f"tg_2fa_approve:{tg_token}"),
-                                    InlineKeyboardButton(text="❌ Заблокировать IP", callback_data=f"tg_2fa_block:{tg_token}")
+                                    InlineKeyboardButton(text=t("tg_2fa_btn_approve", lang=lang, category="backend"), callback_data=f"tg_2fa_approve:{tg_token}"),
+                                    InlineKeyboardButton(text=t("tg_2fa_btn_block_ip", lang=lang, category="backend"), callback_data=f"tg_2fa_block:{tg_token}")
                                 ]
                             ])
                             
@@ -235,7 +237,7 @@ async def login_api(request: Request, response: Response):
                                 try:
                                     await bot_inst.send_message(
                                         chat_id=chat,
-                                        text=f"🚨 <b>Попытка входа в панель с IP <code>{ip}</code>. Это вы?</b>",
+                                        text=t("tg_2fa_alert_text", lang=lang, category="backend", ip=ip),
                                         reply_markup=keyboard,
                                         parse_mode="HTML"
                                     )
@@ -256,10 +258,10 @@ async def login_api(request: Request, response: Response):
                             "requires_2fa": True,
                             "type": "both" if totp_active else "tg_2fa",
                             "token": tg_token,
-                            "msg": "Требуется подтверждение входа"
+                            "msg": t("login_requires_approval", lang=lang, category="backend")
                         }
                     else:
-                        return {"success": True, "requires_2fa": True, "type": "totp", "msg": "Требуется двухфакторная аутентификация"}
+                        return {"success": True, "requires_2fa": True, "type": "totp", "msg": t("login_requires_2fa", lang=lang, category="backend")}
 
         session_id = secrets.token_hex(16)
         
@@ -281,14 +283,15 @@ async def login_api(request: Request, response: Response):
             max_age=timeout_days * 24 * 3600
         )
         log_action(uname, "login_success", target=client_ip, details="Web password login success")
-        return {"success": True, "msg": "Успешный вход"}
+        return {"success": True, "msg": t("login_success", lang=lang, category="backend")}
         
     log_action(uname, "login_failure", target=client_ip, details="Invalid password")
-    return {"success": False, "msg": "Неверный логин или пароль"}
+    return {"success": False, "msg": t("login_invalid_credentials", lang=lang, category="backend")}
 
 @router.post("/api/auth/telegram")
 async def telegram_webapp_auth(request: Request, response: Response, payload: dict):
     """Auth via Telegram WebApp with initData signature verification."""
+    lang = get_lang(request)
     init_data = payload.get("initData")
     if not init_data:
         return JSONResponse(status_code=400, content={"success": False, "msg": "Missing initData"})
@@ -298,7 +301,7 @@ async def telegram_webapp_auth(request: Request, response: Response, payload: di
     user = verify_telegram_webapp(init_data)
     if not user:
         log_action("unknown_tg", "login_telegram_failure", target=client_ip, details="Invalid Telegram webapp signature")
-        return JSONResponse(status_code=401, content={"success": False, "msg": "Неверная цифровая подпись Telegram"})
+        return JSONResponse(status_code=401, content={"success": False, "msg": t("login_tg_invalid_signature", lang=lang, category="backend")})
         
     tg_id = str(user.get("id"))
     username_tg = user.get("username") or f"tg_{tg_id}"
@@ -309,7 +312,7 @@ async def telegram_webapp_auth(request: Request, response: Response, payload: di
     if not allowed_ids or tg_id not in allowed_ids:
         logging.warning(f"Unauthorized Telegram login attempt: ID {tg_id} ({user.get('username')})")
         log_action(username_tg, "login_telegram_failure", target=client_ip, details=f"Telegram ID {tg_id} not in whitelist")
-        return JSONResponse(status_code=403, content={"success": False, "msg": "Ваш Telegram ID отсутствует в белом списке"})
+        return JSONResponse(status_code=403, content={"success": False, "msg": t("login_tg_not_whitelisted", lang=lang, category="backend")})
 
     # Проверяем статус TOTP 2FA для основного администратора.
     # Если TOTP включён, вход через Telegram Mini App без кода недопустим.
@@ -323,14 +326,14 @@ async def telegram_webapp_auth(request: Request, response: Response, payload: di
                        details="Telegram Mini App login blocked: TOTP 2FA is enabled")
             return JSONResponse(status_code=403, content={
                 "success": False,
-                "msg": "Вход через Telegram заблокирован: включена двухфакторная аутентификация (TOTP). Используйте форму входа."
+                "msg": t("login_tg_blocked_totp_active", lang=lang, category="backend")
             })
         
     if not check_rate_limit(client_ip):
         from backend.audit import log_action
         period = int(get_setting("login_attempts_period", str(settings.LOGIN_ATTEMPTS_PERIOD)))
         log_action("system", "login_rate_limited", target=client_ip, details=f"IP {client_ip} exceeded max Telegram webapp login attempts. Blocked for {period}s.")
-        return JSONResponse(status_code=429, content={"success": False, "msg": f"Слишком много попыток входа. Пожалуйста, подождите {period} сек."})
+        return JSONResponse(status_code=429, content={"success": False, "msg": t("login_rate_limited", lang=lang, category="backend", period=period)})
         
     record_attempt(client_ip)
 

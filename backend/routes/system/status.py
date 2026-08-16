@@ -6,6 +6,7 @@ from backend.host_client import host_client
 from backend.xray import is_xray_running, get_installed_xray_version
 from backend.hysteria import is_hysteria_running, get_installed_hysteria_version
 import backend.routes.system
+from backend.i18n import t, get_lang
 
 router = APIRouter()
 
@@ -45,13 +46,21 @@ async def server_status_api(request: Request):
     disk_total = _cached_stats["disk"]["total"]
     disk_percent = _cached_stats["disk"]["percent"]
 
-    # Получаем версию xray, hysteria и sing-box
-    xray_status = "running" if is_xray_running() else "stopped"
-    hysteria_status = "running" if is_hysteria_running() else "stopped"
+    # Получаем статус xray, hysteria и sing-box через sentinel-core супервизор
+    core_status = {}
+    try:
+        from backend.sentinel_core_bridge import get_cores_status
+        core_status = get_cores_status() or {}
+    except Exception:
+        pass
+
+    xray_status = "running" if (core_status.get("xray", {}).get("running") or is_xray_running()) else "stopped"
+    hysteria_status = "running" if (core_status.get("hysteria2", {}).get("running") or is_hysteria_running()) else "stopped"
     
+    lang = get_lang(request)
     from backend.singbox import is_singbox_running, get_installed_singbox_version
-    singbox_status = "running" if is_singbox_running() else "stopped"
-    singbox_version = get_installed_singbox_version() or "Неизвестно"
+    singbox_status = "running" if (core_status.get("sing-box", {}).get("running") or is_singbox_running()) else "stopped"
+    singbox_version = get_installed_singbox_version() or t("status_unknown", lang=lang, category="backend")
     
     return {
         "success": True,

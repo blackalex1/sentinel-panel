@@ -1,26 +1,26 @@
-<div id="links-modal" class="modal" style="z-index: 1100;">
-    <div class="glass-card modal-card" style="max-width: 620px; width: 95%;">
-        <div class="modal-header">
-            <h2 data-i18n="links_modal_title">Ссылки подключения</h2>
-            <button class="btn close-modal-btn"><i class="fa-solid fa-xmark"></i></button>
-        </div>
-        <div class="modal-body">
-            <div class="input-group">
-                <div class="copy-input-group">
-                    <input type="text" id="import-link-input" readonly>
-                    <button class="btn copy-btn" data-target="import-link-input" title="Скопировать" data-i18n-title="links_copy_btn"><i class="fa-regular fa-copy"></i></button>
-                </div>
-            </div>
-            <div id="mihomo-container" class="input-group" style="margin-top: 15px; display: none;">
-                <label style="font-size: 0.85rem; color: var(--text-secondary, #94a3b8); margin-bottom: 5px; display: block;" data-i18n="links_mihomo_label">Mihomo / Clash Meta (YAML):</label>
-                <div style="position: relative;">
-                    <textarea id="mihomo-link-input" readonly rows="8" style="width: 100%; min-height: 180px; font-family: monospace; font-size: 0.85rem; line-height: 1.5; background: rgba(15, 23, 42, 0.6); color: #e2e8f0; border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; padding: 10px 42px 10px 12px; resize: vertical; box-sizing: border-box;"></textarea>
-                    <button class="btn icon-btn copy-btn" data-target="mihomo-link-input" title="Скопировать Mihomo YAML" data-i18n-title="links_copy_mihomo_btn" style="position: absolute; right: 8px; top: 8px; width: 30px; height: 30px; padding: 0; display: inline-flex; align-items: center; justify-content: center; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15); border-radius: 6px; color: var(--text-color); cursor: pointer; transition: all 0.2s ease;"><i class="fa-regular fa-copy"></i></button>
-                </div>
-            </div>
-            <div id="qrcode-container" class="qr-container">
-                <!-- QR-код рендерится сюда -->
-            </div>
-        </div>
-    </div>
+<div class="modal" id="links-modal" style="z-index: 1100;">
+<div class="glass-card modal-card" style="max-width: 620px; width: 95%;">
+<div class="modal-header">
+<h2 data-i18n="links_modal_title"></h2>
+<button class="btn close-modal-btn"><i class="fa-solid fa-xmark"></i></button>
+</div>
+<div class="modal-body">
+<div class="input-group">
+<div class="copy-input-group">
+<input id="import-link-input" readonly="" type="text"/>
+<button class="btn copy-btn" data-i18n-title="links_copy_btn" data-target="import-link-input" title=""><i class="fa-regular fa-copy"></i></button>
+</div>
+</div>
+<div class="input-group" id="mihomo-container" style="margin-top: 15px; display: none;">
+<label data-i18n="links_mihomo_label" style="font-size: 0.85rem; color: var(--text-secondary, #94a3b8); margin-bottom: 5px; display: block;"></label>
+<div style="position: relative;">
+<textarea id="mihomo-link-input" readonly="" rows="8" style="width: 100%; min-height: 180px; font-family: monospace; font-size: 0.85rem; line-height: 1.5; background: rgba(15, 23, 42, 0.6); color: #e2e8f0; border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; padding: 10px 42px 10px 12px; resize: vertical; box-sizing: border-box;"></textarea>
+<button class="btn icon-btn copy-btn" data-i18n-title="links_copy_mihomo_btn" data-target="mihomo-link-input" style="position: absolute; right: 8px; top: 8px; width: 30px; height: 30px; padding: 0; display: inline-flex; align-items: center; justify-content: center; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15); border-radius: 6px; color: var(--text-color); cursor: pointer; transition: all 0.2s ease;" title=""><i class="fa-regular fa-copy"></i></button>
+</div>
+</div>
+<div class="qr-container" id="qrcode-container">
+
+</div>
+</div>
+</div>
 </div>

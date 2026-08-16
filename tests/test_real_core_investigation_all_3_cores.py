@@ -1,6 +1,5 @@
 import json
 import time
-import subprocess
 import pytest
 from pathlib import Path
 import backend.routes.security as sec_facade
@@ -15,6 +14,7 @@ from backend.config import XRAY_BIN_PATH, SINGBOX_BIN_PATH
 from backend.hysteria import HYSTERIA_BIN_PATH
 
 
+@pytest.mark.xdist_group("core_ops")
 def test_remote_server_all_3_real_core_binaries_present():
     """
     Проверяет установку и исполняемость всех 3 нативных Linux-бинарников на сервере:
@@ -26,15 +26,16 @@ def test_remote_server_all_3_real_core_binaries_present():
     assert SINGBOX_BIN_PATH.exists(), f"sing-box binary missing at {SINGBOX_BIN_PATH}"
     assert HYSTERIA_BIN_PATH.exists(), f"Hysteria binary missing at {HYSTERIA_BIN_PATH}"
 
-    # Verify execution of each binary
-    res_xray = subprocess.run([str(XRAY_BIN_PATH), "version"], capture_output=True, text=True, timeout=5)
-    assert res_xray.returncode == 0 or "Xray" in res_xray.stdout
+    # Verify execution of each binary via sentinel-core
+    from backend.sentinel_core_bridge import get_core_version
+    v_xray = get_core_version("xray", str(XRAY_BIN_PATH))
+    assert v_xray != "Not Installed" and v_xray != "", f"Xray version check failed: {v_xray}"
 
-    res_sb = subprocess.run([str(SINGBOX_BIN_PATH), "version"], capture_output=True, text=True, timeout=5)
-    assert res_sb.returncode == 0 or "sing-box" in res_sb.stdout
+    v_sb = get_core_version("sing-box", str(SINGBOX_BIN_PATH))
+    assert v_sb != "Not Installed" and v_sb != "", f"sing-box version check failed: {v_sb}"
 
-    res_hy = subprocess.run([str(HYSTERIA_BIN_PATH), "version"], capture_output=True, text=True, timeout=5)
-    assert "Hysteria" in res_hy.stdout or "version" in res_hy.stdout.lower() or res_hy.returncode == 0
+    v_hy = get_core_version("hysteria2", str(HYSTERIA_BIN_PATH))
+    assert v_hy != "Not Installed" and v_hy != "", f"Hysteria version check failed: {v_hy}"
 
 
 def test_investigation_on_real_xray_logs(tmp_path):

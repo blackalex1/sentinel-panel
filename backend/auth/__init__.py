@@ -7,6 +7,7 @@ from backend.auth.sessions import (
 )
 from backend.auth.verification import (
     check_auth,
+    check_ws_auth,
     verify_node_token,
     verify_telegram_webapp,
 )
@@ -27,6 +28,7 @@ __all__ = [
     "ACTIVE_SESSIONS",
     "CSRF_TOKENS",
     "check_auth",
+    "check_ws_auth",
     "verify_node_token",
     "verify_telegram_webapp",
     "DecoyException",

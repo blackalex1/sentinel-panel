@@ -16,7 +16,7 @@ export function setupBackupsListeners() {
             const encrypt = document.getElementById("setting-backup-encrypt").checked;
 
             if (isNaN(rotation) || rotation <= 0) {
-                showToast("Количество бэкапов для ротации должно быть целым положительным числом", "error");
+                showToast(t("settings_backup_rotation_invalid", "Количество бэкапов для ротации должно быть целым положительным числом"), "error");
                 return;
             }
 
@@ -95,12 +95,12 @@ export function setupBackupsListeners() {
             try {
                 const res = await apiFetch("/api/system/backup/clear", { method: "POST" });
                 if (res && res.success) {
-                    showToast(res.msg || "Локальные бэкапы успешно удалены!");
+                    showToast(res.msg || t("toast_backup_cleared", "Локальные бэкапы успешно удалены!"));
                 } else {
-                    showToast(res ? res.msg : "Не удалось удалить локальные бэкапы", "error");
+                    showToast(res ? res.msg : t("toast_backup_clear_fail", "Не удалось удалить локальные бэкапы"), "error");
                 }
             } catch (err) {
-                showToast("Ошибка при удалении бэкапов: " + err, "error");
+                showToast(t("toast_backup_clear_error", "Ошибка при удалении бэкапов: ") + err, "error");
             } finally {
                 btnClearBackups.disabled = false;
             }
@@ -130,7 +130,7 @@ export function setupBackupsListeners() {
 
             btnTriggerUpload.disabled = true;
             const originalText = btnTriggerUpload.innerHTML;
-            btnTriggerUpload.innerHTML = `<i class="fa-solid fa-circle-notch fa-spin"></i> Восстановление...`;
+            btnTriggerUpload.innerHTML = `<i class="fa-solid fa-circle-notch fa-spin"></i> ${t("settings_backup_restoring", "Восстановление...")}`;
 
             try {
                 let res = await apiFetch("/api/system/backup/upload", {
@@ -156,15 +156,15 @@ export function setupBackupsListeners() {
                 }
                 
                 if (res && res.success) {
-                    showToast(res.msg || "База данных успешно восстановлена!");
+                    showToast(res.msg || t("toast_backup_restore_success", "База данных успешно восстановлена!"));
                     setTimeout(() => {
                         window.location.reload();
                     }, 2000);
                 } else {
-                    showToast(res ? res.msg : "Не удалось восстановить бэкап", "error");
+                    showToast(res ? res.msg : t("toast_backup_restore_fail", "Не удалось восстановить бэкап"), "error");
                 }
             } catch (err) {
-                showToast("Ошибка при загрузке бэкапа: " + err, "error");
+                showToast(t("toast_backup_upload_error", "Ошибка при загрузке бэкапа: ") + err, "error");
             } finally {
                 btnTriggerUpload.disabled = false;
                 btnTriggerUpload.innerHTML = originalText;
@@ -293,10 +293,10 @@ export function setupBackupsListeners() {
                             if (btnSaveBackups) btnSaveBackups.click();
                         }
                     } else {
-                        showToast(res ? res.msg : "Не удалось сохранить пароль", "error");
+                        showToast(res ? res.msg : t("toast_backup_pwd_save_fail", "Не удалось сохранить пароль"), "error");
                     }
                 } catch (err) {
-                    showToast("Ошибка при сохранении пароля: " + err, "error");
+                    showToast(t("toast_backup_pwd_save_error", "Ошибка при сохранении пароля: ") + err, "error");
                 } finally {
                     btnSave.disabled = false;
                 }
@@ -342,10 +342,10 @@ export function setupBackupsListeners() {
                     document.getElementById("setting-backup-new-password").value = "";
                     document.getElementById("setting-backup-confirm-password").value = "";
                 } else {
-                    showToast(res ? res.msg : "Не удалось изменить пароль", "error");
+                    showToast(res ? res.msg : t("toast_backup_pwd_change_fail", "Не удалось изменить пароль"), "error");
                 }
             } catch (err) {
-                showToast("Ошибка при смене пароля: " + err, "error");
+                showToast(t("toast_backup_pwd_change_error", "Ошибка при смене пароля: ") + err, "error");
             } finally {
                 btnChangeBackupPassword.disabled = false;
             }

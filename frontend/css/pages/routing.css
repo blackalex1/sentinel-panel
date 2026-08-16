@@ -26,3 +26,44 @@
     padding: 14px 18px;
     font-size: 13.5px;
 }
+
+/* Outbound Schema-Driven Modal Styles */
+#outbound-schema-container .tab-panel {
+    display: none;
+    animation: fadeInTab 0.15s ease-in-out;
+}
+
+#outbound-schema-container .tab-panel.active-panel {
+    display: block;
+}
+
+@keyframes fadeInTab {
+    from { opacity: 0; transform: translateY(4px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+#outbound-modal-tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-bottom: 22px;
+    padding-bottom: 14px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+#outbound-modal-tabs .modal-tab-btn {
+    padding: 9px 18px;
+    font-size: 13.5px;
+    font-weight: 600;
+    border-radius: var(--radius-md);
+    transition: all var(--transition-fast);
+    display: inline-flex;
+    align-items: center;
+    cursor: pointer;
+}
+
+#outbound-modal-tabs .modal-tab-btn.active {
+    background: var(--primary);
+    color: #fff;
+    box-shadow: 0 0 16px rgba(139, 92, 246, 0.4);
+}

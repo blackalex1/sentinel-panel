@@ -1,35 +1,30 @@
-<!-- Модальное окно Импорта Пресета Маршрутизации -->
-<div id="routing-preset-import-modal" class="modal" style="z-index: 1100;">
-    <div class="glass-card modal-card" style="background: hsl(223, 47%, 11%) !important; width: 500px; max-width: 95%;">
-        <div class="modal-header">
-            <h3>Импорт пресета маршрутизации</h3>
-            <button class="btn icon-btn close-modal-btn"><i class="fa-solid fa-xmark"></i></button>
-        </div>
-        <form id="routing-preset-import-form">
-            <div class="input-group">
-                <label for="preset-template-select">Выберите готовый шаблон или загрузите файл</label>
-                <select id="preset-template-select" class="glass-select">
-                    <option value="custom">-- Загрузить собственный JSON файл --</option>
-                    <option value="ai_bypass">Маршрутизация OpenAI / ChatGPT / AI в VPN</option>
-                    <option value="block_ads_torrent">Блокировка рекламы и BitTorrent</option>
-                    <option value="split_ru_direct">Разделение RU-трафика (Direct) и VPN</option>
-                </select>
-            </div>
 
-            <div class="input-group" id="preset-file-group">
-                <label for="preset-json-file">Загрузить файл пресета (.json)</label>
-                <input type="file" id="preset-json-file" accept=".json">
-            </div>
-
-            <div class="input-group">
-                <label for="preset-mode-select">Режим импорта</label>
-                <select id="preset-mode-select" class="glass-select">
-                    <option value="append" selected>Добавить к существующим правилам (Append)</option>
-                    <option value="overwrite">Заменить текущие правила (Overwrite)</option>
-                </select>
-            </div>
-
-            <button type="submit" class="btn primary-btn" style="width: 100%; margin-top: 15px;"><i class="fa-solid fa-file-import" style="margin-right: 5px;"></i>Импортировать правила</button>
-        </form>
-    </div>
+<div class="modal" id="routing-preset-import-modal" style="z-index: 1100;">
+<div class="glass-card modal-card" style="background: hsl(223, 47%, 11%) !important; width: 500px; max-width: 95%;">
+<div class="modal-header">
+<h3 data-i18n="routing_preset_import_title"></h3>
+<button class="btn icon-btn close-modal-btn"><i class="fa-solid fa-xmark"></i></button>
+</div>
+<form id="routing-preset-import-form">
+<div class="input-group">
+<label data-i18n="routing_preset_template_label" for="preset-template-select"></label>
+<select class="glass-select" id="preset-template-select">
+<option data-i18n="routing_preset_opt_custom" value="custom"></option>
+<!-- Dynamically populated from sentinel-core presets -->
+</select>
+</div>
+<div class="input-group" id="preset-file-group">
+<label data-i18n="routing_preset_file_label" for="preset-json-file"></label>
+<input accept=".json" id="preset-json-file" type="file"/>
+</div>
+<div class="input-group">
+<label data-i18n="routing_preset_mode_label" for="preset-mode-select"></label>
+<select class="glass-select" id="preset-mode-select">
+<option data-i18n="routing_preset_mode_append" selected="" value="append"></option>
+<option data-i18n="routing_preset_mode_overwrite" value="overwrite"></option>
+</select>
+</div>
+<button class="btn primary-btn" style="width: 100%; margin-top: 15px;" type="submit"><i class="fa-solid fa-file-import" style="margin-right: 5px;"></i><span data-i18n="routing_preset_btn_import"></span></button>
+</form>
+</div>
 </div>

@@ -3,19 +3,11 @@ import { showToast } from "../../../../ui.js";
 import { t } from "../../../../i18n.js";
 import { loadOutbounds } from "../../../routing-outbounds.js";
 import { validateOutboundForm } from "../validation.js";
+import { getCurrentOutboundValues } from "../modal_manager.js";
 
 export function bindSubmitListener() {
     const outboundForm = document.getElementById("outbound-form");
     if (!outboundForm) return;
-
-    outboundForm.querySelectorAll("input, select, textarea").forEach(el => {
-        el.addEventListener("input", () => {
-            el.classList.remove("input-invalid");
-        });
-        el.addEventListener("change", () => {
-            el.classList.remove("input-invalid");
-        });
-    });
 
     outboundForm.addEventListener("submit", async (e) => {
         e.preventDefault();
@@ -23,214 +15,202 @@ export function bindSubmitListener() {
         if (!validateOutboundForm()) {
             return;
         }
-        
+
         const id = document.getElementById("ob-id").value;
-        const remark = document.getElementById("ob-remark").value.trim();
-        const protocol = document.getElementById("ob-protocol").value;
-        const tag = document.getElementById("ob-tag").value.trim();
-        const enable = document.getElementById("ob-enable").checked ? 1 : 0;
+        const vals = getCurrentOutboundValues() || {};
         
-        // Prepare settings JSON
+        // Read top fields
+        const remark = (document.getElementById("ob-remark") ? document.getElementById("ob-remark").value.trim() : vals.remark) || "Outbound";
+        const protocol = (document.getElementById("ob-protocol") ? document.getElementById("ob-protocol").value : vals.protocol) || "vless";
+        const tag = (document.getElementById("ob-tag") ? document.getElementById("ob-tag").value.trim() : vals.tag) || `${protocol}-${Math.floor(Math.random()*1000)}`;
+        const enable = (document.getElementById("ob-enable") ? document.getElementById("ob-enable").checked : (vals.enable !== false)) ? 1 : 0;
+        
+        const host = (document.getElementById("ob-host") ? document.getElementById("ob-host").value.trim() : vals.host) || "";
+        const port = (document.getElementById("ob-port") ? (parseInt(document.getElementById("ob-port").value) || 443) : (parseInt(vals.port) || 443));
+        const uuid = (document.getElementById("ob-uuid") ? document.getElementById("ob-uuid").value.trim() : (vals.uuid || vals.password)) || "";
+        const password = (document.getElementById("ob-password") ? document.getElementById("ob-password").value.trim() : (vals.password || vals.uuid)) || "";
+        
         let settings = {};
         let streamSettings = {};
-        
-        if (protocol === "wireguard") {
-            const privateKey = document.getElementById("ob-wg-private-key").value.trim();
-            const addressesInput = document.getElementById("ob-wg-addresses").value.trim();
-            const addressList = addressesInput ? addressesInput.split(",").map(s => s.trim()).filter(Boolean) : [];
-            
-            const reservedInput = document.getElementById("ob-wg-reserved").value.trim();
-            let reserved = [];
-            if (reservedInput) {
-                reserved = reservedInput.split(",").map(s => parseInt(s.trim())).filter(x => !isNaN(x));
-            }
-            
-            const peerPublicKey = document.getElementById("ob-wg-peer-public-key").value.trim();
-            const peerEndpoint = document.getElementById("ob-wg-endpoint").value.trim();
-            
-            const mtuInput = document.getElementById("ob-wg-mtu").value.trim();
-            const mtu = mtuInput ? parseInt(mtuInput) : null;
-            
+
+        if (protocol === "freedom" || protocol === "direct") {
+            const domainStrategy = document.getElementById("ob-domain-strategy") ? document.getElementById("ob-domain-strategy").value : (vals.domainStrategy || "AsIs");
+            settings = { domainStrategy };
+        } else if (protocol === "blackhole" || protocol === "block") {
+            settings = { response: { type: "none" } };
+        } else if (protocol === "wireguard") {
+            const secretKey = (document.getElementById("ob-private-key") ? document.getElementById("ob-private-key").value.trim() : vals.privateKey) || "";
+            const peerPublicKey = (document.getElementById("ob-peer-public-key") ? document.getElementById("ob-peer-public-key").value.trim() : vals.peerPublicKey) || "";
+            const localAddrRaw = (document.getElementById("ob-local-address") ? document.getElementById("ob-local-address").value.trim() : vals.localAddress) || "";
+            const addressList = localAddrRaw ? localAddrRaw.split(",").map(s => s.trim()).filter(Boolean) : [];
+            const mtu = document.getElementById("ob-mtu") ? (parseInt(document.getElementById("ob-mtu").value) || 1420) : (parseInt(vals.mtu) || 1420);
+            const reservedRaw = (document.getElementById("ob-reserved") ? document.getElementById("ob-reserved").value.trim() : vals.reserved) || "";
+            const reserved = reservedRaw ? reservedRaw.split(",").map(s => parseInt(s.trim())).filter(x => !isNaN(x)) : [];
+
             settings = {
-                "secretKey": privateKey,
-                "address": addressList,
-                "peers": [{
-                    "publicKey": peerPublicKey,
-                    "endpoint": peerEndpoint
+                secretKey,
+                address: addressList,
+                peers: [{
+                    publicKey: peerPublicKey,
+                    endpoint: host ? `${host}:${port}` : ""
+                }],
+                mtu
+            };
+            if (reserved.length > 0) settings.reserved = reserved;
+        } else if (protocol === "vless") {
+            const flow = document.getElementById("ob-flow") ? document.getElementById("ob-flow").value : (vals.flow || "");
+            const encryption = (document.getElementById("ob-vless-encryption") ? document.getElementById("ob-vless-encryption").value.trim() : (vals.encryption || "none")) || "none";
+            settings = {
+                vnext: [{
+                    address: host,
+                    port: port,
+                    users: [{
+                        id: uuid || password,
+                        encryption: encryption,
+                        flow: flow
+                    }]
                 }]
             };
-            
-            if (reserved.length > 0) {
-                settings.reserved = reserved;
-            }
-            if (mtu) {
-                settings.mtu = mtu;
-            }
-        } else if (protocol === "socks" || protocol === "http" || protocol === "shadowsocks" || protocol === "vless" || protocol === "hysteria" || protocol === "hysteria2") {
-            const address = document.getElementById("ob-address").value.trim();
-            const rawPort = document.getElementById("ob-port").value.trim();
-            const port = (rawPort.includes("-") || rawPort.includes(",")) ? rawPort : (parseInt(rawPort) || 443);
-            const password = document.getElementById("ob-password").value.trim();
-            
-            if (!address || (!rawPort.includes("-") && !rawPort.includes(",") && isNaN(parseInt(rawPort)))) {
-                showToast(t("routing_err_host_port", "Укажите адрес и порт сервера прокси"), "warning");
-                return;
-            }
-            
-            if (protocol === "shadowsocks") {
-                const method = document.getElementById("ob-ss-method").value;
-                settings = {
-                    "servers": [{
-                        "address": address,
-                        "port": port,
-                        "password": password,
-                        "method": method
-                    }]
+
+            const security = (document.getElementById("ob-security") ? document.getElementById("ob-security").value : (vals.security || "reality")) || "none";
+            const network = (document.getElementById("ob-network") ? document.getElementById("ob-network").value : (vals.network || "tcp")) || "tcp";
+            const sni = (document.getElementById("ob-sni") ? document.getElementById("ob-sni").value.trim() : vals.sni) || "";
+            const fp = (document.getElementById("ob-fp") ? document.getElementById("ob-fp").value : (vals.fingerprint || "chrome")) || "chrome";
+            const path = (document.getElementById("ob-path") ? document.getElementById("ob-path").value.trim() : vals.path) || "";
+            const wsHost = (document.getElementById("ob-ws-host") ? document.getElementById("ob-ws-host").value.trim() : vals.wsHost) || "";
+            const serviceName = (document.getElementById("ob-service-name") ? document.getElementById("ob-service-name").value.trim() : vals.serviceName) || "";
+
+            streamSettings = {
+                network: network,
+                security: security
+            };
+
+            if (network === "ws" || network === "httpupgrade" || network === "xhttp") {
+                streamSettings.wsSettings = {
+                    path: path || "/",
+                    headers: wsHost ? { Host: wsHost } : {}
                 };
-            } else if (protocol === "vless") {
-                const flow = document.getElementById("ob-flow").value;
-                const encryption = document.getElementById("ob-encryption").value.trim() || "none";
-                settings = {
-                    "vnext": [{
-                        "address": address,
-                        "port": port,
-                        "users": [{
-                            "id": password,
-                            "encryption": encryption,
-                            "flow": flow
-                        }]
-                    }]
-                };
-                
-                const security = document.getElementById("ob-security").value;
-                const sni = document.getElementById("ob-sni").value.trim();
-                streamSettings = {
-                    "network": "tcp",
-                    "security": security
-                };
-                
-                if (security === "tls") {
-                    const alpnInput = document.getElementById("ob-alpn").value.trim();
-                    const alpn = alpnInput ? alpnInput.split(",").map(s => s.trim()).filter(Boolean) : [];
-                    const allowInsecure = document.getElementById("ob-allow-insecure").checked;
-                    streamSettings.tlsSettings = {
-                        "serverName": sni,
-                        "allowInsecure": allowInsecure
-                    };
-                    const pinnedShaInput = document.getElementById("ob-pinned-sha256").value.trim();
-                    if (pinnedShaInput) {
-                        const pins = pinnedShaInput.split(/[,~]+/)
-                            .map(s => s.replace(/:/g, "").trim().toLowerCase())
-                            .filter(Boolean);
-                        if (pins.length > 0) {
-                            streamSettings.tlsSettings.pinnedPeerCertSha256 = pins.join("~");
-                        }
-                    }
-                    if (alpn.length > 0) {
-                        streamSettings.tlsSettings.alpn = alpn;
-                    }
-                } else if (security === "reality") {
-                    const pbk = document.getElementById("ob-pbk").value.trim();
-                    const shortId = document.getElementById("ob-shortid").value.trim();
-                    const fp = document.getElementById("ob-fingerprint").value;
-                    const spx = document.getElementById("ob-spx") ? document.getElementById("ob-spx").value.trim() : "";
-                    streamSettings.realitySettings = {
-                        "serverName": sni,
-                        "publicKey": pbk,
-                        "shortId": shortId,
-                        "fingerprint": fp
-                    };
-                    if (spx) {
-                        streamSettings.realitySettings.spiderX = spx;
-                    }
-                }
-            } else if (protocol === "hysteria" || protocol === "hysteria2") {
-                settings = {
-                    "version": 2,
-                    "address": address,
-                    "port": port
-                };
-                
-                const sni = document.getElementById("ob-sni").value.trim();
-                const alpnInput = document.getElementById("ob-alpn").value.trim() || "h3";
-                const alpn = alpnInput.split(",").map(s => s.trim()).filter(Boolean);
-                const allowInsecure = document.getElementById("ob-allow-insecure").checked;
-                
-                const upMbps = parseInt(document.getElementById("ob-up-mbps").value);
-                const downMbps = parseInt(document.getElementById("ob-down-mbps").value);
-                
-                let hysteriaSettings = {
-                    "version": 2,
-                    "auth": password
-                };
-                if (!isNaN(upMbps) && upMbps > 0) {
-                    hysteriaSettings.up = `${upMbps} mbps`;
-                }
-                if (!isNaN(downMbps) && downMbps > 0) {
-                    hysteriaSettings.down = `${downMbps} mbps`;
-                }
-                
-                const obfsType = document.getElementById("ob-hysteria-obfs").value;
-                if (obfsType) {
-                    hysteriaSettings.obfs = obfsType;
-                    hysteriaSettings.obfs_type = obfsType;
-                    const obfsPwd = document.getElementById("ob-hysteria-obfs-password").value.trim();
-                    if (obfsPwd) {
-                        hysteriaSettings.obfsPassword = obfsPwd;
-                        hysteriaSettings.obfs_password = obfsPwd;
-                    }
-                }
-                
-                const pinnedShaInput = document.getElementById("ob-pinned-sha256").value.trim();
-                let tlsSettings = {
-                    "serverName": sni,
-                    "alpn": alpn,
-                    "allowInsecure": allowInsecure
-                };
-                if (pinnedShaInput) {
-                    const pins = pinnedShaInput.split(/[,~]+/)
-                        .map(s => s.replace(/:/g, "").trim().toLowerCase())
-                        .filter(Boolean);
-                    if (pins.length > 0) {
-                        tlsSettings.pinnedPeerCertSha256 = pins.join("~");
-                    }
-                }
-                
-                streamSettings = {
-                    "network": "hysteria",
-                    "security": "tls",
-                    "tlsSettings": tlsSettings,
-                    "hysteriaSettings": hysteriaSettings
-                };
-            } else {
-                const username = document.getElementById("ob-username").value.trim();
-                const users = username || password ? [{"user": username, "pass": password}] : [];
-                settings = {
-                    "servers": [{
-                        "address": address,
-                        "port": port,
-                        "users": users
-                    }]
+            } else if (network === "grpc") {
+                streamSettings.grpcSettings = {
+                    serviceName: serviceName || "grpc"
                 };
             }
+
+            if (security === "reality") {
+                const pbk = (document.getElementById("ob-pbk") ? document.getElementById("ob-pbk").value.trim() : vals.publicKey) || "";
+                const sid = (document.getElementById("ob-sid") ? document.getElementById("ob-sid").value.trim() : vals.shortId) || "";
+                const spx = (document.getElementById("ob-spx") ? document.getElementById("ob-spx").value.trim() : (vals.spiderX || "/")) || "/";
+                streamSettings.realitySettings = {
+                    serverName: sni,
+                    publicKey: pbk,
+                    shortId: sid,
+                    spiderX: spx,
+                    fingerprint: fp
+                };
+            } else if (security === "tls") {
+                const alpnRaw = (document.getElementById("ob-alpn") ? document.getElementById("ob-alpn").value.trim() : vals.alpn) || "";
+                const allowInsecure = document.getElementById("ob-insecure") ? document.getElementById("ob-insecure").checked : Boolean(vals.allowInsecure);
+                streamSettings.tlsSettings = {
+                    serverName: sni,
+                    alpn: alpnRaw ? alpnRaw.split(",").map(s => s.trim()) : ["h2", "http/1.1"],
+                    allowInsecure: allowInsecure,
+                    fingerprint: fp
+                };
+            }
+        } else if (protocol === "hysteria2" || protocol === "hysteria") {
+            const upMbps = document.getElementById("ob-up-mbps") ? (parseInt(document.getElementById("ob-up-mbps").value) || 100) : (parseInt(vals.upMbps) || 100);
+            const downMbps = document.getElementById("ob-down-mbps") ? (parseInt(document.getElementById("ob-down-mbps").value) || 100) : (parseInt(vals.downMbps) || 100);
+            const sni = (document.getElementById("ob-sni") ? document.getElementById("ob-sni").value.trim() : vals.sni) || "";
+            const allowInsecure = document.getElementById("ob-insecure") ? document.getElementById("ob-insecure").checked : Boolean(vals.allowInsecure);
+            const pinSha = (document.getElementById("ob-pin-sha256") ? document.getElementById("ob-pin-sha256").value.trim() : vals.pinnedPeerCertSha256) || "";
+            const obfsType = (document.getElementById("ob-obfs-type") ? document.getElementById("ob-obfs-type").value : vals.obfs) || "";
+            const obfsPassword = (document.getElementById("ob-obfs-password") ? document.getElementById("ob-obfs-password").value.trim() : vals.obfsPassword) || "";
+
+            settings = {
+                server: host,
+                port: port,
+                auth: password || uuid,
+                up_mbps: upMbps,
+                down_mbps: downMbps
+            };
+
+            if (obfsType === "salamander") {
+                settings.obfs = {
+                    type: "salamander",
+                    salamander: { password: obfsPassword }
+                };
+            }
+
+            streamSettings = {
+                network: "hysteria",
+                security: "tls",
+                tlsSettings: {
+                    serverName: sni,
+                    allowInsecure: allowInsecure,
+                    pinnedPeerCertSha256: pinSha
+                }
+            };
+        } else if (protocol === "shadowsocks" || protocol === "ss") {
+            const method = (document.getElementById("ob-method") ? document.getElementById("ob-method").value : (vals.method || "2022-blake3-aes-128-gcm")) || "2022-blake3-aes-128-gcm";
+            settings = {
+                servers: [{
+                    address: host,
+                    port: port,
+                    password: password,
+                    method: method
+                }]
+            };
+        } else if (protocol === "trojan") {
+            const sni = (document.getElementById("ob-sni") ? document.getElementById("ob-sni").value.trim() : vals.sni) || "";
+            const allowInsecure = document.getElementById("ob-insecure") ? document.getElementById("ob-insecure").checked : Boolean(vals.allowInsecure);
+            const fp = (document.getElementById("ob-fp") ? document.getElementById("ob-fp").value : (vals.fingerprint || "chrome")) || "chrome";
+
+            settings = {
+                servers: [{
+                    address: host,
+                    port: port,
+                    password: password
+                }]
+            };
+            streamSettings = {
+                network: "tcp",
+                security: "tls",
+                tlsSettings: {
+                    serverName: sni,
+                    allowInsecure: allowInsecure,
+                    fingerprint: fp
+                }
+            };
+        } else if (protocol === "socks" || protocol === "socks5" || protocol === "http") {
+            const user = (document.getElementById("ob-user") ? document.getElementById("ob-user").value.trim() : vals.user) || "";
+            const pass = (document.getElementById("ob-pass") ? document.getElementById("ob-pass").value.trim() : vals.pass) || "";
+            const users = user || pass ? [{ user, pass }] : [];
+            settings = {
+                servers: [{
+                    address: host,
+                    port: port,
+                    users: users
+                }]
+            };
+        } else if (protocol === "warp") {
+            const secretKey = (document.getElementById("ob-private-key") ? document.getElementById("ob-private-key").value.trim() : vals.privateKey) || "";
+            const peerPublicKey = (document.getElementById("ob-peer-public-key") ? document.getElementById("ob-peer-public-key").value.trim() : (vals.peerPublicKey || "bmXOC+F1FxEMF9dyiK2H5/1SUtzH0JuVo51h2wPfgyo=")) || "";
+            settings = {
+                secretKey,
+                address: ["172.16.0.2/32", "2606:4700:110:8f81:85b7:83c8:5087:dfc8/128"],
+                peers: [{
+                    publicKey: peerPublicKey,
+                    endpoint: `${host || "162.159.192.1"}:${port || 2408}`
+                }]
+            };
         }
 
-        // Attach backup failover settings if specified
-        const selectedBackups = Array.isArray(window.selectedBackupOrder) && window.selectedBackupOrder.length > 0 
-            ? [...window.selectedBackupOrder] 
-            : Array.from(document.querySelectorAll(".ob-backup-cb:checked")).map(cb => cb.value);
-        const fallbackStrategy = document.getElementById("ob-fallback-strategy") ? document.getElementById("ob-fallback-strategy").value : "priority";
-        const healthUrl = document.getElementById("ob-health-url").value.trim();
-        const healthIntRaw = document.getElementById("ob-health-interval").value.trim();
-        const healthInterval = healthIntRaw ? parseInt(healthIntRaw) : 15;
-
-        if (selectedBackups.length > 0) {
-            settings.backup_outbounds = selectedBackups;
-            settings.fallback_strategy = fallbackStrategy;
-            if (healthUrl) settings.health_check_url = healthUrl;
-            if (healthInterval) settings.health_check_interval = healthInterval;
+        // Attach fallback route if set
+        const fallbackRoute = document.getElementById("fallback_outbound") ? document.getElementById("fallback_outbound").value : vals.fallback_outbound;
+        if (fallbackRoute) {
+            settings.backup_outbounds = [fallbackRoute];
         }
-        
+
         const url = id ? `/api/routing/outbounds/update/${id}` : "/api/routing/outbounds/create";
         const res = await apiFetch(url, {
             method: "POST",

@@ -1,80 +1,72 @@
 <!-- SECTION 2: NETWORK & SSL -->
 <div class="settings-section-panel" id="sec-network">
-    <!-- CARD 4: Управление SSL (Let's Encrypt Certbot) -->
-    <div class="glass-card settings-card">
-        <h3 data-i18n="settings_ssl_title">Управление SSL (Let's Encrypt Certbot)</h3>
-        <p class="card-desc" data-i18n="settings_ssl_desc">Выпуск сертификата требует, чтобы домен был направлен на этот сервер и порт 80 был свободен.</p>
-        <div class="settings-form-content" style="margin-top: auto;">
-            <div class="input-row" style="display: flex; flex-wrap: wrap; gap: 15px;">
-                <div class="input-group" style="flex: 1 1 150px;">
-                    <label for="setting-ssl-domain" data-i18n="settings_ssl_domain">Доменное имя</label>
-                    <input type="text" id="setting-ssl-domain" placeholder="example.com">
-                </div>
-                <div class="input-group" style="flex: 1 1 150px;">
-                    <label for="setting-ssl-email" data-i18n="settings_ssl_email">Email администратора</label>
-                    <input type="email" id="setting-ssl-email" placeholder="admin@example.com">
-                </div>
-            </div>
 
-            <div style="margin-top: 20px; display: flex; gap: 10px;">
-                <button type="button" id="btn-save-ssl" class="btn primary-btn w-100" style="padding: 10px; font-weight: 600;"><i class="fa-solid fa-floppy-disk"></i> <span data-i18n="settings_btn_save_short">Сохранить</span></button>
-                <button type="button" id="btn-generate-ssl" class="btn secondary-btn w-100" style="padding: 10px; font-weight: 600;"><i class="fa-solid fa-shield-halved"></i> <span data-i18n="settings_ssl_btn_generate">Выпустить сертификат</span></button>
-            </div>
-        </div>
-    </div>
+<div class="glass-card settings-card">
+<h3 data-i18n="settings_ssl_title"></h3>
+<p class="card-desc" data-i18n="settings_ssl_desc"></p>
+<div class="settings-form-content" style="margin-top: auto;">
+<div class="input-row" style="display: flex; flex-wrap: wrap; gap: 15px;">
+<div class="input-group" style="flex: 1 1 150px;">
+<label data-i18n="settings_ssl_domain" for="setting-ssl-domain"></label>
+<input id="setting-ssl-domain" placeholder="example.com" type="text"/>
+</div>
+<div class="input-group" style="flex: 1 1 150px;">
+<label data-i18n="settings_ssl_email" for="setting-ssl-email"></label>
+<input id="setting-ssl-email" placeholder="admin@example.com" type="email"/>
+</div>
+</div>
+<div style="margin-top: 20px; display: flex; gap: 10px;">
+<button class="btn primary-btn w-100" id="btn-save-ssl" style="padding: 10px; font-weight: 600;" type="button"><i class="fa-solid fa-floppy-disk"></i> <span data-i18n="settings_btn_save_short"></span></button>
+<button class="btn secondary-btn w-100" id="btn-generate-ssl" style="padding: 10px; font-weight: 600;" type="button"><i class="fa-solid fa-shield-halved"></i> <span data-i18n="settings_ssl_btn_generate"></span></button>
+</div>
+</div>
+</div>
 
-    <!-- CARD 3: Маскировка панели (Сайт-заглушка) -->
-    <div class="glass-card settings-card">
-        <h3 data-i18n="settings_decoy_title">Маскировка панели (Сайт-заглушка)</h3>
-        <p class="card-desc" data-i18n="settings_decoy_desc">Заглушка отображается всем, кто переходит по основному адресу сервера без секретного пути.</p>
-        <div class="settings-form-content" style="margin-top: auto;">
-            <div class="input-group">
-                <label for="setting-decoy-type" data-i18n="settings_decoy_type">Тип маскировки</label>
-                <select id="setting-decoy-type">
-                    <option value="none" data-i18n="settings_decoy_type_none">Nginx 404 (Стандартная страница ошибки)</option>
-                    <option value="drop" data-i18n="settings_decoy_type_drop">Сброс соединения / Молчание (HTTP 444 / No Response)</option>
-                    <option value="static" data-i18n="settings_decoy_type_static">Локальный шаблон (Красивый корпоративный лендинг)</option>
-                    <option value="proxy" data-i18n="settings_decoy_type_proxy">Проксирование (Прозрачное отображение стороннего сайта)</option>
-                    <option value="redirect" data-i18n="settings_decoy_type_redirect">Перенаправление (HTTP Redirect 302 на другой сайт)</option>
-                </select>
-            </div>
+<div class="glass-card settings-card">
+<h3 data-i18n="settings_decoy_title"></h3>
+<p class="card-desc" data-i18n="settings_decoy_desc"></p>
+<div class="settings-form-content" style="margin-top: auto;">
+<div class="input-group">
+<label data-i18n="settings_decoy_type" for="setting-decoy-type"></label>
+<select id="setting-decoy-type">
+<option data-i18n="settings_decoy_type_none" value="none"></option>
+<option data-i18n="settings_decoy_type_drop" value="drop"></option>
+<option data-i18n="settings_decoy_type_static" value="static"></option>
+<option data-i18n="settings_decoy_type_proxy" value="proxy"></option>
+<option data-i18n="settings_decoy_type_redirect" value="redirect"></option>
+</select>
+</div>
+<div class="input-group" id="setting-decoy-value-group" style="margin-top: 20px;">
+<label data-i18n="settings_decoy_val" for="setting-decoy-value" id="setting-decoy-value-label"></label>
+<input data-i18n-placeholder="settings_decoy_val_placeholder" id="setting-decoy-value" placeholder="" type="text"/>
+<span class="field-desc" data-i18n="settings_decoy_val_desc" id="setting-decoy-value-desc"></span>
+</div>
+<div style="margin-top: 24px; display: flex; gap: 10px;">
+<button class="btn primary-btn w-100" id="btn-save-decoy" style="padding: 10px; font-weight: 600;" type="button"><i class="fa-solid fa-floppy-disk"></i> <span data-i18n="settings_btn_save_short"></span></button>
+<button class="btn secondary-btn w-100" id="btn-preview-decoy" style="padding: 10px; font-weight: 600;" type="button"><i class="fa-solid fa-eye"></i> <span data-i18n="settings_btn_preview"></span></button>
+</div>
+</div>
+</div>
 
-            <div class="input-group" id="setting-decoy-value-group" style="margin-top: 20px;">
-                <label for="setting-decoy-value" id="setting-decoy-value-label" data-i18n="settings_decoy_val">Параметр маскировки</label>
-                <input type="text" id="setting-decoy-value" placeholder="Например: https://wikipedia.org" data-i18n-placeholder="settings_decoy_val_placeholder">
-                <span class="field-desc" id="setting-decoy-value-desc" data-i18n="settings_decoy_val_desc">Для типа «Проксирование» укажите полный URL сайта с http/https. Для «Локальный шаблон» укажите название шаблона (по умолчанию: company_landing).</span>
-            </div>
-            
-            <div style="margin-top: 24px; display: flex; gap: 10px;">
-                <button type="button" id="btn-save-decoy" class="btn primary-btn w-100" style="padding: 10px; font-weight: 600;"><i class="fa-solid fa-floppy-disk"></i> <span data-i18n="settings_btn_save_short">Сохранить</span></button>
-                <button type="button" id="btn-preview-decoy" class="btn secondary-btn w-100" style="padding: 10px; font-weight: 600;"><i class="fa-solid fa-eye"></i> <span data-i18n="settings_btn_preview">Предпросмотр</span></button>
-            </div>
-        </div>
-    </div>
-
-    <!-- CARD 4.5: Мультиплексирование (Mux) -->
-    <div class="glass-card settings-card">
-        <h3 data-i18n="settings_mux_title">Мультиплексирование клиентов (Mux)</h3>
-        <p class="card-desc" data-i18n="settings_mux_desc">Мультиплексирование позволяет передавать несколько виртуальных соединений в одном TCP-канале, снижая задержку при установке связи (handshake). Не рекомендуется для высокоскоростной загрузки больших файлов.</p>
-        <div class="settings-form-content" style="margin-top: auto; display: flex; flex-direction: column; gap: 15px;">
-            <label class="checkbox-container" style="display: flex; align-items: center; gap: 10px; cursor: pointer; color: var(--text-secondary); font-size: 14px; font-weight: normal; text-transform: none; margin-bottom: 0;">
-                <input type="checkbox" id="setting-mux-enabled">
-                <span data-i18n="settings_mux_enable">Включить мультиплексирование (Mux)</span>
-            </label>
-
-            <div class="input-group" id="mux-concurrency-group">
-                <label for="setting-mux-concurrency" data-i18n="settings_mux_concurrency">Максимум соединений (Concurrency)</label>
-                <input type="number" id="setting-mux-concurrency" min="1" max="1024" value="8">
-            </div>
-
-            <label class="checkbox-container" id="mux-xver-group" style="display: flex; align-items: center; gap: 10px; cursor: pointer; color: var(--text-secondary); font-size: 14px; font-weight: normal; text-transform: none; margin-bottom: 0;">
-                <input type="checkbox" id="setting-mux-xver">
-                <span data-i18n="settings_mux_xver">Использовать XMux (xver=1)</span>
-            </label>
-
-            <div style="margin-top: 10px;">
-                <button type="button" id="btn-save-mux" class="btn primary-btn w-100" style="padding: 10px; font-weight: 600;"><i class="fa-solid fa-floppy-disk"></i> <span data-i18n="settings_btn_save_short">Сохранить</span></button>
-            </div>
-        </div>
-    </div>
+<div class="glass-card settings-card">
+<h3 data-i18n="settings_mux_title"></h3>
+<p class="card-desc" data-i18n="settings_mux_desc"></p>
+<div class="settings-form-content" style="margin-top: auto; display: flex; flex-direction: column; gap: 15px;">
+<label class="checkbox-container" style="display: flex; align-items: center; gap: 10px; cursor: pointer; color: var(--text-secondary); font-size: 14px; font-weight: normal; text-transform: none; margin-bottom: 0;">
+<input id="setting-mux-enabled" type="checkbox"/>
+<span data-i18n="settings_mux_enable"></span>
+</label>
+<div class="input-group" id="mux-concurrency-group">
+<label data-i18n="settings_mux_concurrency" for="setting-mux-concurrency"></label>
+<input id="setting-mux-concurrency" max="1024" min="1" type="number" value="8"/>
+</div>
+<label class="checkbox-container" id="mux-xver-group" style="display: flex; align-items: center; gap: 10px; cursor: pointer; color: var(--text-secondary); font-size: 14px; font-weight: normal; text-transform: none; margin-bottom: 0;">
+<input id="setting-mux-xver" type="checkbox"/>
+<span data-i18n="settings_mux_xver"></span>
+</label>
+<div style="margin-top: 10px;">
+<button class="btn primary-btn w-100" id="btn-save-mux" style="padding: 10px; font-weight: 600;" type="button"><i class="fa-solid fa-floppy-disk"></i> <span data-i18n="settings_btn_save_short"></span></button>
+</div>
+</div>
+</div>
 </div>

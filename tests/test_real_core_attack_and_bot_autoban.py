@@ -1,7 +1,6 @@
 import pytest
 import time
 import json
-import subprocess
 from unittest.mock import AsyncMock, patch
 from backend.database import db_session
 from backend.models import Inbound, ClientStats, AuditLog
@@ -13,9 +12,9 @@ from backend.routes.security_routes.firewall import block_ip_api
 @pytest.mark.xdist_group("core_ops")
 def test_real_singbox_attack_mitigation_and_socket_termination():
     """
-    Launches the REAL Sing-box process, simulates an abusive client exceeding limits / attacking,
+    Launches the REAL Sing-box process via sentinel-core, simulates an abusive client exceeding limits / attacking,
     verifies that enforce_client_limits_and_rules disables the user, triggers config regeneration,
-    and drops active sockets via the real Sing-box Clash API.
+    and drops active sockets via sentinel-core bridge.
     """
     stop_singbox()
 

@@ -2,6 +2,7 @@ from fastapi import APIRouter, Request
 
 from backend.database import set_setting
 import backend.routes.system
+from backend.i18n import t, get_lang
 
 router = APIRouter()
 
@@ -9,12 +10,13 @@ router = APIRouter()
 async def generate_ssl_api(request: Request):
     if not backend.routes.system.check_auth(request):
         return backend.routes.system.decoy_response()
+    lang = get_lang(request)
     try:
         data = await request.json()
         domain = data.get("domain", "").strip()
         email = data.get("email", "").strip()
         if not domain:
-            return {"success": False, "msg": "Домен обязателен для выпуска сертификата"}
+            return {"success": False, "msg": t("ssl_domain_required", lang=lang, category="backend")}
         
         from backend.ssl_utils import request_ssl_cert
         success, msg = request_ssl_cert(domain, email)
@@ -54,4 +56,4 @@ async def generate_ssl_api(request: Request):
             log_action(actor, "generate_ssl", target=data.get("domain", "unknown"), details=f"status:error, error:{str(e)}")
         except Exception:
             pass
-        return {"success": False, "msg": f"Ошибка выпуска сертификата: {str(e)}"}
+        return {"success": False, "msg": t("ssl_generate_error", lang=lang, category="backend", error=str(e))}

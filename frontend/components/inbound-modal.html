@@ -1,29 +1,560 @@
-<div id="inbound-modal" class="modal" style="z-index: 1050;">
-    <div class="glass-card modal-card large-card">
-        <div class="modal-header">
-            <h2 id="inbound-modal-title">Создание подключения</h2>
-            <button type="button" class="btn close-modal-btn"><i class="fa-solid fa-xmark"></i></button>
-        </div>
-        <div class="modal-body">
-            <form id="inbound-form">
-                <!-- Tabs navigation header -->
-                <div class="modal-tabs">
-                    <button type="button" class="btn secondary-btn modal-tab-btn active" data-tab="basic" data-i18n="ib_tab_basic">Основное</button>
-                    <button type="button" class="btn secondary-btn modal-tab-btn" data-tab="protocol" id="ib-tab-protocol" data-i18n="ib_tab_protocol">Протокол</button>
-                    <button type="button" class="btn secondary-btn modal-tab-btn" data-tab="stream" id="ib-tab-stream" data-i18n="ib_tab_stream">Поток</button>
-                    <button type="button" class="btn secondary-btn modal-tab-btn" data-tab="security" id="ib-tab-security" data-i18n="ib_tab_security">Безопасность</button>
-                    <button type="button" class="btn secondary-btn modal-tab-btn" data-tab="sniffing" id="ib-tab-sniffing" data-i18n="ib_tab_sniffing">Сниффинг</button>
-                    <button type="button" class="btn secondary-btn modal-tab-btn" data-tab="advanced" id="ib-tab-advanced" data-i18n="ib_tab_json">JSON шаблон</button>
-                </div>
+<div class="modal" id="inbound-modal" style="z-index: 1050;">
+<div class="glass-card modal-card large-card">
+<div class="modal-header">
+<h2 data-i18n="inbound_modal_title" id="inbound-modal-title"></h2>
+<button class="btn close-modal-btn" type="button"><i class="fa-solid fa-xmark"></i></button>
+</div>
+<div class="modal-body">
+<form id="inbound-form">
+<!-- Tabs navigation header -->
+<div class="modal-tabs">
+<button class="btn secondary-btn modal-tab-btn active" data-i18n="ib_tab_basic" data-tab="basic" type="button"></button>
+<button class="btn secondary-btn modal-tab-btn" data-i18n="ib_tab_protocol" data-tab="protocol" id="ib-tab-protocol" type="button"></button>
+<button class="btn secondary-btn modal-tab-btn" data-i18n="ib_tab_stream" data-tab="stream" id="ib-tab-stream" type="button"></button>
+<button class="btn secondary-btn modal-tab-btn" data-i18n="ib_tab_security" data-tab="security" id="ib-tab-security" type="button"></button>
+<button class="btn secondary-btn modal-tab-btn" data-i18n="ib_tab_sniffing" data-tab="sniffing" id="ib-tab-sniffing" type="button"></button>
+<button class="btn secondary-btn modal-tab-btn" data-i18n="ib_tab_json" data-tab="advanced" id="ib-tab-advanced" type="button"></button>
+</div>
+<!-- TAB PANELS CONTAINER -->
+<div id="inbound-form-tabs-container">
 
-                <!-- DYNAMIC TAB PANELS CONTAINER -->
-                <div id="inbound-form-tabs-container">
-                    <!-- Dynamically populated from components/inbound_modal/tab-*.html -->
-                </div>
+<div class="tab-panel active-panel" id="tab-panel-basic">
+<div class="input-group">
+<label data-i18n="ib_label_remark" for="ib-remark"></label>
+<input id="ib-remark" placeholder="VLESS Reality" type="text"/>
+</div>
+<div class="input-row">
+<div class="input-group">
+<label data-i18n="inbound_port" for="ib-port"></label>
+<div class="copy-input-group">
+<input id="ib-port" max="65535" min="1" placeholder="443" type="number"/>
+<button class="btn secondary-btn" data-i18n-title="ib_title_gen_port" id="ib-gen-port-btn" style="margin-left: 5px;" title="" type="button"><i class="fa-solid fa-wand-magic-sparkles"></i></button>
+</div>
+</div>
+<div class="input-group">
+<label data-i18n="ib_label_protocol" for="ib-protocol"></label>
+<select id="ib-protocol">
+<option value="vless">VLESS</option>
+<option value="vmess">VMess</option>
+<option value="trojan">Trojan</option>
+<option value="shadowsocks">Shadowsocks</option>
+<option value="hysteria2">Hysteria 2</option>
+<option value="socks">SOCKS5</option>
+<option value="http">HTTP</option>
+</select>
+</div>
+<div class="input-group">
+<label data-i18n="ib_label_core" for="ib-core"></label>
+<select id="ib-core">
+<option value="xray">Xray-core</option>
+<option value="singbox">sing-box</option>
+<option value="hysteria">Hysteria 2</option>
+</select>
+</div>
+</div>
+<div class="input-row">
+<div class="input-group">
+<label data-i18n="ib_label_total" for="ib-total"></label>
+<input id="ib-total" min="0" type="number" value="0"/>
+</div>
+<div class="input-group">
+<label data-i18n="ib_label_expiry" for="ib-expiry-time"></label>
+<input id="ib-expiry-time" type="datetime-local"/>
+</div>
+</div>
+</div>
 
-                <!-- Footer submit button -->
-                <button type="submit" class="btn primary-btn w-100" style="margin-top: 25px;">Создать</button>
-            </form>
-        </div>
-    </div>
+<div class="tab-panel" id="tab-panel-protocol" style="display: none;">
+<!-- Shadowsocks settings -->
+<div class="settings-subgroup" id="shadowsocks-settings-group" style="display: none;">
+<h4 data-i18n="ib_title_ss"></h4>
+<div class="input-group">
+<label data-i18n="ib_label_ss_method" for="ib-ss-method"></label>
+<select id="ib-ss-method">
+<option value="aes-128-gcm">aes-128-gcm</option>
+<option selected="" value="aes-256-gcm">aes-256-gcm</option>
+<option value="chacha20-ietf-poly1305">chacha20-ietf-poly1305</option>
+<option value="2022-blake3-aes-128-gcm">2022-blake3-aes-128-gcm</option>
+<option value="2022-blake3-aes-256-gcm">2022-blake3-aes-256-gcm</option>
+<option value="2022-blake3-chacha20-poly1305">2022-blake3-chacha20-poly1305</option>
+</select>
+</div>
+</div>
+<!-- VLESS settings -->
+<div class="settings-subgroup" id="vless-protocol-settings-group">
+<h4 data-i18n="ib_title_vless"></h4>
+<div class="input-group">
+<label data-i18n="ib_label_vless_decryption" for="ib-vless-decryption"></label>
+<input id="ib-vless-decryption" placeholder="none" type="text" value="none"/>
+<small data-i18n="validation_inbound_vless_decryption_incompatible_note" id="ib-vless-decryption-note" style="color: var(--text-muted); font-size: 11px; margin-top: 4px; display: block;"></small>
+</div>
+<div class="input-group" style="margin-top: 10px;">
+<label data-i18n="ib_label_vless_encryption" for="ib-vless-encryption"></label>
+<input id="ib-vless-encryption" placeholder="none" type="text" value="none"/>
+</div>
+<div class="input-group" style="margin-top: 15px; display: flex; gap: 10px; flex-wrap: wrap;">
+<button class="btn secondary-btn" data-i18n="ib_btn_auth_x25519" id="gen-vless-x25519-btn" style="padding: 6px 12px; font-size: 13px;" type="button"><i class="fa-solid fa-key"></i></button>
+<button class="btn secondary-btn" data-i18n="ib_btn_auth_mlkem" id="gen-vless-mlkem-btn" style="padding: 6px 12px; font-size: 13px;" type="button"><i class="fa-solid fa-shield-halved"></i></button>
+<button class="btn secondary-btn" data-i18n="ib_btn_clear" id="clear-vless-enc-btn" style="padding: 6px 12px; font-size: 13px; color: var(--accent-rose);" type="button"><i class="fa-solid fa-eraser"></i></button>
+</div>
+</div>
+<!-- Fallbacks (VLESS / Trojan) -->
+<div class="settings-subgroup" id="fallbacks-settings-group">
+<h4 data-i18n="ib_title_fallbacks"></h4>
+<div class="input-row">
+<div class="input-group">
+<label data-i18n="ib_label_fallback_dest" for="ib-fallback-dest"></label>
+<input data-i18n-placeholder="ib_placeholder_fallback_dest" id="ib-fallback-dest" placeholder="" type="text"/>
+<small data-i18n="validation_inbound_vless_fallbacks_incompatible_note" id="ib-fallback-dest-note" style="color: var(--text-muted); font-size: 11px; margin-top: 4px; display: block;"></small>
+</div>
+<div class="input-group">
+<label data-i18n="ib_label_fallback_path" for="ib-fallback-path"></label>
+<input id="ib-fallback-path" placeholder="/masquerade" type="text"/>
+</div>
+</div>
+<div class="input-row" style="margin-top: 15px;">
+<div class="input-group">
+<label data-i18n="ib_label_fallback_xver" for="ib-fallback-xver"></label>
+<select id="ib-fallback-xver">
+<option data-i18n="ib_opt_disabled" value="0"></option>
+<option value="1">1</option>
+<option value="2">2</option>
+</select>
+</div>
+<div class="input-group">
+<label data-i18n="ib_label_fallback_alpn" for="ib-fallback-alpn"></label>
+<input id="ib-fallback-alpn" placeholder="h2" type="text"/>
+</div>
+</div>
+</div>
+<!-- No protocol settings notice -->
+<div class="settings-subgroup" id="no-protocol-settings-group" style="display: none; text-align: center; padding: 30px 15px;">
+<i class="fa-solid fa-circle-check" style="font-size: 32px; color: var(--accent-green); margin-bottom: 12px; display: inline-block;"></i>
+<p data-i18n="ib_no_protocol_settings" style="color: var(--text-secondary); font-size: 13px; margin: 0;"></p>
+</div>
+</div>
+
+<div class="tab-panel" id="tab-panel-stream" style="display: none;">
+<div class="input-group" id="xray-network-security-row">
+<label data-i18n="ib_label_network" for="ib-network"></label>
+<select id="ib-network">
+<option value="tcp">TCP</option>
+<option value="ws">WebSocket (WS)</option>
+<option value="grpc">gRPC</option>
+<option value="h2">HTTP/2 (h2)</option>
+<option value="httpupgrade">HTTPUpgrade</option>
+<option value="xhttp">XHTTP (SplitHTTP)</option>
+<option value="mkcp">mKCP (UDP)</option>
+</select>
+</div>
+<!-- TCP settings subgroup -->
+<div class="settings-subgroup" id="tcp-settings-group" style="display: none;">
+<h4 data-i18n="ib_title_tcp"></h4>
+<div class="input-group">
+<label data-i18n="ib_label_tcp_type" for="ib-tcp-type"></label>
+<select id="ib-tcp-type">
+<option data-i18n="ib_opt_none_obfs" value="none"></option>
+<option data-i18n="ib_opt_http_obfs" value="http"></option>
+</select>
+</div>
+<div id="tcp-http-settings" style="display: none; margin-top: 15px;">
+<div class="input-group">
+<label data-i18n="ib_label_tcp_host" for="ib-tcp-host"></label>
+<input id="ib-tcp-host" placeholder="google.com, yandex.ru" type="text"/>
+</div>
+<div class="input-group" style="margin-top: 10px;">
+<label data-i18n="ib_label_tcp_path" for="ib-tcp-path"></label>
+<input id="ib-tcp-path" placeholder="/video, /stream" type="text"/>
+</div>
+</div>
+</div>
+<!-- WS settings subgroup -->
+<div class="settings-subgroup" id="ws-settings-group" style="display: none;">
+<h4 data-i18n="ib_title_ws"></h4>
+<div class="input-row">
+<div class="input-group">
+<label data-i18n="ib_label_ws_path" for="ib-ws-path"></label>
+<input id="ib-ws-path" placeholder="/" type="text"/>
+</div>
+<div class="input-group">
+<label data-i18n="ib_label_ws_host" for="ib-ws-host"></label>
+<input id="ib-ws-host" placeholder="mydomain.com" type="text"/>
+</div>
+</div>
+<div class="input-group" style="margin-top: 15px;">
+<label data-i18n="ib_label_ws_ed" for="ib-ws-ed"></label>
+<input id="ib-ws-ed" min="0" type="number" value="0"/>
+</div>
+</div>
+<!-- gRPC settings subgroup -->
+<div class="settings-subgroup" id="grpc-settings-group" style="display: none;">
+<h4 data-i18n="ib_title_grpc"></h4>
+<div class="input-group">
+<label data-i18n="ib_label_grpc_service" for="ib-grpc-service"></label>
+<input id="ib-grpc-service" placeholder="grpc" type="text"/>
+</div>
+<div class="input-group" style="margin-top: 15px;">
+<label class="checkbox-container" style="display: flex; align-items: center; gap: 10px;">
+<input id="ib-grpc-multi-mode" type="checkbox"/>
+<span data-i18n="ib_label_grpc_multi"></span>
+</label>
+</div>
+</div>
+<!-- HTTP/2 settings subgroup -->
+<div class="settings-subgroup" id="h2-settings-group" style="display: none;">
+<h4 data-i18n="ib_title_h2"></h4>
+<div class="input-row">
+<div class="input-group">
+<label data-i18n="ib_label_h2_path" for="ib-h2-path"></label>
+<input id="ib-h2-path" placeholder="/" type="text"/>
+</div>
+<div class="input-group">
+<label data-i18n="ib_label_h2_host" for="ib-h2-host"></label>
+<input id="ib-h2-host" placeholder="domain.com" type="text"/>
+</div>
+</div>
+</div>
+<!-- HTTPUpgrade settings subgroup -->
+<div class="settings-subgroup" id="httpupgrade-settings-group" style="display: none;">
+<h4 data-i18n="ib_title_httpupgrade"></h4>
+<div class="input-row">
+<div class="input-group">
+<label data-i18n="ib_label_httpupgrade_path" for="ib-httpupgrade-path"></label>
+<input id="ib-httpupgrade-path" placeholder="/" type="text" value="/"/>
+</div>
+<div class="input-group">
+<label data-i18n="ib_label_httpupgrade_host" for="ib-httpupgrade-host"></label>
+<input id="ib-httpupgrade-host" placeholder="mydomain.com" type="text"/>
+</div>
+</div>
+</div>
+<!-- XHTTP (SplitHTTP) settings subgroup -->
+<div class="settings-subgroup" id="xhttp-settings-group" style="display: none;">
+<h4 data-i18n="ib_title_xhttp"></h4>
+<div class="input-row">
+<div class="input-group">
+<label data-i18n="ib_label_xhttp_path" for="ib-xhttp-path"></label>
+<input id="ib-xhttp-path" placeholder="/" type="text" value="/"/>
+</div>
+<div class="input-group">
+<label data-i18n="ib_label_xhttp_host" for="ib-xhttp-host"></label>
+<input id="ib-xhttp-host" placeholder="mydomain.com" type="text"/>
+</div>
+</div>
+<div class="input-group" style="margin-top: 15px;">
+<label data-i18n="ib_label_xhttp_mode" for="ib-xhttp-mode"></label>
+<select id="ib-xhttp-mode">
+<option data-i18n="ib_opt_xhttp_auto" selected="" value="auto"></option>
+<option value="packet-up">packet-up</option>
+<option value="stream-up">stream-up</option>
+<option value="stream-one">stream-one</option>
+</select>
+</div>
+<div class="input-group" style="margin-top: 15px;">
+<label data-i18n="ib_label_xhttp_extra" for="ib-xhttp-extra"></label>
+<textarea id="ib-xhttp-extra" placeholder='{"noGRPCHeader": false, "noSSEHeader": false}' style="width: 100%; height: 80px; font-family: monospace; font-size: 12px; background: #0b0f19; color: #cbd5e1; border: 1px solid var(--border-color); border-radius: 8px; padding: 10px; resize: vertical;"></textarea>
+</div>
+</div>
+<!-- mKCP settings subgroup -->
+<div class="settings-subgroup" id="mkcp-settings-group" style="display: none;">
+<h4 data-i18n="ib_title_mkcp"></h4>
+<div class="input-row">
+<div class="input-group">
+<label data-i18n="ib_label_mkcp_header" for="ib-mkcp-header"></label>
+<select id="ib-mkcp-header">
+<option value="none">none</option>
+<option value="srtp">srtp</option>
+<option value="utp">utp</option>
+<option value="wechat-video">wechat-video</option>
+<option value="dtls">dtls</option>
+<option value="wireguard">wireguard</option>
+</select>
+</div>
+<div class="input-group">
+<label data-i18n="ib_label_mkcp_seed" for="ib-mkcp-seed"></label>
+<input id="ib-mkcp-seed" placeholder="my_obfs_seed" type="text"/>
+</div>
+</div>
+<div class="input-group" style="margin-top: 15px;">
+<label class="checkbox-container" style="display: flex; align-items: center; gap: 10px;">
+<input id="ib-mkcp-congestion" type="checkbox"/>
+<span data-i18n="ib_label_mkcp_congestion"></span>
+</label>
+</div>
+</div>
+<!-- Hysteria 2 settings group -->
+<div class="settings-subgroup" id="hysteria-settings-group" style="display: none;">
+<h4 data-i18n="ib_title_hysteria"></h4>
+<div class="input-group">
+<label data-i18n="ib_label_hysteria_mode" for="ib-hysteria-mode"></label>
+<select id="ib-hysteria-mode">
+<option data-i18n="ib_opt_masq" selected="" value="masq"></option>
+<option data-i18n="ib_opt_obfs" value="obfs"></option>
+</select>
+</div>
+
+<div id="hysteria-obfs-group" style="display: none; margin-top: 15px;">
+<div class="input-group">
+<label data-i18n="ib_label_hysteria_obfs_pass" for="ib-hysteria-obfs-password"></label>
+<div class="copy-input-group">
+<input data-i18n-placeholder="ib_placeholder_random_pass" id="ib-hysteria-obfs-password" placeholder="" type="text"/>
+<button class="btn secondary-btn" data-i18n-title="ib_title_generate" id="btn-gen-obfs" title="" type="button"><i class="fa-solid fa-wand-magic-sparkles"></i></button>
+</div>
+</div>
+</div>
+
+<div id="hysteria-masq-group" style="margin-top: 15px;">
+<div class="input-row">
+<div class="input-group">
+<label data-i18n="ib_label_hysteria_masq_type" for="ib-hysteria-masq-type"></label>
+<select id="ib-hysteria-masq-type">
+<option data-i18n="ib_opt_masq_proxy" value="proxy"></option>
+<option data-i18n="ib_opt_masq_file" value="file"></option>
+<option data-i18n="ib_opt_masq_status" value="status"></option>
+</select>
+</div>
+<div class="input-group">
+<label data-i18n="ib_label_hysteria_masq_val" for="ib-hysteria-masq-value"></label>
+<input id="ib-hysteria-masq-value" placeholder="https://google.com" type="text"/>
+</div>
+</div>
+</div>
+<div class="input-row" style="margin-top: 15px;">
+<div class="input-group">
+<label data-i18n="ib_label_hysteria_up" for="ib-hysteria-up-mbps"></label>
+<input id="ib-hysteria-up-mbps" min="0" type="number" value="100"/>
+</div>
+<div class="input-group">
+<label data-i18n="ib_label_hysteria_down" for="ib-hysteria-down-mbps"></label>
+<input id="ib-hysteria-down-mbps" min="0" type="number" value="100"/>
+</div>
+</div>
+<div class="input-group" style="margin-top: 15px;">
+<label class="checkbox-container" style="display: flex; align-items: center; gap: 10px;">
+<input id="ib-hysteria-ignore-bw" type="checkbox"/>
+<span data-i18n="ib_label_hysteria_ignore_bw"></span>
+</label>
+<small data-i18n="ib_hysteria_ignore_bw_desc" style="color: var(--text-muted); font-size: 11px; margin-top: 4px; display: block;"></small>
+</div>
+<div class="input-group" style="margin-top: 15px;">
+<label data-i18n="ib_label_hysteria_sni" for="ib-hysteria-sni"></label>
+<input data-i18n-placeholder="ib_placeholder_hysteria_sni" id="ib-hysteria-sni" placeholder="" type="text"/>
+</div>
+<div class="input-group" style="margin-top: 15px;">
+<label data-i18n="ib_label_hysteria_cert_mode" for="ib-hysteria-cert-mode"></label>
+<select id="ib-hysteria-cert-mode">
+<option data-i18n="ib_opt_cert_self" value="self"></option>
+<option data-i18n="ib_opt_cert_custom" value="custom"></option>
+</select>
+</div>
+<div id="hysteria-custom-cert-fields" style="display: none; margin-top: 15px;">
+<div class="input-group">
+<label data-i18n="ib_label_hysteria_cert_path" for="ib-hysteria-cert-path"></label>
+<input id="ib-hysteria-cert-path" placeholder="/etc/letsencrypt/live/domain/fullchain.pem" type="text"/>
+</div>
+<div class="input-group" style="margin-top: 10px;">
+<label data-i18n="ib_label_hysteria_key_path" for="ib-hysteria-key-path"></label>
+<input id="ib-hysteria-key-path" placeholder="/etc/letsencrypt/live/domain/privkey.pem" type="text"/>
+</div>
+</div>
+<div class="input-group" style="margin-top: 15px;">
+<label data-i18n="ib_label_hysteria_hop" for="ib-hysteria-hop"></label>
+<input data-i18n-placeholder="ib_placeholder_empty_disable" id="ib-hysteria-hop" placeholder="" type="text"/>
+</div>
+<div class="input-group" style="margin-top: 15px;">
+<label class="checkbox-container" style="display: flex; align-items: center; gap: 10px;">
+<input id="ib-hysteria-routing-xray" type="checkbox"/>
+<span data-i18n="ib_label_hysteria_routing_xray"></span>
+</label>
+</div>
+</div>
+</div>
+
+<div class="tab-panel" id="tab-panel-security" style="display: none;">
+<div class="input-group">
+<label data-i18n="ib_label_security" for="ib-security"></label>
+<select id="ib-security">
+<option data-i18n="ib_opt_none_sec" value="none"></option>
+<option value="tls">TLS</option>
+<option value="reality">REALITY</option>
+</select>
+</div>
+<!-- TLS settings subgroup -->
+<div class="settings-subgroup" id="tls-settings-group" style="display: none; margin-top: 15px;">
+<h4 data-i18n="ib_title_tls"></h4>
+<div class="input-row">
+<div class="input-group">
+<label data-i18n="ib_label_tls_sni" for="ib-tls-sni"></label>
+<input id="ib-tls-sni" placeholder="mydomain.com" type="text"/>
+</div>
+<div class="input-group">
+<label data-i18n="ib_label_tls_alpn" for="ib-tls-alpn"></label>
+<input id="ib-tls-alpn" type="text" value="h2,http/1.1"/>
+</div>
+</div>
+<div class="input-row" style="margin-top: 15px;">
+<div class="input-group">
+<label data-i18n="ib_label_tls_fp" for="ib-tls-fp"></label>
+<select id="ib-tls-fp">
+<option selected="" value="chrome">chrome</option>
+<option value="firefox">firefox</option>
+<option value="safari">safari</option>
+<option value="edge">edge</option>
+<option value="qq">qq</option>
+<option value="opera">opera</option>
+<option value="360">360</option>
+<option value="android">android</option>
+<option value="ios">ios</option>
+<option value="random">random</option>
+<option value="randomized">randomized</option>
+</select>
+</div>
+<div class="input-group">
+<label data-i18n="ib_label_tls_min" for="ib-tls-min-ver"></label>
+<select id="ib-tls-min-ver">
+<option value="1.2">1.2</option>
+<option selected="" value="1.3">1.3</option>
+</select>
+</div>
+</div>
+<div class="input-row" style="margin-top: 15px;">
+<div class="input-group">
+<label data-i18n="ib_label_tls_max" for="ib-tls-max-ver"></label>
+<select id="ib-tls-max-ver">
+<option value="1.2">1.2</option>
+<option selected="" value="1.3">1.3</option>
+</select>
+</div>
+</div>
+<div class="input-group" style="margin-top: 15px;">
+<label class="checkbox-container" style="display: flex; align-items: center; gap: 10px;">
+<input id="ib-tls-reject-unknown-sni" type="checkbox"/>
+<span data-i18n="ib_label_tls_reject_unknown"></span>
+</label>
+</div>
+<div class="input-group" style="margin-top: 15px;">
+<label class="checkbox-container" style="display: flex; align-items: center; gap: 10px;">
+<input id="ib-tls-insecure" type="checkbox"/>
+<span data-i18n="ib_label_tls_allow_insecure"></span>
+</label>
+</div>
+</div>
+<!-- REALITY settings subgroup -->
+<div class="settings-subgroup" id="reality-settings-group" style="display: none; margin-top: 15px;">
+<h4 data-i18n="ib_title_reality"></h4>
+<div class="input-row">
+<div class="input-group">
+<label data-i18n="ib_label_reality_dest" for="ib-reality-dest"></label>
+<input id="ib-reality-dest" placeholder="www.apple.com:443" type="text" value=""/>
+</div>
+<div class="input-group">
+<label data-i18n="ib_label_reality_sni" for="ib-reality-sni"></label>
+<input id="ib-reality-sni" placeholder="www.apple.com" type="text" value=""/>
+</div>
+</div>
+<div class="input-row" style="margin-top: 15px;">
+<div class="input-group">
+<label data-i18n="ib_label_reality_privkey" for="ib-reality-priv"></label>
+<div class="copy-input-group">
+<input data-i18n-placeholder="ib_reality_priv_placeholder" id="ib-reality-priv" placeholder="" type="text" value=""/>
+<button class="btn secondary-btn" data-i18n-title="ib_title_gen_keys" id="gen-x25519-keys-btn" style="margin-left: 5px;" title="" type="button"><i class="fa-solid fa-wand-magic-sparkles"></i></button>
+</div>
+</div>
+<div class="input-group">
+<label data-i18n="ib_label_reality_pubkey" for="ib-reality-pbk"></label>
+<input data-i18n-placeholder="ib_reality_pbk_placeholder" id="ib-reality-pbk" placeholder="" type="text" value=""/>
+</div>
+</div>
+<div class="input-row" style="margin-top: 15px;">
+<div class="input-group">
+<label data-i18n="ib_label_reality_shortids" for="ib-reality-shortids"></label>
+<div class="copy-input-group">
+<input id="ib-reality-shortids" placeholder="8f9c2d1b" type="text" value=""/>
+<button class="btn secondary-btn" data-i18n-title="ib_btn_gen_shortid" id="gen-short-ids-btn" style="margin-left: 5px;" title="" type="button"><i class="fa-solid fa-wand-magic-sparkles"></i></button>
+</div>
+</div>
+<div class="input-group">
+<label data-i18n="ib_label_reality_fp" for="ib-reality-fp"></label>
+<select id="ib-reality-fp">
+<option selected="" value="chrome">chrome</option>
+<option value="firefox">firefox</option>
+<option value="safari">safari</option>
+<option value="edge">edge</option>
+<option value="qq">qq</option>
+<option value="ios">ios</option>
+<option value="android">android</option>
+<option value="random">random</option>
+<option value="randomized">randomized</option>
+</select>
+</div>
+</div>
+<div class="input-row" style="margin-top: 15px;">
+<div class="input-group">
+<label data-i18n="ib_label_reality_max_time_diff" for="ib-reality-max-time-diff"></label>
+<input id="ib-reality-max-time-diff" placeholder="0" type="number" value=""/>
+</div>
+<div class="input-group">
+<label data-i18n="ib_label_reality_min_ver" for="ib-reality-min-ver"></label>
+<input data-i18n-placeholder="ib_reality_min_ver_placeholder" id="ib-reality-min-ver" placeholder="" type="text" value=""/>
+</div>
+</div>
+<div class="input-group" style="margin-top: 15px;">
+<label data-i18n="ib_label_reality_spx" for="ib-reality-spx"></label>
+<input id="ib-reality-spx" placeholder="/" type="text" value=""/>
+</div>
+<div class="input-group" style="margin-top: 15px;">
+<label class="checkbox-container" style="display: flex; align-items: center; gap: 10px;">
+<input id="ib-reality-xver" type="checkbox"/>
+<span data-i18n="ib_label_reality_xver"></span>
+</label>
+</div>
+</div>
+</div>
+
+<div class="tab-panel" id="tab-panel-sniffing" style="display: none;">
+<div class="input-group">
+<label class="checkbox-container" style="display: flex; align-items: center; gap: 10px; cursor: pointer; color: var(--text-secondary);">
+<input id="ib-sniffing" type="checkbox"/>
+<span data-i18n="ib_label_sniffing"></span>
+</label>
+</div>
+<div class="settings-subgroup" id="sniffing-overrides" style="display: none; margin-top: 15px; flex-direction: column; gap: 10px;">
+<h4 data-i18n="ib_title_sniffing_protocols"></h4>
+<label class="checkbox-container" style="display: flex; align-items: center; gap: 10px;">
+<input checked="" id="ib-sniffing-http" type="checkbox"/>
+<span data-i18n="ib_label_sniffing_http"></span>
+</label>
+<label class="checkbox-container" style="display: flex; align-items: center; gap: 10px;">
+<input checked="" id="ib-sniffing-tls" type="checkbox"/>
+<span data-i18n="ib_label_sniffing_tls"></span>
+</label>
+<label class="checkbox-container" style="display: flex; align-items: center; gap: 10px;">
+<input checked="" id="ib-sniffing-quic" type="checkbox"/>
+<span data-i18n="ib_label_sniffing_quic"></span>
+</label>
+<label class="checkbox-container" style="display: flex; align-items: center; gap: 10px;">
+<input id="ib-sniffing-fakedns" type="checkbox"/>
+<span data-i18n="ib_label_sniffing_fakedns"></span>
+</label>
+<div style="border-top: 1px solid var(--border-color); margin-top: 10px; padding-top: 10px;">
+<label class="checkbox-container" style="display: flex; align-items: center; gap: 10px;">
+<input id="ib-sniffing-routeonly" type="checkbox"/>
+<span data-i18n="ib_label_sniffing_routeonly"></span>
+</label>
+</div>
+</div>
+</div>
+
+<div class="tab-panel" id="tab-panel-advanced" style="display: none;">
+<div class="input-group">
+<label data-i18n="ib_label_json_desc" for="ib-json-editor"></label>
+<textarea data-i18n-placeholder="ib_placeholder_json_loading" id="ib-json-editor" placeholder="" style="width: 100%; height: 350px; font-family: monospace; font-size: 13px; background: #0b0f19; color: #cbd5e1; border: 1px solid var(--border-color); border-radius: 8px; padding: 15px; resize: vertical; outline: none; transition: border-color 0.2s;"></textarea>
+</div>
+</div>
+</div>
+<!-- Footer submit button -->
+<button class="btn primary-btn w-100" data-i18n="ib_btn_create" style="margin-top: 25px;" type="submit"></button>
+</form>
+</div>
+</div>
 </div>

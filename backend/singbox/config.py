@@ -1,118 +1,64 @@
+"""Sing-box configuration builder - powered by sentinel-core native compiler."""
 import json
 import logging
-import sys
-from backend.config import SINGBOX_CONFIG_PATH, SINGBOX_LOG_PATH
+from backend.config import SINGBOX_CONFIG_PATH
 import backend.database as db
-from backend.singbox.inbounds import generate_singbox_inbounds
-from backend.singbox.outbounds import generate_singbox_outbounds, sanitize_singbox_config
-from backend.singbox.routing import generate_singbox_routing
+from backend.sentinel_core_bridge import compile_node_server_config
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
+def get_all_inbounds(*args, **kwargs):
+    return db.get_all_inbounds(*args, **kwargs)
 
-# Переопределяемые символы для обезьяньего патча в тестах
-get_all_inbounds = db.get_all_inbounds
-get_clients_for_inbound = db.get_clients_for_inbound
-get_all_outbounds = db.get_all_outbounds
-get_all_routing_rules = db.get_all_routing_rules
-get_setting = db.get_setting
+def get_clients_for_inbound(*args, **kwargs):
+    return db.get_clients_for_inbound(*args, **kwargs)
+
+def get_all_outbounds(*args, **kwargs):
+    return db.get_all_outbounds(*args, **kwargs)
+
+def get_all_routing_rules(*args, **kwargs):
+    return db.get_all_routing_rules(*args, **kwargs)
+
+def get_setting(*args, **kwargs):
+    return db.get_setting(*args, **kwargs)
 
 def generate_singbox_config_json() -> dict:
-    """Генерирует динамическую конфигурацию sing-box из базы данных"""
-    mod = sys.modules[__name__]
-
-    # Сначала проверяем monkeypatch в backend.singbox.config, затем в backend.database
-    inbounds_fn = getattr(mod, "get_all_inbounds", db.get_all_inbounds)
-    if inbounds_fn is db.get_all_inbounds or getattr(inbounds_fn, "__name__", "") == "get_all_inbounds":
-        inbounds_fn = db.get_all_inbounds
-
-    clients_fn = getattr(mod, "get_clients_for_inbound", db.get_clients_for_inbound)
-    if clients_fn is db.get_clients_for_inbound or getattr(clients_fn, "__name__", "") == "get_clients_for_inbound":
-        clients_fn = db.get_clients_for_inbound
-
-    outbounds_fn = getattr(mod, "get_all_outbounds", db.get_all_outbounds)
-    if outbounds_fn is db.get_all_outbounds or getattr(outbounds_fn, "__name__", "") == "get_all_outbounds":
-        outbounds_fn = db.get_all_outbounds
-
-    rules_fn = getattr(mod, "get_all_routing_rules", db.get_all_routing_rules)
-    if rules_fn is db.get_all_routing_rules or getattr(rules_fn, "__name__", "") == "get_all_routing_rules":
-        rules_fn = db.get_all_routing_rules
-
-    setting_fn = getattr(mod, "get_setting", db.get_setting)
-    if setting_fn is db.get_setting or getattr(setting_fn, "__name__", "") == "get_setting":
-        setting_fn = db.get_setting
-
-    singbox_inbounds = generate_singbox_inbounds(inbounds_fn, clients_fn)
-    singbox_outbounds = generate_singbox_outbounds(outbounds_fn)
-    route_config = generate_singbox_routing(rules_fn, setting_fn)
-
-    sb_loglevel = setting_fn("singbox_loglevel")
-    if sb_loglevel not in ("trace", "debug", "info", "warn", "error", "fatal", "panic"):
-        sb_loglevel = "info"
-
-    config = {
-        "log": {
-            "level": sb_loglevel,
-            "output": str(SINGBOX_LOG_PATH).replace("\\", "/"),
-            "timestamp": True
-        },
-        "dns": {
-            "servers": [
-                {
-                    "tag": "dns-remote",
-                    "type": "udp",
-                    "server": "8.8.8.8"
-                }
-            ],
-            "strategy": "ipv4_only"
-        },
-        "experimental": {
-            "clash_api": {
-                "external_controller": "127.0.0.1:9090"
-            }
-        },
-        "inbounds": singbox_inbounds,
-        "outbounds": singbox_outbounds,
-        "route": route_config
-    }
-    return sanitize_singbox_config(config)
-
-def read_singbox_config(config_path=None) -> dict:
-    """Считывает имеющийся конфигурационный файл sing-box с диска"""
-    path = config_path or SINGBOX_CONFIG_PATH
-    if not path.exists():
-        return {}
+    """Generates Sing-box server configuration JSON via sentinel-core compiler."""
     try:
-        with open(path, "r", encoding="utf-8") as f:
-            return json.load(f)
+        res = compile_node_server_config("sing-box")
+        if isinstance(res, dict):
+            if "config" in res:
+                cfg = res["config"]
+                if isinstance(cfg, str):
+                    return json.loads(cfg)
+                elif isinstance(cfg, dict):
+                    return cfg
+            return res
     except Exception as e:
-        logging.error(f"Failed to read sing-box config from {path}: {e}")
-        return {}
+        logging.error(f"Error compiling sing-box config via sentinel-core: {e}")
+    return {}
 
-def parse_singbox_config(raw_input) -> dict:
-    """Парсит и валидирует строку или словарь конфигурации sing-box"""
-    if isinstance(raw_input, dict):
-        config_dict = raw_input
-    elif isinstance(raw_input, str):
-        try:
-            config_dict = json.loads(raw_input)
-        except Exception as e:
-            raise ValueError(f"Невалидный JSON конфигурации sing-box: {e}")
-    else:
-        raise ValueError("Входные данные должны быть строкой JSON или словарем.")
-
+def parse_singbox_config(config_dict: dict) -> dict:
+    """Sanitizes sing-box config before writing."""
     if not isinstance(config_dict, dict):
-        raise ValueError("Конфигурация sing-box должна быть JSON-объектом (dict).")
-
-    for section in ("inbounds", "outbounds"):
+        raise ValueError("Sing-box config must be a dictionary.")
+    for section in ["inbounds", "outbounds"]:
         if section in config_dict and not isinstance(config_dict[section], list):
-            raise ValueError(f"Секция '{section}' в sing-box должна быть списком (list).")
+            raise ValueError(f"Section '{section}' in Sing-box config must be a list.")
+    return config_dict
 
-    return sanitize_singbox_config(config_dict)
+def read_singbox_config() -> dict:
+    """Reads sing-box config from file or generates default."""
+    if SINGBOX_CONFIG_PATH.exists():
+        try:
+            with open(SINGBOX_CONFIG_PATH, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            pass
+    return generate_singbox_config_json()
 
 def write_singbox_config(config_dict: dict = None, force: bool = False) -> bool:
-    """Записывает конфигурационный файл sing-box в формате JSON"""
+    """Writes sing-box server configuration file."""
     try:
-        setting_fn = getattr(sys.modules[__name__], "get_setting", db.get_setting)
+        setting_fn = getattr(db, "get_setting", lambda k, d="": d)
         if config_dict is None:
             if not force and setting_fn("use_custom_singbox_config") == "true" and SINGBOX_CONFIG_PATH.exists():
                 logging.info("Using existing custom Sing-box config from file.")

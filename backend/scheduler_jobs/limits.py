@@ -18,10 +18,6 @@ def parse_recent_xray_ips():
     global ACTIVE_IP_CACHE
     import backend.scheduler
     
-    xray_log_path = backend.scheduler.XRAY_LOG_PATH
-    if not xray_log_path.exists():
-        return
-        
     now_ts = time.time()
     cutoff_ts = now_ts - 180  # 3 minutes
     
@@ -34,9 +30,29 @@ def parse_recent_xray_ips():
         if not ip_map:
             del ACTIVE_IP_CACHE[email]
             
+    # Incorporate active client IPs from sentinel-core bridge
     try:
-        # Read last 1000 lines
-        lines = read_last_lines(xray_log_path, 1000)
+        from backend.sentinel_core_bridge import get_unified_traffic
+        traffic = get_unified_traffic()
+        if traffic and isinstance(traffic, dict):
+            for email, stats in traffic.items():
+                if isinstance(stats, dict) and "activeIPs" in stats:
+                    for ip in stats["activeIPs"]:
+                        if email not in ACTIVE_IP_CACHE:
+                            ACTIVE_IP_CACHE[email] = {}
+                        ACTIVE_IP_CACHE[email][ip] = now_ts
+    except Exception:
+        pass
+
+    xray_log_path = backend.scheduler.XRAY_LOG_PATH
+    if not xray_log_path.exists():
+        return
+            
+    try:
+        from backend.sentinel_core_bridge import get_core_logs
+        lines = get_core_logs(str(xray_log_path), 1000)
+        if not lines:
+            lines = read_last_lines(xray_log_path, 1000)
             
         for line in lines:
             if "accepted" not in line or "email: " not in line:
@@ -81,9 +97,6 @@ def parse_recent_singbox_ips():
     global ACTIVE_IP_CACHE
     from backend.config import SINGBOX_LOG_PATH
     
-    if not SINGBOX_LOG_PATH.exists():
-        return
-        
     now_ts = time.time()
     cutoff_ts = now_ts - 180  # 3 minutes
     
@@ -96,6 +109,23 @@ def parse_recent_singbox_ips():
         if not ip_map:
             del ACTIVE_IP_CACHE[email]
             
+    # Incorporate active client IPs from sentinel-core bridge
+    try:
+        from backend.sentinel_core_bridge import get_unified_traffic
+        traffic = get_unified_traffic()
+        if traffic and isinstance(traffic, dict):
+            for email, stats in traffic.items():
+                if isinstance(stats, dict) and "activeIPs" in stats:
+                    for ip in stats["activeIPs"]:
+                        if email not in ACTIVE_IP_CACHE:
+                            ACTIVE_IP_CACHE[email] = {}
+                        ACTIVE_IP_CACHE[email][ip] = now_ts
+    except Exception:
+        pass
+
+    if not SINGBOX_LOG_PATH.exists():
+        return
+            
     try:
         from backend.database import db_session
         from backend.models import ClientStats
@@ -105,7 +135,10 @@ def parse_recent_singbox_ips():
         if not client_emails:
             return
 
-        lines = read_last_lines(SINGBOX_LOG_PATH, 1000)
+        from backend.sentinel_core_bridge import get_core_logs
+        lines = get_core_logs(str(SINGBOX_LOG_PATH), 1000)
+        if not lines:
+            lines = read_last_lines(SINGBOX_LOG_PATH, 1000)
 
         import re
         # Pre-compile patterns once (not inside the loop)
@@ -235,24 +268,25 @@ def enforce_client_limits_and_rules():
                 c.block_reason = block_reason
                 need_config_update = True
                 
-                if inbound.protocol == "hysteria2":
-                    backend.scheduler.kick_client_hysteria_api(inbound.id, c.email)
-                else:
-                    backend.scheduler.remove_client_api(inbound.id, c.email)
+                try:
+                    from backend.sentinel_core_bridge import kick_client
+                    kick_client(c.email)
+                except Exception:
+                    pass
+
+                try:
+                    if inbound.protocol == "hysteria2":
+                        backend.scheduler.kick_client_hysteria_api(inbound.id, c.email)
+                    else:
+                        backend.scheduler.remove_client_api(inbound.id, c.email)
+                except Exception:
+                    pass
                     
                 backend.scheduler.asyncio_notify_admin(c.email, block_reason, bot_token, tg_admin_ids)
                 
     if need_config_update:
         from backend.utils.service_restart import restart_services_background
         restart_services_background(delay=0.5)
-
-
-    # Run Watchdog
-    try:
-        from backend.scheduler_jobs.watchdog import run_service_watchdog
-        run_service_watchdog()
-    except Exception as e:
-        logging.error(f"[Watchdog] Error running watchdog: {e}")
         
     # Run Backup
     try:
@@ -288,10 +322,13 @@ def asyncio_notify_admin(email: str, reason: str, bot_token: str, tg_admin_ids: 
     try:
         if bot_token and tg_admin_ids:
             from aiogram import Bot
+            from backend.database import get_setting
+            from backend.i18n import t
+            lang = get_setting("language", "ru")
             temp_bot = Bot(token=bot_token)
             admin_ids = [x.strip() for x in tg_admin_ids.split(",") if x.strip()]
             for admin_id in admin_ids:
-                msg = f"🛑 <b>[Система Лимитов]</b>\nПользователь <code>{email}</code> заблокирован автоматически.\nПричина: <b>{reason}</b>"
+                msg = t("limits_user_blocked_notification", lang=lang, category="backend", email=email, reason=reason)
                 try:
                     loop = asyncio.get_running_loop()
                     

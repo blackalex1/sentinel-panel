@@ -2,6 +2,7 @@ import { apiFetch, getCsrfToken } from "../../api.js";
 import { showToast, showConfirmDialog } from "../../ui.js";
 import { t } from "../../i18n.js";
 import { populateOutboundDropdowns } from "../routing-outbounds.js";
+import { enhanceAllSelects } from "../../components/customSelect.js";
 
 export async function loadRoutingRules() {
     loadQuickSecurityRules();
@@ -18,25 +19,27 @@ export async function loadRoutingRules() {
         tr.style.borderBottom = "1px solid var(--border-color)";
         
         let conditions = [];
-        if (rule.inbound_tags && rule.inbound_tags.length > 0) {
-            conditions.push(`<span style="color:var(--accent-orange); font-size:12px; margin-right:4px;">Inbounds:</span>${rule.inbound_tags.join(", ")}`);
+        const fmtArr = (arr) => Array.isArray(arr) ? arr.join(", ") : String(arr || "");
+        if (rule.inbound_tags && (Array.isArray(rule.inbound_tags) ? rule.inbound_tags.length > 0 : rule.inbound_tags)) {
+            conditions.push(`<span style="color:var(--accent-orange); font-size:12px; margin-right:4px;">Inbounds:</span>${fmtArr(rule.inbound_tags)}`);
         }
-        if (rule.users && rule.users.length > 0) {
-            conditions.push(`<span style="color:#eccc68; font-size:12px; margin-right:4px;">Users:</span>${rule.users.join(", ")}`);
+        if (rule.users && (Array.isArray(rule.users) ? rule.users.length > 0 : rule.users)) {
+            conditions.push(`<span style="color:#eccc68; font-size:12px; margin-right:4px;">Users:</span>${fmtArr(rule.users)}`);
         }
-        if (rule.domains && rule.domains.length > 0) {
-            conditions.push(`<span style="color:var(--accent-blue); font-size:12px; margin-right:4px;">Domains:</span>${rule.domains.length} шт.`);
+        if (rule.domains && (Array.isArray(rule.domains) ? rule.domains.length > 0 : rule.domains)) {
+            const dCount = Array.isArray(rule.domains) ? rule.domains.length : 1;
+            conditions.push(`<span style="color:var(--accent-blue); font-size:12px; margin-right:4px;">Domains:</span>${dCount} ${t("routing_count_pcs", "шт.")}`);
         }
-        if (rule.ips && rule.ips.length > 0) {
-            conditions.push(`<span style="color:var(--accent-purple); font-size:12px; margin-right:4px;">IPs:</span>${rule.ips.join(", ")}`);
+        if (rule.ips && (Array.isArray(rule.ips) ? rule.ips.length > 0 : rule.ips)) {
+            conditions.push(`<span style="color:var(--accent-purple); font-size:12px; margin-right:4px;">IPs:</span>${fmtArr(rule.ips)}`);
         }
-        if (rule.protocols && rule.protocols.length > 0) {
-            conditions.push(`<span style="color:#2ed573; font-size:12px; margin-right:4px;">Protos:</span>${rule.protocols.join(", ")}`);
+        if (rule.protocols && (Array.isArray(rule.protocols) ? rule.protocols.length > 0 : rule.protocols)) {
+            conditions.push(`<span style="color:#2ed573; font-size:12px; margin-right:4px;">Protos:</span>${fmtArr(rule.protocols)}`);
         }
         
         const conditionsHtml = conditions.length > 0 
             ? conditions.map(c => `<div style="margin-bottom: 4px; font-size: 13px;">${c}</div>`).join("") 
-            : `<span style="color: var(--text-secondary); font-size:13px;">Any (Всегда)</span>`;
+            : `<span style="color: var(--text-secondary); font-size:13px;">${t("routing_condition_any", "Any (Всегда)")}</span>`;
             
         let badgeClass = "tag-badge";
         const destLower = rule.outbound_tag.toLowerCase();
@@ -168,7 +171,35 @@ export async function loadRoutingRules() {
     const importBtn = document.getElementById("import-routing-preset-btn");
     const importModal = document.getElementById("routing-preset-import-modal");
     if (importBtn && importModal) {
-        importBtn.onclick = () => {
+        importBtn.onclick = async () => {
+            const templateSelect = document.getElementById("preset-template-select");
+            const fileGroup = document.getElementById("preset-file-group");
+
+            function updateFileGroupVisibility() {
+                if (fileGroup && templateSelect) {
+                    fileGroup.style.display = (templateSelect.value === "custom") ? "block" : "none";
+                }
+            }
+
+            if (templateSelect) {
+                try {
+                    const presetsRes = await apiFetch("/api/v1/routing/presets");
+                    const presets = (presetsRes && presetsRes.success && Array.isArray(presetsRes.obj)) ? presetsRes.obj : [];
+                    templateSelect.innerHTML = `<option data-i18n="routing_preset_opt_custom" value="custom">${t("routing_preset_opt_custom", "Загрузить свой JSON файл")}</option>`;
+                    presets.forEach(p => {
+                        const opt = document.createElement("option");
+                        opt.value = p.id;
+                        opt.textContent = `${p.name} (${p.description || p.defaultTarget})`;
+                        templateSelect.appendChild(opt);
+                    });
+                } catch (e) {
+                    console.warn("Failed to load presets for modal:", e);
+                }
+
+                templateSelect.onchange = updateFileGroupVisibility;
+                updateFileGroupVisibility();
+                enhanceAllSelects(importModal);
+            }
             importModal.classList.add("active");
         };
     }
@@ -195,52 +226,15 @@ export async function loadRoutingRules() {
                     showToast(t("routing_invalid_json", "Ошибка парсинга JSON файла"), "error");
                     return;
                 }
-            } else if (templateVal === "ai_bypass") {
-                presetObj = {
-                    rules: [
-                        {
-                            remark: "Route OpenAI & ChatGPT",
-                            outbound_tag: "proxy",
-                            domains: ["geosite:openai", "domain:chatgpt.com", "domain:oaistatic.com", "domain:oaiusercontent.com"],
-                            enable: 1
-                        },
-                        {
-                            remark: "Route Anthropic & Claude",
-                            outbound_tag: "proxy",
-                            domains: ["domain:claude.ai", "domain:anthropic.com"],
-                            enable: 1
-                        }
-                    ]
-                };
-            } else if (templateVal === "block_ads_torrent") {
-                presetObj = {
-                    rules: [
-                        {
-                            remark: "Block Torrent Traffic",
-                            outbound_tag: "blocked",
-                            protocols: ["bittorrent"],
-                            domains: ["domain:torrent", "domain:tracker", "domain:peerexchange", "keyword:torrent"],
-                            enable: 1
-                        },
-                        {
-                            remark: "Block Ad Networks",
-                            outbound_tag: "blocked",
-                            domains: ["geosite:category-ads-all"],
-                            enable: 1
-                        }
-                    ]
-                };
-            } else if (templateVal === "split_ru_direct") {
-                presetObj = {
-                    rules: [
-                        {
-                            remark: "Route RU Government & Yandex Direct",
-                            outbound_tag: "direct",
-                            domains: ["geosite:category-gov-ru", "geosite:yandex"],
-                            enable: 1
-                        }
-                    ]
-                };
+            } else {
+                // Fetch dynamic preset directly from sentinel-core
+                const presetDetailsRes = await apiFetch(`/api/v1/routing/presets/${templateVal}`);
+                if (presetDetailsRes && presetDetailsRes.success && presetDetailsRes.obj) {
+                    presetObj = presetDetailsRes.obj;
+                } else {
+                    showToast(t("routing_preset_load_error", "Не удалось загрузить пресет из ядра"), "error");
+                    return;
+                }
             }
 
             if (!presetObj) return;
@@ -263,61 +257,72 @@ export async function loadRoutingRules() {
 }
 
 export async function loadQuickSecurityRules() {
-    // Load Quick Security Rules settings & outbound selections
+    // Load Quick Security Rules settings & outbound selections dynamically from sentinel-core presets
     try {
-        const [setObj, outboundsRes] = await Promise.all([
+        const [setObj, outboundsRes, presetsRes] = await Promise.all([
             apiFetch("/api/settings"),
-            apiFetch("/api/routing/outbounds")
+            apiFetch("/api/routing/outbounds"),
+            apiFetch("/api/v1/routing/presets")
         ]);
 
         if (setObj && setObj.success) {
-            const bittorrentCb = document.getElementById("quick-block-bittorrent");
-            if (bittorrentCb) bittorrentCb.checked = Boolean(setObj.block_bittorrent);
-            
-            const adsCb = document.getElementById("quick-block-ads");
-            if (adsCb) adsCb.checked = Boolean(setObj.block_ads);
-            
-            const cnCb = document.getElementById("quick-block-cn");
-            if (cnCb) cnCb.checked = Boolean(setObj.block_cn);
-            
-            const ruCb = document.getElementById("quick-block-ru");
-            if (ruCb) ruCb.checked = Boolean(setObj.block_ru);
-            
-            const usCb = document.getElementById("quick-block-us");
-            if (usCb) usCb.checked = Boolean(setObj.block_us);
-
-            const ipCheckersCb = document.getElementById("quick-block-ip-checkers");
-            if (ipCheckersCb) ipCheckersCb.checked = Boolean(setObj.ip_checkers);
-
             const outbounds = (outboundsRes && outboundsRes.success) ? outboundsRes.obj : [];
-            const selectElements = document.querySelectorAll(".quick-outbound-select");
-            selectElements.forEach(select => {
-                select.innerHTML = `
-                    <option value="blocked">BLOCKED</option>
-                    <option value="direct">DIRECT</option>
-                `;
-                outbounds.forEach(ob => {
-                    if (ob.tag !== "blocked" && ob.tag !== "direct") {
-                        const opt = document.createElement("option");
-                        opt.value = ob.tag;
-                        opt.textContent = ob.remark ? `${ob.remark} (${ob.tag})` : ob.tag;
-                        select.appendChild(opt);
-                    }
-                });
-            });
+            const presets = (presetsRes && presetsRes.success && Array.isArray(presetsRes.obj)) ? presetsRes.obj : [];
+            const quickPresets = presets.filter(p => p.type === "quick_rule" || (p.type !== "template" && p.id !== "global_proxy" && p.id !== "direct_all"));
+            const gridContainer = document.getElementById("quick-security-rules-grid");
 
-            const bittorrentOut = document.getElementById("quick-outbound-bittorrent");
-            if (bittorrentOut && setObj.block_bittorrent_outbound) bittorrentOut.value = setObj.block_bittorrent_outbound;
-            const adsOut = document.getElementById("quick-outbound-ads");
-            if (adsOut && setObj.block_ads_outbound) adsOut.value = setObj.block_ads_outbound;
-            const cnOut = document.getElementById("quick-outbound-cn");
-            if (cnOut && setObj.block_cn_outbound) cnOut.value = setObj.block_cn_outbound;
-            const ruOut = document.getElementById("quick-outbound-ru");
-            if (ruOut && setObj.block_ru_outbound) ruOut.value = setObj.block_ru_outbound;
-            const usOut = document.getElementById("quick-outbound-us");
-            if (usOut && setObj.block_us_outbound) usOut.value = setObj.block_us_outbound;
-            const ipCheckersOut = document.getElementById("quick-outbound-ip-checkers");
-            if (ipCheckersOut && setObj.ip_checkers_outbound) ipCheckersOut.value = setObj.ip_checkers_outbound;
+            if (gridContainer) {
+                gridContainer.innerHTML = "";
+
+                quickPresets.forEach(p => {
+                    const presetId = p.id;
+                    const settingKey = (presetId === "ip_checkers") ? "ip_checkers" : `block_${presetId}`;
+                    const outSettingKey = (presetId === "ip_checkers") ? "ip_checkers_outbound" : `block_${presetId}_outbound`;
+                    
+                    const isChecked = Boolean(setObj[settingKey]);
+                    const selectedOutbound = setObj[outSettingKey] || (p.defaultTarget === "block" ? "blocked" : (p.defaultTarget || "direct"));
+
+                    const card = document.createElement("div");
+                    card.id = `quick-rule-card-${presetId}`;
+                    card.style.cssText = "background: var(--bg-input); border: 1px solid var(--border-color); border-radius: 12px; padding: 15px 20px; display: flex; flex-direction: column; gap: 10px;";
+
+                    // Options HTML
+                    let optionsHtml = `
+                        <option value="blocked" ${selectedOutbound === "blocked" ? "selected" : ""}>BLOCKED</option>
+                        <option value="direct" ${selectedOutbound === "direct" ? "selected" : ""}>DIRECT</option>
+                    `;
+                    outbounds.forEach(ob => {
+                        if (ob.tag !== "blocked" && ob.tag !== "direct") {
+                            const sel = selectedOutbound === ob.tag ? "selected" : "";
+                            const label = ob.remark ? `${ob.remark} (${ob.tag})` : ob.tag;
+                            optionsHtml += `<option value="${ob.tag}" ${sel}>${label}</option>`;
+                        }
+                    });
+
+                    card.innerHTML = `
+                        <label for="quick-block-${presetId}" style="display: flex; align-items: center; justify-content: space-between; cursor: pointer; user-select: none; margin: 0;">
+                            <div style="display: flex; flex-direction: column; gap: 4px;">
+                                <span style="font-weight: 600; font-size: 14px;">${p.name}</span>
+                                <span style="font-size: 11px; color: var(--text-secondary);">${p.description || ""}</span>
+                            </div>
+                            <span class="switch-toggle">
+                                <input id="quick-block-${presetId}" type="checkbox" ${isChecked ? "checked" : ""}/>
+                                <span class="switch-slider"></span>
+                            </span>
+                        </label>
+                        <div style="display: flex; align-items: center; justify-content: space-between; gap: 10px; border-top: 1px dashed var(--border-color); padding-top: 8px;">
+                            <span data-i18n="routing_outbound_label" style="font-size: 12px; color: var(--text-secondary);">${t("routing_outbound_label", "Маршрут")}</span>
+                            <select class="select-input quick-outbound-select" id="quick-outbound-${presetId}" style="padding: 4px 8px; font-size: 12px; height: 30px; min-width: 130px;">
+                                ${optionsHtml}
+                            </select>
+                        </div>
+                    `;
+                    gridContainer.appendChild(card);
+                });
+
+                // Initialize custom selects on newly created quick rule cards
+                enhanceAllSelects(gridContainer);
+            }
 
             // Custom Config Warning Banner
             const banner = document.getElementById("custom-config-warning-banner");
@@ -335,8 +340,8 @@ export async function loadQuickSecurityRules() {
                     const coresText = cores.join(", ");
                     const titleEl = document.getElementById("custom-config-banner-title");
                     const textEl = document.getElementById("custom-config-banner-text");
-                    if (titleEl) titleEl.innerText = `⚠️ Внимание: Активен ручной (кастомный) конфиг для ${coresText}!`;
-                    if (textEl) textEl.innerText = `Для ${coresText} включено ручное редактирование файла. Правила маршрутизации панели не применяются движком.`;
+                    if (titleEl) titleEl.innerText = t("routing_custom_config_banner_title_dynamic", "⚠️ Внимание: Активен ручной (кастомный) конфиг для {cores}!").replace("{cores}", coresText);
+                    if (textEl) textEl.innerText = t("routing_custom_config_banner_text_dynamic", "Для {cores} включено ручное редактирование файла. Правила маршрутизации панели не применяются движком.").replace("{cores}", coresText);
                 } else {
                     banner.style.display = "none";
                 }
@@ -373,7 +378,7 @@ export async function openRoutingRuleModal(id = null) {
     
     const inboundSelect = document.getElementById("rule-inbound-select");
     if (inboundSelect) {
-        inboundSelect.innerHTML = '<option value="">Все подключения (Any)</option>';
+        inboundSelect.innerHTML = `<option value="">${t("routing_rule_modal_all_inbounds", "Все подключения (Any)")}</option>`;
         
         const apiOpt = document.createElement("option");
         apiOpt.value = "api";
@@ -387,7 +392,7 @@ export async function openRoutingRuleModal(id = null) {
                 if (hysteria.routingViaXray) {
                     const opt = document.createElement("option");
                     opt.value = `inbound-${ib.id}-socks`;
-                    opt.innerText = `Hysteria 2 - ${ib.remark} (через Xray)`;
+                    opt.innerText = `Hysteria 2 - ${ib.remark} (${t("routing_via_xray", "через Xray")})`;
                     inboundSelect.appendChild(opt);
                 }
             } else {
@@ -404,7 +409,7 @@ export async function openRoutingRuleModal(id = null) {
             
             if (!selectedVal || selectedVal === "api") {
                 if (clientSelectGroup) clientSelectGroup.style.display = "none";
-                if (clientSelect) clientSelect.innerHTML = '<option value="">Все клиенты (All)</option>';
+                if (clientSelect) clientSelect.innerHTML = `<option value="">${t("routing_rule_modal_all_clients", "Все клиенты (All)")}</option>`;
                 return;
             }
             
@@ -414,7 +419,7 @@ export async function openRoutingRuleModal(id = null) {
             
             if (selectedIb && selectedIb.clientStats && selectedIb.clientStats.length > 0) {
                 if (clientSelect) {
-                    clientSelect.innerHTML = '<option value="">Все клиенты (All)</option>';
+                    clientSelect.innerHTML = `<option value="">${t("routing_rule_modal_all_clients", "Все клиенты (All)")}</option>`;
                     selectedIb.clientStats.forEach(c => {
                         const opt = document.createElement("option");
                         opt.value = c.email;
@@ -425,7 +430,7 @@ export async function openRoutingRuleModal(id = null) {
                 if (clientSelectGroup) clientSelectGroup.style.display = "block";
             } else {
                 if (clientSelectGroup) clientSelectGroup.style.display = "none";
-                if (clientSelect) clientSelect.innerHTML = '<option value="">Все клиенты (All)</option>';
+                if (clientSelect) clientSelect.innerHTML = `<option value="">${t("routing_rule_modal_all_clients", "Все клиенты (All)")}</option>`;
             }
         };
     }

@@ -1,250 +1,224 @@
-<section id="tab-dashboard" class="tab-content active">
-    <!-- Блок графиков и логов системы -->
-    <div class="charts-container">
-        <!-- Левая колонка: Ресурсы и График Трафика -->
-        <div class="glass-card chart-card" style="padding: 24px;">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 1px solid var(--border-color); padding-bottom: 14px;">
-                <h3 style="margin: 0; font-size: 16px; font-weight: 700; color: var(--text-primary); border-left: 3.5px solid var(--primary); padding-left: 12px; display: flex; align-items: center; gap: 8px;">
-                    <i class="fa-solid fa-microchip" style="color: var(--accent-cyan);"></i> <span data-i18n="dashboard_usage">Использование ресурсов</span>
-                </h3>
-                <span class="live-pulse-badge" style="display: inline-flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 600; color: var(--accent-green); background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.25); padding: 4px 10px; border-radius: 20px;">
-                    <span class="pulse-dot" style="width: 6px; height: 6px; border-radius: 50%; background: var(--accent-green); box-shadow: 0 0 8px var(--accent-green);"></span> LIVE
+<section class="tab-content active" id="tab-dashboard">
+
+<div class="charts-container">
+
+<div class="glass-card chart-card" style="padding: 24px;">
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 1px solid var(--border-color); padding-bottom: 14px;">
+<h3 style="margin: 0; font-size: 16px; font-weight: 700; color: var(--text-primary); border-left: 3.5px solid var(--primary); padding-left: 12px; display: flex; align-items: center; gap: 8px;">
+<i class="fa-solid fa-microchip" style="color: var(--accent-cyan);"></i> <span data-i18n="dashboard_usage"></span>
+</h3>
+<span class="live-pulse-badge" style="display: inline-flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 600; color: var(--accent-green); background: rgba(16, 185, 129, 0.1); border: 1px solid rgba(16, 185, 129, 0.25); padding: 4px 10px; border-radius: 20px;">
+<span class="pulse-dot" style="width: 6px; height: 6px; border-radius: 50%; background: var(--accent-green); box-shadow: 0 0 8px var(--accent-green);"></span> LIVE
                 </span>
-            </div>
+</div>
 
-            <!-- Круговые диаграммы ресурсов -->
-            <div class="chart-wrapper circular-charts-wrapper" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 15px; height: auto; padding: 10px 0 20px 0; border-bottom: 1px solid var(--border-color); margin-bottom: 20px;">
-                <div class="circular-chart-container" style="display: flex; flex-direction: column; align-items: center; text-align: center; background: rgba(255,255,255,0.015); padding: 14px 8px; border-radius: 14px; border: 1px solid rgba(255,255,255,0.04); transition: transform 0.2s ease, border-color 0.2s ease;">
-                    <div style="position: relative; width: 90px; height: 90px;">
-                        <canvas id="cpuCircularChart"></canvas>
-                        <div class="chart-inner-text" id="cpu-chart-text" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 14px; font-weight: 800; color: var(--text-primary); font-family: var(--font-family);">0.0%</div>
-                    </div>
-                    <div style="margin-top: 10px; font-size: 11px; font-weight: 700; color: var(--accent-cyan); text-transform: uppercase; letter-spacing: 0.8px; display: flex; align-items: center; gap: 4px;" data-i18n="dashboard_cpu">
-                        <i class="fa-solid fa-cpu" style="font-size: 10px;"></i> CPU
-                    </div>
-                    <div id="cpu-value" style="font-size: 11px; font-weight: 600; color: var(--text-muted); margin-top: 2px;">0%</div>
-                </div>
+<div class="chart-wrapper circular-charts-wrapper" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 15px; height: auto; padding: 10px 0 20px 0; border-bottom: 1px solid var(--border-color); margin-bottom: 20px;">
+<div class="circular-chart-container" style="display: flex; flex-direction: column; align-items: center; text-align: center; background: rgba(255,255,255,0.015); padding: 14px 8px; border-radius: 14px; border: 1px solid rgba(255,255,255,0.04); transition: transform 0.2s ease, border-color 0.2s ease;">
+<div style="position: relative; width: 90px; height: 90px;">
+<canvas id="cpuCircularChart"></canvas>
+<div class="chart-inner-text" id="cpu-chart-text" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 14px; font-weight: 800; color: var(--text-primary); font-family: var(--font-family);">...</div>
+</div>
+<div data-i18n="dashboard_cpu" style="margin-top: 10px; font-size: 11px; font-weight: 700; color: var(--accent-cyan); text-transform: uppercase; letter-spacing: 0.8px; display: flex; align-items: center; gap: 4px;"><i class="fa-solid fa-cpu" style="font-size: 10px;"></i></div>
+<div id="cpu-value" style="font-size: 11px; font-weight: 600; color: var(--text-muted); margin-top: 2px;">...</div>
+</div>
+<div class="circular-chart-container" style="display: flex; flex-direction: column; align-items: center; text-align: center; background: rgba(255,255,255,0.015); padding: 14px 8px; border-radius: 14px; border: 1px solid rgba(255,255,255,0.04); transition: transform 0.2s ease, border-color 0.2s ease;">
+<div style="position: relative; width: 90px; height: 90px;">
+<canvas id="ramCircularChart"></canvas>
+<div class="chart-inner-text" id="ram-chart-text" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 14px; font-weight: 800; color: var(--text-primary); font-family: var(--font-family);">...</div>
+</div>
+<div data-i18n="dashboard_ram" style="margin-top: 10px; font-size: 11px; font-weight: 700; color: var(--accent-purple); text-transform: uppercase; letter-spacing: 0.8px; display: flex; align-items: center; gap: 4px;"><i class="fa-solid fa-memory" style="font-size: 10px;"></i></div>
+<div id="ram-value" style="font-size: 11px; font-weight: 600; color: var(--text-muted); margin-top: 2px;">...</div>
+</div>
+<div class="circular-chart-container" style="display: flex; flex-direction: column; align-items: center; text-align: center; background: rgba(255,255,255,0.015); padding: 14px 8px; border-radius: 14px; border: 1px solid rgba(255,255,255,0.04); transition: transform 0.2s ease, border-color 0.2s ease;">
+<div style="position: relative; width: 90px; height: 90px;">
+<canvas id="swapCircularChart"></canvas>
+<div class="chart-inner-text" id="swap-chart-text" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 14px; font-weight: 800; color: var(--text-primary); font-family: var(--font-family);">...</div>
+</div>
+<div data-i18n="dashboard_swap" style="margin-top: 10px; font-size: 11px; font-weight: 700; color: var(--accent-orange); text-transform: uppercase; letter-spacing: 0.8px; display: flex; align-items: center; gap: 4px;"><i class="fa-solid fa-arrows-rotate" style="font-size: 10px;"></i></div>
+<div id="swap-value" style="font-size: 11px; font-weight: 600; color: var(--text-muted); margin-top: 2px;">...</div>
+</div>
+<div class="circular-chart-container" style="display: flex; flex-direction: column; align-items: center; text-align: center; background: rgba(255,255,255,0.015); padding: 14px 8px; border-radius: 14px; border: 1px solid rgba(255,255,255,0.04); transition: transform 0.2s ease, border-color 0.2s ease;">
+<div style="position: relative; width: 90px; height: 90px;">
+<canvas id="diskCircularChart"></canvas>
+<div class="chart-inner-text" id="disk-chart-text" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 14px; font-weight: 800; color: var(--text-primary); font-family: var(--font-family);">...</div>
+</div>
+<div data-i18n="dashboard_disk" style="margin-top: 10px; font-size: 11px; font-weight: 700; color: var(--accent-green); text-transform: uppercase; letter-spacing: 0.8px; display: flex; align-items: center; gap: 4px;"><i class="fa-solid fa-hard-drive" style="font-size: 10px;"></i></div>
+<div id="disk-value" style="font-size: 11px; font-weight: 600; color: var(--text-muted); margin-top: 2px;">...</div>
+</div>
+</div>
 
-                <div class="circular-chart-container" style="display: flex; flex-direction: column; align-items: center; text-align: center; background: rgba(255,255,255,0.015); padding: 14px 8px; border-radius: 14px; border: 1px solid rgba(255,255,255,0.04); transition: transform 0.2s ease, border-color 0.2s ease;">
-                    <div style="position: relative; width: 90px; height: 90px;">
-                        <canvas id="ramCircularChart"></canvas>
-                        <div class="chart-inner-text" id="ram-chart-text" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 14px; font-weight: 800; color: var(--text-primary); font-family: var(--font-family);">0.0%</div>
-                    </div>
-                    <div style="margin-top: 10px; font-size: 11px; font-weight: 700; color: var(--accent-purple); text-transform: uppercase; letter-spacing: 0.8px; display: flex; align-items: center; gap: 4px;" data-i18n="dashboard_ram">
-                        <i class="fa-solid fa-memory" style="font-size: 10px;"></i> RAM
-                    </div>
-                    <div id="ram-value" style="font-size: 11px; font-weight: 600; color: var(--text-muted); margin-top: 2px;">0 / 0 GB</div>
-                </div>
+<div class="net-speed-row" style="display: flex; justify-content: space-around; align-items: center; margin-bottom: 25px; padding: 14px 20px; background: linear-gradient(135deg, rgba(6, 182, 212, 0.05), rgba(124, 58, 237, 0.05)); border-radius: 12px; border: 1px solid rgba(255, 255, 255, 0.08); gap: 20px; flex-wrap: wrap;">
+<div style="display: flex; align-items: center; gap: 10px;">
+<div style="width: 36px; height: 36px; border-radius: 10px; background: rgba(16, 185, 129, 0.12); border: 1px solid rgba(16, 185, 129, 0.25); display: flex; align-items: center; justify-content: center;">
+<i class="fa-solid fa-cloud-arrow-down" style="color: var(--accent-green); font-size: 15px;"></i>
+</div>
+<div>
+<div data-i18n="dashboard_net_speed_down" style="font-size: 11px; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.6px;"></div>
+<span id="net-speed-down-value-usage" style="font-size: 16px; font-weight: 800; color: var(--accent-green); font-family: var(--font-family);">...</span>
+</div>
+</div>
+<div style="width: 1px; height: 30px; background: rgba(255, 255, 255, 0.1);"></div>
+<div style="display: flex; align-items: center; gap: 10px;">
+<div style="width: 36px; height: 36px; border-radius: 10px; background: rgba(139, 92, 246, 0.12); border: 1px solid rgba(139, 92, 246, 0.25); display: flex; align-items: center; justify-content: center;">
+<i class="fa-solid fa-cloud-arrow-up" style="color: var(--accent-purple); font-size: 15px;"></i>
+</div>
+<div>
+<div data-i18n="dashboard_net_speed_up" style="font-size: 11px; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.6px;"></div>
+<span id="net-speed-up-value-usage" style="font-size: 16px; font-weight: 800; color: var(--accent-purple); font-family: var(--font-family);">...</span>
+</div>
+</div>
+</div>
 
-                <div class="circular-chart-container" style="display: flex; flex-direction: column; align-items: center; text-align: center; background: rgba(255,255,255,0.015); padding: 14px 8px; border-radius: 14px; border: 1px solid rgba(255,255,255,0.04); transition: transform 0.2s ease, border-color 0.2s ease;">
-                    <div style="position: relative; width: 90px; height: 90px;">
-                        <canvas id="swapCircularChart"></canvas>
-                        <div class="chart-inner-text" id="swap-chart-text" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 14px; font-weight: 800; color: var(--text-primary); font-family: var(--font-family);">0.0%</div>
-                    </div>
-                    <div style="margin-top: 10px; font-size: 11px; font-weight: 700; color: var(--accent-orange); text-transform: uppercase; letter-spacing: 0.8px; display: flex; align-items: center; gap: 4px;" data-i18n="dashboard_swap">
-                        <i class="fa-solid fa-arrows-rotate" style="font-size: 10px;"></i> SWAP
-                    </div>
-                    <div id="swap-value" style="font-size: 11px; font-weight: 600; color: var(--text-muted); margin-top: 2px;">0 / 0 GB</div>
-                </div>
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+<h4 data-i18n="dashboard_global_traffic" style="font-size: 13px; font-weight: 700; margin: 0; text-transform: uppercase; letter-spacing: 0.8px; color: var(--text-secondary); border-left: 3px solid var(--accent-purple); padding-left: 10px; display: flex; align-items: center; gap: 6px;"><i class="fa-solid fa-chart-area" style="color: var(--accent-purple);"></i></h4>
+</div>
+<div class="chart-wrapper" style="height: 200px; position: relative;">
+<canvas id="globalTrafficChart"></canvas>
+</div>
+</div>
 
-                <div class="circular-chart-container" style="display: flex; flex-direction: column; align-items: center; text-align: center; background: rgba(255,255,255,0.015); padding: 14px 8px; border-radius: 14px; border: 1px solid rgba(255,255,255,0.04); transition: transform 0.2s ease, border-color 0.2s ease;">
-                    <div style="position: relative; width: 90px; height: 90px;">
-                        <canvas id="diskCircularChart"></canvas>
-                        <div class="chart-inner-text" id="disk-chart-text" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 14px; font-weight: 800; color: var(--text-primary); font-family: var(--font-family);">0.0%</div>
-                    </div>
-                    <div style="margin-top: 10px; font-size: 11px; font-weight: 700; color: var(--accent-green); text-transform: uppercase; letter-spacing: 0.8px; display: flex; align-items: center; gap: 4px;" data-i18n="dashboard_disk">
-                        <i class="fa-solid fa-hard-drive" style="font-size: 10px;"></i> Диск
-                    </div>
-                    <div id="disk-value" style="font-size: 11px; font-weight: 600; color: var(--text-muted); margin-top: 2px;">0 / 0 GB</div>
-                </div>
-            </div>
-            
-            <!-- Текущая скорость сети -->
-            <div class="net-speed-row" style="display: flex; justify-content: space-around; align-items: center; margin-bottom: 25px; padding: 14px 20px; background: linear-gradient(135deg, rgba(6, 182, 212, 0.05), rgba(124, 58, 237, 0.05)); border-radius: 12px; border: 1px solid rgba(255, 255, 255, 0.08); gap: 20px; flex-wrap: wrap;">
-                <div style="display: flex; align-items: center; gap: 10px;">
-                    <div style="width: 36px; height: 36px; border-radius: 10px; background: rgba(16, 185, 129, 0.12); border: 1px solid rgba(16, 185, 129, 0.25); display: flex; align-items: center; justify-content: center;">
-                        <i class="fa-solid fa-cloud-arrow-down" style="color: var(--accent-green); font-size: 15px;"></i>
-                    </div>
-                    <div>
-                        <div style="font-size: 11px; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.6px;" data-i18n="dashboard_net_speed_down">Скорость скачивания</div>
-                        <span id="net-speed-down-value-usage" style="font-size: 16px; font-weight: 800; color: var(--accent-green); font-family: var(--font-family);">0 B/s</span>
-                    </div>
-                </div>
-                
-                <div style="width: 1px; height: 30px; background: rgba(255, 255, 255, 0.1);"></div>
+<div class="glass-card info-card" style="padding: 24px;">
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 1px solid var(--border-color); padding-bottom: 14px;">
+<h3 data-i18n="dashboard_sys_info" style="margin: 0; font-size: 16px; font-weight: 700; color: var(--text-primary); border-left: 3.5px solid var(--accent-cyan); padding-left: 12px; display: flex; align-items: center; gap: 8px;"><i class="fa-solid fa-server" style="color: var(--accent-cyan);"></i></h3>
+</div>
+<div class="sys-info-list" style="display: flex; flex-direction: column; gap: 12px;">
+<div class="info-item" style="display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; border-radius: 10px; background: rgba(255,255,255,0.015); border: 1px solid rgba(255,255,255,0.03);">
+<span class="label" style="display: flex; align-items: center; gap: 10px; color: var(--text-secondary); font-size: 13px; font-weight: 500;">
+<i class="fa-solid fa-clock-rotate-left" style="color: var(--accent-orange); width: 18px; text-align: center; font-size: 14px;"></i> <span data-i18n="dashboard_uptime"></span>
+</span>
+<span class="value" id="sys-uptime" style="font-weight: 700; font-size: 13px; color: var(--text-primary); font-family: var(--font-family);">...</span>
+</div>
+<div class="info-item" style="display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; border-radius: 10px; background: rgba(255,255,255,0.015); border: 1px solid rgba(255,255,255,0.03);">
+<span class="label" style="display: flex; align-items: center; gap: 10px; color: var(--text-secondary); font-size: 13px; font-weight: 500;">
+<i class="fa-solid fa-circle-arrow-up" style="color: var(--accent-purple); width: 18px; text-align: center; font-size: 14px;"></i> <span data-i18n="dashboard_net_up"></span>
+</span>
+<span class="value" id="net-up-value" style="font-weight: 700; font-size: 13px; color: var(--accent-purple);">...</span>
+</div>
+<div class="info-item" style="display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; border-radius: 10px; background: rgba(255,255,255,0.015); border: 1px solid rgba(255,255,255,0.03);">
+<span class="label" style="display: flex; align-items: center; gap: 10px; color: var(--text-secondary); font-size: 13px; font-weight: 500;">
+<i class="fa-solid fa-circle-arrow-down" style="color: var(--accent-green); width: 18px; text-align: center; font-size: 14px;"></i> <span data-i18n="dashboard_net_down"></span>
+</span>
+<span class="value" id="net-down-value" style="font-weight: 700; font-size: 13px; color: var(--accent-green);">...</span>
+</div>
+<div class="info-item" style="display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; border-radius: 10px; background: rgba(255,255,255,0.015); border: 1px solid rgba(255,255,255,0.03);">
+<span class="label" style="display: flex; align-items: center; gap: 10px; color: var(--text-secondary); font-size: 13px; font-weight: 500;">
+<span style="width: 18px; display: inline-flex; justify-content: center; align-items: center;">
+<svg fill="#06b6d4" height="16" style="display: inline-block; vertical-align: middle;" viewbox="0 0 24 24" width="16"><path d="M 11,1 C 9.5,7 7,9.5 1,11 L 11,11 Z M 13,1 L 13,11 L 23,11 C 17,9.5 14.5,7 13,1 Z M 13,23 C 14.5,17 17,14.5 23,13 L 13,13 Z M 11,23 L 11,13 L 1,13 C 7,14.5 9.5,17 11,23 Z"></path></svg>
+</span>
+<span data-i18n="dashboard_xray_state"></span>
+</span>
+<span class="value" id="sys-xray-state" style="font-weight: 700; font-size: 13px;">...</span>
+</div>
+<div class="info-item" style="display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; border-radius: 10px; background: rgba(255,255,255,0.015); border: 1px solid rgba(255,255,255,0.03);">
+<span class="label" style="display: flex; align-items: center; gap: 10px; color: var(--text-secondary); font-size: 13px; font-weight: 500;">
+<span style="width: 22px; height: 18px; display: inline-flex; justify-content: center; align-items: center; position: relative;">
+<svg fill="#06b6d4" height="15" style="display: inline-block; vertical-align: middle;" viewbox="0 0 24 24" width="15"><path d="M 11,1 C 9.5,7 7,9.5 1,11 L 11,11 Z M 13,1 L 13,11 L 23,11 C 17,9.5 14.5,7 13,1 Z M 13,23 C 14.5,17 17,14.5 23,13 L 13,13 Z M 11,23 L 11,13 L 1,13 C 7,14.5 9.5,17 11,23 Z"></path></svg>
+<i class="fa-solid fa-tag" style="font-size: 8px; color: #06b6d4; position: absolute; right: -2px; bottom: -2px; background: #0f172a; border-radius: 50%; padding: 1px;"></i>
+</span>
+<span data-i18n="dashboard_xray_version"></span>
+</span>
+<span class="value" id="sys-xray-version" style="font-weight: 600; font-size: 12px; font-family: monospace; color: var(--accent-cyan); background: rgba(6, 182, 212, 0.1); padding: 2px 8px; border-radius: 6px; border: 1px solid rgba(6, 182, 212, 0.2);">...</span>
+</div>
+<div class="info-item" style="display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; border-radius: 10px; background: rgba(255,255,255,0.015); border: 1px solid rgba(255,255,255,0.03);">
+<span class="label" style="display: flex; align-items: center; gap: 10px; color: var(--text-secondary); font-size: 13px; font-weight: 500;">
+<span style="width: 18px; display: inline-flex; justify-content: center; align-items: center;">
+<svg height="13" style="display: inline-block; vertical-align: middle;" viewbox="0 0 442.19 323.31" width="18"><polygon fill="#10b981" points="72.8 140.45 60.1 285.55 102.51 285.55 111.5 182.86 111.54 182.86 115.21 140.45 72.8 140.45"></polygon><polygon fill="#10b981" points="124.16 37.75 81.76 37.75 76.19 101.36 118.59 101.36 124.16 37.75"></polygon><polygon fill="#10b981" points="318.36 285.56 360.44 285.56 366.01 221.95 323.9 221.95 318.36 285.56"></polygon><polygon fill="#10b981" points="382.09 37.76 340 37.76 329.16 161.66 221.09 161.66 206.95 323.31 292.78 201.84 438.67 201.84 442.19 161.66 371.25 161.66 382.09 37.76"></polygon><polygon fill="#ffbc00" points="149.41 121.47 3.52 121.47 0 161.66 221.09 161.66 235.23 0 149.41 121.47"></polygon></svg>
+</span>
+<span data-i18n="dashboard_hysteria_state"></span>
+</span>
+<span class="value" id="sys-hysteria-state" style="font-weight: 700; font-size: 13px;">...</span>
+</div>
+<div class="info-item" style="display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; border-radius: 10px; background: rgba(255,255,255,0.015); border: 1px solid rgba(255,255,255,0.03);">
+<span class="label" style="display: flex; align-items: center; gap: 10px; color: var(--text-secondary); font-size: 13px; font-weight: 500;">
+<span style="width: 22px; height: 18px; display: inline-flex; justify-content: center; align-items: center; position: relative;">
+<svg height="12" style="display: inline-block; vertical-align: middle;" viewbox="0 0 442.19 323.31" width="16"><polygon fill="#10b981" points="72.8 140.45 60.1 285.55 102.51 285.55 111.5 182.86 111.54 182.86 115.21 140.45 72.8 140.45"></polygon><polygon fill="#10b981" points="124.16 37.75 81.76 37.75 76.19 101.36 118.59 101.36 124.16 37.75"></polygon><polygon fill="#10b981" points="318.36 285.56 360.44 285.56 366.01 221.95 323.9 221.95 318.36 285.56"></polygon><polygon fill="#10b981" points="382.09 37.76 340 37.76 329.16 161.66 221.09 161.66 206.95 323.31 292.78 201.84 438.67 201.84 442.19 161.66 371.25 161.66 382.09 37.76"></polygon><polygon fill="#ffbc00" points="149.41 121.47 3.52 121.47 0 161.66 221.09 161.66 235.23 0 149.41 121.47"></polygon></svg>
+<i class="fa-solid fa-tag" style="font-size: 8px; color: #10b981; position: absolute; right: -2px; bottom: -2px; background: #0f172a; border-radius: 50%; padding: 1px;"></i>
+</span>
+<span data-i18n="dashboard_hysteria_version"></span>
+</span>
+<span class="value" id="sys-hysteria-version" style="font-weight: 600; font-size: 12px; font-family: monospace; color: var(--accent-green); background: rgba(16, 185, 129, 0.1); padding: 2px 8px; border-radius: 6px; border: 1px solid rgba(16, 185, 129, 0.2);">...</span>
+</div>
+<div class="info-item" style="display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; border-radius: 10px; background: rgba(255,255,255,0.015); border: 1px solid rgba(255,255,255,0.03);">
+<span class="label" style="display: flex; align-items: center; gap: 10px; color: var(--text-secondary); font-size: 13px; font-weight: 500;">
+<span style="width: 18px; display: inline-flex; justify-content: center; align-items: center;">
+<svg height="16" style="display: inline-block; vertical-align: middle;" viewbox="0 0 24 24" width="16"><path d="M12 2.5 C12.6 2.5 13.2 2.8 13.8 3.1 L20.5 6.5 C21.4 7.0 21.6 7.8 21.2 8.5 L12 13.2 L2.8 8.5 C2.4 7.8 2.6 7.0 3.5 6.5 L10.2 3.1 C10.8 2.8 11.4 2.5 12 2.5 Z" fill="#f59e0b"></path><path d="M2.8 8.5 L12 13.2 V20.5 C12 21.3 11.3 21.9 10.5 21.5 L3.8 18.2 C2.9 17.7 2.4 16.8 2.4 15.8 V9.5 C2.4 8.9 2.5 8.6 2.8 8.5 Z" fill="#d97706"></path><path d="M12 13.2 L21.2 8.5 C21.5 8.6 21.6 8.9 21.6 9.5 V15.8 C21.6 16.8 21.1 17.7 20.2 18.2 L13.5 21.5 C12.7 21.9 12 21.3 12 20.5 V13.2 Z" fill="#b45309"></path><path d="M6.5 4.7 L9.8 3.0 C10.2 3.2 10.6 3.4 11.0 3.6 L18.5 10.2 L15.2 11.8 L6.5 4.7 Z" fill="#fef3c7"></path><path d="M18.5 10.2 L18.5 14.5 C18.5 15.2 17.8 15.6 17.2 15.3 L15.2 14.2 V11.8 L18.5 10.2 Z" fill="#fde68a"></path></svg>
+</span>
+<span data-i18n="dashboard_singbox_state"></span>
+</span>
+<span class="value" id="sys-singbox-state" style="font-weight: 700; font-size: 13px;">...</span>
+</div>
+<div class="info-item" style="display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; border-radius: 10px; background: rgba(255,255,255,0.015); border: 1px solid rgba(255,255,255,0.03);">
+<span class="label" style="display: flex; align-items: center; gap: 10px; color: var(--text-secondary); font-size: 13px; font-weight: 500;">
+<span style="width: 22px; height: 18px; display: inline-flex; justify-content: center; align-items: center; position: relative;">
+<svg height="15" style="display: inline-block; vertical-align: middle;" viewbox="0 0 24 24" width="15"><path d="M12 2.5 C12.6 2.5 13.2 2.8 13.8 3.1 L20.5 6.5 C21.4 7.0 21.6 7.8 21.2 8.5 L12 13.2 L2.8 8.5 C2.4 7.8 2.6 7.0 3.5 6.5 L10.2 3.1 C10.8 2.8 11.4 2.5 12 2.5 Z" fill="#f59e0b"></path><path d="M2.8 8.5 L12 13.2 V20.5 C12 21.3 11.3 21.9 10.5 21.5 L3.8 18.2 C2.9 17.7 2.4 16.8 2.4 15.8 V9.5 C2.4 8.9 2.5 8.6 2.8 8.5 Z" fill="#d97706"></path><path d="M12 13.2 L21.2 8.5 C21.5 8.6 21.6 8.9 21.6 9.5 V15.8 C21.6 16.8 21.1 17.7 20.2 18.2 L13.5 21.5 C12.7 21.9 12 21.3 12 20.5 V13.2 Z" fill="#b45309"></path><path d="M6.5 4.7 L9.8 3.0 C10.2 3.2 10.6 3.4 11.0 3.6 L18.5 10.2 L15.2 11.8 L6.5 4.7 Z" fill="#fef3c7"></path><path d="M18.5 10.2 L18.5 14.5 C18.5 15.2 17.8 15.6 17.2 15.3 L15.2 14.2 V11.8 L18.5 10.2 Z" fill="#fde68a"></path></svg>
+<i class="fa-solid fa-tag" style="font-size: 8px; color: #f59e0b; position: absolute; right: -2px; bottom: -2px; background: #0f172a; border-radius: 50%; padding: 1px;"></i>
+</span>
+<span data-i18n="dashboard_singbox_version"></span>
+</span>
+<span class="value" id="sys-singbox-version" style="font-weight: 600; font-size: 12px; font-family: monospace; color: var(--accent-orange); background: rgba(245, 158, 11, 0.1); padding: 2px 8px; border-radius: 6px; border: 1px solid rgba(245, 158, 11, 0.2);">...</span>
+</div>
+<div class="info-item" style="display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; border-radius: 10px; background: rgba(255,255,255,0.015); border: 1px solid rgba(255,255,255,0.03);">
+<span class="label" style="display: flex; align-items: center; gap: 10px; color: var(--text-secondary); font-size: 13px; font-weight: 500;">
+<i class="fa-solid fa-globe" style="color: var(--accent-cyan); width: 18px; text-align: center; font-size: 14px;"></i> <span data-i18n="dashboard_server_ip"></span>
+</span>
+<span class="value" id="sys-ip" style="font-weight: 600; font-size: 12px; font-family: monospace; color: var(--accent-cyan);">...</span>
+</div>
+<div class="info-item" style="display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; border-radius: 10px; background: rgba(255,255,255,0.015); border: 1px solid rgba(255,255,255,0.03);">
+<span class="label" style="display: flex; align-items: center; gap: 10px; color: var(--text-secondary); font-size: 13px; font-weight: 500;">
+<i class="fa-solid fa-gauge-high" style="color: var(--accent-rose); width: 18px; text-align: center; font-size: 14px;"></i> <span data-i18n="dashboard_bbr_status"></span>
+</span>
+<div style="display: flex; align-items: center; gap: 10px;">
+<span class="value" data-i18n="checking" id="sys-bbr" style="font-weight: 700; font-size: 13px;"></span>
+<button class="btn secondary-btn" data-i18n="dashboard_enable_bbr" id="enable-bbr-btn" style="padding: 4px 10px; font-size: 11px; border-radius: 6px; display: none; background: rgba(16, 185, 129, 0.15); color: var(--accent-green); border: 1px solid rgba(16, 185, 129, 0.3);"></button>
+</div>
+</div>
+</div>
+</div>
+</div>
 
-                <div style="display: flex; align-items: center; gap: 10px;">
-                    <div style="width: 36px; height: 36px; border-radius: 10px; background: rgba(139, 92, 246, 0.12); border: 1px solid rgba(139, 92, 246, 0.25); display: flex; align-items: center; justify-content: center;">
-                        <i class="fa-solid fa-cloud-arrow-up" style="color: var(--accent-purple); font-size: 15px;"></i>
-                    </div>
-                    <div>
-                        <div style="font-size: 11px; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.6px;" data-i18n="dashboard_net_speed_up">Скорость отправки</div>
-                        <span id="net-speed-up-value-usage" style="font-size: 16px; font-weight: 800; color: var(--accent-purple); font-family: var(--font-family);">0 B/s</span>
-                    </div>
-                </div>
-            </div>
-            
-            <!-- График трафика -->
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
-                <h4 data-i18n="dashboard_global_traffic" style="font-size: 13px; font-weight: 700; margin: 0; text-transform: uppercase; letter-spacing: 0.8px; color: var(--text-secondary); border-left: 3px solid var(--accent-purple); padding-left: 10px; display: flex; align-items: center; gap: 6px;">
-                    <i class="fa-solid fa-chart-area" style="color: var(--accent-purple);"></i> Потребление трафика за 30 дней
-                </h4>
-            </div>
-            <div class="chart-wrapper" style="height: 200px; position: relative;">
-                <canvas id="globalTrafficChart"></canvas>
-            </div>
-        </div>
+<div class="glass-card client-list-card" style="margin-top: 25px; padding: 24px; border-radius: 16px; border: 1px solid var(--border-color);">
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 15px;">
+<h3 data-i18n="dashboard_clients_title" style="margin: 0; border-left: 3.5px solid var(--primary); padding-left: 12px; font-size: 17px; font-weight: 700; color: var(--text-primary); display: flex; align-items: center; gap: 8px;"><i class="fa-solid fa-users" style="color: var(--primary);"></i></h3>
+<div style="display: flex; gap: 15px; align-items: center; flex-wrap: wrap;">
 
-        <!-- Правая колонка: Системная информация -->
-        <div class="glass-card info-card" style="padding: 24px;">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 1px solid var(--border-color); padding-bottom: 14px;">
-                <h3 style="margin: 0; font-size: 16px; font-weight: 700; color: var(--text-primary); border-left: 3.5px solid var(--accent-cyan); padding-left: 12px; display: flex; align-items: center; gap: 8px;" data-i18n="dashboard_sys_info">
-                    <i class="fa-solid fa-server" style="color: var(--accent-cyan);"></i> Системная информация
-                </h3>
-            </div>
-            <div class="sys-info-list" style="display: flex; flex-direction: column; gap: 12px;">
-                <div class="info-item" style="display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; border-radius: 10px; background: rgba(255,255,255,0.015); border: 1px solid rgba(255,255,255,0.03);">
-                    <span class="label" style="display: flex; align-items: center; gap: 10px; color: var(--text-secondary); font-size: 13px; font-weight: 500;">
-                        <i class="fa-solid fa-clock-rotate-left" style="color: var(--accent-orange); width: 18px; text-align: center; font-size: 14px;"></i> <span data-i18n="dashboard_uptime">Аптайм сервера</span>
-                    </span>
-                    <span class="value" id="sys-uptime" style="font-weight: 700; font-size: 13px; color: var(--text-primary); font-family: var(--font-family);">0ч 0м</span>
-                </div>
-                <div class="info-item" style="display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; border-radius: 10px; background: rgba(255,255,255,0.015); border: 1px solid rgba(255,255,255,0.03);">
-                    <span class="label" style="display: flex; align-items: center; gap: 10px; color: var(--text-secondary); font-size: 13px; font-weight: 500;">
-                        <i class="fa-solid fa-circle-arrow-up" style="color: var(--accent-purple); width: 18px; text-align: center; font-size: 14px;"></i> <span data-i18n="dashboard_net_up">Исходящий трафик</span>
-                    </span>
-                    <span class="value" id="net-up-value" style="font-weight: 700; font-size: 13px; color: var(--accent-purple);">0 GB</span>
-                </div>
-                <div class="info-item" style="display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; border-radius: 10px; background: rgba(255,255,255,0.015); border: 1px solid rgba(255,255,255,0.03);">
-                    <span class="label" style="display: flex; align-items: center; gap: 10px; color: var(--text-secondary); font-size: 13px; font-weight: 500;">
-                        <i class="fa-solid fa-circle-arrow-down" style="color: var(--accent-green); width: 18px; text-align: center; font-size: 14px;"></i> <span data-i18n="dashboard_net_down">Входящий трафик</span>
-                    </span>
-                    <span class="value" id="net-down-value" style="font-weight: 700; font-size: 13px; color: var(--accent-green);">0 GB</span>
-                </div>
-                <div class="info-item" style="display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; border-radius: 10px; background: rgba(255,255,255,0.015); border: 1px solid rgba(255,255,255,0.03);">
-                    <span class="label" style="display: flex; align-items: center; gap: 10px; color: var(--text-secondary); font-size: 13px; font-weight: 500;">
-                        <span style="width: 18px; display: inline-flex; justify-content: center; align-items: center;">
-                            <svg viewBox="0 0 24 24" width="16" height="16" fill="#06b6d4" style="display: inline-block; vertical-align: middle;"><path d="M 11,1 C 9.5,7 7,9.5 1,11 L 11,11 Z M 13,1 L 13,11 L 23,11 C 17,9.5 14.5,7 13,1 Z M 13,23 C 14.5,17 17,14.5 23,13 L 13,13 Z M 11,23 L 11,13 L 1,13 C 7,14.5 9.5,17 11,23 Z"/></svg>
-                        </span>
-                        <span data-i18n="dashboard_xray_state">Статус Xray</span>
-                    </span>
-                    <span class="value" id="sys-xray-state" style="font-weight: 700; font-size: 13px;">Неизвестно</span>
-                </div>
-                <div class="info-item" style="display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; border-radius: 10px; background: rgba(255,255,255,0.015); border: 1px solid rgba(255,255,255,0.03);">
-                    <span class="label" style="display: flex; align-items: center; gap: 10px; color: var(--text-secondary); font-size: 13px; font-weight: 500;">
-                        <span style="width: 22px; height: 18px; display: inline-flex; justify-content: center; align-items: center; position: relative;">
-                            <svg viewBox="0 0 24 24" width="15" height="15" fill="#06b6d4" style="display: inline-block; vertical-align: middle;"><path d="M 11,1 C 9.5,7 7,9.5 1,11 L 11,11 Z M 13,1 L 13,11 L 23,11 C 17,9.5 14.5,7 13,1 Z M 13,23 C 14.5,17 17,14.5 23,13 L 13,13 Z M 11,23 L 11,13 L 1,13 C 7,14.5 9.5,17 11,23 Z"/></svg>
-                            <i class="fa-solid fa-tag" style="font-size: 8px; color: #06b6d4; position: absolute; right: -2px; bottom: -2px; background: #0f172a; border-radius: 50%; padding: 1px;"></i>
-                        </span>
-                        <span data-i18n="dashboard_xray_version">Версия Xray</span>
-                    </span>
-                    <span class="value" id="sys-xray-version" style="font-weight: 600; font-size: 12px; font-family: monospace; color: var(--accent-cyan); background: rgba(6, 182, 212, 0.1); padding: 2px 8px; border-radius: 6px; border: 1px solid rgba(6, 182, 212, 0.2);">v1.8.24</span>
-                </div>
-                <div class="info-item" style="display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; border-radius: 10px; background: rgba(255,255,255,0.015); border: 1px solid rgba(255,255,255,0.03);">
-                    <span class="label" style="display: flex; align-items: center; gap: 10px; color: var(--text-secondary); font-size: 13px; font-weight: 500;">
-                        <span style="width: 18px; display: inline-flex; justify-content: center; align-items: center;">
-                            <svg viewBox="0 0 442.19 323.31" width="18" height="13" style="display: inline-block; vertical-align: middle;"><polygon fill="#10b981" points="72.8 140.45 60.1 285.55 102.51 285.55 111.5 182.86 111.54 182.86 115.21 140.45 72.8 140.45"/><polygon fill="#10b981" points="124.16 37.75 81.76 37.75 76.19 101.36 118.59 101.36 124.16 37.75"/><polygon fill="#10b981" points="318.36 285.56 360.44 285.56 366.01 221.95 323.9 221.95 318.36 285.56"/><polygon fill="#10b981" points="382.09 37.76 340 37.76 329.16 161.66 221.09 161.66 206.95 323.31 292.78 201.84 438.67 201.84 442.19 161.66 371.25 161.66 382.09 37.76"/><polygon fill="#ffbc00" points="149.41 121.47 3.52 121.47 0 161.66 221.09 161.66 235.23 0 149.41 121.47"/></svg>
-                        </span>
-                        <span data-i18n="dashboard_hysteria_state">Статус Hysteria</span>
-                    </span>
-                    <span class="value" id="sys-hysteria-state" style="font-weight: 700; font-size: 13px;">Неизвестно</span>
-                </div>
-                <div class="info-item" style="display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; border-radius: 10px; background: rgba(255,255,255,0.015); border: 1px solid rgba(255,255,255,0.03);">
-                    <span class="label" style="display: flex; align-items: center; gap: 10px; color: var(--text-secondary); font-size: 13px; font-weight: 500;">
-                        <span style="width: 22px; height: 18px; display: inline-flex; justify-content: center; align-items: center; position: relative;">
-                            <svg viewBox="0 0 442.19 323.31" width="16" height="12" style="display: inline-block; vertical-align: middle;"><polygon fill="#10b981" points="72.8 140.45 60.1 285.55 102.51 285.55 111.5 182.86 111.54 182.86 115.21 140.45 72.8 140.45"/><polygon fill="#10b981" points="124.16 37.75 81.76 37.75 76.19 101.36 118.59 101.36 124.16 37.75"/><polygon fill="#10b981" points="318.36 285.56 360.44 285.56 366.01 221.95 323.9 221.95 318.36 285.56"/><polygon fill="#10b981" points="382.09 37.76 340 37.76 329.16 161.66 221.09 161.66 206.95 323.31 292.78 201.84 438.67 201.84 442.19 161.66 371.25 161.66 382.09 37.76"/><polygon fill="#ffbc00" points="149.41 121.47 3.52 121.47 0 161.66 221.09 161.66 235.23 0 149.41 121.47"/></svg>
-                            <i class="fa-solid fa-tag" style="font-size: 8px; color: #10b981; position: absolute; right: -2px; bottom: -2px; background: #0f172a; border-radius: 50%; padding: 1px;"></i>
-                        </span>
-                        <span data-i18n="dashboard_hysteria_version">Версия Hysteria</span>
-                    </span>
-                    <span class="value" id="sys-hysteria-version" style="font-weight: 600; font-size: 12px; font-family: monospace; color: var(--accent-green); background: rgba(16, 185, 129, 0.1); padding: 2px 8px; border-radius: 6px; border: 1px solid rgba(16, 185, 129, 0.2);">Неизвестно</span>
-                </div>
-                <div class="info-item" style="display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; border-radius: 10px; background: rgba(255,255,255,0.015); border: 1px solid rgba(255,255,255,0.03);">
-                    <span class="label" style="display: flex; align-items: center; gap: 10px; color: var(--text-secondary); font-size: 13px; font-weight: 500;">
-                        <span style="width: 18px; display: inline-flex; justify-content: center; align-items: center;">
-                            <svg viewBox="0 0 24 24" width="16" height="16" style="display: inline-block; vertical-align: middle;"><path d="M12 2.5 C12.6 2.5 13.2 2.8 13.8 3.1 L20.5 6.5 C21.4 7.0 21.6 7.8 21.2 8.5 L12 13.2 L2.8 8.5 C2.4 7.8 2.6 7.0 3.5 6.5 L10.2 3.1 C10.8 2.8 11.4 2.5 12 2.5 Z" fill="#f59e0b"/><path d="M2.8 8.5 L12 13.2 V20.5 C12 21.3 11.3 21.9 10.5 21.5 L3.8 18.2 C2.9 17.7 2.4 16.8 2.4 15.8 V9.5 C2.4 8.9 2.5 8.6 2.8 8.5 Z" fill="#d97706"/><path d="M12 13.2 L21.2 8.5 C21.5 8.6 21.6 8.9 21.6 9.5 V15.8 C21.6 16.8 21.1 17.7 20.2 18.2 L13.5 21.5 C12.7 21.9 12 21.3 12 20.5 V13.2 Z" fill="#b45309"/><path d="M6.5 4.7 L9.8 3.0 C10.2 3.2 10.6 3.4 11.0 3.6 L18.5 10.2 L15.2 11.8 L6.5 4.7 Z" fill="#fef3c7"/><path d="M18.5 10.2 L18.5 14.5 C18.5 15.2 17.8 15.6 17.2 15.3 L15.2 14.2 V11.8 L18.5 10.2 Z" fill="#fde68a"/></svg>
-                        </span>
-                        <span data-i18n="dashboard_singbox_state">Статус sing-box</span>
-                    </span>
-                    <span class="value" id="sys-singbox-state" style="font-weight: 700; font-size: 13px;">Неизвестно</span>
-                </div>
-                <div class="info-item" style="display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; border-radius: 10px; background: rgba(255,255,255,0.015); border: 1px solid rgba(255,255,255,0.03);">
-                    <span class="label" style="display: flex; align-items: center; gap: 10px; color: var(--text-secondary); font-size: 13px; font-weight: 500;">
-                        <span style="width: 22px; height: 18px; display: inline-flex; justify-content: center; align-items: center; position: relative;">
-                            <svg viewBox="0 0 24 24" width="15" height="15" style="display: inline-block; vertical-align: middle;"><path d="M12 2.5 C12.6 2.5 13.2 2.8 13.8 3.1 L20.5 6.5 C21.4 7.0 21.6 7.8 21.2 8.5 L12 13.2 L2.8 8.5 C2.4 7.8 2.6 7.0 3.5 6.5 L10.2 3.1 C10.8 2.8 11.4 2.5 12 2.5 Z" fill="#f59e0b"/><path d="M2.8 8.5 L12 13.2 V20.5 C12 21.3 11.3 21.9 10.5 21.5 L3.8 18.2 C2.9 17.7 2.4 16.8 2.4 15.8 V9.5 C2.4 8.9 2.5 8.6 2.8 8.5 Z" fill="#d97706"/><path d="M12 13.2 L21.2 8.5 C21.5 8.6 21.6 8.9 21.6 9.5 V15.8 C21.6 16.8 21.1 17.7 20.2 18.2 L13.5 21.5 C12.7 21.9 12 21.3 12 20.5 V13.2 Z" fill="#b45309"/><path d="M6.5 4.7 L9.8 3.0 C10.2 3.2 10.6 3.4 11.0 3.6 L18.5 10.2 L15.2 11.8 L6.5 4.7 Z" fill="#fef3c7"/><path d="M18.5 10.2 L18.5 14.5 C18.5 15.2 17.8 15.6 17.2 15.3 L15.2 14.2 V11.8 L18.5 10.2 Z" fill="#fde68a"/></svg>
-                            <i class="fa-solid fa-tag" style="font-size: 8px; color: #f59e0b; position: absolute; right: -2px; bottom: -2px; background: #0f172a; border-radius: 50%; padding: 1px;"></i>
-                        </span>
-                        <span data-i18n="dashboard_singbox_version">Версия sing-box</span>
-                    </span>
-                    <span class="value" id="sys-singbox-version" style="font-weight: 600; font-size: 12px; font-family: monospace; color: var(--accent-orange); background: rgba(245, 158, 11, 0.1); padding: 2px 8px; border-radius: 6px; border: 1px solid rgba(245, 158, 11, 0.2);">Неизвестно</span>
-                </div>
-                <div class="info-item" style="display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; border-radius: 10px; background: rgba(255,255,255,0.015); border: 1px solid rgba(255,255,255,0.03);">
-                    <span class="label" style="display: flex; align-items: center; gap: 10px; color: var(--text-secondary); font-size: 13px; font-weight: 500;">
-                        <i class="fa-solid fa-globe" style="color: var(--accent-cyan); width: 18px; text-align: center; font-size: 14px;"></i> <span data-i18n="dashboard_server_ip">Адрес сервера</span>
-                    </span>
-                    <span class="value" id="sys-ip" style="font-weight: 600; font-size: 12px; font-family: monospace; color: var(--accent-cyan);">localhost</span>
-                </div>
-                <div class="info-item" style="display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; border-radius: 10px; background: rgba(255,255,255,0.015); border: 1px solid rgba(255,255,255,0.03);">
-                    <span class="label" style="display: flex; align-items: center; gap: 10px; color: var(--text-secondary); font-size: 13px; font-weight: 500;">
-                        <i class="fa-solid fa-gauge-high" style="color: var(--accent-rose); width: 18px; text-align: center; font-size: 14px;"></i> <span data-i18n="dashboard_bbr_status">Ускорение BBR</span>
-                    </span>
-                    <div style="display: flex; align-items: center; gap: 10px;">
-                        <span class="value" id="sys-bbr" style="font-weight: 700; font-size: 13px;">Проверка...</span>
-                        <button id="enable-bbr-btn" class="btn secondary-btn" style="padding: 4px 10px; font-size: 11px; border-radius: 6px; display: none; background: rgba(16, 185, 129, 0.15); color: var(--accent-green); border: 1px solid rgba(16, 185, 129, 0.3);" data-i18n="dashboard_enable_bbr">Включить</button>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-    
-    <!-- Блок списка клиентов -->
-    <div class="glass-card client-list-card" style="margin-top: 25px; padding: 24px; border-radius: 16px; border: 1px solid var(--border-color);">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 15px;">
-            <h3 style="margin: 0; border-left: 3.5px solid var(--primary); padding-left: 12px; font-size: 17px; font-weight: 700; color: var(--text-primary); display: flex; align-items: center; gap: 8px;" data-i18n="dashboard_clients_title">
-                <i class="fa-solid fa-users" style="color: var(--primary);"></i> Список клиентов
-            </h3>
-            <div style="display: flex; gap: 15px; align-items: center; flex-wrap: wrap;">
-                <!-- Фильтры статуса -->
-                <div style="display: flex; gap: 12px; align-items: center; background: rgba(255,255,255,0.02); padding: 4px 12px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.05);">
-                    <label class="checkbox-container" style="display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 600; color: var(--text-secondary); cursor: pointer; user-select: none;">
-                        <input type="checkbox" id="dashboard-filter-online" style="cursor: pointer; width: 14px; height: 14px; accent-color: var(--primary);">
-                        <span data-i18n="dashboard_clients_only_online">Только онлайн</span>
-                    </label>
-                    <div style="width: 1px; height: 16px; background: rgba(255,255,255,0.1);"></div>
-                    <label class="checkbox-container" style="display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 600; color: var(--text-secondary); cursor: pointer; user-select: none;">
-                        <input type="checkbox" id="dashboard-filter-blocked" style="cursor: pointer; width: 14px; height: 14px; accent-color: var(--accent-rose);">
-                        <span data-i18n="dashboard_clients_only_blocked">Только заблокированные</span>
-                    </label>
-                </div>
-                
-                <!-- Поиск и Обновление -->
-                <div style="display: flex; gap: 10px; align-items: center;">
-                    <div style="position: relative;">
-                        <i class="fa-solid fa-magnifying-glass" style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--text-muted); font-size: 12px;"></i>
-                        <input type="text" id="dashboard-clients-search" placeholder="Поиск по email или подключению..." data-i18n-placeholder="dashboard_clients_search_placeholder" style="padding: 7px 12px 7px 34px; font-size: 12px; width: 240px; height: 34px; border-radius: 8px; background: rgba(255,255,255,0.03); border: 1px solid var(--border-color); color: var(--text-primary);">
-                    </div>
-                    <button id="dashboard-clients-refresh" class="btn secondary-btn" style="padding: 0; height: 34px; width: 34px; border-radius: 8px; font-size: 12px; display: inline-flex; align-items: center; justify-content: center;" title="Обновить"><i class="fa-solid fa-rotate"></i></button>
-                </div>
-            </div>
-        </div>
-        
-        <div class="table-container" style="max-height: 520px; overflow-y: auto;">
-            <table class="glass-table">
-                <thead>
-                    <tr>
-                        <th dash-sort="email" style="cursor: pointer; user-select: none;"><span data-i18n="clients_th_email">Email</span> <span class="sort-icon">↕</span></th>
-                        <th dash-sort="status" style="cursor: pointer; user-select: none;"><span data-i18n="clients_th_status">Статус</span> <span class="sort-icon">↕</span></th>
-                        <th dash-sort="inbound" style="cursor: pointer; user-select: none;"><span data-i18n="dashboard_clients_th_inbound">Подключение</span> <span class="sort-icon">↕</span></th>
-                        <th dash-sort="used" style="cursor: pointer; user-select: none;"><span data-i18n="clients_th_used">Использовано</span> <span class="sort-icon">↕</span></th>
-                        <th dash-sort="limit" style="cursor: pointer; user-select: none;"><span data-i18n="clients_th_limit">Лимит</span> <span class="sort-icon">↕</span></th>
-                        <th dash-sort="expiry" style="cursor: pointer; user-select: none;"><span data-i18n="clients_th_expiry">Срок действия</span> <span class="sort-icon">↕</span></th>
-                        <th data-i18n="clients_th_actions">Действия</th>
-                    </tr>
-                </thead>
-                <tbody id="dashboard-clients-table-body">
-                    <!-- Заполняется динамически -->
-                </tbody>
-            </table>
-        </div>
-    </div>
+<div style="display: flex; gap: 12px; align-items: center; background: rgba(255,255,255,0.02); padding: 4px 12px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.05);">
+<label class="checkbox-container" style="display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 600; color: var(--text-secondary); cursor: pointer; user-select: none;">
+<input id="dashboard-filter-online" style="cursor: pointer; width: 14px; height: 14px; accent-color: var(--primary);" type="checkbox"/>
+<span data-i18n="dashboard_clients_only_online"></span>
+</label>
+<div style="width: 1px; height: 16px; background: rgba(255,255,255,0.1);"></div>
+<label class="checkbox-container" style="display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 600; color: var(--text-secondary); cursor: pointer; user-select: none;">
+<input id="dashboard-filter-blocked" style="cursor: pointer; width: 14px; height: 14px; accent-color: var(--accent-rose);" type="checkbox"/>
+<span data-i18n="dashboard_clients_only_blocked"></span>
+</label>
+</div>
+
+<div style="display: flex; gap: 10px; align-items: center;">
+<div style="position: relative;">
+<i class="fa-solid fa-magnifying-glass" style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--text-muted); font-size: 12px;"></i>
+<input data-i18n-placeholder="dashboard_clients_search_placeholder" id="dashboard-clients-search" placeholder="" style="padding: 7px 12px 7px 34px; font-size: 12px; width: 240px; height: 34px; border-radius: 8px; background: rgba(255,255,255,0.03); border: 1px solid var(--border-color); color: var(--text-primary);" type="text"/>
+</div>
+<button class="btn secondary-btn" data-i18n-title="btn_refresh" id="dashboard-clients-refresh" style="padding: 0; height: 34px; width: 34px; border-radius: 8px; font-size: 12px; display: inline-flex; align-items: center; justify-content: center;" title=""><i class="fa-solid fa-rotate"></i></button>
+</div>
+</div>
+</div>
+<div class="table-container" style="max-height: 520px; overflow-y: auto;">
+<table class="glass-table">
+<thead>
+<tr>
+<th dash-sort="email" style="cursor: pointer; user-select: none;"><span data-i18n="clients_th_email"></span> <span class="sort-icon">↕</span></th>
+<th dash-sort="status" style="cursor: pointer; user-select: none;"><span data-i18n="clients_th_status"></span> <span class="sort-icon">↕</span></th>
+<th dash-sort="inbound" style="cursor: pointer; user-select: none;"><span data-i18n="dashboard_clients_th_inbound"></span> <span class="sort-icon">↕</span></th>
+<th dash-sort="used" style="cursor: pointer; user-select: none;"><span data-i18n="clients_th_used"></span> <span class="sort-icon">↕</span></th>
+<th dash-sort="limit" style="cursor: pointer; user-select: none;"><span data-i18n="clients_th_limit"></span> <span class="sort-icon">↕</span></th>
+<th dash-sort="expiry" style="cursor: pointer; user-select: none;"><span data-i18n="clients_th_expiry"></span> <span class="sort-icon">↕</span></th>
+<th data-i18n="clients_th_actions"></th>
+</tr>
+</thead>
+<tbody id="dashboard-clients-table-body">
+
+</tbody>
+</table>
+</div>
+</div>
 </section>

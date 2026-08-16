@@ -21,8 +21,6 @@ from backend.hysteria.config import (
 from backend.hysteria.service import (
     hysteria_processes,
     _last_hysteria_stats,
-    _hysteria_tailer_running,
-    tail_hysteria_logs,
     get_hysteria_logs,
     is_hysteria_running,
     start_hysteria,
@@ -51,8 +49,6 @@ __all__ = [
     "ensure_hysteria_quic_and_log",
     "hysteria_processes",
     "_last_hysteria_stats",
-    "_hysteria_tailer_running",
-    "tail_hysteria_logs",
     "get_hysteria_logs",
     "is_hysteria_running",
     "start_hysteria",

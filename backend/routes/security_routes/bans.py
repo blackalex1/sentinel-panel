@@ -6,6 +6,7 @@ from pydantic import BaseModel
 from fastapi import APIRouter, Request, Form
 
 from backend.auth_utils import check_auth, decoy_response
+from backend.i18n import t, get_lang
 
 router = APIRouter()
 
@@ -35,6 +36,7 @@ async def unban_ip(request: Request, ip: str = Form(...)):
     if not check_auth(request):
         return decoy_response()
         
+    lang = get_lang(request)
     from backend.database import get_setting, set_setting
     
     banned_ips = get_setting("banned_login_ips", "")
@@ -49,8 +51,8 @@ async def unban_ip(request: Request, ip: str = Form(...)):
         except Exception as ex:
             logging.warning(f"Failed to remove IP from iptables: {ex}")
             
-        return {"success": True, "msg": f"IP {ip} разблокирован"}
-    return {"success": False, "msg": f"IP {ip} не найден в списке заблокированных"}
+        return {"success": True, "msg": t("security_ip_unbanned", lang=lang, category="backend", ip=ip)}
+    return {"success": False, "msg": t("security_ip_not_in_banned_list", lang=lang, category="backend", ip=ip)}
 
 
 @router.get("/api/security/audit-logs")
@@ -94,6 +96,7 @@ async def clear_connection_logs(request: Request):
     if not check_auth(request):
         return decoy_response()
         
+    lang = get_lang(request)
     try:
         from backend.models import AuditLog
         from backend.database import db_session
@@ -111,7 +114,7 @@ async def clear_connection_logs(request: Request):
         from backend.audit import get_actor_username
         log_action(get_actor_username(request), "clear_connection_logs", details="Connection logs cleared via Web UI")
         
-        return {"success": True, "msg": "База подключений успешно очищена"}
+        return {"success": True, "msg": t("security_connection_logs_cleared", lang=lang, category="backend")}
     except Exception as e:
         return {"success": False, "msg": f"Failed to clear connection logs: {e}"}
 
@@ -151,6 +154,7 @@ async def get_banned_ips(request: Request):
     if not check_auth(request):
         return decoy_response()
         
+    lang = get_lang(request)
     from backend.database import get_setting, db_session
     from backend.models import AuditLog
     
@@ -164,14 +168,14 @@ async def get_banned_ips(request: Request):
                 (AuditLog.target == ip) | (AuditLog.details.like(f"%{ip}%"))
             ).order_by(AuditLog.timestamp.desc()).first()
             
-            reason = "2FA-блокировка или настройки"
+            reason = t("security_reason_2fa_or_settings", lang=lang, category="backend")
             if log_entry:
                 if log_entry.action == "login_rate_limited":
-                    reason = "Превышение попыток входа (Bruteforce)"
+                    reason = t("security_reason_bruteforce", lang=lang, category="backend")
                 elif "block" in log_entry.action or "ban" in log_entry.action:
-                    reason = f"Блокировка ({log_entry.action})"
+                    reason = t("security_reason_block_action", lang=lang, category="backend", action=log_entry.action)
                 else:
-                    reason = f"Активность: {log_entry.details[:40]}"
+                    reason = t("security_reason_activity", lang=lang, category="backend", details=log_entry.details[:40])
             
             result.append({
                 "ip": ip,
@@ -186,6 +190,7 @@ async def get_banned_clients(request: Request):
     if not check_auth(request):
         return decoy_response()
         
+    lang = get_lang(request)
     from backend.database import db_session
     from backend.models import ClientStats, Inbound
     
@@ -198,7 +203,7 @@ async def get_banned_clients(request: Request):
         ).all()
         
         for cs, ib in clients:
-            reason = cs.block_reason or "Клиент отключен"
+            reason = cs.block_reason or t("security_reason_client_disabled", lang=lang, category="backend")
             result.append({
                 "email": cs.email,
                 "inbound_id": cs.inbound_id,
@@ -216,6 +221,7 @@ async def unban_client(body: UnbanClientBody, request: Request):
     if not check_auth(request):
         return decoy_response()
         
+    lang = get_lang(request)
     from backend.database import db_session
     from backend.models import ClientStats
     from backend.audit import log_action, get_actor_username
@@ -229,7 +235,7 @@ async def unban_client(body: UnbanClientBody, request: Request):
         clients = query.all()
         
         if not clients:
-            return {"success": False, "msg": f"Клиент {body.email} не найден"}
+            return {"success": False, "msg": t("security_client_not_found", lang=lang, category="backend", email=body.email)}
             
         for cs in clients:
             cs.enable = 1
@@ -244,5 +250,5 @@ async def unban_client(body: UnbanClientBody, request: Request):
     except Exception as e:
         logging.error(f"Error restarting cores after client unban: {e}")
         
-    return {"success": True, "msg": f"Клиент {body.email} успешно разблокирован"}
+    return {"success": True, "msg": t("security_client_unbanned_success", lang=lang, category="backend", email=body.email)}
 

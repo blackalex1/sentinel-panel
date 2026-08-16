@@ -126,7 +126,7 @@ export function renderSelectedHysteriaConfig(config, clients = []) {
     html += `<div style="margin-bottom: 25px;">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
             <h4 style="margin: 0; font-size: 15px; font-weight: 600; color: var(--accent-orange); display: flex; align-items: center; gap: 8px;">
-                <i class="fa-solid fa-file-invoice"></i> <span data-i18n="config_log_title">Системные настройки и логирование</span>
+                <i class="fa-solid fa-file-invoice"></i> <span data-i18n="config_log_title">${t("config_log_title", "Системные настройки и логирование")}</span>
             </h4>
         </div>
         <div class="glass-card" style="padding: 16px; border-radius: 12px; background: rgba(255,255,255,0.015); border: 1px solid var(--border-color);">
@@ -148,7 +148,7 @@ export function renderSelectedHysteriaConfig(config, clients = []) {
     html += `<div style="margin-bottom: 25px;">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
             <h4 style="margin: 0; font-size: 15px; font-weight: 600; color: var(--accent-orange); display: flex; align-items: center; gap: 8px;">
-                <i class="fa-solid fa-gears"></i> <span data-i18n="config_general_title">Основные параметры Hysteria 2</span>
+                <i class="fa-solid fa-gears"></i> <span data-i18n="config_general_title">${t("config_general_title", "Основные параметры Hysteria 2")}</span>
             </h4>
             <button class="btn secondary-btn edit-json-btn" data-type="hysteria-general" style="padding: 4px 8px; font-size: 11px; display: inline-flex; align-items: center; gap: 4px; height: auto;"><i class="fa-regular fa-pen-to-square"></i> JSON</button>
         </div>`;
@@ -215,7 +215,7 @@ export function renderSelectedHysteriaConfig(config, clients = []) {
     html += `<div style="margin-bottom: 25px;">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
             <h4 style="margin: 0; font-size: 15px; font-weight: 600; color: var(--accent-blue); display: flex; align-items: center; gap: 8px;">
-                <i class="fa-solid fa-users"></i> <span data-i18n="hysteria_config_users">Авторизованные пользователи (Auth Users)</span>
+                <i class="fa-solid fa-users"></i> <span data-i18n="hysteria_config_users">${t("hysteria_config_users", "Авторизованные пользователи (Auth Users)")}</span>
             </h4>
             <button class="btn secondary-btn edit-json-btn" data-type="hysteria-auth" style="padding: 4px 8px; font-size: 11px; display: inline-flex; align-items: center; gap: 4px; height: auto;"><i class="fa-regular fa-pen-to-square"></i> JSON</button>
         </div>
@@ -223,8 +223,8 @@ export function renderSelectedHysteriaConfig(config, clients = []) {
             <table class="glass-table">
                 <thead>
                     <tr>
-                        <th data-i18n="hysteria_config_th_email">Идентификатор (Email)</th>
-                        <th data-i18n="hysteria_config_th_password">Пароль / UUID</th>
+                        <th data-i18n="hysteria_config_th_email">${t("hysteria_config_th_email", "Идентификатор (Email)")}</th>
+                        <th data-i18n="hysteria_config_th_password">${t("hysteria_config_th_password", "Пароль / UUID")}</th>
                     </tr>
                 </thead>
                 <tbody>`;
@@ -246,10 +246,10 @@ export function renderSelectedHysteriaConfig(config, clients = []) {
                 </tr>`;
             });
         } else {
-            html += `<tr><td colspan="2" style="text-align: center; color: var(--text-muted);" data-i18n="config_no_users">Нет активных пользователей</td></tr>`;
+            html += `<tr><td colspan="2" style="text-align: center; color: var(--text-muted);" data-i18n="config_no_users">${t("config_no_users", "Нет активных пользователей")}</td></tr>`;
         }
     } else {
-        html += `<tr><td colspan="2" style="text-align: center; color: var(--text-muted);" data-i18n="config_no_users">Пользователи отсутствуют</td></tr>`;
+        html += `<tr><td colspan="2" style="text-align: center; color: var(--text-muted);" data-i18n="config_no_users">${t("config_no_users", "Пользователи отсутствуют")}</td></tr>`;
     }
     html += `</tbody></table></div></div>`;
     
@@ -257,7 +257,7 @@ export function renderSelectedHysteriaConfig(config, clients = []) {
     html += `<div style="margin-bottom: 25px;">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
             <h4 style="margin: 0; font-size: 15px; font-weight: 600; color: var(--accent-green); display: flex; align-items: center; gap: 8px;">
-                <i class="fa-solid fa-arrow-right-from-bracket"></i> <span data-i18n="hysteria_config_outbounds">Исходящие подключения (Outbounds)</span>
+                <i class="fa-solid fa-arrow-right-from-bracket"></i> <span data-i18n="hysteria_config_outbounds">${t("hysteria_config_outbounds", "Исходящие подключения (Outbounds)")}</span>
             </h4>
             <button class="btn secondary-btn edit-json-btn" data-type="hysteria-outbounds" style="padding: 4px 8px; font-size: 11px; display: inline-flex; align-items: center; gap: 4px; height: auto;"><i class="fa-regular fa-pen-to-square"></i> JSON</button>
         </div>`;
@@ -267,9 +267,9 @@ export function renderSelectedHysteriaConfig(config, clients = []) {
             <table class="glass-table">
                 <thead>
                     <tr>
-                        <th data-i18n="hysteria_config_th_out_name">Имя</th>
-                        <th data-i18n="hysteria_config_th_out_type">Тип</th>
-                        <th data-i18n="hysteria_config_th_out_addr">Адрес (Proxy)</th>
+                        <th data-i18n="hysteria_config_th_out_name">${t("hysteria_config_th_out_name", "Имя")}</th>
+                        <th data-i18n="hysteria_config_th_out_type">${t("hysteria_config_th_out_type", "Тип")}</th>
+                        <th data-i18n="hysteria_config_th_out_addr">${t("hysteria_config_th_out_addr", "Адрес (Proxy)")}</th>
                     </tr>
                 </thead>
                 <tbody>`;
@@ -289,7 +289,7 @@ export function renderSelectedHysteriaConfig(config, clients = []) {
         
         html += `</tbody></table></div>`;
     } else {
-        html += `<div class="glass-card" style="padding: 20px; text-align: center; color: var(--text-muted);">Исходящие подключения отсутствуют (Direct Output)</div>`;
+        html += `<div class="glass-card" style="padding: 20px; text-align: center; color: var(--text-muted);" data-i18n="config_no_outbounds_direct">${t("config_no_outbounds_direct", "Исходящие подключения отсутствуют (Direct Output)")}</div>`;
     }
     html += `</div>`;
 
@@ -297,7 +297,7 @@ export function renderSelectedHysteriaConfig(config, clients = []) {
     html += `<div style="margin-bottom: 25px;">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
             <h4 style="margin: 0; font-size: 15px; font-weight: 600; color: var(--accent-purple); display: flex; align-items: center; gap: 8px;">
-                <i class="fa-solid fa-route"></i> <span data-i18n="hysteria_config_routing">Маршрутизация (Routing Rules)</span>
+                <i class="fa-solid fa-route"></i> <span data-i18n="hysteria_config_routing">${t("hysteria_config_routing", "Маршрутизация (Routing Rules)")}</span>
             </h4>
             <button class="btn secondary-btn edit-json-btn" data-type="hysteria-routing" style="padding: 4px 8px; font-size: 11px; display: inline-flex; align-items: center; gap: 4px; height: auto;"><i class="fa-regular fa-pen-to-square"></i> JSON</button>
         </div>
@@ -318,7 +318,7 @@ export function renderSelectedHysteriaConfig(config, clients = []) {
             </tr>`;
         });
     } else {
-        html += `<tr><td colspan="2" style="text-align: center; color: var(--text-muted);">Правила маршрутизации отсутствуют (Прямой доступ)</td></tr>`;
+        html += `<tr><td colspan="2" style="text-align: center; color: var(--text-muted);" data-i18n="config_no_routing_direct">${t("config_no_routing_direct", "Правила маршрутизации отсутствуют (Прямой доступ)")}</td></tr>`;
     }
     html += `</tbody></table></div></div>`;
     
@@ -400,6 +400,6 @@ export function renderSelectedHysteriaConfig(config, clients = []) {
     translatePage(parsedContainer);
     } catch (err) {
         console.error("Error rendering Hysteria config:", err);
-        parsedContainer.innerHTML = `<div class="glass-card" style="padding: 20px; text-align: center; color: var(--accent-rose);">Ошибка отображения структуры конфигурации: ${err.message}</div>`;
+        parsedContainer.innerHTML = `<div class="glass-card" style="padding: 20px; text-align: center; color: var(--accent-rose);">${t("config_render_error", "Ошибка отображения структуры конфигурации")}: ${err.message}</div>`;
     }
 }

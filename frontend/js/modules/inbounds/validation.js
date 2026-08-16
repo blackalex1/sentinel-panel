@@ -51,6 +51,33 @@ export function validateInboundForm() {
                 isValid = false;
             }
         }
+
+        if (proto === "vless") {
+            const decInput = document.getElementById("ib-vless-decryption");
+            const encInput = document.getElementById("ib-vless-encryption");
+            if (decInput && encInput) {
+                const decVal = (decInput.value || "").trim();
+                const encVal = (encInput.value || "").trim();
+                if (decVal && decVal.toLowerCase() !== "none" && !decVal.startsWith("mlkem768x25519plus.")) {
+                    decInput.classList.add("input-invalid");
+                    errors.push(t("validation_inbound_vless_dec_format", "Неверный формат ключа Decryption (должен начинаться с 'mlkem768x25519plus.')"));
+                    isValid = false;
+                }
+                if (encVal && encVal.toLowerCase() !== "none" && !encVal.startsWith("mlkem768x25519plus.")) {
+                    encInput.classList.add("input-invalid");
+                    errors.push(t("validation_inbound_vless_enc_format", "Неверный формат ключа Encryption (должен начинаться с 'mlkem768x25519plus.')"));
+                    isValid = false;
+                }
+                const hasDec = decVal && decVal.toLowerCase() !== "none";
+                const hasEnc = encVal && encVal.toLowerCase() !== "none";
+                if ((hasDec && !hasEnc) || (!hasDec && hasEnc)) {
+                    if (!hasDec) decInput.classList.add("input-invalid");
+                    if (!hasEnc) encInput.classList.add("input-invalid");
+                    errors.push(t("validation_inbound_vless_enc_pair", "Необходимо указать оба ключа VLESS Encryption либо очистить оба"));
+                    isValid = false;
+                }
+            }
+        }
     } else if (proto === "hysteria2") {
         const hystMode = document.getElementById("ib-hysteria-mode").value || "masq";
         if (hystMode === "obfs") {

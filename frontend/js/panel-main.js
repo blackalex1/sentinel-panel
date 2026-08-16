@@ -26,20 +26,24 @@ export async function initPanel() {
     setupAuthorizedEventListeners();
     setLoadInboundsCallback(loadInbounds);
 
-    switchTab("dashboard", loadInbounds, loadCoreInfo, loadLogs);
+    const initialDataPromise = switchTab("dashboard", loadInbounds, loadCoreInfo, loadLogs);
     loadBbrStatus();
     startGlobalStatusPolling();
 
     // Загружаем имя администратора для отображения в сайдбаре
-    try {
-        const res = await apiFetch("/api/settings");
-        if (res && res.admin_username) {
-            const navUser = document.getElementById("nav-username");
-            if (navUser) navUser.innerText = res.admin_username;
+    const settingsPromise = (async () => {
+        try {
+            const res = await apiFetch("/api/settings");
+            if (res && res.admin_username) {
+                const navUser = document.getElementById("nav-username");
+                if (navUser) navUser.innerText = res.admin_username;
+            }
+        } catch (e) {
+            console.error("Failed to load admin username", e);
         }
-    } catch (e) {
-        console.error("Failed to load admin username", e);
-    }
+    })();
+
+    await Promise.all([initialDataPromise, settingsPromise]);
 }
 
 function setupAuthorizedEventListeners() {

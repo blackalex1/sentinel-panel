@@ -1,79 +1,74 @@
-<section id="tab-singbox" class="tab-content">
-    <div class="core-controls glass-card">
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
-            <h3 style="margin: 0; display: flex; align-items: center; gap: 8px;">
-                <svg viewBox="0 0 24 24" width="20" height="20" style="display: inline-block; vertical-align: middle;"><path d="M12 2.5 C12.6 2.5 13.2 2.8 13.8 3.1 L20.5 6.5 C21.4 7.0 21.6 7.8 21.2 8.5 L12 13.2 L2.8 8.5 C2.4 7.8 2.6 7.0 3.5 6.5 L10.2 3.1 C10.8 2.8 11.4 2.5 12 2.5 Z" fill="#546E7A"/><path d="M2.8 8.5 L12 13.2 V20.5 C12 21.3 11.3 21.9 10.5 21.5 L3.8 18.2 C2.9 17.7 2.4 16.8 2.4 15.8 V9.5 C2.4 8.9 2.5 8.6 2.8 8.5 Z" fill="#37474F"/><path d="M12 13.2 L21.2 8.5 C21.5 8.6 21.6 8.9 21.6 9.5 V15.8 C21.6 16.8 21.1 17.7 20.2 18.2 L13.5 21.5 C12.7 21.9 12 21.3 12 20.5 V13.2 Z" fill="#263238"/><path d="M6.5 4.7 L9.8 3.0 C10.2 3.2 10.6 3.4 11.0 3.6 L18.5 10.2 L15.2 11.8 L6.5 4.7 Z" fill="#ECEFF1"/><path d="M18.5 10.2 L18.5 14.5 C18.5 15.2 17.8 15.6 17.2 15.3 L15.2 14.2 V11.8 L18.5 10.2 Z" fill="#CFD8DC"/></svg>
-                <span data-i18n="singbox_title">Логи и управление ядром sing-box</span>
-            </h3>
-            <label style="display: flex; align-items: center; gap: 8px; font-size: 13px; cursor: pointer; color: var(--text-secondary);">
-                <input type="checkbox" id="singbox-prerelease-toggle" style="cursor: pointer; accent-color: var(--accent-blue);">
-                <span data-i18n="singbox_include_prerelease">Включать пре-релизы (Pre-releases)</span>
-            </label>
-        </div>
-        <div class="core-info-row">
-            <div>
-                <p class="label" data-i18n="singbox_curr_version">Установленная версия</p>
-                <p class="value" id="singbox-curr-version">...</p>
-            </div>
-            <div>
-                <p class="label" data-i18n="singbox_latest_version">Доступная версия на GitHub</p>
-                <div style="display: flex; align-items: center; gap: 8px;">
-                    <p class="value" id="singbox-latest-version" style="margin: 0;">...</p>
-                    <span id="singbox-prerelease-badge" class="tag-badge" style="display: none; background: rgba(255, 171, 0, 0.15); color: #ffab00; border: 1px solid rgba(255, 171, 0, 0.3); font-size: 11px; padding: 2px 6px; border-radius: 4px; font-weight: 600;">Pre-release</span>
-                </div>
-                <select id="singbox-version-select" class="version-select-dropdown" style="display: none;"></select>
-            </div>
-            <div class="core-actions">
-                <button id="singbox-update-btn" class="btn primary-btn" disabled><i class="fa-solid fa-download"></i> <span data-i18n="singbox_btn_update">Обновить ядро</span></button>
-                <button id="singbox-restart-btn" class="btn secondary-btn"><i class="fa-solid fa-rotate-right"></i> <span data-i18n="singbox_btn_restart">Перезапустить sing-box</span></button>
-                <button id="singbox-stop-btn" class="btn danger-btn"><i class="fa-solid fa-stop"></i> <span data-i18n="singbox_btn_stop">Остановить</span></button>
-            </div>
-        </div>
-    </div>
+<section class="tab-content" id="tab-singbox">
+<div class="core-controls glass-card">
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+<h3 style="margin: 0; display: flex; align-items: center; gap: 8px;">
+<svg height="20" style="display: inline-block; vertical-align: middle;" viewbox="0 0 24 24" width="20"><path d="M12 2.5 C12.6 2.5 13.2 2.8 13.8 3.1 L20.5 6.5 C21.4 7.0 21.6 7.8 21.2 8.5 L12 13.2 L2.8 8.5 C2.4 7.8 2.6 7.0 3.5 6.5 L10.2 3.1 C10.8 2.8 11.4 2.5 12 2.5 Z" fill="#546E7A"></path><path d="M2.8 8.5 L12 13.2 V20.5 C12 21.3 11.3 21.9 10.5 21.5 L3.8 18.2 C2.9 17.7 2.4 16.8 2.4 15.8 V9.5 C2.4 8.9 2.5 8.6 2.8 8.5 Z" fill="#37474F"></path><path d="M12 13.2 L21.2 8.5 C21.5 8.6 21.6 8.9 21.6 9.5 V15.8 C21.6 16.8 21.1 17.7 20.2 18.2 L13.5 21.5 C12.7 21.9 12 21.3 12 20.5 V13.2 Z" fill="#263238"></path><path d="M6.5 4.7 L9.8 3.0 C10.2 3.2 10.6 3.4 11.0 3.6 L18.5 10.2 L15.2 11.8 L6.5 4.7 Z" fill="#ECEFF1"></path><path d="M18.5 10.2 L18.5 14.5 C18.5 15.2 17.8 15.6 17.2 15.3 L15.2 14.2 V11.8 L18.5 10.2 Z" fill="#CFD8DC"></path></svg>
+<span data-i18n="singbox_title"></span>
+</h3>
+<label style="display: flex; align-items: center; gap: 8px; font-size: 13px; cursor: pointer; color: var(--text-secondary);">
+<input id="singbox-prerelease-toggle" style="cursor: pointer; accent-color: var(--accent-blue);" type="checkbox"/>
+<span data-i18n="singbox_include_prerelease"></span>
+</label>
+</div>
+<div class="core-info-row">
+<div>
+<p class="label" data-i18n="singbox_curr_version"></p>
+<p class="value" id="singbox-curr-version">...</p>
+</div>
+<div>
+<p class="label" data-i18n="singbox_latest_version"></p>
+<div style="display: flex; align-items: center; gap: 8px;">
+<p class="value" id="singbox-latest-version" style="margin: 0;">...</p>
+<span class="tag-badge" id="singbox-prerelease-badge" style="display: none; background: rgba(255, 171, 0, 0.15); color: #ffab00; border: 1px solid rgba(255, 171, 0, 0.3); font-size: 11px; padding: 2px 6px; border-radius: 4px; font-weight: 600;">Pre-release</span>
+</div>
+<select class="version-select-dropdown" id="singbox-version-select" style="display: none;"></select>
+</div>
+<div class="core-actions">
+<button class="btn primary-btn" disabled="" id="singbox-update-btn"><i class="fa-solid fa-download"></i> <span data-i18n="singbox_btn_update"></span></button>
+<button class="btn secondary-btn" id="singbox-restart-btn"><i class="fa-solid fa-rotate-right"></i> <span data-i18n="singbox_btn_restart"></span></button>
+<button class="btn danger-btn" id="singbox-stop-btn"><i class="fa-solid fa-stop"></i> <span data-i18n="singbox_btn_stop"></span></button>
+</div>
+</div>
+</div>
 
-    <!-- Логи терминала -->
-    <div class="terminal-card glass-card" style="margin-top: 20px;">
-        <div class="terminal-header">
-            <span style="display: flex; align-items: center; gap: 8px;">
-                <svg viewBox="0 0 24 24" width="18" height="18" style="display: inline-block; vertical-align: middle;"><path d="M12 2.5 C12.6 2.5 13.2 2.8 13.8 3.1 L20.5 6.5 C21.4 7.0 21.6 7.8 21.2 8.5 L12 13.2 L2.8 8.5 C2.4 7.8 2.6 7.0 3.5 6.5 L10.2 3.1 C10.8 2.8 11.4 2.5 12 2.5 Z" fill="#546E7A"/><path d="M2.8 8.5 L12 13.2 V20.5 C12 21.3 11.3 21.9 10.5 21.5 L3.8 18.2 C2.9 17.7 2.4 16.8 2.4 15.8 V9.5 C2.4 8.9 2.5 8.6 2.8 8.5 Z" fill="#37474F"/><path d="M12 13.2 L21.2 8.5 C21.5 8.6 21.6 8.9 21.6 9.5 V15.8 C21.6 16.8 21.1 17.7 20.2 18.2 L13.5 21.5 C12.7 21.9 12 21.3 12 20.5 V13.2 Z" fill="#263238"/><path d="M6.5 4.7 L9.8 3.0 C10.2 3.2 10.6 3.4 11.0 3.6 L18.5 10.2 L15.2 11.8 L6.5 4.7 Z" fill="#ECEFF1"/><path d="M18.5 10.2 L18.5 14.5 C18.5 15.2 17.8 15.6 17.2 15.3 L15.2 14.2 V11.8 L18.5 10.2 Z" fill="#CFD8DC"/></svg>
-                <span data-i18n="singbox_terminal_title">Логи ядра sing-box (в реальном времени)</span>
-            </span>
-            <div style="display: flex; gap: 8px;">
-                <button class="btn icon-btn" id="singbox-copy-logs-btn" title="Копировать логи" data-i18n-title="singbox_btn_copy_logs"><i class="fa-regular fa-copy"></i></button>
-                <button class="btn icon-btn" id="singbox-clear-logs-btn" title="Очистить терминал" data-i18n-title="singbox_btn_clear_logs"><i class="fa-regular fa-trash-can"></i></button>
-            </div>
-        </div>
-        <div class="terminal-body" id="singbox-logs-terminal">
-            <!-- Логи заполняются динамически -->
-        </div>
-    </div>
+<div class="terminal-card glass-card" style="margin-top: 20px;">
+<div class="terminal-header">
+<span style="display: flex; align-items: center; gap: 8px;">
+<svg height="18" style="display: inline-block; vertical-align: middle;" viewbox="0 0 24 24" width="18"><path d="M12 2.5 C12.6 2.5 13.2 2.8 13.8 3.1 L20.5 6.5 C21.4 7.0 21.6 7.8 21.2 8.5 L12 13.2 L2.8 8.5 C2.4 7.8 2.6 7.0 3.5 6.5 L10.2 3.1 C10.8 2.8 11.4 2.5 12 2.5 Z" fill="#546E7A"></path><path d="M2.8 8.5 L12 13.2 V20.5 C12 21.3 11.3 21.9 10.5 21.5 L3.8 18.2 C2.9 17.7 2.4 16.8 2.4 15.8 V9.5 C2.4 8.9 2.5 8.6 2.8 8.5 Z" fill="#37474F"></path><path d="M12 13.2 L21.2 8.5 C21.5 8.6 21.6 8.9 21.6 9.5 V15.8 C21.6 16.8 21.1 17.7 20.2 18.2 L13.5 21.5 C12.7 21.9 12 21.3 12 20.5 V13.2 Z" fill="#263238"></path><path d="M6.5 4.7 L9.8 3.0 C10.2 3.2 10.6 3.4 11.0 3.6 L18.5 10.2 L15.2 11.8 L6.5 4.7 Z" fill="#ECEFF1"></path><path d="M18.5 10.2 L18.5 14.5 C18.5 15.2 17.8 15.6 17.2 15.3 L15.2 14.2 V11.8 L18.5 10.2 Z" fill="#CFD8DC"></path></svg>
+<span data-i18n="singbox_terminal_title"></span>
+</span>
+<div style="display: flex; gap: 8px;">
+<button class="btn icon-btn" data-i18n-title="singbox_btn_copy_logs" id="singbox-copy-logs-btn" title=""><i class="fa-regular fa-copy"></i></button>
+<button class="btn icon-btn" data-i18n-title="singbox_btn_clear_logs" id="singbox-clear-logs-btn" title=""><i class="fa-regular fa-trash-can"></i></button>
+</div>
+</div>
+<div class="terminal-body" id="singbox-logs-terminal">
 
-    <!-- Конфигурация ядра -->
-    <div class="terminal-card glass-card" style="margin-top: 30px; height: auto; display: flex; flex-direction: column;">
-        <div class="terminal-header" style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 10px; margin-bottom: 15px; flex-wrap: wrap; gap: 15px;">
-            <span style="display: flex; align-items: center; gap: 8px;">
-                <svg viewBox="0 0 24 24" width="18" height="18" style="display: inline-block; vertical-align: middle;"><path d="M12 2.5 C12.6 2.5 13.2 2.8 13.8 3.1 L20.5 6.5 C21.4 7.0 21.6 7.8 21.2 8.5 L12 13.2 L2.8 8.5 C2.4 7.8 2.6 7.0 3.5 6.5 L10.2 3.1 C10.8 2.8 11.4 2.5 12 2.5 Z" fill="#546E7A"/><path d="M2.8 8.5 L12 13.2 V20.5 C12 21.3 11.3 21.9 10.5 21.5 L3.8 18.2 C2.9 17.7 2.4 16.8 2.4 15.8 V9.5 C2.4 8.9 2.5 8.6 2.8 8.5 Z" fill="#37474F"/><path d="M12 13.2 L21.2 8.5 C21.5 8.6 21.6 8.9 21.6 9.5 V15.8 C21.6 16.8 21.1 17.7 20.2 18.2 L13.5 21.5 C12.7 21.9 12 21.3 12 20.5 V13.2 Z" fill="#263238"/><path d="M6.5 4.7 L9.8 3.0 C10.2 3.2 10.6 3.4 11.0 3.6 L18.5 10.2 L15.2 11.8 L6.5 4.7 Z" fill="#ECEFF1"/><path d="M18.5 10.2 L18.5 14.5 C18.5 15.2 17.8 15.6 17.2 15.3 L15.2 14.2 V11.8 L18.5 10.2 Z" fill="#CFD8DC"/></svg>
-                <span data-i18n="singbox_config_title">Конфигурация ядра sing-box</span>
-                <span id="singbox-config-mode-badge" class="tag-badge tag-badge-direct" style="font-size: 11px; margin-left: 6px; padding: 3px 8px; text-transform: uppercase;"></span>
-            </span>
-            
-            <div style="display: flex; gap: 8px; align-items: center; margin-left: auto;">
-                <button class="btn success-btn" id="singbox-config-save-btn" style="padding: 6px 12px; font-size: 13px; display: none;"><i class="fa-solid fa-floppy-disk"></i> <span data-i18n="config_save_btn">Сохранить</span></button>
-                <button class="btn danger-btn" id="singbox-config-reset-btn" style="padding: 6px 12px; font-size: 13px; display: none;"><i class="fa-solid fa-rotate-left"></i> <span data-i18n="config_reset_btn">Сбросить</span></button>
-                <button class="btn secondary-btn active" id="singbox-config-tab-parsed" style="padding: 6px 12px; font-size: 13px;"><span data-i18n="singbox_config_tab_parsed">Структура</span></button>
-                <button class="btn secondary-btn" id="singbox-config-tab-raw" style="padding: 6px 12px; font-size: 13px;"><span data-i18n="singbox_config_tab_raw">JSON</span></button>
-            </div>
-        </div>
-        
-        <!-- Parsed View -->
-        <div id="singbox-config-parsed-container" class="config-view-container active">
-            <!-- Будет заполнено динамически -->
-        </div>
+</div>
+</div>
 
-        <!-- Raw JSON View -->
-        <div id="singbox-config-raw-container" class="config-view-container" style="display: none; position: relative;">
-            <button class="btn icon-btn copy-btn" id="singbox-config-copy-btn" data-target="singbox-config-raw-pre" style="position: absolute; right: 15px; top: 15px; background: rgba(0,0,0,0.5); z-index: 10;" title="Копировать" data-i18n-title="copy_btn"><i class="fa-regular fa-copy"></i></button>
-            <textarea id="singbox-config-raw-pre" class="terminal-body" style="height: 350px; margin: 0; font-family: monospace; white-space: pre-wrap; word-break: break-all; overflow-y: auto; user-select: text; border: 1px solid var(--border-color); border-radius: 8px; padding: 15px; background: #020617; width: 100%; color: #cbd5e1; outline: none; resize: vertical;"></textarea>
-        </div>
-    </div>
+<div class="terminal-card glass-card" style="margin-top: 30px; height: auto; display: flex; flex-direction: column;">
+<div class="terminal-header" style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 10px; margin-bottom: 15px; flex-wrap: wrap; gap: 15px;">
+<span style="display: flex; align-items: center; gap: 8px;">
+<svg height="18" style="display: inline-block; vertical-align: middle;" viewbox="0 0 24 24" width="18"><path d="M12 2.5 C12.6 2.5 13.2 2.8 13.8 3.1 L20.5 6.5 C21.4 7.0 21.6 7.8 21.2 8.5 L12 13.2 L2.8 8.5 C2.4 7.8 2.6 7.0 3.5 6.5 L10.2 3.1 C10.8 2.8 11.4 2.5 12 2.5 Z" fill="#546E7A"></path><path d="M2.8 8.5 L12 13.2 V20.5 C12 21.3 11.3 21.9 10.5 21.5 L3.8 18.2 C2.9 17.7 2.4 16.8 2.4 15.8 V9.5 C2.4 8.9 2.5 8.6 2.8 8.5 Z" fill="#37474F"></path><path d="M12 13.2 L21.2 8.5 C21.5 8.6 21.6 8.9 21.6 9.5 V15.8 C21.6 16.8 21.1 17.7 20.2 18.2 L13.5 21.5 C12.7 21.9 12 21.3 12 20.5 V13.2 Z" fill="#263238"></path><path d="M6.5 4.7 L9.8 3.0 C10.2 3.2 10.6 3.4 11.0 3.6 L18.5 10.2 L15.2 11.8 L6.5 4.7 Z" fill="#ECEFF1"></path><path d="M18.5 10.2 L18.5 14.5 C18.5 15.2 17.8 15.6 17.2 15.3 L15.2 14.2 V11.8 L18.5 10.2 Z" fill="#CFD8DC"></path></svg>
+<span data-i18n="singbox_config_title"></span>
+<span class="tag-badge tag-badge-direct" id="singbox-config-mode-badge" style="font-size: 11px; margin-left: 6px; padding: 3px 8px; text-transform: uppercase;"></span>
+</span>
+<div style="display: flex; gap: 8px; align-items: center; margin-left: auto;">
+<button class="btn success-btn" id="singbox-config-save-btn" style="padding: 6px 12px; font-size: 13px; display: none;"><i class="fa-solid fa-floppy-disk"></i> <span data-i18n="config_save_btn"></span></button>
+<button class="btn danger-btn" id="singbox-config-reset-btn" style="padding: 6px 12px; font-size: 13px; display: none;"><i class="fa-solid fa-rotate-left"></i> <span data-i18n="config_reset_btn"></span></button>
+<button class="btn secondary-btn active" id="singbox-config-tab-parsed" style="padding: 6px 12px; font-size: 13px;"><span data-i18n="singbox_config_tab_parsed"></span></button>
+<button class="btn secondary-btn" id="singbox-config-tab-raw" style="padding: 6px 12px; font-size: 13px;"><span data-i18n="singbox_config_tab_raw"></span></button>
+</div>
+</div>
+<!-- Parsed View -->
+<div class="config-view-container active" id="singbox-config-parsed-container">
+
+</div>
+<!-- Raw JSON View -->
+<div class="config-view-container" id="singbox-config-raw-container" style="display: none; position: relative;">
+<button class="btn icon-btn copy-btn" data-i18n-title="copy_btn" data-target="singbox-config-raw-pre" id="singbox-config-copy-btn" style="position: absolute; right: 15px; top: 15px; background: rgba(0,0,0,0.5); z-index: 10;" title=""><i class="fa-regular fa-copy"></i></button>
+<textarea class="terminal-body" id="singbox-config-raw-pre" style="height: 350px; margin: 0; font-family: monospace; white-space: pre-wrap; word-break: break-all; overflow-y: auto; user-select: text; border: 1px solid var(--border-color); border-radius: 8px; padding: 15px; background: #020617; width: 100%; color: #cbd5e1; outline: none; resize: vertical;"></textarea>
+</div>
+</div>
 </section>

@@ -85,88 +85,62 @@ def update_rules_priority(rule_ids_in_order: list):
                 rule.sort_order = idx + 1
         return True
 
-QUICK_SECURITY_RULES_SPECS = {
-    "block_bittorrent": {
-        "remark": "Блокировка BitTorrent",
-        "outbound_tag": "blocked",
-        "protocols": ["bittorrent"],
-        "domains": ["domain:torrent", "domain:tracker", "domain:peerexchange", "keyword:torrent"],
-        "ips": []
-    },
-    "block_ads": {
-        "remark": "Блокировка рекламы",
-        "outbound_tag": "blocked",
-        "protocols": [],
-        "domains": ["geosite:category-ads-all"],
-        "ips": []
-    },
-    "block_cn": {
-        "remark": "Блокировка сайтов Китая (CN)",
-        "outbound_tag": "blocked",
-        "protocols": [],
-        "domains": ["geosite:cn", "regexp:.*\\.cn$"],
-        "ips": ["geoip:cn"]
-    },
-    "block_ru": {
-        "remark": "Блокировка сайтов России (RU)",
-        "outbound_tag": "blocked",
-        "protocols": [],
-        "domains": ["regexp:.*\\.ru$", "regexp:.*\\.su$", "regexp:.*\\.рф$", "regexp:.*\\.xn--p1ai$", "geosite:yandex", "geosite:vk"],
-        "ips": ["geoip:ru"]
-    },
-    "block_us": {
-        "remark": "Блокировка сайтов США (US)",
-        "outbound_tag": "blocked",
-        "protocols": [],
-        "domains": ["regexp:.*\\.us$"],
-        "ips": ["geoip:us"]
-    },
-    "ip_checkers": {
-        "remark": "Сервисы определения IP",
-        "outbound_tag": "direct",
-        "protocols": [],
-        "domains": [
-            "domain:ipify.org", "domain:api.ipify.org", "domain:checkip.amazonaws.com", "domain:ifconfig.me", "domain:ifconfig.co", "domain:ifconfig.io",
-            "domain:telega.me", "domain:ipinfo.io", "domain:2ip.ru", "domain:2ip.io", "domain:2ip.ua", "domain:2ip.me",
-            "domain:myip.ru", "domain:myip.com", "domain:icanhazip.com", "domain:wtfismyip.com", "domain:ip.sb",
-            "domain:ipapi.co", "domain:ip-api.com", "domain:ipapi.com", "domain:db-ip.com", "domain:whoer.net",
-            "domain:ipwhois.io", "domain:ipwho.is", "domain:ipaddress.my", "domain:ipaddress.com", "domain:check-host.net",
-            "domain:browserleaks.com", "domain:ip2location.com", "domain:ip2location.io", "domain:showmyip.com",
-            "domain:whatsmyip.org", "domain:whatismyip.com", "domain:whatsmyipaddress.com", "domain:whatismyipaddress.com",
-            "domain:dnsleaktest.com", "domain:ipleak.net", "domain:ip.me", "domain:ip.cn", "domain:ip138.com",
-            "domain:ident.me", "domain:curlmyip.org", "domain:eth0.me", "domain:myexternalip.com", "domain:ip.nf",
-            "domain:trackip.net", "domain:checkip.dyndns.org",
-            "keyword:ipify", "keyword:2ip", "keyword:ipwhois", "keyword:icanhazip", "keyword:ifconfig", "keyword:checkip", "keyword:browserleaks", "keyword:whoer", "keyword:ipleak"
-        ],
-        "ips": ["1.1.1.1/32", "1.0.0.1/32"]
-    }
-}
+from backend.sentinel_core_bridge import get_preset_details, get_routing_presets
+
+def get_preset_spec(key: str) -> dict:
+    """Dynamically fetches rule spec from sentinel-core presets."""
+    preset_id = key.replace("block_", "")
+    details = get_preset_details(preset_id)
+    if isinstance(details, dict) and "id" in details:
+        out_target = "blocked" if details.get("defaultTarget") == "block" else details.get("defaultTarget", "direct")
+        return {
+            "remark": details.get("name", f"Rule {preset_id}"),
+            "outbound_tag": out_target,
+            "protocols": details.get("protocols", []),
+            "domains": details.get("domains", []),
+            "ips": details.get("ips", [])
+        }
+    return {}
 
 def find_quick_rule(session, key: str):
-    spec = QUICK_SECURITY_RULES_SPECS.get(key)
+    spec = get_preset_spec(key)
     if not spec:
         return None
-    remark = spec["remark"]
-    rule = session.query(RoutingRule).filter(RoutingRule.remark.ilike(f"%{remark}%")).first()
-    if rule:
-        return rule
-    if key == "block_bittorrent":
-        rule = session.query(RoutingRule).filter(RoutingRule.protocols.like('%bittorrent%')).first()
-    elif key == "block_ads":
-        rule = session.query(RoutingRule).filter(RoutingRule.domains.like('%category-ads-all%')).first()
-    elif key == "block_ru":
-        rule = session.query(RoutingRule).filter(RoutingRule.ips.like('%geoip:ru%')).first()
-    elif key == "block_cn":
-        rule = session.query(RoutingRule).filter(RoutingRule.ips.like('%geoip:cn%')).first()
-    elif key == "block_us":
-        rule = session.query(RoutingRule).filter(RoutingRule.ips.like('%geoip:us%')).first()
-    elif key == "ip_checkers":
-        rule = session.query(RoutingRule).filter(RoutingRule.domains.like('%ipify%')).first()
-    return rule
+    remark = spec.get("remark", "")
+    if remark:
+        rule = session.query(RoutingRule).filter(RoutingRule.remark.ilike(f"%{remark}%")).first()
+        if rule:
+            return rule
+
+    # Check by dynamic protocols from core spec
+    for proto in spec.get("protocols", []):
+        rule = session.query(RoutingRule).filter(RoutingRule.protocols.like(f"%{proto}%")).first()
+        if rule:
+            return rule
+
+    # Check by dynamic domains from core spec
+    for dom in spec.get("domains", []):
+        rule = session.query(RoutingRule).filter(RoutingRule.domains.like(f"%{dom}%")).first()
+        if rule:
+            return rule
+
+    # Check by dynamic IPs from core spec
+    for ip in spec.get("ips", []):
+        rule = session.query(RoutingRule).filter(RoutingRule.ips.like(f"%{ip}%")).first()
+        if rule:
+            return rule
+
+    return None
 
 def sync_quick_security_rules(settings_dict: dict):
+    presets = get_routing_presets()
     with backend.database.db_session() as session:
-        for key, spec in QUICK_SECURITY_RULES_SPECS.items():
+        for p in presets:
+            pid = p.get("id", "")
+            key = "ip_checkers" if pid == "ip_checkers" else f"block_{pid}"
+            spec = get_preset_spec(key)
+            if not spec:
+                continue
             outbound_key = f"{key}_outbound"
             desired_outbound = settings_dict.get(outbound_key)
             if key in settings_dict or outbound_key in settings_dict:
@@ -203,9 +177,16 @@ def sync_quick_security_rules(settings_dict: dict):
 
 def get_quick_security_rules_state() -> dict:
     state = {}
+    presets = get_routing_presets()
     with backend.database.db_session() as session:
-        for key, spec in QUICK_SECURITY_RULES_SPECS.items():
+        for p in presets:
+            pid = p.get("id", "")
+            key = "ip_checkers" if pid == "ip_checkers" else f"block_{pid}"
+            spec = get_preset_spec(key)
+            if not spec:
+                continue
             rule = find_quick_rule(session, key)
             state[key] = bool(rule and rule.enable == 1)
             state[f"{key}_outbound"] = rule.outbound_tag if rule else spec["outbound_tag"]
     return state
+

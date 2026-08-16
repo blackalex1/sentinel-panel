@@ -207,11 +207,33 @@ def restore_backup_dump(dump_str: str, lang: str = None) -> tuple[bool, str]:
                         sort_order=rr.get("sort_order", 0)
                     ))
             else:
-                # Default seeds for older backups without routing rules
+                # Default seeds for older backups without routing rules from sentinel-core
+                from backend.sentinel_core_bridge import get_preset_details
+                bt = get_preset_details("bittorrent") or {}
+                ads = get_preset_details("ads") or {}
                 session.add(RoutingRule(remark="API Traffic", outbound_tag="api", inbound_tags='["api"]', enable=1, sort_order=1))
-                session.add(RoutingRule(remark="Block BitTorrent", outbound_tag="blocked", protocols='["bittorrent"]', enable=0, sort_order=2))
-                session.add(RoutingRule(remark="Block Ads (AdBlock)", outbound_tag="blocked", domains='["geosite:category-ads-all"]', enable=0, sort_order=3))
-                session.add(RoutingRule(remark="Route ChatGPT via WARP", outbound_tag="warp", domains='["domain:openai.com", "domain:chatgpt.com", "domain:oaistatic.com", "domain:oaiusercontent.com"]', enable=0, sort_order=4))
+                session.add(RoutingRule(
+                    remark=bt.get("name", "Block BitTorrent"),
+                    outbound_tag="blocked",
+                    protocols=json.dumps(bt.get("protocols", ["bittorrent"])),
+                    domains=json.dumps(bt.get("domains", [])),
+                    ips=json.dumps(bt.get("ips", [])),
+                    inbound_tags="[]",
+                    users="[]",
+                    enable=0,
+                    sort_order=2
+                ))
+                session.add(RoutingRule(
+                    remark=ads.get("name", "Block Ads"),
+                    outbound_tag="blocked",
+                    protocols=json.dumps(ads.get("protocols", [])),
+                    domains=json.dumps(ads.get("domains", ["geosite:category-ads-all"])),
+                    ips=json.dumps(ads.get("ips", [])),
+                    inbound_tags="[]",
+                    users="[]",
+                    enable=0,
+                    sort_order=3
+                ))
             
             # 7. Restore client stats
             for c in data.get("client_stats", []):

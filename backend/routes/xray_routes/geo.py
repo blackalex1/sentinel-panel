@@ -2,6 +2,7 @@ from fastapi import APIRouter, Request
 from urllib.parse import urlparse
 
 from backend.xray import get_geo_files_info, download_geo_files, restart_xray
+from backend.i18n import t, get_lang
 
 router = APIRouter()
 
@@ -23,6 +24,7 @@ async def save_geo_settings(request: Request, payload: dict):
     import backend.routes.xray as xray_facade
     if not xray_facade.check_auth(request):
         return xray_facade.decoy_response()
+    lang = get_lang(request)
     try:
         from backend.database import set_setting
 
@@ -33,9 +35,9 @@ async def save_geo_settings(request: Request, payload: dict):
             if url:
                 parsed = urlparse(url)
                 if parsed.scheme not in ("https", "http"):
-                    return {"success": False, "msg": f"Недопустимый протокол в {label}: используйте https://"}
+                    return {"success": False, "msg": t("xray_geo_protocol_invalid", lang=lang, category="backend", label=label)}
                 if not url.lower().endswith(".dat"):
-                    return {"success": False, "msg": f"{label} должен указывать на .dat файл"}
+                    return {"success": False, "msg": t("xray_geo_must_point_to_dat", lang=lang, category="backend", label=label)}
 
         # Сохраняем (пустая строка = вернуться к дефолтному URL)
         set_setting("geo_geoip_url", geoip_url)
@@ -56,6 +58,7 @@ async def update_geo_files(request: Request):
     import backend.routes.xray as xray_facade
     if not xray_facade.check_auth(request):
         return xray_facade.decoy_response()
+    lang = get_lang(request)
     try:
         result = download_geo_files()
 
@@ -70,9 +73,9 @@ async def update_geo_files(request: Request):
 
         msg_parts = []
         if result["geoip"]:
-            msg_parts.append("geoip.dat — обновлён")
+            msg_parts.append(t("xray_geo_geoip_updated", lang=lang, category="backend"))
         if result["geosite"]:
-            msg_parts.append("geosite.dat — обновлён")
+            msg_parts.append(t("xray_geo_geosite_updated", lang=lang, category="backend"))
         if result["errors"]:
             msg_parts.extend(result["errors"])
 
@@ -80,7 +83,7 @@ async def update_geo_files(request: Request):
         return {
             "success": success,
             "partial": result["geoip"] or result["geosite"],
-            "msg": "; ".join(msg_parts) if msg_parts else "Ошибка обновления",
+            "msg": "; ".join(msg_parts) if msg_parts else t("xray_geo_update_error", lang=lang, category="backend"),
             "info": get_geo_files_info()
         }
     except Exception as e:

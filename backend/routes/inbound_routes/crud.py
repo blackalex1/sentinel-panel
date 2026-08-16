@@ -10,8 +10,9 @@ from backend.xray import restart_xray
 from backend.hysteria import restart_hysteria
 from backend.singbox import restart_singbox
 from backend.auth_utils import check_auth, decoy_response
-from backend.routes.inbound_routes.validation import validate_inbound_port_collision
+from backend.routes.inbound_routes.validation import validate_inbound_port_collision, validate_vless_encryption_settings
 from backend.utils.service_restart import restart_services_background
+from backend.i18n import t, get_lang
 
 router = APIRouter()
 
@@ -131,22 +132,30 @@ def _sanitize_hysteria_payload(payload):
                 hysteria_opts["socksPassword"] = secrets.token_hex(16)
         payload.streamSettings["hysteria"] = hysteria_opts
 
-        if isinstance(payload.settings, dict) and "clients" in payload.settings:
-            for c in payload.settings["clients"]:
-                c.pop("flow", None)
+def _sanitize_inbound_payload(payload):
+    _sanitize_hysteria_payload(payload)
 
 @router.post("/api/inbounds/create")
 async def create_inbound_ui(request: Request, payload: InboundCreate):
     if not check_auth(request):
         return decoy_response()
         
-    _sanitize_hysteria_payload(payload)
+    _sanitize_inbound_payload(payload)
     stream_settings = payload.streamSettings or {}
     
     # Run collision check
     err = validate_inbound_port_collision(payload.port, payload.protocol, stream_settings)
     if err:
         return {"success": False, "msg": err}
+
+    lang = request.headers.get("accept-language", "ru")[:2].lower()
+    if lang not in ("ru", "en"):
+        lang = "ru"
+
+    if payload.protocol == "vless":
+        enc_err = validate_vless_encryption_settings(payload.settings, lang=lang)
+        if enc_err:
+            return {"success": False, "msg": enc_err}
             
     inbound_id = add_inbound(
         remark=payload.remark,
@@ -159,6 +168,7 @@ async def create_inbound_ui(request: Request, payload: InboundCreate):
         total=payload.total,
         expiry_time=payload.expiryTime
     )
+    lang = get_lang(request)
     if inbound_id:
         from backend.audit import log_action, get_actor_username
         actor = get_actor_username(request)
@@ -167,31 +177,46 @@ async def create_inbound_ui(request: Request, payload: InboundCreate):
         restart_hysteria()
         singbox_ok = restart_singbox()
         target_core = payload.core or ("hysteria" if payload.protocol == "hysteria2" else "xray")
-        if target_core == "xray" and xray_ok is False:
-            from backend.xray.service import get_last_xray_error
-            last_err = get_last_xray_error()
-            if last_err:
-                return {"success": False, "msg": f"Ошибка конфигурации Xray: {last_err}"}
-        elif target_core == "singbox" and singbox_ok is False:
-            from backend.singbox.service import get_last_singbox_error
-            last_err = get_last_singbox_error()
-            if last_err:
-                return {"success": False, "msg": f"Ошибка конфигурации Sing-box: {last_err}"}
+        if (target_core == "xray" and xray_ok is False) or (target_core == "singbox" and singbox_ok is False):
+            # Rollback newly created inbound from DB so database is never left corrupted
+            delete_inbound(inbound_id)
+            restart_xray()
+            restart_singbox()
+            restart_hysteria()
+            if target_core == "xray":
+                from backend.xray.service import get_last_xray_error
+                last_err = get_last_xray_error() or "Failed to start or validate Xray process"
+                return {"success": False, "msg": t("xray_config_error", lang=lang, category="backend", error=last_err)}
+            else:
+                from backend.singbox.service import get_last_singbox_error
+                last_err = get_last_singbox_error() or "Failed to start or validate Sing-box process"
+                return {"success": False, "msg": t("singbox_config_error", lang=lang, category="backend", error=last_err)}
         return {"success": True, "id": inbound_id}
-    return {"success": False, "msg": "Порт уже занят или неверные параметры"}
+    return {"success": False, "msg": t("inbound_port_busy", lang=lang, category="backend")}
 
 @router.post("/panel/api/inbounds/update/{inbound_id}")
 async def update_inbound_ui(request: Request, inbound_id: int, payload: InboundUpdate):
     if not check_auth(request):
         return decoy_response()
         
-    _sanitize_hysteria_payload(payload)
+    _sanitize_inbound_payload(payload)
     stream_settings = payload.streamSettings or {}
     
     # Run collision check
     err = validate_inbound_port_collision(payload.port, payload.protocol, stream_settings, exclude_inbound_id=inbound_id)
     if err:
         return {"success": False, "msg": err}
+
+    lang = get_lang(request)
+
+    if payload.protocol == "vless":
+        enc_err = validate_vless_encryption_settings(payload.settings, lang=lang)
+        if enc_err:
+            return {"success": False, "msg": enc_err}
+
+    # Save previous state for automatic database rollback if config validation fails
+    from backend.database.crud.inbounds import get_inbound_by_id
+    previous_ib = get_inbound_by_id(inbound_id)
             
     success = update_inbound(
         inbound_id=inbound_id,
@@ -214,27 +239,49 @@ async def update_inbound_ui(request: Request, inbound_id: int, payload: InboundU
         restart_hysteria()
         singbox_ok = restart_singbox()
         target_core = payload.core or ("hysteria" if payload.protocol == "hysteria2" else "xray")
-        if target_core == "xray" and xray_ok is False:
-            from backend.xray.service import get_last_xray_error
-            last_err = get_last_xray_error()
-            if last_err:
-                return {"success": False, "msg": f"Ошибка конфигурации Xray: {last_err}"}
-        elif target_core == "singbox" and singbox_ok is False:
-            from backend.singbox.service import get_last_singbox_error
-            last_err = get_last_singbox_error()
-            if last_err:
-                return {"success": False, "msg": f"Ошибка конфигурации Sing-box: {last_err}"}
+        if (target_core == "xray" and xray_ok is False) or (target_core == "singbox" and singbox_ok is False):
+            # Rollback database record to previous working state
+            if previous_ib:
+                prev_settings = json.loads(previous_ib.get("settings") or "{}")
+                prev_stream = json.loads(previous_ib.get("stream_settings") or "{}")
+                prev_sniff = json.loads(previous_ib.get("sniffing") or "{}")
+                update_inbound(
+                    inbound_id=inbound_id,
+                    remark=previous_ib["remark"],
+                    port=previous_ib["port"],
+                    protocol=previous_ib["protocol"],
+                    core=previous_ib.get("core"),
+                    settings_dict=prev_settings,
+                    stream_settings_dict=prev_stream,
+                    sniffing_dict=prev_sniff,
+                    enable=previous_ib["enable"],
+                    total=previous_ib["total"],
+                    expiry_time=previous_ib["expiry_time"]
+                )
+                restart_xray()
+                restart_singbox()
+                restart_hysteria()
+
+            if target_core == "xray":
+                from backend.xray.service import get_last_xray_error
+                last_err = get_last_xray_error() or "Failed to start or validate Xray process"
+                return {"success": False, "msg": t("xray_config_error", lang=lang, category="backend", error=last_err)}
+            else:
+                from backend.singbox.service import get_last_singbox_error
+                last_err = get_last_singbox_error() or "Failed to start or validate Sing-box process"
+                return {"success": False, "msg": t("singbox_config_error", lang=lang, category="backend", error=last_err)}
         return {"success": True}
-    return {"success": False, "msg": "Inbound не найден или порт уже занят"}
+    return {"success": False, "msg": t("inbound_not_found_or_port_busy", lang=lang, category="backend")}
 
 @router.post("/api/inbounds/delete/{inbound_id}")
 async def delete_inbound_ui(request: Request, inbound_id: int):
     if not check_auth(request):
         return decoy_response()
+    lang = get_lang(request)
     if delete_inbound(inbound_id):
         from backend.audit import log_action, get_actor_username
         actor = get_actor_username(request)
         log_action(actor, "delete_inbound", target=f"id:{inbound_id}")
         restart_services_background()
         return {"success": True}
-    return {"success": False, "msg": "Inbound не найден"}
+    return {"success": False, "msg": t("inbound_not_found", lang=lang, category="backend")}

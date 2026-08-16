@@ -26,7 +26,7 @@ export async function loadOutbounds() {
         try {
             const settingsObj = JSON.parse(ob.settings || "{}");
             if (Array.isArray(settingsObj.backup_outbounds) && settingsObj.backup_outbounds.length > 0) {
-                backupBadge = `<div style="font-size: 11px; color: var(--accent-green); margin-top: 2px;"><i class="fa-solid fa-shield-halved" style="margin-right: 3px;"></i>Резерв: ${settingsObj.backup_outbounds.join(", ")}</div>`;
+                backupBadge = `<div style="font-size: 11px; color: var(--accent-green); margin-top: 2px;"><i class="fa-solid fa-shield-halved" style="margin-right: 3px;"></i>${t("routing_backup_badge_label", "Резерв")}: ${settingsObj.backup_outbounds.join(", ")}</div>`;
             }
             if (ob.protocol === "socks" || ob.protocol === "http" || ob.protocol === "shadowsocks") {
                 const server = settingsObj.servers ? settingsObj.servers[0] : null;

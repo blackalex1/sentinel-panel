@@ -90,7 +90,7 @@ export function renderSingboxConfig(config) {
     html += `<div style="margin-bottom: 25px;">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
             <h4 style="margin: 0; font-size: 15px; font-weight: 600; color: var(--accent-orange); display: flex; align-items: center; gap: 8px;">
-                <i class="fa-solid fa-file-invoice"></i> <span data-i18n="singbox_config_log_title">Системные настройки и логирование</span>
+                <i class="fa-solid fa-file-invoice"></i> <span data-i18n="singbox_config_log_title">${t("singbox_config_log_title", "Системные настройки и логирование")}</span>
             </h4>
             <button class="btn secondary-btn edit-json-btn" data-type="singbox-log" style="padding: 4px 8px; font-size: 11px; display: inline-flex; align-items: center; gap: 4px; height: auto;"><i class="fa-regular fa-pen-to-square"></i> JSON</button>
         </div>
@@ -117,7 +117,7 @@ export function renderSingboxConfig(config) {
     html += `<div style="margin-bottom: 25px;">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 10px;">
             <h4 style="margin: 0; font-size: 15px; font-weight: 600; color: var(--accent-blue); display: flex; align-items: center; gap: 8px;">
-                <i class="fa-solid fa-arrow-right-to-bracket"></i> <span data-i18n="singbox_config_inbounds">Входящие подключения (Inbounds)</span>
+                <i class="fa-solid fa-arrow-right-to-bracket"></i> <span data-i18n="singbox_config_inbounds">${t("singbox_config_inbounds", "Входящие подключения (Inbounds)")}</span>
             </h4>
             <button class="btn secondary-btn edit-json-btn" data-type="singbox-inbounds" style="padding: 4px 8px; font-size: 11px; display: inline-flex; align-items: center; gap: 4px; height: auto;"><i class="fa-regular fa-pen-to-square"></i> JSON</button>
         </div>`;
@@ -153,7 +153,7 @@ export function renderSingboxConfig(config) {
                 });
                 usersRows += `</tbody></table></div>`;
             } else {
-                usersRows = `<div style="font-size: 12px; color: var(--text-muted); margin-top: 8px; font-style: italic;">Нет клиентов</div>`;
+                usersRows = `<div style="font-size: 12px; color: var(--text-muted); margin-top: 8px; font-style: italic;">${t("singbox_no_clients", "Нет клиентов")}</div>`;
             }
 
             html += `<div class="glass-card" style="padding: 16px; margin-bottom: 12px; border-radius: 12px; background: rgba(255,255,255,0.015); border: 1px solid var(--border-color);">
@@ -175,7 +175,7 @@ export function renderSingboxConfig(config) {
             </div>`;
         });
     } else {
-        html += `<div class="glass-card" style="padding: 20px; text-align: center; color: var(--text-muted);" data-i18n="config_no_inbounds">Входящие подключения отсутствуют</div>`;
+        html += `<div class="glass-card" style="padding: 20px; text-align: center; color: var(--text-muted);" data-i18n="config_no_inbounds">${t("config_no_inbounds", "Входящие подключения отсутствуют")}</div>`;
     }
     html += `</div>`;
 
@@ -183,7 +183,7 @@ export function renderSingboxConfig(config) {
     html += `<div style="margin-bottom: 25px;">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
             <h4 style="margin: 0; font-size: 15px; font-weight: 600; color: var(--accent-green); display: flex; align-items: center; gap: 8px;">
-                <i class="fa-solid fa-arrow-right-from-bracket"></i> <span data-i18n="singbox_config_outbounds">Исходящие подключения (Outbounds)</span>
+                <i class="fa-solid fa-arrow-right-from-bracket"></i> <span data-i18n="singbox_config_outbounds">${t("singbox_config_outbounds", "Исходящие подключения (Outbounds)")}</span>
             </h4>
             <button class="btn secondary-btn edit-json-btn" data-type="singbox-outbounds" style="padding: 4px 8px; font-size: 11px; display: inline-flex; align-items: center; gap: 4px; height: auto;"><i class="fa-regular fa-pen-to-square"></i> JSON</button>
         </div>`;
@@ -204,7 +204,7 @@ export function renderSingboxConfig(config) {
             </div>`;
         });
     } else {
-        html += `<div class="glass-card" style="padding: 20px; text-align: center; color: var(--text-muted);">Нет исходящих подключений</div>`;
+        html += `<div class="glass-card" style="padding: 20px; text-align: center; color: var(--text-muted);" data-i18n="config_no_outbounds">${t("config_no_outbounds", "Нет исходящих подключений")}</div>`;
     }
     html += `</div>`;
 
@@ -213,7 +213,7 @@ export function renderSingboxConfig(config) {
         html += `<div style="margin-bottom: 25px;">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
                 <h4 style="margin: 0; font-size: 15px; font-weight: 600; color: var(--accent-purple); display: flex; align-items: center; gap: 8px;">
-                    <i class="fa-solid fa-route"></i> <span data-i18n="singbox_config_routing">Маршрутизация (Routing Rules)</span>
+                    <i class="fa-solid fa-route"></i> <span data-i18n="singbox_config_routing">${t("singbox_config_routing", "Маршрутизация (Routing Rules)")}</span>
                 </h4>
                 <button class="btn secondary-btn edit-json-btn" data-type="singbox-routing" style="padding: 4px 8px; font-size: 11px; display: inline-flex; align-items: center; gap: 4px; height: auto;"><i class="fa-regular fa-pen-to-square"></i> JSON</button>
             </div>
@@ -228,15 +228,17 @@ export function renderSingboxConfig(config) {
                     <tbody>`;
         config.route.rules.forEach(r => {
             let matchDesc = [];
-            if (r.inbound) matchDesc.push(`Inbound: <code>${r.inbound.join(", ")}</code>`);
-            if (r.domain) matchDesc.push(`Domain: <code>${r.domain.join(", ")}</code>`);
-            if (r.domain_suffix) matchDesc.push(`Domain Suffix: <code>${r.domain_suffix.join(", ")}</code>`);
-            if (r.domain_regex) matchDesc.push(`Domain Regex: <code>${r.domain_regex.join(", ")}</code>`);
-            if (r.domain_keyword) matchDesc.push(`Domain Keyword: <code>${r.domain_keyword.join(", ")}</code>`);
+            const fmt = (v) => Array.isArray(v) ? v.join(", ") : String(v || "");
+            if (r.inbound) matchDesc.push(`Inbound: <code>${fmt(r.inbound)}</code>`);
+            if (r.domain) matchDesc.push(`Domain: <code>${fmt(r.domain)}</code>`);
+            if (r.domain_suffix) matchDesc.push(`Domain Suffix: <code>${fmt(r.domain_suffix)}</code>`);
+            if (r.domain_regex) matchDesc.push(`Domain Regex: <code>${fmt(r.domain_regex)}</code>`);
+            if (r.domain_keyword) matchDesc.push(`Domain Keyword: <code>${fmt(r.domain_keyword)}</code>`);
             if (r.ip_is_private) matchDesc.push(`IP: <code>Private / LAN</code>`);
-            if (r.ip_cidr) matchDesc.push(`IP CIDR: <code>${r.ip_cidr.join(", ")}</code>`);
-            if (r.protocol) matchDesc.push(`Protocol: <code>${r.protocol.join(", ")}</code>`);
-            if (r.rule_set) matchDesc.push(`RuleSet: <code>${r.rule_set.join(", ")}</code>`);
+            if (r.ip_cidr) matchDesc.push(`IP CIDR: <code>${fmt(r.ip_cidr)}</code>`);
+            if (r.protocol) matchDesc.push(`Protocol: <code>${fmt(r.protocol)}</code>`);
+            if (r.rule_set) matchDesc.push(`RuleSet: <code>${fmt(r.rule_set)}</code>`);
+            if (r.user) matchDesc.push(`User: <code>${fmt(r.user)}</code>`);
             if (matchDesc.length === 0) matchDesc.push("Default / Any");
 
             html += `<tr>

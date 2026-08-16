@@ -158,29 +158,18 @@ def get_hysteria_bin():
     return None
 
 def validate_xray_config(config_dict: dict) -> tuple[bool, str]:
-    """Validates Xray configuration using the real Xray core binary."""
+    """Validates Xray configuration using sentinel-core supervisor validation."""
     bin_path = get_xray_bin()
     if not bin_path:
-        return True, "Xray binary not found, skipping CLI validation"
+        return True, "Xray binary not found, skipping validation"
         
     with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
         json.dump(config_dict, f, indent=2)
         tmp_name = f.name
         
     try:
-        res = subprocess.run(
-            [str(bin_path), "run", "-test", "-config", tmp_name],
-            capture_output=True,
-            text=True,
-            timeout=5
-        )
-        output = (res.stdout or "") + (res.stderr or "")
-        # Exit code 0 or output containing 'Configuration OK' indicates valid config
-        if res.returncode == 0 or "Configuration OK" in output:
-            return True, output
-        return False, f"Xray config validation failed (code {res.returncode}): {output}"
-    except subprocess.TimeoutExpired:
-        return False, "Xray binary validation timed out"
+        from backend.sentinel_core_bridge import validate_core_config
+        return validate_core_config("xray", str(bin_path), tmp_name)
     finally:
         if os.path.exists(tmp_name):
             try:
@@ -189,28 +178,18 @@ def validate_xray_config(config_dict: dict) -> tuple[bool, str]:
                 pass
 
 def validate_singbox_config(config_dict: dict) -> tuple[bool, str]:
-    """Validates sing-box configuration using the real sing-box core binary."""
+    """Validates sing-box configuration using sentinel-core supervisor validation."""
     bin_path = get_singbox_bin()
     if not bin_path:
-        return True, "sing-box binary not found, skipping CLI validation"
+        return True, "sing-box binary not found, skipping validation"
         
     with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
         json.dump(config_dict, f, indent=2)
         tmp_name = f.name
         
     try:
-        res = subprocess.run(
-            [str(bin_path), "check", "-c", tmp_name],
-            capture_output=True,
-            text=True,
-            timeout=5
-        )
-        output = (res.stdout or "") + (res.stderr or "")
-        if res.returncode == 0:
-            return True, output
-        return False, f"sing-box config validation failed (code {res.returncode}): {output}"
-    except subprocess.TimeoutExpired:
-        return False, "sing-box binary validation timed out"
+        from backend.sentinel_core_bridge import validate_core_config
+        return validate_core_config("sing-box", str(bin_path), tmp_name)
     finally:
         if os.path.exists(tmp_name):
             try:
@@ -219,10 +198,10 @@ def validate_singbox_config(config_dict: dict) -> tuple[bool, str]:
                 pass
 
 def validate_hysteria_config(config_dict: dict) -> tuple[bool, str]:
-    """Validates Hysteria 2 configuration using the real Hysteria core binary."""
+    """Validates Hysteria 2 configuration using sentinel-core supervisor validation."""
     bin_path = get_hysteria_bin()
     if not bin_path:
-        return True, "Hysteria binary not found, skipping CLI validation"
+        return True, "Hysteria binary not found, skipping validation"
         
     from backend.hysteria import generate_self_signed_cert, HYSTERIA_CERT_PATH, HYSTERIA_KEY_PATH
     if not HYSTERIA_CERT_PATH.exists() or not HYSTERIA_KEY_PATH.exists():
@@ -236,19 +215,8 @@ def validate_hysteria_config(config_dict: dict) -> tuple[bool, str]:
         tmp_name = f.name
         
     try:
-        res = subprocess.run(
-            [str(bin_path), "server", "-c", tmp_name],
-            capture_output=True,
-            text=True,
-            timeout=1
-        )
-        output = (res.stdout or "") + (res.stderr or "")
-        if "invalid config" in output.lower() and "tls: failed to find any pem data" not in output.lower():
-            return False, f"Hysteria config validation failed: {output}"
-        return True, output
-    except subprocess.TimeoutExpired:
-        # Running fine for 1s means it loaded config and started listening server mode successfully
-        return True, "Hysteria server started successfully"
+        from backend.sentinel_core_bridge import validate_core_config
+        return validate_core_config("hysteria2", str(bin_path), tmp_name)
     finally:
         if os.path.exists(tmp_name):
             try:

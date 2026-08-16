@@ -19,7 +19,7 @@ export function setupWarpListeners() {
                 showToast(t("settings_warp_toast_install_success", "Cloudflare WARP успешно установлен!"));
                 await loadWarpStatus();
             } else {
-                showToast(res ? res.msg : "Не удалось установить WARP", "error");
+                showToast(res ? res.msg : t("toast_warp_install_fail", "Не удалось установить WARP"), "error");
             }
         });
     }
@@ -39,7 +39,7 @@ export function setupWarpListeners() {
                 showToast(t("settings_warp_toast_connect_success", "WARP успешно подключен!"));
                 await loadWarpStatus();
             } else {
-                showToast(res ? res.msg : "Не удалось подключить WARP", "error");
+                showToast(res ? res.msg : t("toast_warp_connect_fail", "Не удалось подключить WARP"), "error");
             }
         });
     }
@@ -72,7 +72,7 @@ export function setupWarpListeners() {
                 showToast(t("settings_warp_toast_disconnect_success", "WARP успешно отключен!"));
                 await loadWarpStatus();
             } else {
-                showToast(res ? res.msg : "Не удалось отключить WARP", "error");
+                showToast(res ? res.msg : t("toast_warp_disconnect_fail", "Не удалось отключить WARP"), "error");
             }
         });
     }
@@ -93,7 +93,7 @@ export function setupWarpListeners() {
                 }
             }
             
-            if (!confirm("Вы действительно хотите полностью удалить Cloudflare WARP с сервера?")) {
+            if (!confirm(t("confirm_warp_uninstall", "Вы действительно хотите полностью удалить Cloudflare WARP с сервера?"))) {
                 return;
             }
             
@@ -109,7 +109,7 @@ export function setupWarpListeners() {
                 showToast(t("settings_warp_toast_uninstall_success", "Cloudflare WARP успешно удален!"));
                 await loadWarpStatus();
             } else {
-                showToast(res ? res.msg : "Не удалось удалить WARP", "error");
+                showToast(res ? res.msg : t("toast_warp_uninstall_fail", "Не удалось удалить WARP"), "error");
             }
         });
     }
@@ -120,7 +120,7 @@ export function setupWarpListeners() {
             const licenseInput = document.getElementById("settings-warp-license");
             const key = licenseInput ? licenseInput.value.trim() : "";
             if (!key) {
-                showToast("Пожалуйста, введите лицензионный ключ WARP+", "error");
+                showToast(t("toast_warp_key_required", "Пожалуйста, введите лицензионный ключ WARP+"), "error");
                 return;
             }
             
@@ -140,7 +140,7 @@ export function setupWarpListeners() {
                 showToast(t("settings_warp_toast_register_success", "Лицензионный ключ успешно применен!"));
                 await loadWarpStatus();
             } else {
-                showToast(res ? res.msg : "Не удалось применить лицензионный ключ", "error");
+                showToast(res ? res.msg : t("toast_warp_key_fail", "Не удалось применить лицензионный ключ"), "error");
             }
         });
     }
@@ -148,7 +148,7 @@ export function setupWarpListeners() {
     const btnWarpRegisterFree = document.getElementById("btn-warp-register-free");
     if (btnWarpRegisterFree) {
         btnWarpRegisterFree.addEventListener("click", async () => {
-            if (!confirm("Вы действительно хотите сбросить аккаунт WARP+ на бесплатный?")) {
+            if (!confirm(t("confirm_warp_reset_free", "Вы действительно хотите сбросить аккаунт WARP+ на бесплатный?"))) {
                 return;
             }
             btnWarpRegisterFree.disabled = true;
@@ -167,7 +167,7 @@ export function setupWarpListeners() {
                 showToast(t("settings_warp_toast_register_success", "Регистрация бесплатного аккаунта выполнена!"));
                 await loadWarpStatus();
             } else {
-                showToast(res ? res.msg : "Не удалось зарегистрировать бесплатный аккаунт", "error");
+                showToast(res ? res.msg : t("toast_warp_free_fail", "Не удалось зарегистрировать бесплатный аккаунт"), "error");
             }
         });
     }

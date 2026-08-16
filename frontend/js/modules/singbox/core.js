@@ -6,6 +6,15 @@ import { loadSingboxConfig, setupSingboxConfigListeners } from "./config.js";
 export { loadSingboxConfig };
 
 export async function loadSingboxCoreInfo() {
+    const currElem = document.getElementById("singbox-curr-version");
+    const latestElem = document.getElementById("singbox-latest-version");
+
+    // Instantly display cached versions if available to eliminate loading lag
+    const cachedCurr = localStorage.getItem("singbox_cached_curr_ver");
+    const cachedLatest = localStorage.getItem("singbox_cached_latest_ver");
+    if (currElem && cachedCurr && currElem.innerText === "...") currElem.innerText = cachedCurr;
+    if (latestElem && cachedLatest && latestElem.innerText === "...") latestElem.innerText = cachedLatest;
+
     const prereleaseToggle = document.getElementById("singbox-prerelease-toggle");
     let includePrerelease = false;
     if (prereleaseToggle) {
@@ -20,11 +29,15 @@ export async function loadSingboxCoreInfo() {
     const res = await apiFetch(versionUrl);
     if (!res || !res.success) return;
 
-    const currElem = document.getElementById("singbox-curr-version");
-    if (currElem) currElem.innerText = res.current;
+    if (currElem && res.current) {
+        currElem.innerText = res.current;
+        localStorage.setItem("singbox_cached_curr_ver", res.current);
+    }
 
-    const latestElem = document.getElementById("singbox-latest-version");
-    if (latestElem) latestElem.innerText = res.latest;
+    if (latestElem && res.latest) {
+        latestElem.innerText = res.latest;
+        localStorage.setItem("singbox_cached_latest_ver", res.latest);
+    }
 
     const prereleaseBadge = document.getElementById("singbox-prerelease-badge");
     const versionSelect = document.getElementById("singbox-version-select");
@@ -42,7 +55,7 @@ export async function loadSingboxCoreInfo() {
             const tag = item.is_prerelease ? "Pre-release" : "Stable";
             opt.innerText = `${item.version} (${tag})`;
             if (normVer(item.version) === normVer(res.current)) {
-                opt.innerText += " — [Установлено]";
+                opt.innerText += ` — [${t("core_installed_tag", "Установлено")}]`;
             }
             versionSelect.appendChild(opt);
         });
@@ -82,7 +95,7 @@ export async function loadSingboxCoreInfo() {
             } else {
                 updateBtn.disabled = false;
                 updateBtn.setAttribute("data-url", selUrl);
-                updateBtn.innerHTML = `<i class="fa-solid fa-download"></i> <span>Установить ${selVer}</span>`;
+                updateBtn.innerHTML = `<i class="fa-solid fa-download"></i> <span>${t("core_btn_install_version", "Установить")} ${selVer}</span>`;
             }
         };
 
@@ -135,39 +148,130 @@ export async function loadSingboxCoreInfo() {
     await loadSingboxConfig();
 }
 
+let _singboxSocket = null;
+let _singboxES = null;
+let _singboxReconnectTimer = null;
+let _singboxReconnectDelay = 1000;
 let lastSingboxLogsStr = "";
 
+function appendSingboxLines(terminal, lines) {
+    const atBottom = terminal.scrollTop + terminal.clientHeight >= terminal.scrollHeight - 50;
+    const frag = document.createDocumentFragment();
+    lines.forEach(line => {
+        const div = document.createElement("div");
+        const cleanLine = (line || "").replace(/[\u001b\u009b][[()#;?]*(?:[0-9]{1,4}(?:;[0-9]{0,4})*)?[0-9A-ORZcf-nqry=><]/g, '');
+        div.innerText = cleanLine;
+
+        if (cleanLine.includes("[WARN]") || cleanLine.includes("warning")) div.style.color = "var(--accent-orange)";
+        else if (cleanLine.includes("[ERROR]") || cleanLine.includes("error")) div.style.color = "var(--accent-rose)";
+        else if (cleanLine.includes("[INFO]") || cleanLine.includes("info")) div.style.color = "var(--accent-blue)";
+
+        frag.appendChild(div);
+    });
+    terminal.appendChild(frag);
+    while (terminal.childElementCount > 300) {
+        terminal.removeChild(terminal.firstChild);
+    }
+    if (atBottom) terminal.scrollTop = terminal.scrollHeight;
+}
+
 export async function loadSingboxLogs() {
-    const res = await apiFetch("/api/singbox/logs");
-    if (!res || !res.success) return;
-
     const terminal = document.getElementById("singbox-logs-terminal");
-    if (terminal) {
-        const logsStr = JSON.stringify(res.logs);
-        if (logsStr === lastSingboxLogsStr) {
-            return;
+    if (!terminal) return;
+    try {
+        const res = await apiFetch("/api/singbox/logs");
+        if (res && res.success && Array.isArray(res.logs) && res.logs.length > 0) {
+            terminal.innerHTML = "";
+            appendSingboxLines(terminal, res.logs);
         }
-        lastSingboxLogsStr = logsStr;
+    } catch (_) {}
+}
 
-        const currentScroll = terminal.scrollTop + terminal.clientHeight >= terminal.scrollHeight - 50;
+export function startSingboxLogsStream() {
+    stopSingboxLogsStream();
+    const terminal = document.getElementById("singbox-logs-terminal");
+    if (!terminal) return;
 
-        terminal.innerHTML = "";
-        res.logs.forEach(line => {
-            const div = document.createElement("div");
-            const cleanLine = line.replace(/[\u001b\u009b][[()#;?]*(?:[0-9]{1,4}(?:;[0-9]{0,4})*)?[0-9A-ORZcf-nqry=><]/g, '');
-            div.innerText = cleanLine;
+    loadSingboxLogs();
 
-            if (cleanLine.includes("[WARN]") || cleanLine.includes("warning")) div.style.color = "var(--accent-orange)";
-            else if (cleanLine.includes("[ERROR]") || cleanLine.includes("error")) div.style.color = "var(--accent-rose)";
-            else if (cleanLine.includes("[INFO]") || cleanLine.includes("info")) div.style.color = "var(--accent-blue)";
+    function connect() {
+        const proto = window.location.protocol === "https:" ? "wss:" : "ws:";
+        const wsUrl = `${proto}//${window.location.host}/api/singbox/logs/ws`;
 
-            terminal.appendChild(div);
-        });
+        try {
+            const ws = new WebSocket(wsUrl);
+            _singboxSocket = ws;
 
-        if (currentScroll) {
-            terminal.scrollTop = terminal.scrollHeight;
+            ws.onopen = () => {
+                _singboxReconnectDelay = 1000;
+            };
+
+            ws.onmessage = (e) => {
+                try {
+                    const msg = JSON.parse(e.data);
+                    if (msg.event === "history" && Array.isArray(msg.data)) {
+                        terminal.innerHTML = "";
+                        appendSingboxLines(terminal, msg.data);
+                    } else if (msg.event === "line" && msg.data) {
+                        appendSingboxLines(terminal, [msg.data]);
+                    }
+                } catch (_) {}
+            };
+
+            ws.onerror = () => {
+                ws.close();
+            };
+
+            ws.onclose = (e) => {
+                _singboxSocket = null;
+                if (e.code === 4401 || e.code === 1008) return;
+                if (!_singboxES) {
+                    connectSSE();
+                }
+            };
+        } catch (_) {
+            connectSSE();
         }
     }
+
+    function connectSSE() {
+        if (_singboxES) return;
+        const es = new EventSource("/api/singbox/logs/stream");
+        _singboxES = es;
+
+        es.addEventListener("history", (e) => {
+            try {
+                const lines = JSON.parse(e.data);
+                if (Array.isArray(lines) && lines.length > 0) {
+                    terminal.innerHTML = "";
+                    appendSingboxLines(terminal, lines);
+                }
+                _singboxReconnectDelay = 1000;
+            } catch (_) {}
+        });
+
+        es.addEventListener("line", (e) => {
+            try {
+                appendSingboxLines(terminal, [JSON.parse(e.data)]);
+            } catch (_) {}
+        });
+
+        es.onerror = () => {
+            es.close();
+            _singboxES = null;
+            _singboxReconnectDelay = Math.min(_singboxReconnectDelay * 2, 30000);
+            _singboxReconnectTimer = setTimeout(connect, _singboxReconnectDelay);
+        };
+    }
+
+    connect();
+}
+
+export function stopSingboxLogsStream() {
+    if (_singboxReconnectTimer) { clearTimeout(_singboxReconnectTimer); _singboxReconnectTimer = null; }
+    if (_singboxSocket) { _singboxSocket.close(); _singboxSocket = null; }
+    if (_singboxES) { _singboxES.close(); _singboxES = null; }
+    _singboxReconnectDelay = 1000;
 }
 
 export function setupSingboxCoreListeners() {
@@ -218,7 +322,7 @@ export function setupSingboxCoreListeners() {
             if (!url) return;
 
             updateBtn.disabled = true;
-            updateBtn.innerText = "Обновление...";
+            updateBtn.innerText = t("core_btn_updating", "Обновление...");
             showToast(t("singbox_update_started", "Начался процесс обновления ядра sing-box. Пожалуйста, подождите"), "info");
 
             const res = await apiFetch("/api/singbox/update", {

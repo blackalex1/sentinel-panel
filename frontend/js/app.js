@@ -8,12 +8,25 @@ if (tg) {
     tg.expand();
 }
 
-// Запуск инициализации приложения сразу (так как type="module" выполняется после парсинга DOM)
+// Запуск инициализации приложения сразу
 (async () => {
     try {
-        await initI18n();
         setupLoginListener();
-        await initApp();
+        
+        // Parallelize i18n initialization and auth check in one wave
+        const [_, isAuth] = await Promise.all([
+            initI18n(),
+            checkSessionAuth()
+        ]);
+        
+        if (isAuth) {
+            await startPanel();
+        } else {
+            const loadingOverlay = document.getElementById("loading-overlay");
+            const loginOverlay = document.getElementById("login-overlay");
+            if (loadingOverlay) loadingOverlay.classList.remove("active");
+            if (loginOverlay) loginOverlay.classList.add("active");
+        }
     } catch (e) {
         console.error("Critical app initialization error:", e);
         if (window.onerror) {
@@ -22,12 +35,11 @@ if (tg) {
     }
 })();
 
-async function initApp() {
-    document.getElementById("loading-overlay").classList.add("active");
-    
+async function checkSessionAuth() {
     // 1. Telegram WebApp Authorization
     if (tg && tg.initData) {
-        document.getElementById("loading-text").innerText = "Авторизация в Telegram...";
+        const loadingText = document.getElementById("loading-text");
+        if (loadingText) loadingText.innerText = t("loading_auth_telegram", "Авторизация в Telegram...");
         const res = await apiFetch("/api/auth/telegram", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -37,25 +49,55 @@ async function initApp() {
         if (res && res.success) {
             setCsrfToken(res.token);
             showToast(t("tg_auth_success", "Авторизация Telegram успешна!"));
-            await startPanel();
-        } else {
-            document.getElementById("loading-overlay").classList.remove("active");
-            showToast(res ? res.msg : t("tg_auth_error", "Ошибка проверки подписи"), "error");
-            document.getElementById("login-overlay").classList.add("active");
+            return true;
         }
-        return;
+        return false;
     }
     
     // 2. Regular Browser Cookie Session Authorization
     const csrfRes = await apiFetch("/csrf-token");
     if (csrfRes && csrfRes.success) {
         setCsrfToken(csrfRes.obj);
-        await startPanel();
-    } else {
-        document.getElementById("loading-overlay").classList.remove("active");
-        document.getElementById("login-overlay").classList.add("active");
+        return true;
     }
+    return false;
 }
+
+import { loadedComponents } from "./ui.js";
+import { translatePage } from "./i18n.js";
+
+const COMPONENT_MANIFEST = [
+    // Base tabs and main modals
+    { id: "tab-dashboard", path: "components/dashboard.html", target: ".content-area" },
+    { id: "tab-inbounds", path: "components/inbounds.html", target: ".content-area" },
+    { id: "tab-xray", path: "components/xray.html", target: ".content-area" },
+    { id: "tab-hysteria", path: "components/hysteria.html", target: ".content-area" },
+    { id: "tab-singbox", path: "components/singbox.html", target: ".content-area" },
+    { id: "tab-routing", path: "components/routing.html", target: ".content-area" },
+    { id: "tab-settings", path: "components/settings.html", target: ".content-area" },
+    { id: "inbound-modal", path: "components/inbound-modal.html", target: "body" },
+    { id: "clients-modal", path: "components/clients-modal.html", target: "body" },
+    { id: "client-modal", path: "components/client-modal.html", target: "body" },
+    { id: "links-modal", path: "components/links-modal.html", target: "body" },
+    { id: "json-modal", path: "components/json-modal.html", target: "body" },
+    { id: "global-traffic-modal", path: "components/global-traffic-modal.html", target: "body" },
+
+    // Settings sections
+    { id: "sec-security", path: "components/settings/security.html", target: ".settings-sections-content" },
+    { id: "sec-network", path: "components/settings/network.html", target: ".settings-sections-content" },
+    { id: "sec-telegram", path: "components/settings/telegram.html", target: ".settings-sections-content" },
+    { id: "sec-system", path: "components/settings/system.html", target: ".settings-sections-content" },
+    { id: "sec-backups", path: "components/settings/backups.html", target: ".settings-sections-content" },
+    { id: "sec-logs", path: "components/settings/logs.html", target: ".settings-sections-content" },
+
+    // Routing components
+    { id: "routing-quick-security", path: "components/routing/quick-security-rules.html", target: "#routing-quick-security-container" },
+    { id: "routing-rules-table", path: "components/routing/routing-rules-table.html", target: "#routing-rules-table-container" },
+    { id: "routing-outbounds-table", path: "components/routing/outbounds-table.html", target: "#routing-outbounds-table-container" },
+    { id: "routing-preset-import-modal-wrapper", path: "components/routing/preset-import-modal.html", target: "#routing-modals-container" },
+    { id: "routing-outbound-modal-wrapper", path: "components/routing/outbound-modal.html", target: "#routing-modals-container" },
+    { id: "routing-rule-modal-wrapper", path: "components/routing/routing-rule-modal.html", target: "#routing-modals-container" }
+];
 
 async function loadAuthorizedComponents() {
     const loadingOverlay = document.getElementById("loading-overlay");
@@ -63,84 +105,90 @@ async function loadAuthorizedComponents() {
     if (loadingOverlay) loadingOverlay.classList.add("active");
     if (loadingText) loadingText.innerText = t("loading_components", "Загрузка компонентов...");
     
-    // Загружаем все компоненты интерфейса параллельно только после успешной авторизации
-    await Promise.all([
-        loadComponent("tab-dashboard", "components/dashboard.html", ".content-area"),
-        loadComponent("tab-inbounds", "components/inbounds.html", ".content-area"),
-        loadComponent("tab-xray", "components/xray.html", ".content-area"),
-        loadComponent("tab-hysteria", "components/hysteria.html", ".content-area"),
-        loadComponent("tab-singbox", "components/singbox.html", ".content-area"),
-        loadComponent("tab-routing", "components/routing.html", ".content-area"),
-        loadComponent("tab-settings", "components/settings.html", ".content-area"),
-        loadComponent("inbound-modal", "components/inbound-modal.html", "body"),
-        loadComponent("clients-modal", "components/clients-modal.html", "body"),
-        loadComponent("client-modal", "components/client-modal.html", "body"),
-        loadComponent("links-modal", "components/links-modal.html", "body"),
-        loadComponent("json-modal", "components/json-modal.html", "body"),
-        loadComponent("global-traffic-modal", "components/global-traffic-modal.html", "body")
-    ]);
+    const BUNDLE_STORAGE_KEY = "sentinel_comp_bundle_v60";
+    let bundle = null;
 
-    // Загружаем секции настроек
-    await Promise.all([
-        loadComponent("sec-security", "components/settings/security.html", ".settings-sections-content"),
-        loadComponent("sec-network", "components/settings/network.html", ".settings-sections-content"),
-        loadComponent("sec-telegram", "components/settings/telegram.html", ".settings-sections-content"),
-        loadComponent("sec-system", "components/settings/system.html", ".settings-sections-content"),
-        loadComponent("sec-backups", "components/settings/backups.html", ".settings-sections-content"),
-        loadComponent("sec-logs", "components/settings/logs.html", ".settings-sections-content")
-    ]);
+    // Clear any obsolete bundle versions from session storage
+    try {
+        for (let i = sessionStorage.length - 1; i >= 0; i--) {
+            const k = sessionStorage.key(i);
+            if (k && k.startsWith("sentinel_comp_bundle") && k !== BUNDLE_STORAGE_KEY) {
+                sessionStorage.removeItem(k);
+            }
+        }
+        const cached = sessionStorage.getItem(BUNDLE_STORAGE_KEY);
+        if (cached) {
+            bundle = JSON.parse(cached);
+        }
+    } catch (e) {}
 
-    // Загружаем вкладки модального окна инбаундов
-    await Promise.all([
-        loadComponent("ib-tab-panel-basic", "components/inbound_modal/tab-basic.html", "#inbound-form-tabs-container"),
-        loadComponent("ib-tab-panel-protocol", "components/inbound_modal/tab-protocol.html", "#inbound-form-tabs-container"),
-        loadComponent("ib-tab-panel-stream", "components/inbound_modal/tab-stream.html", "#inbound-form-tabs-container"),
-        loadComponent("ib-tab-panel-security", "components/inbound_modal/tab-security.html", "#inbound-form-tabs-container"),
-        loadComponent("ib-tab-panel-sniffing", "components/inbound_modal/tab-sniffing.html", "#inbound-form-tabs-container"),
-        loadComponent("ib-tab-panel-advanced", "components/inbound_modal/tab-advanced.html", "#inbound-form-tabs-container")
-    ]);
+    if (!bundle) {
+        try {
+            const res = await apiFetch(`/api/components/bundle?t=${Date.now()}`);
+            if (res && res.success && res.components) {
+                bundle = res.components;
+                try {
+                    sessionStorage.setItem(BUNDLE_STORAGE_KEY, JSON.stringify(bundle));
+                } catch (e) {}
+            }
+        } catch (e) {
+            console.warn("Bundle fetch failed, falling back to parallel fetch:", e);
+        }
+    }
 
-    // Загружаем компоненты и модальные окна маршрутизации
-    await Promise.all([
-        loadComponent("routing-quick-security", "components/routing/quick-security-rules.html", "#routing-quick-security-container"),
-        loadComponent("routing-rules-table", "components/routing/routing-rules-table.html", "#routing-rules-table-container"),
-        loadComponent("routing-outbounds-table", "components/routing/outbounds-table.html", "#routing-outbounds-table-container"),
-        loadComponent("routing-preset-import-modal-wrapper", "components/routing/preset-import-modal.html", "#routing-modals-container"),
-        loadComponent("routing-outbound-modal-wrapper", "components/routing/outbound-modal.html", "#routing-modals-container"),
-        loadComponent("routing-rule-modal-wrapper", "components/routing/routing-rule-modal.html", "#routing-modals-container")
-    ]);
+    if (bundle) {
+        for (const item of COMPONENT_MANIFEST) {
+            if (loadedComponents.has(item.id)) continue;
+            const html = bundle[item.path];
+            if (html) {
+                const target = document.querySelector(item.target);
+                if (target) {
+                    target.insertAdjacentHTML("beforeend", html);
+                    loadedComponents.add(item.id);
+                }
+            }
+        }
+    } else {
+        const htmlMap = {};
+        await Promise.all(COMPONENT_MANIFEST.map(async (item) => {
+            try {
+                const r = await fetch(item.path);
+                if (r.ok) htmlMap[item.path] = await r.text();
+            } catch (e) {}
+        }));
+        for (const item of COMPONENT_MANIFEST) {
+            if (loadedComponents.has(item.id)) continue;
+            const html = htmlMap[item.path];
+            if (html) {
+                const target = document.querySelector(item.target);
+                if (target) {
+                    target.insertAdjacentHTML("beforeend", html);
+                    loadedComponents.add(item.id);
+                }
+            }
+        }
+    }
+
+    try {
+        translatePage();
+    } catch (e) {}
 }
 
 async function loadPanelStylesheets() {
-    const sheets = [
-        "css/pages/dashboard.css",
-        "css/pages/inbounds.css",
-        "css/pages/settings.css",
-        "css/pages/routing.css"
-    ];
-    await Promise.all(sheets.map(href => {
-        return new Promise((resolve) => {
-            const link = document.createElement("link");
-            link.rel = "stylesheet";
-            link.href = href + "?v=upgrade_7";
-            link.onload = resolve;
-            link.onerror = resolve; // Продолжить даже при ошибке
-            document.head.appendChild(link);
-        });
-    }));
+    return Promise.resolve();
 }
 
 import { enhanceAllSelects } from "./components/customSelect.js";
 
 async function startPanel() {
     try {
-        await Promise.all([
+        // Load HTML templates and main JS modules in parallel
+        const [_, { initPanel }] = await Promise.all([
             loadAuthorizedComponents(),
-            loadPanelStylesheets()
+            import("./panel-main.js")
         ]);
         
-        // Dynamically import admin logic only after successful authorization
-        const { initPanel } = await import("./panel-main.js");
+        // Populate initial dashboard data before revealing so nothing flashes empty
         await initPanel();
         enhanceAllSelects();
     } catch (err) {
@@ -180,12 +228,12 @@ function startTg2faPolling(token) {
                 } else if (res.status === "blocked") {
                     clearInterval(tg2faPollInterval);
                     tg2faPollInterval = null;
-                    if (errorDiv) errorDiv.innerText = "Этот IP-адрес был заблокирован.";
+                    if (errorDiv) errorDiv.innerText = t("login_ip_blocked", "Этот IP-адрес был заблокирован.");
                     if (btnBack) btnBack.click();
                 } else if (res.status === "expired") {
                     clearInterval(tg2faPollInterval);
                     tg2faPollInterval = null;
-                    if (errorDiv) errorDiv.innerText = "Время подтверждения входа истекло.";
+                    if (errorDiv) errorDiv.innerText = t("login_time_expired", "Время подтверждения входа истекло.");
                     if (btnBack) btnBack.click();
                 }
             }

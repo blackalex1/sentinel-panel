@@ -1,4 +1,5 @@
 import { showToast } from "./ui.js";
+import { t } from "./i18n.js";
 
 let csrfToken = "";
 
@@ -21,17 +22,17 @@ export async function apiFetch(url, options = {}) {
     try {
         const response = await fetch(url, options);
         if (response.status === 404) {
-            // Decoy 404 handler
-            if (!url.includes("csrf-token")) {
-                location.reload();
-            }
             return null;
         }
         return await response.json();
     } catch (error) {
+        // Suppress benign network aborts and transient connection errors during polling/reload
+        if (error && (error.name === "AbortError" || error.name === "TypeError")) {
+            return null;
+        }
         console.error("API error:", error);
-        if (!url.includes("csrf-token")) {
-            showToast("Ошибка соединения с API", "error");
+        if (!url.includes("csrf-token") && !url.includes("status")) {
+            showToast(t("api_connection_error", "Ошибка соединения с API"), "error");
         }
         return null;
     }

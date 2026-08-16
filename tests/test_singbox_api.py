@@ -146,11 +146,11 @@ def test_singbox_config_generation_with_hysteria_and_rules(monkeypatch):
         }
     ]
 
-    monkeypatch.setattr("backend.singbox.config.get_all_inbounds", lambda: mock_inbounds)
-    monkeypatch.setattr("backend.singbox.config.get_clients_for_inbound", lambda ib_id: [])
+    monkeypatch.setattr("backend.database.get_all_inbounds", lambda: mock_inbounds)
+    monkeypatch.setattr("backend.database.get_clients_for_inbound", lambda ib_id: [])
     monkeypatch.setattr("backend.database.get_all_outbounds", lambda: mock_outbounds)
     monkeypatch.setattr("backend.database.get_all_routing_rules", lambda: mock_rules)
-    monkeypatch.setattr("backend.singbox.config.get_setting", lambda key: "true" if key in ("block_bittorrent", "block_ads") else "false")
+    monkeypatch.setattr("backend.database.get_setting", lambda key: "true" if key in ("block_bittorrent", "block_ads") else "false")
 
     config = generate_singbox_config_json()
     from tests.core_verifier import validate_singbox_config
@@ -188,38 +188,21 @@ def test_singbox_config_generation_with_hysteria_and_rules(monkeypatch):
 
 
 def test_update_online_emails_singbox(monkeypatch):
-    """Test update_online_emails properly detects Sing-box online clients via Clash API and active IP cache."""
-    class MockResponse:
-        def __init__(self, status_code, json_data):
-            self.status_code = status_code
-            self._json = json_data
-        def json(self):
-            return self._json
-
-    mock_clash_data = {
-        "connections": [
-            {
-                "download": 1024,
-                "upload": 512,
-                "metadata": {
-                    "user": "singbox_user1@test.com",
-                    "sourceIP": "192.168.1.10"
-                }
-            }
-        ]
-    }
-
-    import requests
+    """Test update_online_emails properly detects Sing-box online clients via sentinel-core bridge."""
     import backend.routes.clients.actions
     from backend.routes.clients.actions import update_online_emails
     from backend.scheduler_jobs.limits import ACTIVE_IP_CACHE
 
     ACTIVE_IP_CACHE.clear()
 
-    monkeypatch.setattr("backend.xray.is_xray_running", lambda: False)
-    monkeypatch.setattr("backend.singbox.is_singbox_running", lambda: True)
-    monkeypatch.setattr("backend.singbox.service.is_singbox_running", lambda: True)
-    monkeypatch.setattr(requests, "get", lambda url, timeout=2: MockResponse(200, mock_clash_data))
+    monkeypatch.setattr("backend.sentinel_core_bridge.get_unified_traffic", lambda: {
+        "singbox_user1@test.com": {
+            "online": True,
+            "ip": "192.168.1.10",
+            "up": 512,
+            "down": 1024
+        }
+    })
 
     class MockClient:
         def __init__(self, email):
@@ -247,5 +230,32 @@ def test_update_online_emails_singbox(monkeypatch):
     update_online_emails()
 
     assert "singbox_user1@test.com" in backend.routes.clients.actions._online_emails
+
+
+def test_singbox_bridge_methods():
+    """Verify sentinel_core_bridge methods: build_server_config, validate_core_config, get_core_version."""
+    from backend.sentinel_core_bridge import (
+        build_server_config,
+        validate_core_config,
+        get_core_version
+    )
+    from backend.config import SINGBOX_BIN_PATH
+
+    inbounds = [{
+        "id": 1,
+        "port": 443,
+        "protocol": "vless",
+        "tag": "inbound-1",
+        "core": "singbox",
+        "settings": {"decryption": "none"},
+        "streamSettings": {"network": "tcp"}
+    }]
+    compiled = build_server_config("sing-box", inbounds)
+    assert isinstance(compiled, dict)
+    assert "inbounds" in compiled or "error" in compiled
+
+    ver = get_core_version("sing-box", str(SINGBOX_BIN_PATH))
+    assert isinstance(ver, str)
+
 
 

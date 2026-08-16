@@ -69,37 +69,26 @@ export function setupRoutingRulesListeners() {
     const btnSaveQuickRules = document.getElementById("btn-save-quick-rules");
     if (btnSaveQuickRules) {
         btnSaveQuickRules.addEventListener("click", async () => {
-            const block_bittorrent = document.getElementById("quick-block-bittorrent").checked;
-            const block_bittorrent_outbound = document.getElementById("quick-outbound-bittorrent")?.value || "blocked";
-            const block_ads = document.getElementById("quick-block-ads").checked;
-            const block_ads_outbound = document.getElementById("quick-outbound-ads")?.value || "blocked";
-            const block_cn = document.getElementById("quick-block-cn").checked;
-            const block_cn_outbound = document.getElementById("quick-outbound-cn")?.value || "blocked";
-            const block_ru = document.getElementById("quick-block-ru").checked;
-            const block_ru_outbound = document.getElementById("quick-outbound-ru")?.value || "blocked";
-            const block_us = document.getElementById("quick-block-us").checked;
-            const block_us_outbound = document.getElementById("quick-outbound-us")?.value || "blocked";
-            const ip_checkers = document.getElementById("quick-block-ip-checkers").checked;
-            const ip_checkers_outbound = document.getElementById("quick-outbound-ip-checkers")?.value || "direct";
+            const payload = {};
+            const checkboxes = document.querySelectorAll('#quick-security-rules-grid input[type="checkbox"]');
+            
+            checkboxes.forEach(cb => {
+                const presetId = cb.id.replace("quick-block-", "");
+                const settingKey = (presetId === "ip_checkers") ? "ip_checkers" : `block_${presetId}`;
+                const outSettingKey = (presetId === "ip_checkers") ? "ip_checkers_outbound" : `block_${presetId}_outbound`;
+                
+                payload[settingKey] = cb.checked;
+                const outSelect = document.getElementById(`quick-outbound-${presetId}`);
+                if (outSelect) {
+                    payload[outSettingKey] = outSelect.value;
+                }
+            });
             
             btnSaveQuickRules.disabled = true;
             const res = await apiFetch("/api/settings/update", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    block_bittorrent,
-                    block_bittorrent_outbound,
-                    block_ads,
-                    block_ads_outbound,
-                    block_cn,
-                    block_cn_outbound,
-                    block_ru,
-                    block_ru_outbound,
-                    block_us,
-                    block_us_outbound,
-                    ip_checkers,
-                    ip_checkers_outbound
-                })
+                body: JSON.stringify(payload)
             });
             btnSaveQuickRules.disabled = false;
             
@@ -122,7 +111,7 @@ export function setupRoutingRulesListeners() {
                 apiFetch("/api/hysteria/config/reset", { method: "POST" })
             ]);
             btnResetCustom.disabled = false;
-            showToast("Конфигурация ядер успешно сброшена к авто-режиму панели!");
+            showToast(t("routing_custom_config_reset_success", "Конфигурация ядер успешно сброшена к авто-режиму панели!"));
             loadRoutingRules();
         });
     }

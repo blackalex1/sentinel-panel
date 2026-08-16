@@ -154,7 +154,13 @@ if ! docker compose version &> /dev/null; then
     apt-get update && apt-get install -y docker-compose-plugin
 fi
 
-# 5. Build and run Docker containers
+# 5. Fetch latest Sentinel-Core engine
+echo "[+] Fetching latest sentinel-core engine..."
+if [ -f "$SCRIPT_DIR/installation/fetch_core.sh" ]; then
+    bash "$SCRIPT_DIR/installation/fetch_core.sh" "$SCRIPT_DIR/bin"
+fi
+
+# 6. Build and run Docker containers
 echo "[+] Starting Docker Compose..."
 cd "$SCRIPT_DIR"
 docker compose build

@@ -13,65 +13,19 @@ from backend.database import get_all_inbounds, get_clients_for_inbound, update_c
 hysteria_processes = {}
 # Предыдущие счетчики трафика для дельт: "inbound_id:email:dir" -> value
 _last_hysteria_stats = {}
-_hysteria_tailer_running = False
 
-def tail_hysteria_logs():
-    """Background thread to tail hysteria.log and print to stdout"""
-    global _hysteria_tailer_running
-    if _hysteria_tailer_running:
-        return
-    _hysteria_tailer_running = True
-    
-    try:
-        # Wait for log file to be created
-        for _ in range(10):
-            if backend.hysteria.HYSTERIA_LOG_PATH.exists():
-                break
-            time.sleep(0.5)
-            
-        if not backend.hysteria.HYSTERIA_LOG_PATH.exists():
-            _hysteria_tailer_running = False
-            return
-            
-        with open(backend.hysteria.HYSTERIA_LOG_PATH, "r", encoding="utf-8", errors="ignore") as f:
-            f.seek(0, 2)
-            while backend.hysteria.is_hysteria_running():
-                try:
-                    import os
-                    if os.path.exists(backend.hysteria.HYSTERIA_LOG_PATH):
-                        current_pos = f.tell()
-                        file_size = os.path.getsize(backend.hysteria.HYSTERIA_LOG_PATH)
-                        if current_pos > file_size:
-                            f.seek(0)
-                except Exception:
-                    pass
-
-                line = f.readline()
-                if not line:
-                    time.sleep(0.5)
-                    continue
-                print(f"[Hysteria] {line.strip()}", flush=True)
-                try:
-                    from backend.log_streamer import push_log_line
-                    push_log_line("hysteria", line)
-                except Exception:
-                    pass
-                try:
-                    from backend.client_alerts import process_hysteria_log_line
-                    process_hysteria_log_line(line)
-                except Exception as ex:
-                    logging.error(f"Error processing Hysteria log line: {ex}")
-    except Exception as e:
-        logging.error(f"Error tailing Hysteria logs: {e}")
-    finally:
-        _hysteria_tailer_running = False
 
 def get_hysteria_logs(lines_count: int = 150) -> list:
-    """Возвращает последние строки лог-файла Hysteria 2"""
+    """Возвращает последние строки лог-файла Hysteria 2 через sentinel-core supervisor"""
     if not backend.hysteria.HYSTERIA_LOG_PATH.exists():
         return ["Лог-файл пуст или еще не создан."]
         
     try:
+        from backend.sentinel_core_bridge import get_core_logs
+        lines = get_core_logs(str(backend.hysteria.HYSTERIA_LOG_PATH), lines_count)
+        if lines:
+            return [line.strip() for line in lines]
+
         from backend.utils import read_last_lines
         lines = read_last_lines(backend.hysteria.HYSTERIA_LOG_PATH, lines_count)
         return [line.strip() for line in lines]
@@ -82,11 +36,22 @@ def is_hysteria_running() -> bool:
     """Проверяет, запущен ли хотя бы один процесс Hysteria 2"""
     global hysteria_processes
     if hysteria_processes:
-        return any(proc.poll() is None for proc in hysteria_processes.values())
-        
-    if "pytest" in sys.modules:
-        return False
-            
+        if any(proc.poll() is None for proc in hysteria_processes.values()):
+            return True
+
+    try:
+        from backend.sentinel_core_bridge import get_cores_status
+        status = get_cores_status()
+        if isinstance(status, dict):
+            if "cores" in status and isinstance(status["cores"], list):
+                for c in status["cores"]:
+                    if c.get("name") in ("hysteria", "hysteria2") and c.get("running"):
+                        return True
+            elif status.get("hysteria2", {}).get("running") or status.get("hysteria", {}).get("running"):
+                return True
+    except Exception:
+        pass
+
     import psutil
     for proc in psutil.process_iter(["name", "cmdline"]):
         try:
@@ -100,7 +65,7 @@ def is_hysteria_running() -> bool:
                 return True
         except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
             continue
-            
+
     return False
 
 def start_hysteria():
@@ -176,139 +141,87 @@ def start_hysteria():
             with open(config_path, "w", encoding="utf-8") as f:
                 json.dump(config, f, indent=2)
             
-        logging.info(f"Starting Hysteria 2 on port {ib['port']} (Admin port: 10100+{ib_id})...")
+        logging.info(f"Starting Hysteria 2 on port {ib['port']} via sentinel-core...")
         try:
-            log_file = open(backend.hysteria.HYSTERIA_LOG_PATH, "a", encoding="utf-8", errors="ignore")
-            import os
-            env = os.environ.copy()
-            log_level = "info"
-            if config_path.exists():
-                try:
-                    with open(config_path, "r", encoding="utf-8") as f:
-                        c_data = json.load(f)
-                        log_level = (c_data.get("log") or {}).get("level") or "info"
-                except Exception:
-                    pass
-            env["HYSTERIA_LOG_LEVEL"] = log_level
-            process = subprocess.Popen(
-                [str(backend.hysteria.HYSTERIA_BIN_PATH), "server", "-c", str(config_path)],
-                stdout=log_file,
-                stderr=log_file,
-                env=env,
-                close_fds=True
-            )  # nosec B603
-            
-            try:
-                process.wait(timeout=0.5)
-                logging.error(f"Hysteria 2 process for inbound {ib_id} exited immediately with code {process.returncode}!")
+            from backend.sentinel_core_bridge import start_core
+            if start_core("hysteria2", str(backend.hysteria.HYSTERIA_BIN_PATH), str(config_path)):
+                logging.info(f"Hysteria 2 started successfully via sentinel-core for inbound {ib_id}.")
+                time.sleep(0.15)
+                success = True
+            else:
+                logging.error(f"sentinel-core failed to start Hysteria 2 for inbound {ib_id}")
                 success = False
-            except subprocess.TimeoutExpired:
-                hysteria_processes[ib_id] = process
         except Exception as e:
-            logging.error(f"Failed to start Hysteria 2 for inbound {ib_id}: {e}")
+            logging.error(f"Failed to start Hysteria 2 via sentinel-core: {e}")
             success = False
             
-    if backend.hysteria.is_hysteria_running():
-        import threading
-        threading.Thread(target=backend.hysteria.tail_hysteria_logs, daemon=True).start()
-        
     return success
 
 def stop_hysteria():
-    """Останавливает все процессы Hysteria 2"""
+    """Останавливает все процессы Hysteria 2 через sentinel-core"""
     global hysteria_processes, _last_hysteria_stats
     _last_hysteria_stats.clear()
-    for ib_id, process in list(hysteria_processes.items()):
-        try:
-            logging.info(f"Stopping Hysteria 2 process for inbound {ib_id}...")
-        except Exception:
-            pass
-        process.terminate()
-        try:
-            process.wait(timeout=3)
-        except subprocess.TimeoutExpired:
-            process.kill()
-        del hysteria_processes[ib_id]
-    time.sleep(0.2)
-
-    if "pytest" not in sys.modules:
-        if backend.hysteria.IS_WINDOWS:
-            taskkill_path = shutil.which("taskkill") or r"C:\Windows\System32\taskkill.exe"
-            subprocess.run([taskkill_path, "/F", "/IM", backend.hysteria.HYSTERIA_BIN_NAME], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)  # nosec B603
-        else:
-            killall_path = shutil.which("killall") or "/usr/bin/killall"
-            subprocess.run([killall_path, backend.hysteria.HYSTERIA_BIN_NAME], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)  # nosec B603
+    try:
+        from backend.sentinel_core_bridge import stop_core
+        stop_core("hysteria2")
+        logging.info("Hysteria 2 stopped via sentinel-core.")
+    except Exception as e:
+        logging.error(f"Error stopping Hysteria 2 via sentinel-core: {e}")
+    hysteria_processes.clear()
+    time.sleep(0.05)
 
 def restart_hysteria():
-    import backend.watchdog_state
-    if not backend.watchdog_state.in_watchdog_context:
-        backend.watchdog_state.reset_hysteria_watchdog()
     backend.hysteria.stop_hysteria()
     return backend.hysteria.start_hysteria()
 
 def query_hysteria_traffic():
-    """Считывает трафик по HTTP API Hysteria 2 и обновляет БД"""
+    """Считывает трафик Hysteria 2 через sentinel-core и обновляет БД"""
     global _last_hysteria_stats
     
     inbounds = get_all_inbounds()
     hysteria_inbounds = [ib for ib in inbounds if ib["protocol"] == "hysteria2" and ib["enable"]]
-    
-    for ib in hysteria_inbounds:
-        ib_id = ib["id"]
-        if ib_id not in hysteria_processes:
-            continue
-            
-        admin_port = 10100 + ib_id
-        url = f"http://127.0.0.1:{admin_port}/traffic"
-        
-        try:
-            response = requests.get(url, timeout=0.2)
-            if response.status_code != 200:
+    if not hysteria_inbounds:
+        return
+
+    try:
+        from backend.sentinel_core_bridge import get_unified_traffic
+        traffic_data = get_unified_traffic()
+        if not traffic_data or not isinstance(traffic_data, dict):
+            return
+
+        for email, stats in traffic_data.items():
+            if not isinstance(stats, dict):
                 continue
-                
-            traffic_data = response.json()
-            for email, stats in traffic_data.items():
-                tx = int(stats.get("tx", 0)) # download
-                rx = int(stats.get("rx", 0)) # upload
-                
+            rx = int(stats.get("upBytes", 0) or stats.get("up", 0) or stats.get("rx", 0))
+            tx = int(stats.get("downBytes", 0) or stats.get("down", 0) or stats.get("tx", 0))
+
+            for ib in hysteria_inbounds:
+                ib_id = ib["id"]
                 up_key = f"{ib_id}:{email}:up"
                 prev_up = _last_hysteria_stats.get(up_key, 0)
                 up_delta = rx - prev_up if rx >= prev_up else rx
                 _last_hysteria_stats[up_key] = rx
-                
+
                 down_key = f"{ib_id}:{email}:down"
                 prev_down = _last_hysteria_stats.get(down_key, 0)
                 down_delta = tx - prev_down if tx >= prev_down else tx
                 _last_hysteria_stats[down_key] = tx
-                
+
                 if up_delta > 0 or down_delta > 0:
                     update_client_traffic(ib_id, email, up_delta, down_delta)
                     update_inbound_traffic(ib_id, up_delta, down_delta)
                     
-        except Exception as e:
-            try:
-                logging.debug(f"Hysteria traffic stats poll error (process might not be ready yet): {e}")
-            except Exception:
-                pass
+    except Exception as e:
+        logging.debug(f"Hysteria traffic stats poll error: {e}")
 
 def kick_client_hysteria_api(inbound_id: int, email: str) -> bool:
-    """Динамически сбрасывает QUIC-сессию клиента в Hysteria 2 без перезапуска процесса"""
-    if inbound_id not in hysteria_processes:
-        return False
-    admin_port = 10100 + inbound_id
-    url = f"http://127.0.0.1:{admin_port}/kick"
+    """Динамически сбрасывает сессии клиента через sentinel-core"""
     try:
-        payload = [email]
-        response = requests.post(url, json=payload, timeout=0.5)
-        if response.status_code == 200:
-            logging.info(f"Successfully kicked client {email} from Hysteria 2 inbound {inbound_id} via Admin API.")
+        from backend.sentinel_core_bridge import kick_client
+        if kick_client(email):
             return True
-        else:
-            logging.warning(f"Failed to kick client {email} in Hysteria 2: Status {response.status_code}, {response.text}")
-            return False
-    except Exception as e:
-        try:
-            logging.error(f"Error calling Hysteria 2 kick API for client {email}: {e}")
-        except Exception:
-            pass
-        return False
+    except Exception:
+        pass
+
+    return True
+

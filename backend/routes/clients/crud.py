@@ -11,6 +11,7 @@ from backend.database import (
 from backend.xray import restart_xray
 from backend.hysteria import restart_hysteria
 from backend.links_generator import get_client_links, get_client_mihomo_yaml
+from backend.i18n import t, get_lang
 import backend.routes.clients
 
 router = APIRouter()
@@ -24,17 +25,18 @@ async def add_client_api(request: Request, payload: Optional[ClientSettings] = N
     if not backend.routes.clients.check_auth(request):
         return backend.routes.clients.decoy_response()
         
+    lang = get_lang(request)
     ib_id = id or (payload.id if payload else None)
     settings_str = settings or (payload.settings if payload else None)
     
     if not ib_id or not settings_str:
-        return {"success": False, "msg": "Неверные параметры запроса"}
+        return {"success": False, "msg": t("invalid_request_params", lang=lang, category="backend")}
         
     try:
         data = json.loads(settings_str)
         clients = data.get("clients", [])
         if not clients:
-            return {"success": False, "msg": "Список клиентов пуст"}
+            return {"success": False, "msg": t("client_list_empty", lang=lang, category="backend")}
             
         client = clients[0] # Контроллер шлет по одному клиенту
         email = client.get("email")
@@ -90,11 +92,11 @@ async def add_client_api(request: Request, payload: Optional[ClientSettings] = N
             # Перезапуск сервисов в фоне с debounce
             from backend.utils.service_restart import restart_services_background
             restart_services_background(delay=0.5)
-            return {"success": True, "msg": "Клиент добавлен"}
+            return {"success": True, "msg": t("client_added", lang=lang, category="backend")}
             
-        return {"success": False, "msg": "Клиент с таким email уже существует"}
+        return {"success": False, "msg": t("client_email_exists", lang=lang, category="backend")}
     except Exception as e:
-        return {"success": False, "msg": f"Ошибка: {str(e)}"}
+        return {"success": False, "msg": t("generic_error", lang=lang, category="backend", error=str(e))}
 
 @router.post("/panel/api/inbounds/updateClient/{client_id}")
 async def update_client_api(request: Request, client_id: str, payload: Optional[ClientSettings] = None, id: Optional[int] = Form(None), settings: Optional[str] = Form(None)):
@@ -102,17 +104,18 @@ async def update_client_api(request: Request, client_id: str, payload: Optional[
     if not backend.routes.clients.check_auth(request):
         return backend.routes.clients.decoy_response()
         
+    lang = get_lang(request)
     ib_id = id or (payload.id if payload else None)
     settings_str = settings or (payload.settings if payload else None)
     
     if not ib_id or not settings_str:
-        return {"success": False, "msg": "Неверные параметры запроса"}
+        return {"success": False, "msg": t("invalid_request_params", lang=lang, category="backend")}
         
     try:
         data = json.loads(settings_str)
         clients = data.get("clients", [])
         if not clients:
-            return {"success": False, "msg": "Список клиентов пуст"}
+            return {"success": False, "msg": t("client_list_empty", lang=lang, category="backend")}
             
         client = clients[0]
         email = client.get("email")
@@ -123,7 +126,7 @@ async def update_client_api(request: Request, client_id: str, payload: Optional[
         from backend.database.crud.clients import get_client_by_id_or_pwd
         existing_client = get_client_by_id_or_pwd(ib_id, client_id)
         if not existing_client:
-            return {"success": False, "msg": "Клиент не найден"}
+            return {"success": False, "msg": t("client_not_found", lang=lang, category="backend")}
             
         real_old_email = existing_client["email"]
         
@@ -132,7 +135,7 @@ async def update_client_api(request: Request, client_id: str, payload: Optional[
             from backend.database.crud.clients import get_client_by_email
             existing_with_new_email = get_client_by_email(ib_id, email)
             if existing_with_new_email:
-                return {"success": False, "msg": "Клиент с таким email уже существует"}
+                return {"success": False, "msg": t("client_email_exists", lang=lang, category="backend")}
                 
         c_id = client.get("id") or client.get("password")
         if c_id:
@@ -200,12 +203,12 @@ async def update_client_api(request: Request, client_id: str, payload: Optional[
                     c["limitIp"] = limit_ip
                     c["totalGB"] = total_gb
                     c["expiryTime"] = expiry_time
+                    c["alterId"] = alter_id
+                    c["security"] = security
                     if inbound and inbound.get("protocol") == "vless":
                         c["flow"] = flow
                     else:
                         c.pop("flow", None)
-                    c["alterId"] = alter_id
-                    c["security"] = security
                     break
             ib_settings["clients"] = ib_clients
             
@@ -215,26 +218,19 @@ async def update_client_api(request: Request, client_id: str, payload: Optional[
                 inbound["enable"], inbound["total"], inbound["expiry_time"], core=inbound.get("core")
             )
             
-            if inbound["protocol"] == "hysteria2" and not bool(enable):
-                from backend.hysteria import kick_client_hysteria_api
-                try:
-                    kick_client_hysteria_api(ib_id, email)
-                except Exception:
-                    pass
-
             if not bool(enable):
                 try:
-                    from backend.singbox.service import kick_singbox_user
-                    kick_singbox_user(email)
+                    from backend.sentinel_core_bridge import kick_client
+                    kick_client(email)
                 except Exception:
                     pass
 
             from backend.utils.service_restart import restart_services_background
             restart_services_background(delay=0.5)
-            return {"success": True, "msg": "Клиент обновлен"}
-        return {"success": False, "msg": "Клиент не найден"}
+            return {"success": True, "msg": t("client_updated", lang=lang, category="backend")}
+        return {"success": False, "msg": t("client_not_found", lang=lang, category="backend")}
     except Exception as e:
-        return {"success": False, "msg": f"Ошибка: {str(e)}"}
+        return {"success": False, "msg": t("generic_error", lang=lang, category="backend", error=str(e))}
 
 @router.post("/panel/api/inbounds/{inbound_id}/delClient/{client_id}")
 async def delete_client_api(request: Request, inbound_id: int, client_id: str):
@@ -242,49 +238,46 @@ async def delete_client_api(request: Request, inbound_id: int, client_id: str):
     if not backend.routes.clients.check_auth(request):
         return backend.routes.clients.decoy_response()
         
+    lang = get_lang(request)
     client = get_client_by_id_or_pwd(inbound_id, client_id)
-    if not client:
-        return {"success": False, "msg": "Клиент не найден"}
-        
-    email = client["email"].strip()
+    email = client["email"].strip() if client else client_id
     
-    # Удаляем из client_stats
-    success = delete_client_db(inbound_id, email)
+    from backend.database import delete_client_db as delete_client
+    success = delete_client(inbound_id, email)
+    if not success and client_id != email:
+        success = delete_client(inbound_id, client_id)
+        
     if success:
         from backend.audit import log_action, get_actor_username
         actor = get_actor_username(request)
         log_action(actor, "delete_client", target=email, details=f"inbound_id:{inbound_id}")
-        # Удаляем из settings inbound
+        
         inbound = get_inbound_by_id(inbound_id)
-        ib_settings = json.loads(inbound["settings"] or "{}")
-        ib_clients = ib_settings.get("clients", [])
-        ib_clients = [c for c in ib_clients if c.get("email") != email]
-        ib_settings["clients"] = ib_clients
-        
-        update_inbound(
-            inbound_id, inbound["remark"], inbound["port"], inbound["protocol"],
-            ib_settings, json.loads(inbound["stream_settings"]), json.loads(inbound["sniffing"]),
-            inbound["enable"], inbound["total"], inbound["expiry_time"], core=inbound.get("core")
-        )
-        
-        if inbound["protocol"] == "hysteria2":
-            from backend.hysteria import kick_client_hysteria_api
-            try:
-                kick_client_hysteria_api(inbound_id, email)
-            except Exception:
-                pass
+        if inbound:
+            ib_settings = json.loads(inbound["settings"] or "{}")
+            ib_clients = ib_settings.get("clients", [])
+            ib_clients = [c for c in ib_clients if c.get("email") not in (email, client_id) and c.get("id") not in (email, client_id) and c.get("password") not in (email, client_id)]
+            ib_settings["clients"] = ib_clients
+            
+            update_inbound(
+                inbound_id, inbound["remark"], inbound["port"], inbound["protocol"],
+                ib_settings, json.loads(inbound["stream_settings"]), json.loads(inbound["sniffing"]),
+                inbound["enable"], inbound["total"], inbound["expiry_time"], core=inbound.get("core")
+            )
         
         try:
-            from backend.singbox.service import kick_singbox_user
-            kick_singbox_user(email)
+            from backend.sentinel_core_bridge import kick_client
+            kick_client(email)
+            if client_id != email:
+                kick_client(client_id)
         except Exception:
             pass
 
         from backend.utils.service_restart import restart_services_background
         restart_services_background(delay=0.5)
-        return {"success": True, "msg": "Клиент удален"}
+        return {"success": True, "msg": t("client_deleted", lang=lang, category="backend")}
         
-    return {"success": False, "msg": "Ошибка удаления"}
+    return {"success": False, "msg": t("client_delete_error", lang=lang, category="backend")}
 
 @router.get("/panel/api/inbounds/getClientLinks/{inbound_id}/{email}")
 async def get_client_links_api(request: Request, inbound_id: int, email: str):
@@ -292,9 +285,10 @@ async def get_client_links_api(request: Request, inbound_id: int, email: str):
     if not backend.routes.clients.check_auth(request):
         return backend.routes.clients.decoy_response()
         
+    lang = get_lang(request)
     inbound = get_inbound_by_id(inbound_id)
     if not inbound:
-        return {"success": False, "msg": "Inbound не найден"}
+        return {"success": False, "msg": t("inbound_not_found", lang=lang, category="backend")}
         
     # Ищем клиента в client_stats
     client = None
@@ -305,7 +299,7 @@ async def get_client_links_api(request: Request, inbound_id: int, email: str):
             break
             
     if not client:
-        return {"success": False, "msg": "Клиент не найден"}
+        return {"success": False, "msg": t("client_not_found", lang=lang, category="backend")}
         
     # Генерируем ссылки
     host_header = request.headers.get("Host", "127.0.0.1")

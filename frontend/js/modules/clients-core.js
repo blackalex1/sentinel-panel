@@ -112,7 +112,7 @@ function renderClientsModalTable() {
         let statusHtml = "";
         if (!c.enable) {
             const reasonStr = stats.blockReason || c.blockReason || t("client_status_blocked", "Заблокирован");
-            statusHtml = `<span class="badge inactive" title="Причина: ${reasonStr}" style="cursor: help;">${t("client_status_blocked", "Бан ⚠️")}</span>`;
+            statusHtml = `<span class="badge inactive" title="${t("client_block_reason_title", "Причина")}: ${reasonStr}" style="cursor: help;">${t("client_status_blocked", "Бан ⚠️")}</span>`;
         } else if (isOnline) {
             statusHtml = `<span class="badge" style="background: rgba(46, 213, 115, 0.15); color: #2ed573; box-shadow: 0 0 8px rgba(46, 213, 115, 0.2);"><span style="display: inline-block; width: 6px; height: 6px; background: #2ed573; border-radius: 50%; margin-right: 6px; vertical-align: middle;"></span>${t("client_status_online", "Онлайн")}</span>`;
         } else {

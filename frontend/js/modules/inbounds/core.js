@@ -70,6 +70,12 @@ export function switchInboundModalTab(tabName) {
             panel.classList.remove("active-panel");
         }
     });
+
+    try {
+        updateFormToggles();
+    } catch (e) {
+        console.warn("updateFormToggles on tab switch error:", e);
+    }
     
     return true;
 }
@@ -367,11 +373,17 @@ export async function openEditInboundModal(id) {
             populateXraySettings(target.protocol, sec, net, streamSettings, settings);
         }
     } else if (target.protocol === "shadowsocks") {
-        document.getElementById("ib-ss-method").value = settings.method || "aes-256-gcm";
+        const ssMethodElem = document.getElementById("ib-ss-method");
+        if (ssMethodElem) ssMethodElem.value = settings.method || "aes-256-gcm";
     } else if (target.protocol === "hysteria2") {
         populateHysteriaSettings(streamSettings);
     }
     
+    ["ib-protocol", "ib-core", "ib-network", "ib-security", "ib-tcp-type", "ib-reality-fp", "ib-tls-fp", "ib-ss-method", "ib-fallback-xver"].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+
     updateFormToggles();
     updateTabVisibility(target.protocol);
     switchInboundModalTab("basic");

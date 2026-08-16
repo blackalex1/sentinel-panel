@@ -1,5 +1,6 @@
 import { apiFetch } from "../../api.js";
 import { formatBytes, loadComponent } from "../../ui.js";
+import { t } from "../../i18n.js";
 
 export async function openGlobalTrafficDetailsModal(selectedDate) {
     let modal = document.getElementById("global-traffic-details-modal");
@@ -29,11 +30,11 @@ export async function openGlobalTrafficDetailsModal(selectedDate) {
 
     const tableBody = document.getElementById("gt-modal-table-body");
     if (!tableBody) return;
-    tableBody.innerHTML = `<tr><td colspan="5" style="text-align: center; padding: 20px; color: var(--text-muted);">Загрузка данных...</td></tr>`;
+    tableBody.innerHTML = `<tr><td colspan="5" style="text-align: center; padding: 20px; color: var(--text-muted);">${t("gt_modal_loading", "Загрузка данных...")}</td></tr>`;
 
     const res = await apiFetch(`/panel/api/system/global-traffic-details?date=${dateStr}`);
     if (!res || !res.success) {
-        tableBody.innerHTML = `<tr><td colspan="5" style="text-align: center; padding: 20px; color: var(--accent-rose);">Ошибка загрузки данных</td></tr>`;
+        tableBody.innerHTML = `<tr><td colspan="5" style="text-align: center; padding: 20px; color: var(--accent-rose);">${t("gt_modal_load_error", "Ошибка загрузки данных")}</td></tr>`;
         return;
     }
 
@@ -54,7 +55,7 @@ export async function openGlobalTrafficDetailsModal(selectedDate) {
         const filtered = res.clients.filter(c => c.email.toLowerCase().includes(query));
 
         if (filtered.length === 0) {
-            tableBody.innerHTML = `<tr><td colspan="6" style="text-align: center; padding: 20px; color: var(--text-muted);">Нет данных по клиентам за эту дату</td></tr>`;
+            tableBody.innerHTML = `<tr><td colspan="6" style="text-align: center; padding: 20px; color: var(--text-muted);">${t("gt_modal_no_data", "Нет данных по клиентам за эту дату")}</td></tr>`;
             return;
         }
 

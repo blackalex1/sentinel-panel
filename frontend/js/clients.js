@@ -16,6 +16,7 @@ import {
 } from "./modules/clients-form.js";
 
 import { generateUUID } from "./ui.js";
+import { t } from "./i18n.js";
 
 export { activeInboundId, activeInboundProtocol, editModeClientEmail };
 
@@ -95,7 +96,7 @@ export function setupClientListeners(loadInboundsCallback) {
         document.getElementById("client-form").reset();
         setEditModeEmail(null);
         document.getElementById("c-email").disabled = false;
-        document.getElementById("client-modal-title").innerText = "Добавление клиента";
+        document.getElementById("client-modal-title").innerText = t("client_add_title", "Добавление клиента");
         document.getElementById("client-ib-id").value = activeInboundId || "";
         document.getElementById("c-email").value = generateRandomUsername();
         

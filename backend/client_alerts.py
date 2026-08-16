@@ -114,26 +114,17 @@ def get_xray_user_traffic(email: str) -> tuple:
     return tx, rx
 
 def get_user_traffic_bytes(username: str) -> tuple:
-    """Queries Hysteria 2 API stats locally for active connections/traffic."""
-    tx, rx = 0, 0
+    """Queries user traffic via sentinel-core unified traffic snapshot."""
     try:
-        for ib_id, proc in list(hysteria_processes.items()):
-            if proc.poll() is None:
-                admin_port = 10100 + ib_id
-                url = f"http://127.0.0.1:{admin_port}/traffic"
-                try:
-                    r = requests.get(url, timeout=0.5)
-                    if r.status_code == 200:
-                        stats = r.json()
-                        user_stats = stats.get(username)
-                        if user_stats:
-                            tx += user_stats.get("tx", 0)
-                            rx += user_stats.get("rx", 0)
-                except Exception:
-                    pass
+        from backend.sentinel_core_bridge import get_unified_traffic
+        traffic_data = get_unified_traffic()
+        if traffic_data and isinstance(traffic_data, dict):
+            user_stats = traffic_data.get(username, {})
+            if isinstance(user_stats, dict):
+                return user_stats.get("downBytes", 0), user_stats.get("upBytes", 0)
     except Exception as e:
-        logging.error(f"[Hysteria Stats Alert] Error querying traffic: {e}")
-    return tx, rx
+        logging.error(f"[Stats Alert] Error querying traffic via sentinel-core: {e}")
+    return 0, 0
 
 def process_xray_log_line(line: str):
     """Parses Xray accepted log lines to track new connections."""

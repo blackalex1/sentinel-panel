@@ -48,9 +48,24 @@ async def poll_xray_stats_loop():
         
         from backend.scheduler import enforce_client_limits_and_rules
         await asyncio.to_thread(enforce_client_limits_and_rules)
+
+        # Warm up GitHub core releases cache asynchronously in background
+        async def _warmup_core_releases():
+            try:
+                from backend.singbox.core import get_singbox_releases
+                from backend.xray.core import get_xray_releases
+                from backend.hysteria.core import get_hysteria_releases
+                await asyncio.to_thread(get_singbox_releases)
+                await asyncio.to_thread(get_xray_releases)
+                await asyncio.to_thread(get_hysteria_releases)
+            except Exception:
+                pass
+
+        asyncio.create_task(_warmup_core_releases())
     except Exception as e:
         logging.error(f"Error in initial stats polling: {e}")
         
+    last_releases_refresh = time.time()
     while True:
         try:
             await asyncio.sleep(30)
@@ -71,6 +86,11 @@ async def poll_xray_stats_loop():
             # Проверка лимитов клиентов (лимит трафика, срок действия, лимит IP)
             from backend.scheduler import enforce_client_limits_and_rules
             await asyncio.to_thread(enforce_client_limits_and_rules)
+
+            # Автоматическое фоновое обновление версий ядер каждые 30 минут
+            if time.time() - last_releases_refresh > 1800:
+                last_releases_refresh = time.time()
+                asyncio.create_task(_warmup_core_releases())
         except asyncio.CancelledError:
             logging.info("Background traffic statistics polling task cancelled.")
             break
@@ -119,6 +139,10 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logging.error(f"Failed to check sing-box inbounds status at startup: {e}")
     
+    # Запуск фоновых сборщиков и стримеров логов ядер
+    from backend.log_streamer import ensure_log_tailers
+    ensure_log_tailers()
+
     # Запуск фонового опроса трафика
     polling_task = asyncio.create_task(poll_xray_stats_loop())
     
@@ -179,7 +203,7 @@ app.add_middleware(
 from fastapi.middleware.gzip import GZipMiddleware
 app.add_middleware(GZipMiddleware, minimum_size=1000)
 
-# Middleware для отключения кэширования фронтенда
+# Middleware для правильного кэширования статики и отключения кэша для HTML
 @app.middleware("http")
 async def add_no_cache_headers(request: Request, call_next):
     try:
@@ -192,9 +216,13 @@ async def add_no_cache_headers(request: Request, call_next):
 
     path = request.url.path
     if path.startswith(f"/{settings.PANEL_SECRET_PATH}"):
-        response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
-        response.headers["Pragma"] = "no-cache"
-        response.headers["Expires"] = "0"
+        clean_path = path.rstrip("/")
+        if clean_path.endswith(f"/{settings.PANEL_SECRET_PATH}") or clean_path.endswith(".html"):
+            response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate, max-age=0"
+            response.headers["Pragma"] = "no-cache"
+            response.headers["Expires"] = "0"
+        elif any(clean_path.endswith(ext) for ext in (".js", ".css", ".svg", ".png", ".jpg", ".woff2", ".woff", ".ttf", ".ico")):
+            response.headers["Cache-Control"] = "private, max-age=86400"
 
     # Mask real server technology — replace uvicorn header with nginx decoy on all responses
     response.headers["Server"] = "nginx/1.24.0 (Ubuntu)"
@@ -254,9 +282,8 @@ class AuthenticatedStaticFiles(StaticFiles):
             "panel-main.js", "dashboard.js", "hysteria.js", "routing.js", 
             "inbound-modal.js", "clients.js", "modules/"
         ))
-        is_private_css = "css/pages/" in norm_path and "login.css" not in norm_path
         
-        if is_component or is_private_js or is_private_css:
+        if is_component or is_private_js:
             from backend.auth_utils import check_auth, decoy_response
             req = Request(scope)
             if not check_auth(req):
@@ -264,11 +291,10 @@ class AuthenticatedStaticFiles(StaticFiles):
         
         response = await super().get_response(path, scope)
         
-        clean_path = path.strip("/")
-        if clean_path == "" or clean_path == "index.html":
-            response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
-            response.headers["Pragma"] = "no-cache"
-            response.headers["Expires"] = "0"
+        # Prevent any caching of frontend assets during active development and updates
+        response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+        response.headers["Pragma"] = "no-cache"
+        response.headers["Expires"] = "0"
             
         return response
 

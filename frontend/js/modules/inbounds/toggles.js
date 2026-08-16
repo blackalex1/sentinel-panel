@@ -1,10 +1,16 @@
 import { generateRandomPassword, editInboundId, switchInboundModalTab } from "./core.js";
+import { renderDynamicModalTabs } from "./schema-renderer.js";
 import { t } from "../../i18n.js";
+import { apiFetch } from "../../api.js";
 
 export function updateFormToggles() {
-    const proto = document.getElementById("ib-protocol").value;
-    const network = document.getElementById("ib-network").value;
-    const security = document.getElementById("ib-security").value;
+    const protoElem = document.getElementById("ib-protocol");
+    const netElem = document.getElementById("ib-network");
+    const secElem = document.getElementById("ib-security");
+    
+    const proto = protoElem ? protoElem.value : "vless";
+    const network = netElem ? netElem.value : "tcp";
+    const security = secElem ? secElem.value : "reality";
     
     const xrayRow = document.getElementById("xray-network-security-row");
     const sniffingGroup = document.getElementById("ib-sniffing-group");
@@ -30,23 +36,22 @@ export function updateFormToggles() {
         coreElem.dataset.bound = "true";
         coreElem.addEventListener("change", () => {
             updateFormToggles();
-            updateTabVisibility(document.getElementById("ib-protocol").value);
+            updateTabVisibility(document.getElementById("ib-protocol") ? document.getElementById("ib-protocol").value : "vless");
         });
     }
 
-    // Ensure tab visibility is synchronized with protocol and core
-    updateTabVisibility(proto);
-
     // Toggle Sniffing Overrides display
-    const sniffingChecked = document.getElementById("ib-sniffing").checked;
+    const sniffingInput = document.getElementById("ib-sniffing");
+    const sniffingChecked = sniffingInput ? sniffingInput.checked : false;
     const sniffingOverrides = document.getElementById("sniffing-overrides");
     if (sniffingOverrides) {
         sniffingOverrides.style.display = sniffingChecked ? "flex" : "none";
     }
     
     // VLESS Encryption/Decryption/ML-KEM options are strictly Xray-only!
+    const isXray = (core === "xray" || core === "xray-core" || !core || core === "");
     if (vlessProtoGroup) {
-        vlessProtoGroup.style.display = (proto === "vless" && core === "xray") ? "block" : "none";
+        vlessProtoGroup.style.display = (proto === "vless" && isXray) ? "block" : "none";
     }
     
     if (proto === "vless" || proto === "vmess" || proto === "trojan") {
@@ -69,13 +74,14 @@ export function updateFormToggles() {
         
         // TCP HTTP masquerade fields toggle
         if (network === "tcp") {
-            const tcpType = document.getElementById("ib-tcp-type").value;
+            const tcpTypeElem = document.getElementById("ib-tcp-type");
+            const tcpType = tcpTypeElem ? tcpTypeElem.value : "none";
             const tcpHttp = document.getElementById("tcp-http-settings");
             if (tcpHttp) tcpHttp.style.display = (tcpType === "http") ? "block" : "none";
         }
         
         // Fallbacks settings display is strictly Xray-only!
-        if (fallbacksGroup) fallbacksGroup.style.display = ((proto === "vless" || proto === "trojan") && core === "xray") ? "block" : "none";
+        if (fallbacksGroup) fallbacksGroup.style.display = ((proto === "vless" || proto === "trojan") && isXray) ? "block" : "none";
         
         // Exclusivity between VLESS Decryption and VLESS Fallbacks
         if (proto === "vless") {
@@ -210,6 +216,20 @@ export function updateFormToggles() {
         if (mkcpGroup) mkcpGroup.style.display = "none";
         if (ssGroup) ssGroup.style.display = "none";
         if (hysteriaGroup) hysteriaGroup.style.display = "block";
+        
+        // Hysteria 2 Protection Mode (masq vs obfs)
+        const hystModeElem = document.getElementById("ib-hysteria-mode");
+        const hystMode = hystModeElem ? hystModeElem.value : "masq";
+        const masqGroup = document.getElementById("hysteria-masq-group");
+        const obfsGroup = document.getElementById("hysteria-obfs-group");
+        if (masqGroup) masqGroup.style.display = (hystMode === "masq") ? "block" : "none";
+        if (obfsGroup) obfsGroup.style.display = (hystMode === "obfs") ? "block" : "none";
+
+        // Hysteria 2 Certificate Mode (self vs custom)
+        const certModeElem = document.getElementById("ib-hysteria-cert-mode");
+        const certMode = certModeElem ? certModeElem.value : "self";
+        const customCertFields = document.getElementById("hysteria-custom-cert-fields");
+        if (customCertFields) customCertFields.style.display = (certMode === "custom") ? "block" : "none";
     } else if (proto === "socks" || proto === "http") {
         if (xrayRow) xrayRow.style.display = "none";
         if (sniffingGroup) sniffingGroup.style.display = "none";
@@ -217,98 +237,154 @@ export function updateFormToggles() {
         if (hysteriaGroup) hysteriaGroup.style.display = "none";
         if (fallbacksGroup) fallbacksGroup.style.display = "none";
     }
+
+    const noProtoGroup = document.getElementById("no-protocol-settings-group");
+    if (noProtoGroup) {
+        const hasVisibleProtoSettings = (
+            (vlessProtoGroup && vlessProtoGroup.style.display === "block") ||
+            (fallbacksGroup && fallbacksGroup.style.display === "block") ||
+            (ssGroup && ssGroup.style.display === "block")
+        );
+        noProtoGroup.style.display = hasVisibleProtoSettings ? "none" : "block";
+    }
 }
 
-export function updateTabVisibility(proto) {
-    const tabProtocol = document.getElementById("ib-tab-protocol");
-    const tabStream = document.getElementById("ib-tab-stream");
-    const tabSecurity = document.getElementById("ib-tab-security");
-    const tabSniffing = document.getElementById("ib-tab-sniffing");
+export async function updateTabVisibility(proto) {
+    const tabsContainer = document.querySelector("#inbound-modal .modal-tabs");
     const coreElem = document.getElementById("ib-core");
-    const core = coreElem ? coreElem.value : "xray";
-    
-    if (!tabProtocol || !tabStream || !tabSecurity || !tabSniffing) return;
-    
-    if (proto === "vless" || proto === "vmess" || proto === "trojan") {
-        if (core === "singbox") {
-            tabProtocol.style.display = "none";
-        } else {
-            tabProtocol.style.display = "inline-block";
+    const core = (coreElem && coreElem.value) ? coreElem.value : "xray";
+    const isXray = (core === "xray" || core === "xray-core" || !core);
+
+    try {
+        const schema = await fetchCapabilitiesSchema();
+        const protoCap = (schema && schema.protocols) ? schema.protocols[proto] : null;
+
+        if (protoCap && Array.isArray(protoCap.tabDefinitions) && protoCap.tabDefinitions.length > 0) {
+            const activeTabBtn = tabsContainer ? tabsContainer.querySelector(".modal-tab-btn.active") : null;
+            let currentActiveTab = activeTabBtn ? activeTabBtn.getAttribute("data-tab") : "basic";
+
+            // Filter out protocol tab if not supported on current core
+            let visibleTabDefs = protoCap.tabDefinitions.filter(tab => {
+                if (tab.id === "protocol" && proto === "vless" && !isXray) return false;
+                return true;
+            });
+
+            // If current active tab is not in visible definitions, default to basic
+            if (!visibleTabDefs.some(t => t.id === currentActiveTab)) {
+                currentActiveTab = "basic";
+            }
+
+            renderDynamicModalTabs(tabsContainer, visibleTabDefs, currentActiveTab, (tabId) => {
+                switchInboundModalTab(tabId);
+            });
+
+            switchInboundModalTab(currentActiveTab);
+            return;
         }
-        tabStream.style.display = "inline-block";
-        tabSecurity.style.display = "inline-block";
-        tabSniffing.style.display = "inline-block";
-    } else if (proto === "shadowsocks") {
-        tabProtocol.style.display = "inline-block";
-        tabStream.style.display = "none";
-        tabSecurity.style.display = "none";
-        tabSniffing.style.display = "inline-block";
-    } else if (proto === "hysteria2") {
-        tabProtocol.style.display = "none";
-        tabStream.style.display = "inline-block";
-        tabSecurity.style.display = "none";
-        tabSniffing.style.display = "inline-block";
-    } else if (proto === "socks" || proto === "http") {
-        tabProtocol.style.display = "none";
-        tabStream.style.display = "none";
-        tabSecurity.style.display = "none";
-        tabSniffing.style.display = "inline-block";
-    }
-    
-    // Auto switch to Basic if current active tab is hidden
-    const activeTabButton = document.querySelector(".modal-tab-btn.active");
-    if (activeTabButton) {
-        const activeTab = activeTabButton.getAttribute("data-tab");
-        const targetBtn = document.querySelector(`.modal-tab-btn[data-tab='${activeTab}']`);
-        if (targetBtn && targetBtn.style.display === "none") {
-            switchInboundModalTab("basic");
+
+        // Fallback for legacy schema format
+        const tabProtocol = document.getElementById("ib-tab-protocol");
+        const tabStream = document.getElementById("ib-tab-stream");
+        const tabSecurity = document.getElementById("ib-tab-security");
+        const tabSniffing = document.getElementById("ib-tab-sniffing");
+        const tabAdvanced = document.getElementById("ib-tab-advanced");
+
+        if (protoCap && Array.isArray(protoCap.tabs)) {
+            const tabs = protoCap.tabs;
+            const showProtoTab = tabs.includes("protocol") && (proto !== "vless" || isXray);
+            if (tabProtocol) tabProtocol.style.display = showProtoTab ? "inline-block" : "none";
+            if (tabStream) tabStream.style.display = tabs.includes("stream") ? "inline-block" : "none";
+            if (tabSecurity) tabSecurity.style.display = tabs.includes("security") ? "inline-block" : "none";
+            if (tabSniffing) tabSniffing.style.display = tabs.includes("sniffing") ? "inline-block" : "none";
+            if (tabAdvanced) tabAdvanced.style.display = tabs.includes("advanced") ? "inline-block" : "none";
         }
+    } catch (e) {
+        console.warn("Error resolving dynamic schema tabs:", e);
     }
 }
 
-export function updateCoreOptions(proto) {
+let cachedCapabilitiesSchema = null;
+
+export async function fetchCapabilitiesSchema() {
+    if (!cachedCapabilitiesSchema) {
+        try {
+            const res = await apiFetch("/api/v1/schema/capabilities");
+            if (res && res.success && res.obj) {
+                cachedCapabilitiesSchema = res.obj;
+            }
+        } catch (e) {
+            console.warn("Failed to fetch capabilities schema:", e);
+        }
+    }
+    return cachedCapabilitiesSchema;
+}
+
+export async function updateCoreOptions(proto) {
     const coreSelect = document.getElementById("ib-core");
     if (!coreSelect) return;
     
-    const currentCore = coreSelect.value;
-    coreSelect.innerHTML = "";
-    
-    if (proto === "hysteria2") {
-        coreSelect.appendChild(new Option("Hysteria 2", "hysteria"));
-        coreSelect.appendChild(new Option("sing-box", "singbox"));
-    } else {
-        coreSelect.appendChild(new Option("Xray-core", "xray"));
-        coreSelect.appendChild(new Option("sing-box", "singbox"));
-    }
-    
-    const hasOption = Array.from(coreSelect.options).some(opt => opt.value === currentCore);
-    if (hasOption) {
-        coreSelect.value = currentCore;
-    } else {
-        coreSelect.value = coreSelect.options[0].value;
+    try {
+        const schema = await fetchCapabilitiesSchema();
+        if (schema && schema.protocols && schema.protocols[proto]) {
+            const supportedEngines = schema.protocols[proto].supportedEngines || [];
+            
+            const newOptions = [];
+            (schema.engines || []).forEach(eng => {
+                const engId = eng.id;
+                let val = engId;
+                if (engId === "xray-core") val = "xray";
+                if (engId === "sing-box") val = "singbox";
+                if (engId === "hysteria2") val = "hysteria";
+
+                if (supportedEngines.includes(engId) || supportedEngines.includes(val)) {
+                    newOptions.push({ name: eng.name, val });
+                }
+            });
+
+            // Check if options actually changed before touching DOM
+            const currentOpts = Array.from(coreSelect.options).map(o => o.value);
+            const newOptVals = newOptions.map(o => o.val);
+            const isSame = currentOpts.length === newOptVals.length && currentOpts.every((v, i) => v === newOptVals[i]);
+
+            if (!isSame) {
+                const previousVal = coreSelect.value;
+                coreSelect.innerHTML = "";
+                newOptions.forEach(opt => {
+                    coreSelect.appendChild(new Option(opt.name, opt.val));
+                });
+                const valid = newOptVals.includes(previousVal);
+                if (valid) {
+                    coreSelect.value = previousVal;
+                } else if (coreSelect.options.length > 0) {
+                    coreSelect.value = coreSelect.options[0].value;
+                }
+            }
+        }
+    } catch (e) {
+        console.warn("Error updating core options from schema:", e);
     }
 }
 
-export function handleProtocolChange(proto) {
+export async function handleProtocolChange(proto) {
     const networkSelect = document.getElementById("ib-network");
     const securitySelect = document.getElementById("ib-security");
     
     if (proto === "vless") {
-        networkSelect.value = "tcp";
-        securitySelect.value = "reality";
+        if (networkSelect) networkSelect.value = "tcp";
+        if (securitySelect) securitySelect.value = "reality";
     } else if (proto === "vmess") {
-        networkSelect.value = "ws";
-        securitySelect.value = "none";
+        if (networkSelect) networkSelect.value = "ws";
+        if (securitySelect) securitySelect.value = "none";
     } else if (proto === "trojan") {
-        networkSelect.value = "tcp";
-        securitySelect.value = "tls";
+        if (networkSelect) networkSelect.value = "tcp";
+        if (securitySelect) securitySelect.value = "tls";
     } else if (proto === "hysteria2") {
-        const obfsInput = document.getElementById("ib-hysteria-obfs-password");
-        if (obfsInput && !obfsInput.value && !editInboundId) {
-            obfsInput.value = generateRandomPassword(16);
-        }
+        if (networkSelect) networkSelect.value = "quic";
+        if (securitySelect) securitySelect.value = "tls";
     }
-    updateCoreOptions(proto);
+    
+    await updateCoreOptions(proto);
     updateFormToggles();
-    updateTabVisibility(proto);
+    await updateTabVisibility(proto);
 }
+

@@ -1,5 +1,6 @@
 import os
 import sys
+import time
 import logging
 import zipfile
 import tarfile
@@ -13,89 +14,85 @@ from backend.config import BIN_DIR, SINGBOX_BIN_PATH, SINGBOX_BIN_NAME, IS_WINDO
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
 def get_installed_singbox_version() -> str:
-    """Возвращает версию локально установленного ядра sing-box"""
+    """Возвращает версию локально установленного ядра sing-box через sentinel-core"""
     if not SINGBOX_BIN_PATH.exists():
         return "Not installed"
     try:
-        cmd = [str(SINGBOX_BIN_PATH), "version"]
-        result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, encoding="utf-8", timeout=5)
-        if result.returncode == 0:
-            lines = result.stdout.strip().splitlines()
-            for line in lines:
-                if "sing-box version" in line.lower() or "version" in line.lower():
-                    parts = line.split()
-                    if len(parts) >= 3:
-                        return parts[2]
-                    return parts[-1]
-            if lines:
-                return lines[0].split()[-1]
+        from backend.sentinel_core_bridge import get_core_version
+        v = get_core_version("sing-box", str(SINGBOX_BIN_PATH))
+        if v and v != "Unknown":
+            return v
     except Exception as e:
-        logging.error(f"Error getting installed sing-box version: {e}")
+        logging.error(f"Error getting installed sing-box version via sentinel-core: {e}")
     return "Unknown"
 
 HEADERS = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 SentinelPanel/1.0"}
 
-def get_latest_singbox_version_info(include_prerelease: bool = False):
-    """Получает информацию о последнем релизе sing-box с GitHub (SagerNet/sing-box)"""
-    if include_prerelease:
-        url = "https://api.github.com/repos/SagerNet/sing-box/releases"
-    else:
-        url = "https://api.github.com/repos/SagerNet/sing-box/releases/latest"
+import xml.etree.ElementTree as ET
 
+_SINGBOX_RELEASES_CACHE = {}
+CACHE_TTL = 3600  # 1 hour cache for releases
+
+def _fetch_singbox_releases_atom(include_prerelease: bool = False, limit: int = 20) -> list[dict]:
     try:
-        response = requests.get(url, headers=HEADERS, timeout=10)
-        if response.status_code == 200:
-            res_data = response.json()
-            if include_prerelease and isinstance(res_data, list):
-                if not res_data:
-                    return None
-                data = res_data[0]
-            elif isinstance(res_data, dict):
-                data = res_data
-            else:
-                return None
-
-            tag_name = data.get("tag_name")
-            if tag_name and tag_name.startswith("v"):
-                version_num = tag_name[1:]
-            else:
-                version_num = tag_name
-
-            is_prerelease = bool(data.get("prerelease", False))
-            assets = data.get("assets", [])
-
-            arch = platform.machine().lower()
-            is_arm = "arm64" in arch or "aarch64" in arch
-
+        url = "https://github.com/SagerNet/sing-box/releases.atom"
+        resp = requests.get(url, headers=HEADERS, timeout=3)
+        if resp.status_code != 200:
+            return []
+        raw_content = getattr(resp, "content", None)
+        if raw_content is None:
+            raw_content = getattr(resp, "text", "").encode("utf-8")
+        if not raw_content:
+            return []
+        root = ET.fromstring(raw_content)
+        ns = {"atom": "http://www.w3.org/2005/Atom"}
+        arch = platform.machine().lower()
+        is_arm = "arm64" in arch or "aarch64" in arch
+        releases = []
+        for entry in root.findall("atom:entry", ns):
+            title = entry.find("atom:title", ns)
+            title_text = title.text.strip() if title is not None and title.text else ""
+            tag = title_text.split()[-1] if title_text else ""
+            if not tag:
+                continue
+            if not tag.startswith("v"):
+                tag = "v" + tag
+            v_clean = tag.lstrip("v")
+            is_pre = any(k in tag.lower() for k in ("beta", "alpha", "rc", "pre"))
+            if not include_prerelease and is_pre:
+                continue
             if IS_WINDOWS:
-                os_str = "windows"
+                target_name = f"sing-box-{v_clean}-windows-arm64.zip" if is_arm else f"sing-box-{v_clean}-windows-amd64.zip"
             else:
-                os_str = "linux"
-
-            arch_str = "arm64" if is_arm else "amd64"
-
-            download_url = None
-            for asset in assets:
-                name = asset.get("name", "").lower()
-                if os_str in name and arch_str in name and (name.endswith(".zip") or name.endswith(".tar.gz")):
-                    download_url = asset.get("browser_download_url")
-                    break
-
-            return {
-                "version": tag_name,
+                target_name = f"sing-box-{v_clean}-linux-arm64.tar.gz" if is_arm else f"sing-box-{v_clean}-linux-amd64.tar.gz"
+            download_url = f"https://github.com/SagerNet/sing-box/releases/download/{tag}/{target_name}"
+            releases.append({
+                "version": tag,
                 "download_url": download_url,
-                "is_prerelease": is_prerelease
-            }
+                "is_prerelease": is_pre
+            })
+            if len(releases) >= limit:
+                break
+        return releases
     except Exception as e:
-        logging.error(f"Failed to fetch sing-box version info from GitHub: {e}")
-    return None
+        logging.error(f"Failed to fetch sing-box releases atom feed: {e}")
+        return []
 
 def get_singbox_releases(include_prerelease: bool = False, limit: int = 20) -> list[dict]:
-    """Получает список всех доступных релизов sing-box с GitHub"""
+    """Получает список всех доступных релизов sing-box с GitHub с кэшированием в памяти"""
+    cache_key = f"releases_{include_prerelease}_{limit}"
+    now = time.time()
+
+    # Сначала проверяем горячий кэш
+    if cache_key in _SINGBOX_RELEASES_CACHE:
+        ts, cached = _SINGBOX_RELEASES_CACHE[cache_key]
+        if now - ts < CACHE_TTL and cached:
+            return cached
+
     url = "https://api.github.com/repos/SagerNet/sing-box/releases"
     releases = []
     try:
-        response = requests.get(url, headers=HEADERS, timeout=10)
+        response = requests.get(url, headers=HEADERS, timeout=3)
         if response.status_code == 200:
             data = response.json()
             if isinstance(data, list):
@@ -115,6 +112,8 @@ def get_singbox_releases(include_prerelease: bool = False, limit: int = 20) -> l
                         if os_str in name and arch_str in name and (name.endswith(".zip") or name.endswith(".tar.gz")):
                             download_url = asset.get("browser_download_url")
                             break
+                    if not download_url and item.get("assets"):
+                        download_url = item["assets"][0].get("browser_download_url")
                     if tag_name and download_url:
                         releases.append({
                             "version": tag_name,
@@ -124,8 +123,30 @@ def get_singbox_releases(include_prerelease: bool = False, limit: int = 20) -> l
                     if len(releases) >= limit:
                         break
     except Exception as e:
-        logging.error(f"Failed to fetch sing-box releases list from GitHub: {e}")
-    return releases
+        logging.error(f"Failed to fetch sing-box releases list from GitHub API: {e}")
+
+    if releases:
+        _SINGBOX_RELEASES_CACHE[cache_key] = (now, releases)
+        return releases
+
+    # Резервный опрос через Atom feed
+    releases = _fetch_singbox_releases_atom(include_prerelease=include_prerelease, limit=limit)
+    if releases:
+        _SINGBOX_RELEASES_CACHE[cache_key] = (now, releases)
+        return releases
+
+    # Если опрос не удался, но есть устаревший кэш — отдаем его
+    if cache_key in _SINGBOX_RELEASES_CACHE:
+        return _SINGBOX_RELEASES_CACHE[cache_key][1]
+
+    return []
+
+def get_latest_singbox_version_info(include_prerelease: bool = False):
+    """Получает информацию о последнем релизе sing-box из кэша релизов"""
+    releases = get_singbox_releases(include_prerelease=include_prerelease, limit=5)
+    if releases and len(releases) > 0:
+        return releases[0]
+    return None
 
 def download_singbox_core(download_url: str = None):
     """Скачивает и распаковывает ядро sing-box"""

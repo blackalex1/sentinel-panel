@@ -127,8 +127,6 @@ export async function loadStats() {
     
     // Update chart
     updateChart(obj.cpu, (memCurrent / memTotal) * 100, swapPercent, obj.disk ? obj.disk.percent : 0);
-    await loadGlobalTrafficChart();
-    await loadDashboardClients();
 }
 
 export async function loadBbrStatus() {

@@ -11,6 +11,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 CONFIG_DIR = BASE_DIR / "config"
 CONFIG_DIR.mkdir(parents=True, exist_ok=True)
 ENV_FILE = CONFIG_DIR / ".env"
+FRONTEND_DIR = BASE_DIR / "frontend"
 
 def generate_random_string(length: int = 12, chars: str = string.ascii_letters + string.digits) -> str:
     return "".join(secrets.choice(chars) for _ in range(length))

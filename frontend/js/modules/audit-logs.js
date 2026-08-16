@@ -20,13 +20,13 @@ export async function loadAuditLogs() {
     
     const res = await apiFetch(`/api/audit-logs?page=${auditPage}&limit=${auditLimit}&search=${encodeURIComponent(auditSearch)}`);
     if (!res || !res.success) {
-        tbody.innerHTML = `<tr><td colspan="5" style="text-align: center; padding: 15px; color: var(--text-secondary);" data-i18n="audit_logs_no_records">Записи не найдены</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="5" style="text-align: center; padding: 15px; color: var(--text-secondary);">${t("audit_logs_no_records", "Записи не найдены")}</td></tr>`;
         return;
     }
     
     tbody.innerHTML = "";
     if (res.obj.logs.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="5" style="text-align: center; padding: 15px; color: var(--text-secondary);" data-i18n="audit_logs_no_records">Записи не найдены</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="5" style="text-align: center; padding: 15px; color: var(--text-secondary);">${t("audit_logs_no_records", "Записи не найдены")}</td></tr>`;
         const totalText = document.getElementById("audit-logs-total-text");
         if (totalText) totalText.innerText = `${t("audit_logs_total_text", "Всего записей")}: 0`;
         return;

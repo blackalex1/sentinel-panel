@@ -1,286 +1,53 @@
-<!-- Модальное окно добавления/редактирования Outbound -->
-<div id="outbound-modal" class="modal" style="z-index: 1100;">
-    <div class="glass-card modal-card large-card" style="background: hsl(223, 47%, 11%) !important;">
+<div class="modal" id="outbound-modal" style="z-index: 1100;">
+    <div class="glass-card modal-card large-card" style="background: hsl(223, 47%, 11%) !important; max-width: 1120px; width: 92vw; padding: 32px 36px;">
         <div class="modal-header">
-            <h3 id="outbound-modal-title">Создание исходящего подключения</h3>
-            <button class="btn icon-btn close-modal-btn"><i class="fa-solid fa-xmark"></i></button>
+            <h3 data-i18n="routing_modal_create_outbound" id="outbound-modal-title"></h3>
+            <button class="btn icon-btn close-modal-btn" type="button"><i class="fa-solid fa-xmark"></i></button>
         </div>
         <div class="modal-body">
             <form id="outbound-form">
-            <input type="hidden" id="ob-id">
-            <div class="input-group" id="ob-import-group">
-                <label for="ob-import-link" data-i18n="routing_modal_import_link">Импортировать из ссылки (vless, ss, socks, http, hysteria)</label>
-                <input type="text" id="ob-import-link" data-i18n-placeholder="routing_modal_import_placeholder" placeholder="Вставьте vless://, ss://, hysteria2://, socks:// и т.д.">
-            </div>
-            <div class="input-group">
-                <label for="ob-remark" data-i18n="routing_modal_remark">Описание / Название</label>
-                <input type="text" id="ob-remark" placeholder="Например: Внешний SOCKS5 прокси">
-            </div>
-            <div class="input-row">
-                <div class="input-group">
-                    <label for="ob-protocol" data-i18n="routing_modal_protocol">Протокол</label>
-                    <select id="ob-protocol" class="glass-select">
-                        <option value="freedom">freedom (Напрямую)</option>
-                        <option value="blackhole">blackhole (Блокировка)</option>
-                        <option value="socks">socks (SOCKS5 прокси)</option>
-                        <option value="shadowsocks">shadowsocks (Shadowsocks)</option>
-                        <option value="http">http (HTTP прокси)</option>
-                        <option value="vless">VLESS</option>
-                        <option value="hysteria2">Hysteria 2</option>
-                        <option value="hysteria">Hysteria (Legacy)</option>
-                        <option value="wireguard">WireGuard / Cloudflare WARP</option>
-                    </select>
-                </div>
-                <div class="input-group">
-                    <label for="ob-tag" data-i18n="routing_modal_tag">Тег (Tag)</label>
-                    <input type="text" id="ob-tag" placeholder="Например: my-socks-proxy">
-                </div>
-            </div>
-
-            <!-- Группа полей для сетевых прокси (socks, http, shadowsocks) -->
-            <div id="ob-proxy-fields" style="display: none; border: 1px solid var(--border-color); border-radius: 8px; padding: 12px; margin-bottom: 15px;">
-                <div class="input-row">
-                    <div class="input-group" style="flex: 2;">
-                        <label for="ob-address" data-i18n="routing_modal_address">Адрес сервера (Host / IP)</label>
-                        <input type="text" id="ob-address" placeholder="1.2.3.4 или proxy.domain.com">
-                    </div>
-                    <div class="input-group" style="flex: 1;">
-                        <label for="ob-port" data-i18n="routing_modal_port">Порт (или диапазон 1000-3000)</label>
-                        <input type="text" id="ob-port" placeholder="1080 или 1000-3000">
-                    </div>
-                </div>
+                <input id="ob-id" type="hidden"/>
                 
-                <!-- Поля авторизации -->
-                <div class="input-row">
-                    <div class="input-group">
-                        <label for="ob-username" data-i18n="routing_modal_username">Пользователь (опционально)</label>
-                        <input type="text" id="ob-username" placeholder="Username">
-                    </div>
-                    <div class="input-group">
-                        <label for="ob-password" data-i18n="routing_modal_password">Пароль / Ключ</label>
-                        <input type="text" id="ob-password" placeholder="Password">
+                <!-- Quick Link Import Input (Powered by sentinel-core URI parser) -->
+                <div class="input-group" id="ob-import-group" style="margin-bottom: 18px;">
+                    <label data-i18n="routing_modal_import_link" for="ob-import-link"></label>
+                    <div style="position: relative;">
+                        <input data-i18n-placeholder="routing_modal_import_placeholder" id="ob-import-link" placeholder="Вставьте vless://, ss://, hysteria2://, socks:// и т.д." type="text" style="padding-right: 40px;"/>
+                        <i class="fa-solid fa-paste" style="position: absolute; right: 14px; top: 50%; transform: translateY(-50%); color: var(--primary); pointer-events: none;"></i>
                     </div>
                 </div>
 
-                <!-- Метод шифрования для Shadowsocks -->
-                <div id="ob-ss-method-group" class="input-group" style="display: none;">
-                    <label for="ob-ss-method" data-i18n="routing_modal_ss_method">Метод шифрования Shadowsocks</label>
-                    <select id="ob-ss-method" class="glass-select">
-                        <option value="aes-256-gcm">aes-256-gcm</option>
-                        <option value="chacha20-ietf-poly1305">chacha20-ietf-poly1305</option>
-                        <option value="aes-128-gcm">aes-128-gcm</option>
-                    </select>
-                </div>
-            </div>
-
-            <!-- Группа полей безопасности TLS/Reality (для vless, hysteria) -->
-            <div id="ob-security-fields" style="display: none; border: 1px solid var(--border-color); border-radius: 8px; padding: 12px; margin-bottom: 15px;">
-                <h4 style="margin-top: 0; margin-bottom: 10px; font-size: 14px; color: var(--text-primary);">Безопасность и транспорт</h4>
-                <div class="input-row">
-                    <div class="input-group" id="ob-security-group">
-                        <label for="ob-security">Безопасность (Security)</label>
-                        <select id="ob-security" class="glass-select">
-                            <option value="none">none</option>
-                            <option value="tls">tls</option>
-                            <option value="reality">reality</option>
+                <!-- Protocol Selector (Dynamic from Core Schema) -->
+                <div class="input-row" style="margin-bottom: 20px;">
+                    <div class="input-group" style="flex: 1;">
+                        <label data-i18n="routing_modal_protocol" for="ob-protocol"></label>
+                        <select class="glass-select" id="ob-protocol">
+                            <!-- Dynamically loaded from sentinel-core outboundProtocols -->
                         </select>
                     </div>
-                    <div class="input-group">
-                        <label for="ob-sni">SNI / ServerName</label>
-                        <input type="text" id="ob-sni" placeholder="domain.com">
-                    </div>
-                </div>
-                
-                <!-- Reality-специфичные поля -->
-                <div id="ob-reality-fields" style="display: none; margin-top: 10px;">
-                    <div class="input-row">
-                        <div class="input-group">
-                            <label for="ob-pbk">Публичный ключ (Public Key)</label>
-                            <input type="text" id="ob-pbk" placeholder="Reality Public Key">
-                        </div>
-                        <div class="input-group">
-                            <label for="ob-shortid">Short ID</label>
-                            <input type="text" id="ob-shortid" placeholder="8f9c2d1b">
-                        </div>
-                    </div>
-                    <div class="input-row" style="margin-top: 10px;">
-                        <div class="input-group">
-                            <label for="ob-fingerprint">Fingerprint</label>
-                            <select id="ob-fingerprint" class="glass-select">
-                                <option value="chrome">chrome</option>
-                                <option value="firefox">firefox</option>
-                                <option value="safari">safari</option>
-                                <option value="edge">edge</option>
-                                <option value="random">random</option>
-                                <option value="randomized">randomized</option>
-                            </select>
-                        </div>
-                        <div class="input-group">
-                            <label for="ob-spx">SpiderX (spx)</label>
-                            <input type="text" id="ob-spx" placeholder="/">
-                        </div>
-                    </div>
                 </div>
 
-                <!-- ALPN для TLS/Hysteria -->
-                <div class="input-group" id="ob-alpn-group" style="margin-top: 10px;">
-                    <label for="ob-alpn">ALPN (через запятую)</label>
-                    <input type="text" id="ob-alpn" placeholder="h2,http/1.1">
-                </div>
+                <!-- Dynamic Modal Tabs (Generated from sentinel-core schema) -->
+                <div class="modal-tabs" id="outbound-modal-tabs" style="margin-bottom: 20px; display: flex; flex-wrap: wrap; gap: 10px;"></div>
 
-                <!-- Allow Insecure TLS -->
-                <div class="input-group checkbox-group" id="ob-insecure-group" style="margin-top: 10px; display: none; margin-bottom: 5px;">
-                    <label style="display: inline-flex; align-items: center; gap: 10px; cursor: pointer;">
-                        <span class="switch-toggle">
-                            <input type="checkbox" id="ob-allow-insecure">
-                            <span class="switch-slider"></span>
-                        </span>
-                        <span>Разрешить небезопасный TLS (allowInsecure)</span>
-                    </label>
-                </div>
+                <!-- Dynamic Form Panels Container (Rendered from sentinel-core schema) -->
+                <div id="outbound-schema-container"></div>
 
-                <!-- Pinned Peer Cert SHA256 -->
-                <div class="input-group" id="ob-pinned-sha256-group" style="margin-top: 10px; display: none;">
-                    <label for="ob-pinned-sha256" data-i18n="routing_modal_pinned_sha256">Pinned Peer Cert SHA-256 (Хэш сертификата)</label>
-                    <input type="text" id="ob-pinned-sha256" data-i18n-placeholder="routing_modal_pinned_sha256_placeholder" placeholder="Например: 55:C2:68:EC... или через запятую">
-                </div>
-
-                <!-- Flow для VLESS -->
-                <div class="input-group" id="ob-flow-group" style="margin-top: 10px;">
-                    <label for="ob-flow">Flow</label>
-                    <select id="ob-flow" class="glass-select">
-                        <option value="">Без flow</option>
-                        <option value="xtls-rprx-vision">xtls-rprx-vision</option>
-                    </select>
-                </div>
-
-                <!-- Encryption для VLESS -->
-                <div class="input-group" id="ob-encryption-group" style="margin-top: 10px;">
-                    <label for="ob-encryption">VLESS Encryption (Шифрование - опционально)</label>
-                    <input type="text" id="ob-encryption" placeholder="Например: mlkem768x25519plus.native.0rtt.xxxx...">
-                </div>
-            </div>
-
-            <!-- Группа полей скорости Hysteria 2 -->
-            <div id="ob-hysteria-fields" style="display: none; border: 1px solid var(--border-color); border-radius: 8px; padding: 12px; margin-bottom: 15px;">
-                <h4 style="margin-top: 0; margin-bottom: 10px; font-size: 14px; color: var(--text-primary);">Настройки Hysteria 2</h4>
-                <div class="input-row">
-                    <div class="input-group">
-                        <label for="ob-up-mbps">Скорость отдачи (Up Mbps)</label>
-                        <input type="number" id="ob-up-mbps" min="0" placeholder="100">
-                    </div>
-                    <div class="input-group">
-                        <label for="ob-down-mbps">Скорость загрузки (Down Mbps)</label>
-                        <input type="number" id="ob-down-mbps" min="0" placeholder="100">
+                <!-- Modal Actions -->
+                <div class="modal-actions" style="margin-top: 25px; display: flex; justify-content: space-between; align-items: center;">
+                    <button class="btn secondary-btn" id="ob-test-btn" type="button">
+                        <i class="fa-solid fa-bolt" style="margin-right: 6px;"></i>
+                        <span data-i18n="routing_btn_test_outbound">Проверить подключение</span>
+                    </button>
+                    <div style="display: flex; gap: 12px;">
+                        <button class="btn secondary-btn close-modal-btn" data-i18n="btn_cancel" type="button"></button>
+                        <button class="btn primary-btn" id="ob-submit-btn" type="submit">
+                            <i class="fa-solid fa-check" style="margin-right: 6px;"></i>
+                            <span data-i18n="btn_save"></span>
+                        </button>
                     </div>
                 </div>
-                <div class="input-row" style="margin-top: 10px;">
-                    <div class="input-group">
-                        <label for="ob-hysteria-obfs">Обфускация (Obfs)</label>
-                        <select id="ob-hysteria-obfs" class="glass-select">
-                            <option value="">Без обфускации (None)</option>
-                            <option value="salamander">Salamander</option>
-                        </select>
-                    </div>
-                    <div class="input-group" id="ob-hysteria-obfs-password-group" style="display: none;">
-                        <label for="ob-hysteria-obfs-password">Пароль обфускации</label>
-                        <input type="text" id="ob-hysteria-obfs-password" placeholder="Пароль обфускации">
-                    </div>
-                </div>
-            </div>
-
-            <!-- Группа полей для WireGuard / Cloudflare WARP -->
-            <div id="ob-wireguard-fields" style="display: none; border: 1px solid var(--border-color); border-radius: 8px; padding: 12px; margin-bottom: 15px;">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; border-bottom: 1px dashed var(--border-color); padding-bottom: 8px;">
-                    <h4 style="margin: 0; font-size: 14px; color: var(--text-primary);">Настройки WireGuard</h4>
-                    <button type="button" id="btn-generate-warp-profile" class="btn secondary-btn" style="padding: 4px 10px; font-size: 11px;"><i class="fa-solid fa-cloud-bolt" style="margin-right: 4px;"></i>Сгенерировать WARP</button>
-                </div>
-                <div class="input-group">
-                    <label for="ob-wg-private-key">Приватный ключ (Private Key)</label>
-                    <input type="text" id="ob-wg-private-key" placeholder="Client private key (Base64)">
-                </div>
-                <div class="input-row" style="margin-top: 10px;">
-                    <div class="input-group" style="flex: 2;">
-                        <label for="ob-wg-addresses">Адреса интерфейса (Interface Addresses)</label>
-                        <input type="text" id="ob-wg-addresses" placeholder="Например: 172.16.0.2/32, fd00::5/128">
-                    </div>
-                    <div class="input-group" style="flex: 1;">
-                        <label for="ob-wg-reserved">Reserved bytes</label>
-                        <input type="text" id="ob-wg-reserved" placeholder="Например: 0,0,0 (опционально)">
-                    </div>
-                </div>
-                <div class="input-row" style="margin-top: 10px;">
-                    <div class="input-group" style="flex: 2;">
-                        <label for="ob-wg-peer-public-key">Публичный ключ пира (Peer Public Key)</label>
-                        <input type="text" id="ob-wg-peer-public-key" placeholder="Peer public key (Base64)">
-                    </div>
-                    <div class="input-group" style="flex: 1;">
-                        <label for="ob-wg-endpoint">Эндпоинт пира (Endpoint)</label>
-                        <input type="text" id="ob-wg-endpoint" placeholder="engage.cloudflareclient.com:2408">
-                    </div>
-                </div>
-                <div class="input-group" style="margin-top: 10px;">
-                    <label for="ob-wg-mtu">MTU (опционально)</label>
-                    <input type="number" id="ob-wg-mtu" min="1" placeholder="1280">
-                </div>
-            </div>
-
-            <!-- Группа полей резервирования (Failover Backup) -->
-            <div id="ob-backup-fields" style="border: 1px solid var(--border-color); border-radius: 8px; padding: 12px; margin-bottom: 15px;">
-                <h4 style="margin-top: 0; margin-bottom: 10px; font-size: 14px; color: var(--text-primary);">
-                    <i class="fa-solid fa-shield-halved" style="margin-right: 6px; color: var(--primary-color);"></i>
-                    <span data-i18n="routing_modal_backup_title">Резервирование подключений (Failover)</span>
-                </h4>
-                <div class="input-group">
-                    <label data-i18n="routing_modal_backup_label">Резервные исходящие подключения (при сбое основного)</label>
-                    <div id="ob-backup-outbounds-container" class="glass-checkbox-list" style="max-height: 220px; min-height: 120px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 8px; padding: 8px; background: rgba(0,0,0,0.25); display: flex; flex-direction: column; gap: 6px;">
-                        <span style="color: var(--text-secondary); font-size: 12px;" data-i18n="routing_modal_no_backups">Загрузка доступных подключений...</span>
-                    </div>
-                    <small style="color: var(--text-secondary); font-size: 11px; margin-top: 4px; display: block;" data-i18n="routing_modal_backup_hint">
-                        Отмечайте резервные узлы в порядке приоритета. Номер (№1, №2...) показывает очерёдность переключения при сбое.
-                    </small>
-                </div>
-                <div class="input-group" style="margin-top: 10px;">
-                    <label for="ob-fallback-strategy" data-i18n="routing_modal_strategy_label">Режим переключения на резерв</label>
-                    <select id="ob-fallback-strategy" class="glass-select">
-                        <option value="priority" selected data-i18n="routing_modal_strategy_priority">Строгий приоритет (Primary / Fallback) — использовать Основной, пока жив</option>
-                        <option value="least_ping" data-i18n="routing_modal_strategy_least_ping">Наименьший пинг (Least Ping) — использовать узел с лучшей задержкой</option>
-                        <option value="round_robin" data-i18n="routing_modal_strategy_round_robin">Случайный выбор (Random) — распределять между всеми рабочими</option>
-                    </select>
-                </div>
-                <div class="input-row" style="margin-top: 8px;">
-                    <div class="input-group" style="flex: 2;">
-                        <label for="ob-health-url" data-i18n="routing_modal_health_url">URL проверки здоровья (Health Check)</label>
-                        <input type="text" id="ob-health-url" placeholder="https://www.gstatic.com/generate_204">
-                    </div>
-                    <div class="input-group" style="flex: 1;">
-                        <label for="ob-health-interval" data-i18n="routing_modal_health_interval">Интервал (сек)</label>
-                        <input type="number" id="ob-health-interval" placeholder="15" min="5" max="300">
-                    </div>
-                </div>
-            </div>
-
-            <div class="input-group checkbox-group" style="margin-bottom: 15px;">
-                <label style="display: inline-flex; align-items: center; gap: 10px; cursor: pointer;">
-                    <span class="switch-toggle">
-                        <input type="checkbox" id="ob-enable" checked>
-                        <span class="switch-slider"></span>
-                    </span>
-                    <span data-i18n="routing_modal_enable">Включить исходящее подключение</span>
-                </label>
-            </div>
-
-            <div style="display: flex; gap: 10px; margin-top: 25px;">
-                <button type="submit" class="btn primary-btn" style="flex: 1;"><i class="fa-solid fa-floppy-disk" style="margin-right: 5px;"></i><span data-i18n="routing_modal_save">Сохранить</span></button>
-                <div style="display: flex; gap: 5px; flex: 1;">
-                    <select id="ob-test-type" class="glass-select" style="flex: 1; min-width: 90px; padding: 10px;">
-                        <option value="tcp" selected>TCP</option>
-                        <option value="http">HTTP</option>
-                    </select>
-                    <button type="button" id="ob-test-btn" class="btn secondary-btn" style="flex: 2; padding: 10px;"><i class="fa-solid fa-bolt" style="margin-right: 5px;"></i><span data-i18n="routing_modal_test">Проверить</span></button>
-                </div>
-            </div>
-        </form>
+            </form>
         </div>
     </div>
 </div>

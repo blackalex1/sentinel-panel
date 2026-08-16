@@ -12,7 +12,7 @@ export function initCustomSelect(selectElement) {
     
     const container = document.createElement("div");
     container.className = "custom-select-container";
-    if (selectElement.classList.contains("inline-select") || selectElement.classList.contains("compact-select")) {
+    if (selectElement.classList.contains("inline-select") || selectElement.classList.contains("compact-select") || selectElement.classList.contains("quick-outbound-select")) {
         container.classList.add("inline-select");
     }
     
@@ -32,15 +32,24 @@ export function initCustomSelect(selectElement) {
     function buildOptions() {
         dropdown.innerHTML = "";
         const options = Array.from(selectElement.options);
-        const selectedOpt = selectElement.options[selectElement.selectedIndex] || options[0];
-        selectedText.textContent = selectedOpt ? selectedOpt.textContent : "";
+        if (options.length === 0) {
+            selectedText.textContent = "";
+            return;
+        }
+        let selectedIndex = selectElement.selectedIndex;
+        if (selectedIndex < 0 || selectedIndex >= options.length) {
+            selectedIndex = 0;
+            selectElement.selectedIndex = 0;
+        }
+        const selectedOpt = options[selectedIndex] || options[0];
+        selectedText.textContent = selectedOpt ? (selectedOpt.textContent || selectedOpt.value || "").trim() : "";
         
         options.forEach((opt, idx) => {
             const optDiv = document.createElement("div");
-            optDiv.className = `custom-select-option ${idx === selectElement.selectedIndex ? 'selected' : ''}`;
+            optDiv.className = `custom-select-option ${idx === selectedIndex ? 'selected' : ''}`;
             
             const labelSpan = document.createElement("span");
-            labelSpan.textContent = opt.textContent;
+            labelSpan.textContent = (opt.textContent || opt.value || "").trim();
             
             const checkI = document.createElement("i");
             checkI.className = "fa-solid fa-check check-icon";
@@ -51,6 +60,7 @@ export function initCustomSelect(selectElement) {
             optDiv.addEventListener("click", (e) => {
                 e.stopPropagation();
                 selectElement.selectedIndex = idx;
+                selectElement.value = opt.value;
                 selectElement.dispatchEvent(new Event("change", { bubbles: true }));
                 updateSelectedUI();
                 container.classList.remove("open");
@@ -62,12 +72,20 @@ export function initCustomSelect(selectElement) {
     
     function updateSelectedUI() {
         const options = Array.from(selectElement.options);
-        const selectedOpt = selectElement.options[selectElement.selectedIndex] || options[0];
-        selectedText.textContent = selectedOpt ? selectedOpt.textContent : "";
+        if (options.length === 0) {
+            selectedText.textContent = "";
+            return;
+        }
+        let selectedIndex = selectElement.selectedIndex;
+        if (selectedIndex < 0 || selectedIndex >= options.length) {
+            selectedIndex = 0;
+        }
+        const selectedOpt = options[selectedIndex] || options[0];
+        selectedText.textContent = selectedOpt ? (selectedOpt.textContent || selectedOpt.value || "").trim() : "";
         
         const optionDivs = dropdown.querySelectorAll(".custom-select-option");
         optionDivs.forEach((div, idx) => {
-            if (idx === selectElement.selectedIndex) {
+            if (idx === selectedIndex) {
                 div.classList.add("selected");
             } else {
                 div.classList.remove("selected");
@@ -80,8 +98,9 @@ export function initCustomSelect(selectElement) {
     function closeAll() {
         document.querySelectorAll(".custom-select-container.open").forEach(c => {
             c.classList.remove("open");
-            const parentCard = c.closest(".settings-card, .glass-card, .input-group, .modal-body, .form-group, .settings-section-panel");
-            if (parentCard) parentCard.classList.remove("custom-select-open-parent");
+        });
+        document.querySelectorAll(".custom-select-open-parent").forEach(p => {
+            p.classList.remove("custom-select-open-parent");
         });
     }
     
@@ -90,9 +109,23 @@ export function initCustomSelect(selectElement) {
         const isOpen = container.classList.contains("open");
         closeAll();
         if (!isOpen) {
+            // Smart collision / drop direction calculation based on viewport space
+            const triggerRect = trigger.getBoundingClientRect();
+            const bottomSpace = window.innerHeight - triggerRect.bottom;
+            
+            // Only drop upward if overflowing off the bottom of the entire window viewport
+            if (bottomSpace < 200 && triggerRect.top > 220) {
+                container.classList.add("dropup");
+            } else {
+                container.classList.remove("dropup");
+            }
+
             container.classList.add("open");
-            const parentCard = container.closest(".settings-card, .glass-card, .input-group, .modal-body, .form-group, .settings-section-panel");
-            if (parentCard) parentCard.classList.add("custom-select-open-parent");
+            let p = container.parentElement;
+            while (p && !p.classList.contains("modal-card") && !p.classList.contains("content-area") && p !== document.body) {
+                p.classList.add("custom-select-open-parent");
+                p = p.parentElement;
+            }
         }
     });
     
@@ -104,11 +137,15 @@ export function initCustomSelect(selectElement) {
         updateSelectedUI();
     });
     
-    // Rebuild options if options change dynamically (e.g. i18n translation updates)
+    // Rebuild options safely if options change dynamically (debounced to avoid freeze loops)
+    let rebuildTimeout = null;
     const observer = new MutationObserver(() => {
-        buildOptions();
+        if (rebuildTimeout) clearTimeout(rebuildTimeout);
+        rebuildTimeout = setTimeout(() => {
+            buildOptions();
+        }, 30);
     });
-    observer.observe(selectElement, { childList: true, subtree: true, characterData: true });
+    observer.observe(selectElement, { childList: true });
     
     selectElement.parentNode.insertBefore(container, selectElement);
     container.appendChild(trigger);
@@ -120,3 +157,8 @@ export function enhanceAllSelects(parent = document) {
     const selects = parent.querySelectorAll("select:not([data-custom-select-init])");
     selects.forEach(sel => initCustomSelect(sel));
 }
+
+export function initCustomSelects(parent = document) {
+    enhanceAllSelects(parent);
+}
+

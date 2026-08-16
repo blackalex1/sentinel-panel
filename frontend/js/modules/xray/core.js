@@ -3,7 +3,18 @@ import { showToast } from "../../ui.js";
 import { t } from "../../i18n.js";
 import { loadXrayConfig } from "./config.js";
 
+import { initCustomSelect } from "../../components/customSelect.js";
+
 export async function loadCoreInfo() {
+    const currEl = document.getElementById("core-curr-version");
+    const latestEl = document.getElementById("core-latest-version");
+
+    // Instantly display cached versions if available to eliminate loading lag
+    const cachedCurr = localStorage.getItem("xray_cached_curr_ver");
+    const cachedLatest = localStorage.getItem("xray_cached_latest_ver");
+    if (currEl && cachedCurr && currEl.innerText === "...") currEl.innerText = cachedCurr;
+    if (latestEl && cachedLatest && latestEl.innerText === "...") latestEl.innerText = cachedLatest;
+
     const prereleaseToggle = document.getElementById("xray-prerelease-toggle");
     let includePrerelease = false;
     if (prereleaseToggle) {
@@ -18,8 +29,14 @@ export async function loadCoreInfo() {
     const res = await apiFetch(versionUrl);
     if (!res || !res.success) return;
     
-    document.getElementById("core-curr-version").innerText = res.current;
-    document.getElementById("core-latest-version").innerText = res.latest;
+    if (currEl && res.current) {
+        currEl.innerText = res.current;
+        localStorage.setItem("xray_cached_curr_ver", res.current);
+    }
+    if (latestEl && res.latest) {
+        latestEl.innerText = res.latest;
+        localStorage.setItem("xray_cached_latest_ver", res.latest);
+    }
 
     const prereleaseBadge = document.getElementById("core-prerelease-badge");
     const versionSelect = document.getElementById("core-version-select");
@@ -37,16 +54,18 @@ export async function loadCoreInfo() {
             const tag = item.is_prerelease ? "Pre-release" : "Stable";
             opt.innerText = `${item.version} (${tag})`;
             if (normVer(item.version) === normVer(res.current)) {
-                opt.innerText += " — [Установлено]";
+                opt.innerText += ` — [${t("core_installed_tag", "Установлено")}]`;
             }
             versionSelect.appendChild(opt);
         });
 
+        if (!versionSelect.dataset.customSelectInit) {
+            initCustomSelect(versionSelect);
+        }
+
         const customContainer = versionSelect.closest(".custom-select-container");
         if (customContainer) {
             customContainer.style.display = "block";
-        } else {
-            versionSelect.style.display = "none";
         }
 
         const updateSelectedState = () => {
@@ -77,13 +96,17 @@ export async function loadCoreInfo() {
             } else {
                 updateBtn.disabled = false;
                 updateBtn.setAttribute("data-url", selUrl);
-                updateBtn.innerHTML = `<i class="fa-solid fa-download"></i> <span>Установить ${selVer}</span>`;
+                updateBtn.innerHTML = `<i class="fa-solid fa-download"></i> <span>${t("core_btn_install_version", "Установить")} ${selVer}</span>`;
             }
         };
 
         versionSelect.onchange = updateSelectedState;
         updateSelectedState();
     } else {
+        const customContainer = versionSelect?.closest(".custom-select-container");
+        if (customContainer) {
+            customContainer.style.display = "none";
+        }
         if (prereleaseBadge) {
             prereleaseBadge.style.display = res.is_prerelease ? "inline-block" : "none";
         }
@@ -156,24 +179,82 @@ function appendToTerminal(terminal, lines) {
     if (atBottom) terminal.scrollTop = terminal.scrollHeight;
 }
 
+let _xraySocket = null;
 let _xrayES = null;
 let _xrayReconnectTimer = null;
 let _xrayReconnectDelay = 1000;
+
+export async function loadLogs() {
+    const terminal = document.getElementById("logs-terminal");
+    if (!terminal) return;
+    try {
+        const res = await apiFetch("/api/xray/logs");
+        if (res && res.success && Array.isArray(res.logs) && res.logs.length > 0) {
+            terminal.innerHTML = "";
+            appendToTerminal(terminal, res.logs);
+        }
+    } catch (_) {}
+}
 
 export function startLogsStream() {
     stopLogsStream();
     const terminal = document.getElementById("logs-terminal");
     if (!terminal) return;
 
+    loadLogs();
+
     function connect() {
+        const proto = window.location.protocol === "https:" ? "wss:" : "ws:";
+        const wsUrl = `${proto}//${window.location.host}/api/xray/logs/ws`;
+
+        try {
+            const ws = new WebSocket(wsUrl);
+            _xraySocket = ws;
+
+            ws.onopen = () => {
+                _xrayReconnectDelay = 1000;
+            };
+
+            ws.onmessage = (e) => {
+                try {
+                    const msg = JSON.parse(e.data);
+                    if (msg.event === "history" && Array.isArray(msg.data)) {
+                        terminal.innerHTML = "";
+                        appendToTerminal(terminal, msg.data);
+                    } else if (msg.event === "line" && msg.data) {
+                        appendToTerminal(terminal, [msg.data]);
+                    }
+                } catch (_) {}
+            };
+
+            ws.onerror = () => {
+                ws.close();
+            };
+
+            ws.onclose = (e) => {
+                _xraySocket = null;
+                if (e.code === 4401 || e.code === 1008) return;
+                if (!_xrayES) {
+                    connectSSE();
+                }
+            };
+        } catch (_) {
+            connectSSE();
+        }
+    }
+
+    function connectSSE() {
+        if (_xrayES) return;
         const es = new EventSource("/api/xray/logs/stream");
         _xrayES = es;
 
         es.addEventListener("history", (e) => {
             try {
                 const lines = JSON.parse(e.data);
-                terminal.innerHTML = "";
-                appendToTerminal(terminal, lines);
+                if (Array.isArray(lines) && lines.length > 0) {
+                    terminal.innerHTML = "";
+                    appendToTerminal(terminal, lines);
+                }
                 _xrayReconnectDelay = 1000;
             } catch (_) {}
         });
@@ -197,12 +278,10 @@ export function startLogsStream() {
 
 export function stopLogsStream() {
     if (_xrayReconnectTimer) { clearTimeout(_xrayReconnectTimer); _xrayReconnectTimer = null; }
+    if (_xraySocket) { _xraySocket.close(); _xraySocket = null; }
     if (_xrayES) { _xrayES.close(); _xrayES = null; }
     _xrayReconnectDelay = 1000;
 }
-
-/** Kept for import compatibility with router.js — now a no-op since SSE handles streaming. */
-export async function loadLogs() {}
 
 export function setupXrayCoreListeners() {
     const prereleaseToggle = document.getElementById("xray-prerelease-toggle");
@@ -251,7 +330,7 @@ export function setupXrayCoreListeners() {
             const url = updateBtn.getAttribute("data-url");
             if (!url) return;
             updateBtn.disabled = true;
-            updateBtn.innerText = "Обновление...";
+            updateBtn.innerText = t("core_btn_updating", "Обновление...");
             showToast(t("xray_update_started", "Начался процесс обновления ядра Xray. Пожалуйста, подождите"), "info");
             const res = await apiFetch("/api/xray/update", {
                 method: "POST",

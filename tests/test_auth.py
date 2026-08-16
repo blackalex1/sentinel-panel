@@ -197,8 +197,8 @@ def test_decoy_system_static(client):
 def test_decoy_system_drop(client):
     set_setting("decoy_type", "drop")
     
-    with pytest.raises(Exception):
-        client.get("/", timeout=0.1)
+    with pytest.raises(AssertionError, match="TestClient did not receive any response"):
+        client.get("/")
 
 
 def test_decoy_system_none(client):

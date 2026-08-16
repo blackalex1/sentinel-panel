@@ -3,24 +3,24 @@ import { t } from "../i18n.js";
 // Compiles Xray security settings (Reality, TLS, or None)
 export function compileXraySecuritySettings(security, streamSettings) {
     if (security === "reality") {
-        const dest = document.getElementById("ib-reality-dest").value || "yahoo.com:443";
-        const sni = document.getElementById("ib-reality-sni").value || "yahoo.com";
-        const pbk = document.getElementById("ib-reality-pbk").value;
-        const priv = document.getElementById("ib-reality-priv").value;
-        const shortIdsInput = document.getElementById("ib-reality-shortids").value;
+        const dest = document.getElementById("ib-reality-dest").value.trim();
+        const sni = document.getElementById("ib-reality-sni").value.trim();
+        const pbk = document.getElementById("ib-reality-pbk").value.trim();
+        const priv = document.getElementById("ib-reality-priv").value.trim();
+        const shortIdsInput = document.getElementById("ib-reality-shortids").value.trim();
         const shortIds = shortIdsInput ? shortIdsInput.split(",").map(s => s.trim()).filter(Boolean) : [];
         const fp = document.getElementById("ib-reality-fp").value || "chrome";
-        const spx = document.getElementById("ib-reality-spx").value || "/";
+        const spx = document.getElementById("ib-reality-spx").value.trim() || "/";
         
         const maxTimeDiffInput = document.getElementById("ib-reality-max-time-diff").value.trim();
         
         streamSettings.realitySettings = {
             show: false,
             dest: dest,
-            serverNames: [sni],
+            serverNames: sni ? sni.split(",").map(s => s.trim()).filter(Boolean) : [],
             privateKey: priv,
             publicKey: pbk,
-            shortIds: shortIds.length ? shortIds : ["8f9c2d1b"],
+            shortIds: shortIds,
             fingerprint: fp,
             spiderX: spx
         };
@@ -30,13 +30,13 @@ export function compileXraySecuritySettings(security, streamSettings) {
             streamSettings.realitySettings.max_time_difference = maxTimeDiffInput;
         }
     } else if (security === "tls") {
-        const sni = document.getElementById("ib-tls-sni").value || "";
-        const alpnInput = document.getElementById("ib-tls-alpn").value || "h2,http/1.1";
-        const alpn = alpnInput.split(",").map(s => s.trim()).filter(Boolean);
+        const sni = document.getElementById("ib-tls-sni").value.trim();
+        const alpnInput = document.getElementById("ib-tls-alpn").value.trim();
+        const alpn = alpnInput ? alpnInput.split(",").map(s => s.trim()).filter(Boolean) : [];
         const allowInsecure = document.getElementById("ib-tls-insecure").checked;
         const fp = document.getElementById("ib-tls-fp").value || "chrome";
-        const minVer = document.getElementById("ib-tls-min-ver").value || "1.3";
-        const maxVer = document.getElementById("ib-tls-max-ver").value || "1.3";
+        const minVer = document.getElementById("ib-tls-min-ver").value.trim();
+        const maxVer = document.getElementById("ib-tls-max-ver").value.trim();
         
         streamSettings.tlsSettings = {
             serverName: sni,
@@ -54,13 +54,13 @@ export function compileXraySecuritySettings(security, streamSettings) {
 export function populateXraySecuritySettings(security, streamSettings) {
     if (security === "reality") {
         const rs = streamSettings.realitySettings || {};
-        document.getElementById("ib-reality-dest").value = rs.dest || "yahoo.com:443";
-        document.getElementById("ib-reality-sni").value = (rs.serverNames && rs.serverNames[0]) || "yahoo.com";
+        document.getElementById("ib-reality-dest").value = rs.dest || "";
+        document.getElementById("ib-reality-sni").value = (rs.serverNames && rs.serverNames.join(", ")) || "";
         document.getElementById("ib-reality-pbk").value = rs.publicKey || "";
         document.getElementById("ib-reality-priv").value = rs.privateKey || "";
         document.getElementById("ib-reality-shortids").value = (rs.shortIds || []).join(", ");
         document.getElementById("ib-reality-fp").value = rs.fingerprint || "chrome";
-        document.getElementById("ib-reality-spx").value = rs.spiderX || "/";
+        document.getElementById("ib-reality-spx").value = rs.spiderX || "";
         const mtd = rs.maxTimeDiff || rs.max_time_difference || "";
         document.getElementById("ib-reality-max-time-diff").value = (mtd === "0s" || mtd === "0") ? "" : mtd;
     } else if (security === "tls") {

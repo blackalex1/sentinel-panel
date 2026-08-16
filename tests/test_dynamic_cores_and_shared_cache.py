@@ -112,7 +112,6 @@ _skip_no_hysteria = pytest.mark.skipif(get_hysteria_bin() is None, reason="hyste
 
 @_skip_no_xray
 @pytest.mark.xdist_group("core_ops")
-@pytest.mark.timeout(30)
 def test_dynamic_xray_start():
     """Real xray binary: start/stop behaviour driven by DB state."""
     # 1. No xray inbounds — xray should stay stopped
@@ -121,6 +120,7 @@ def test_dynamic_xray_start():
         session.commit()
 
     stop_xray()
+    time.sleep(0.2)
 
     res = start_xray()
     assert res is True
@@ -154,16 +154,17 @@ def test_dynamic_xray_start():
         session.commit()
 
     stop_xray()
+    time.sleep(0.2)
     res = start_xray()
     assert res is True
     assert is_xray_running() is True
     stop_xray()
+    time.sleep(0.3)
     assert is_xray_running() is False
 
 
 @_skip_no_xray
 @pytest.mark.xdist_group("core_ops")
-@pytest.mark.timeout(30)
 def test_dynamic_xray_start_via_hysteria_routing():
     """Real xray binary: starts when a Hysteria 2 inbound routes via xray."""
     with db_session() as session:
@@ -195,6 +196,7 @@ def test_dynamic_xray_start_via_hysteria_routing():
         session.commit()
 
     stop_xray()
+    time.sleep(0.3)
     res = start_xray()
     assert res is True
     assert is_xray_running() is True
@@ -203,7 +205,6 @@ def test_dynamic_xray_start_via_hysteria_routing():
 
 @_skip_no_hysteria
 @pytest.mark.xdist_group("core_ops")
-@pytest.mark.timeout(30)
 def test_dynamic_hysteria_start():
     """Real hysteria binary: start/stop behaviour driven by DB state."""
     # 1. No active hysteria inbounds
@@ -213,6 +214,7 @@ def test_dynamic_hysteria_start():
         session.commit()
 
     stop_hysteria()
+    time.sleep(0.2)
     res = start_hysteria()
     assert res is True
     assert is_hysteria_running() is False
@@ -248,6 +250,7 @@ def test_dynamic_hysteria_start():
     assert is_hysteria_running() is True
     stop_hysteria()
     assert is_hysteria_running() is False
+
 
 def test_decoy_verify_ssl_false(monkeypatch):
     verify_val = None

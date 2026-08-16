@@ -41,6 +41,26 @@ def get_available_languages() -> list[dict]:
     languages.sort(key=lambda x: (x["code"] != "ru", x["code"] != "en", x["name"]))
     return languages
 
+def get_lang(request=None) -> str:
+    """
+    Определяет язык запроса из заголовка Accept-Language или из настроек базы данных.
+    Фолбек — 'ru'.
+    """
+    if request is not None:
+        try:
+            hdr = request.headers.get("accept-language", "")
+            if hdr:
+                code = hdr.split(",")[0].split(";")[0].split("-")[0].strip().lower()
+                if code in _translations:
+                    return code
+        except Exception:
+            pass
+    try:
+        from backend.database import get_setting
+        return get_setting("language", "ru")
+    except Exception:
+        return "ru"
+
 def t(key: str, lang: str = "ru", category: str = "backend", **kwargs) -> str:
     """
     Возвращает переведенную строку по ключу, категории и языку.

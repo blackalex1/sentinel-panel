@@ -15,14 +15,30 @@ from backend.links.protocols import (
     build_hysteria2_mihomo_proxy,
 )
 
+import socket
+
+def get_lan_ip() -> str:
+    """Определяет локальный IP-адрес сетевой карты в локальной сети."""
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(("8.8.8.8", 80))
+        ip = s.getsockname()[0]
+        s.close()
+        return ip
+    except Exception:
+        return "127.0.0.1"
+
 def get_base_host(host_url: str) -> str:
-    """Извлекает IP или домен из URL"""
+    """Извлекает IP или домен из URL. Если это localhost или 127.0.0.1, заменяет на реальный локальный IP."""
     if not host_url:
-        return ""
+        return get_lan_ip()
     if "://" not in host_url:
         host_url = "http://" + host_url
     parsed = urlparse(host_url)
-    return parsed.hostname or ""
+    h = parsed.hostname or ""
+    if not h or h in ("127.0.0.1", "localhost", "0.0.0.0", "::1"):
+        return get_lan_ip()
+    return h
 
 def get_client_links(inbound: dict, client: dict, host_url: str) -> list:
     """Генерирует ссылки для подключения (VLESS, VMess, Trojan, Shadowsocks)"""

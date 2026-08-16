@@ -19,10 +19,13 @@ def build_vless_link(inbound: dict, client: dict, host: str, port: int, display_
     if security == 'reality':
         reality_settings = stream_settings.get('realitySettings', {})
         inner_settings = reality_settings.get('settings', {})
-        
         fp = get_configured_fingerprint(stream_settings, 'reality')
         pbk = inner_settings.get('publicKey') or reality_settings.get('publicKey', '')
-        sni = inner_settings.get('serverName') or reality_settings.get('serverName') or (reality_settings.get('serverNames', [''])[0])
+        raw_sni = inner_settings.get('serverName') or reality_settings.get('serverName')
+        if not raw_sni:
+            s_names = reality_settings.get('serverNames', [''])
+            raw_sni = s_names[0] if isinstance(s_names, list) and s_names else str(s_names)
+        sni = raw_sni.split(',')[0].strip() if isinstance(raw_sni, str) else ''
         spx = inner_settings.get('spiderX') or reality_settings.get('spiderX', '/')
         
         params.append(f"fp={fp}")

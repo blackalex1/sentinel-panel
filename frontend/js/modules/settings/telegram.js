@@ -90,9 +90,9 @@ export function setupTelegramListeners() {
             btnRestartTelegramBot.innerHTML = originalText;
             
             if (res && res.success) {
-                showToast(res.msg || "Telegram-бот успешно перезапущен!");
+                showToast(res.msg || t("toast_telegram_restarted", "Telegram-бот успешно перезапущен!"));
             } else {
-                showToast(res ? res.msg : "Не удалось перезапустить бота", "error");
+                showToast(res ? res.msg : t("toast_telegram_restart_fail", "Не удалось перезапустить бота"), "error");
             }
         });
     }
@@ -114,7 +114,7 @@ export function setupTelegramListeners() {
                             tokenInput.value = res.token || "";
                         }
                     } catch (err) {
-                        showToast("Ошибка получения токена: " + err, "error");
+                        showToast(t("toast_telegram_token_error", "Ошибка получения токена: ") + err, "error");
                     } finally {
                         btnToggleTelegramToken.disabled = false;
                     }

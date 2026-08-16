@@ -10,6 +10,7 @@ from backend.routes.routing import router as routing_router
 from backend.routes.system import router as system_router
 from backend.routes.security import router as security_router
 from backend.routes.nodes import router as nodes_router
+from backend.routes.schema_routes import router as schema_router
 
 router = APIRouter()
 
@@ -23,5 +24,6 @@ router.include_router(routing_router)
 router.include_router(system_router)
 router.include_router(security_router)
 router.include_router(nodes_router)
+router.include_router(schema_router)
 
 

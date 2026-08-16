@@ -2,24 +2,21 @@ import os
 import sys
 import time
 import json
-import socket
-import struct
 import logging
-import threading
-import subprocess
 from pathlib import Path
 from backend.config import SINGBOX_BIN_PATH, SINGBOX_CONFIG_PATH, SINGBOX_LOG_PATH
-from backend.singbox.config import write_singbox_config
+from backend.singbox.config import write_singbox_config, get_all_inbounds
 
 singbox_process = None
 LAST_SINGBOX_ERROR = ""
+_last_singbox_conn_stats = {}
 
 def get_last_singbox_error() -> str:
     global LAST_SINGBOX_ERROR
     return LAST_SINGBOX_ERROR
 
 def is_singbox_running() -> bool:
-    """Проверяет, запущен ли процесс sing-box"""
+    """Проверяет, запущен ли процесс sing-box через sentinel-core supervisor"""
     global singbox_process
     if singbox_process is not None:
         if singbox_process.poll() is None:
@@ -29,6 +26,16 @@ def is_singbox_running() -> bool:
 
     if not SINGBOX_BIN_PATH.exists():
         return False
+
+    try:
+        from backend.sentinel_core_bridge import get_cores_status
+        status = get_cores_status()
+        if isinstance(status, dict) and "cores" in status:
+            for c in status["cores"]:
+                if c.get("name") in ("singbox", "sing-box") and c.get("running"):
+                    return True
+    except Exception:
+        pass
 
     try:
         import psutil
@@ -47,11 +54,26 @@ def is_singbox_running() -> bool:
         return False
 
 def start_singbox(force_generate: bool = False) -> bool:
-    """Запускает процесс sing-box"""
+    """Запускает процесс sing-box через sentinel-core"""
     global singbox_process, LAST_SINGBOX_ERROR
     LAST_SINGBOX_ERROR = ""
     if is_singbox_running():
         logging.info("Sing-box is already running.")
+        return True
+
+    inbounds = get_all_inbounds()
+    has_active_singbox = False
+    for ib in inbounds:
+        if not ib.get("enable", 1):
+            continue
+        ib_core = ib.get("core") or ("hysteria" if ib.get("protocol") == "hysteria2" else "xray")
+        if ib_core in ("singbox", "sing-box") or ib.get("protocol") in ("shadowtls", "naive"):
+            has_active_singbox = True
+            break
+
+    if not has_active_singbox:
+        logging.info("No active Sing-box inbounds found. Sing-box core will not be started.")
+        stop_singbox()
         return True
 
     if not SINGBOX_BIN_PATH.exists():
@@ -64,282 +86,59 @@ def start_singbox(force_generate: bool = False) -> bool:
 
     logging.info("Verifying Sing-box configuration...")
     try:
-        test_cmd = [str(SINGBOX_BIN_PATH), "check", "-c", str(SINGBOX_CONFIG_PATH)]
-        test_res = subprocess.run(test_cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, encoding="utf-8", timeout=5)  # nosec B603
-        if test_res.returncode != 0:
-            err_msg = test_res.stderr.strip() or test_res.stdout.strip()
-            logging.error(f"Sing-box config verification failed: {err_msg}")
-            LAST_SINGBOX_ERROR = err_msg
+        from backend.sentinel_core_bridge import validate_core_config
+        valid, out = validate_core_config("sing-box", str(SINGBOX_BIN_PATH), str(SINGBOX_CONFIG_PATH))
+        if not valid:
+            logging.error(f"Sing-box config verification failed: {out}")
+            LAST_SINGBOX_ERROR = out
             return False
     except Exception as e:
         logging.error(f"Failed to run Sing-box config test: {e}")
 
-    logging.info("Starting sing-box process...")
-
-    log_file = open(SINGBOX_LOG_PATH, "a", encoding="utf-8")
-
+    logging.info("Starting sing-box process via sentinel-core...")
     try:
-        cmd = [str(SINGBOX_BIN_PATH), "run", "-c", str(SINGBOX_CONFIG_PATH)]
-        singbox_process = subprocess.Popen(
-            cmd,
-            stdout=log_file,
-            stderr=subprocess.STDOUT,
-            cwd=str(SINGBOX_BIN_PATH.parent)
-        )
-        time.sleep(1)
-        if singbox_process.poll() is not None:
-            err_msg = f"Sing-box terminated immediately with return code {singbox_process.returncode}"
-            if SINGBOX_LOG_PATH.exists():
-                try:
-                    with open(SINGBOX_LOG_PATH, "r", encoding="utf-8") as f:
-                        lines = f.readlines()
-                        if lines:
-                            err_msg += f": {''.join(lines[-5:]).strip()}"
-                except Exception:
-                    pass
-            logging.error(f"Sing-box process terminated immediately: {err_msg}")
-            LAST_SINGBOX_ERROR = err_msg
-            singbox_process = None
-            return False
-
-        logging.info("Sing-box started successfully.")
-        threading.Thread(target=tail_singbox_logs, daemon=True).start()
-        _start_singbox_ws_stream()
-        return True
+        from backend.sentinel_core_bridge import start_core
+        if start_core("sing-box", str(SINGBOX_BIN_PATH), str(SINGBOX_CONFIG_PATH)):
+            logging.info("Sing-box started successfully via sentinel-core.")
+            return True
+        logging.error("sentinel-core failed to start sing-box.")
+        return False
     except Exception as e:
-        logging.error(f"Failed to start sing-box: {e}")
-        singbox_process = None
+        logging.error(f"Failed to start sing-box via sentinel-core: {e}")
         return False
 
-_singbox_tailer_running = False
-
-def tail_singbox_logs():
-    """Background thread to tail singbox.log and print to stdout / trigger connect alerts."""
-    global _singbox_tailer_running
-    if _singbox_tailer_running:
-        return
-    _singbox_tailer_running = True
-    try:
-        for _ in range(10):
-            if SINGBOX_LOG_PATH.exists():
-                break
-            time.sleep(0.5)
-        if not SINGBOX_LOG_PATH.exists():
-            _singbox_tailer_running = False
-            return
-        with open(SINGBOX_LOG_PATH, "r", encoding="utf-8", errors="ignore") as f:
-            f.seek(0, 2)
-            while is_singbox_running():
-                try:
-                    if os.path.exists(SINGBOX_LOG_PATH):
-                        current_pos = f.tell()
-                        file_size = os.path.getsize(SINGBOX_LOG_PATH)
-                        if current_pos > file_size:
-                            f.seek(0)
-                except Exception:
-                    pass
-                line = f.readline()
-                if not line:
-                    time.sleep(0.5)
-                    continue
-                print(f"[Singbox] {line.strip()}", flush=True)
-                try:
-                    from backend.log_streamer import push_log_line
-                    push_log_line("singbox", line)
-                except Exception:
-                    pass
-                try:
-                    from backend.client_alerts import process_singbox_log_line
-                    process_singbox_log_line(line)
-                except Exception as ex:
-                    logging.error(f"Error processing Singbox log line: {ex}")
-    except Exception as e:
-        logging.error(f"Error tailing Singbox logs: {e}")
-    finally:
-        _singbox_tailer_running = False
-
-_last_singbox_conn_stats = {}
-_singbox_ws_thread = None
-_singbox_ws_stop = None
-
-def _read_ws_frame(sock):
-    """Reads one unmasked WebSocket frame from server (RFC 6455)"""
-    head = sock.recv(2)
-    if not head or len(head) < 2:
-        return None, None
-    b1, b2 = head[0], head[1]
-    opcode = b1 & 0x0F
-    is_masked = (b2 & 0x80) != 0
-    length = b2 & 0x7F
-    
-    if length == 126:
-        ext = sock.recv(2)
-        if len(ext) < 2:
-            return None, None
-        length = struct.unpack("!H", ext)[0]
-    elif length == 127:
-        ext = sock.recv(8)
-        if len(ext) < 8:
-            return None, None
-        length = struct.unpack("!Q", ext)[0]
-        
-    payload = bytearray()
-    while len(payload) < length:
-        chunk = sock.recv(min(65536, length - len(payload)))
-        if not chunk:
-            break
-        payload.extend(chunk)
-        
-    if is_masked:
-        mask = sock.recv(4)
-        for i in range(len(payload)):
-            payload[i] ^= mask[i % 4]
-            
-    return opcode, payload.decode("utf-8", errors="ignore")
-
-def _singbox_ws_stream_worker(stop_event):
-    """Фоновый WebSocket-поток к Clash API Sing-box для мгновенного учета закрытых сессий в реальном времени"""
-    while not stop_event.is_set():
-        if not is_singbox_running():
-            time.sleep(1)
-            continue
-        ws = None
-        try:
-            ws = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            ws.settimeout(5)
-            ws.connect(("127.0.0.1", 9090))
-            req = (
-                "GET /connections HTTP/1.1\r\n"
-                "Host: 127.0.0.1:9090\r\n"
-                "Upgrade: websocket\r\n"
-                "Connection: Upgrade\r\n"
-                "Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\n"
-                "Sec-WebSocket-Version: 13\r\n\r\n"
-            )
-            ws.sendall(req.encode())
-            
-            resp = b""
-            while b"\r\n\r\n" not in resp:
-                chunk = ws.recv(1024)
-                if not chunk:
-                    break
-                resp += chunk
-                
-            if b"101 " not in resp:
-                ws.close()
-                time.sleep(2)
-                continue
-                
-            ws.settimeout(None)
-            while not stop_event.is_set():
-                opcode, text = _read_ws_frame(ws)
-                if opcode is None:
-                    break
-                if opcode == 1 and text:
-                    try:
-                        data = json.loads(text)
-                        _process_singbox_connection_data(data)
-                    except Exception:
-                        pass
-        except Exception as e:
-            logging.debug(f"Singbox WebSocket stream reconnecting: {e}")
-            time.sleep(2)
-        finally:
-            if ws:
-                try:
-                    ws.close()
-                except Exception:
-                    pass
-
-def _start_singbox_ws_stream():
-    global _singbox_ws_thread, _singbox_ws_stop
-    if "pytest" in sys.modules:
-        return
-    if _singbox_ws_thread is not None and _singbox_ws_thread.is_alive():
-        return
-    _singbox_ws_stop = threading.Event()
-    _singbox_ws_thread = threading.Thread(target=_singbox_ws_stream_worker, args=(_singbox_ws_stop,), daemon=True)
-    _singbox_ws_thread.start()
-
-def _stop_singbox_ws_stream():
-    global _singbox_ws_thread, _singbox_ws_stop
-    if _singbox_ws_stop is not None:
-        _singbox_ws_stop.set()
-    _singbox_ws_thread = None
-    _singbox_ws_stop = None
-
 def kick_all_singbox_connections():
-    """Сбрасывает все активные сокеты и туннели клиентов через Clash API"""
+    """Сбрасывает все активные сокеты и туннели клиентов через sentinel-core"""
     try:
-        import requests
-        requests.delete("http://127.0.0.1:9090/connections", timeout=1)
+        from backend.sentinel_core_bridge import kick_client
+        kick_client("")
     except Exception:
         pass
 
 def kick_singbox_user(username: str):
-    """Сбрасывает соединения конкретного пользователя через Clash API"""
+    """Сбрасывает соединения конкретного пользователя через sentinel-core"""
     if not username:
         return
     try:
-        import requests
-        target = str(username).strip().lower()
-        resp = requests.get("http://127.0.0.1:9090/connections", timeout=1)
-        if resp.status_code == 200:
-            for conn in resp.json().get("connections", []):
-                meta = conn.get("metadata", {})
-                user = str(meta.get("inboundUser") or meta.get("user") or conn.get("user") or "").strip().lower()
-                c_id = conn.get("id")
-                if c_id and user and (user == target or target in user or user in target):
-                    requests.delete(f"http://127.0.0.1:9090/connections/{c_id}", timeout=1)
+        from backend.sentinel_core_bridge import kick_client
+        kick_client(str(username).strip())
     except Exception:
         pass
 
 def stop_singbox():
-    """Останавливает процесс sing-box и сбрасывает все активные туннели"""
+    """Останавливает процесс sing-box через sentinel-core"""
     global singbox_process, _last_singbox_conn_stats
     kick_all_singbox_connections()
-    _stop_singbox_ws_stream()
     _last_singbox_conn_stats.clear()
-    try:
-        logging.info("Stopping sing-box process...")
-    except Exception:
-        pass
-
-    if singbox_process is not None:
-        try:
-            singbox_process.terminate()
-            try:
-                singbox_process.wait(timeout=2)
-            except subprocess.TimeoutExpired:
-                singbox_process.kill()
-        except Exception as e:
-            try:
-                logging.error(f"Error terminating sing-box process object: {e}")
-            except Exception:
-                pass
-        singbox_process = None
-        time.sleep(0.2)
-
-    if "pytest" not in sys.modules:
-        try:
-            if os.name == "nt":
-                subprocess.run(["taskkill", "/F", "/IM", SINGBOX_BIN_PATH.name], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-                subprocess.run(["taskkill", "/F", "/IM", "sing-box.exe"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-            else:
-                subprocess.run(["pkill", "-9", "-f", "sing-box"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-                subprocess.run(["pkill", "-9", "sing-box"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-                subprocess.run(["killall", "-9", "sing-box"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        except Exception as e:
-            try:
-                logging.error(f"Error terminating sing-box OS process: {e}")
-            except Exception:
-                pass
 
     try:
-        logging.info("Sing-box stopped.")
-    except Exception:
-        pass
+        from backend.sentinel_core_bridge import stop_core
+        stop_core("sing-box")
+        logging.info("Sing-box stopped via sentinel-core.")
+    except Exception as e:
+        logging.error(f"Error stopping sing-box via sentinel-core: {e}")
 
+    singbox_process = None
 
 def restart_singbox(force_generate: bool = True) -> bool:
     """Перезапускает процесс sing-box с регенерацией свежей конфигурации"""
@@ -349,10 +148,15 @@ def restart_singbox(force_generate: bool = True) -> bool:
     return start_singbox(force_generate=False)
 
 def get_singbox_logs(lines_count: int = 100) -> list[str]:
-    """Считывает последние строки из файла логов sing-box"""
+    """Считывает последние строки из файла логов sing-box через sentinel-core supervisor"""
     if not SINGBOX_LOG_PATH.exists():
         return []
     try:
+        from backend.sentinel_core_bridge import get_core_logs
+        lines = get_core_logs(str(SINGBOX_LOG_PATH), lines_count)
+        if lines:
+            return [line.strip() for line in lines]
+
         with open(SINGBOX_LOG_PATH, "r", encoding="utf-8", errors="ignore") as f:
             lines = f.readlines()
             return [line.strip() for line in lines[-lines_count:]]
@@ -362,76 +166,28 @@ def get_singbox_logs(lines_count: int = 100) -> list[str]:
 
 def get_singbox_client_traffic_stats() -> dict:
     """
-    Опрашивает локальный Clash API Sing-box (127.0.0.1:9090/connections) 
-    и возвращает байтовый объем трафика по email пользователей:
+    Возвращает статистику трафика по email пользователей через sentinel-core:
     { email: {"up": total_up, "down": total_down} }
-    Также автоматически обновляет ACTIVE_IP_CACHE для онлайна и лимитов.
     """
-    if not is_singbox_running():
-        return {}
-    import requests
     try:
-        url = "http://127.0.0.1:9090/connections"
-        resp = requests.get(url, timeout=2)
-        if resp.status_code == 200:
-            data = resp.json()
-            user_stats = {}
-            connections = data.get("connections", [])
-            now_ts = time.time()
-            for conn in connections:
-                metadata = conn.get("metadata", {})
-                user = (
-                    metadata.get("user")
-                    or metadata.get("username")
-                    or metadata.get("client")
-                    or metadata.get("name")
-                    or metadata.get("email")
-                    or conn.get("user")
-                    or conn.get("username")
-                    or conn.get("client")
-                    or conn.get("name")
-                    or conn.get("email")
-                    or conn.get("clientUser")
-                    or conn.get("inboundUser")
-                    or conn.get("auth_user")
-                    or ""
-                )
-                if not user:
-                    continue
-
-                download = int(conn.get("download", 0))
-                upload = int(conn.get("upload", 0))
-
-                if user not in user_stats:
-                    user_stats[user] = {"up": 0, "down": 0}
-                user_stats[user]["down"] += download
-                user_stats[user]["up"] += upload
-
-                # Обновляем ACTIVE_IP_CACHE для отслеживания онлайна и ограничений IP
-                src_ip = (
-                    metadata.get("sourceIP")
-                    or metadata.get("source_ip")
-                    or metadata.get("clientIP")
-                    or conn.get("sourceIP")
-                    or conn.get("source_ip")
-                    or "127.0.0.1"
-                )
-                try:
-                    from backend.scheduler_jobs.limits import ACTIVE_IP_CACHE
-                    if user not in ACTIVE_IP_CACHE:
-                        ACTIVE_IP_CACHE[user] = {}
-                    ACTIVE_IP_CACHE[user][src_ip] = now_ts
-                except Exception:
-                    pass
-
-            return user_stats
+        from backend.sentinel_core_bridge import get_unified_traffic
+        traffic = get_unified_traffic()
+        user_stats = {}
+        if traffic and isinstance(traffic, dict):
+            for email, stats in traffic.items():
+                if isinstance(stats, dict):
+                    user_stats[email] = {
+                        "up": stats.get("upBytes", 0) or stats.get("up", 0) or stats.get("rx", 0),
+                        "down": stats.get("downBytes", 0) or stats.get("down", 0) or stats.get("tx", 0)
+                    }
+        return user_stats
     except Exception as e:
-        logging.debug(f"Failed to query Sing-box Clash API stats: {e}")
-    return {}
+        logging.debug(f"Failed to query Sing-box traffic stats: {e}")
+        return {}
 
 def _process_singbox_connection_data(data: dict):
     """
-    Обрабатывает JSON структуру соединений от Sing-box Clash API (полученную по WebSocket или HTTP GET)
+    Обрабатывает JSON структуру соединений Sing-box
     и начисляет дельты трафика в ClientStats и Inbound.
     """
     global _last_singbox_conn_stats
@@ -546,27 +302,35 @@ def _process_singbox_connection_data(data: dict):
 
 def query_singbox_traffic():
     """
-    Опрашивает Clash API Sing-box (/connections) и производит по-соединениям (per-connection-ID)
-    расчет дельт трафика, исключая потерю байт при разрывах сессий и сброс счетчиков.
-    Обновляет ClientStats и Inbound в БД.
+    Считывает трафик Sing-box через sentinel-core и обновляет ClientStats и Inbound в БД.
     """
     if not is_singbox_running():
         return
 
-    _start_singbox_ws_stream()
-
-    import requests
     try:
-        url = "http://127.0.0.1:9090/connections"
-        resp = requests.get(url, timeout=2)
-        if resp.status_code != 200:
+        from backend.sentinel_core_bridge import get_unified_traffic
+        traffic_data = get_unified_traffic()
+        if not traffic_data or not isinstance(traffic_data, dict):
             return
 
-        data = resp.json()
-        _process_singbox_connection_data(data)
+        from backend.database import update_client_traffic_by_email, get_all_inbounds, update_inbound_traffic
+        inbounds = get_all_inbounds()
+        singbox_inbounds = [ib for ib in inbounds if ib.get("core") == "singbox" and ib.get("enable")]
 
+        for email, stats in traffic_data.items():
+            if not isinstance(stats, dict):
+                continue
+            up = int(stats.get("upBytes", 0))
+            down = int(stats.get("downBytes", 0))
+
+            prev_up, prev_down = _last_singbox_conn_stats.get(email, (0, 0))
+            up_delta = up - prev_up if up >= prev_up else up
+            down_delta = down - prev_down if down >= prev_down else down
+            _last_singbox_conn_stats[email] = (up, down)
+
+            if up_delta > 0 or down_delta > 0:
+                update_client_traffic_by_email(email, up_delta, down_delta)
+                for ib in singbox_inbounds:
+                    update_inbound_traffic(ib["id"], up_delta, down_delta)
     except Exception as e:
-        logging.debug(f"Failed to query Sing-box traffic: {e}")
-
-
-
+        logging.debug(f"Failed to query Sing-box traffic via sentinel-core: {e}")

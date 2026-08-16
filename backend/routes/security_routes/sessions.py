@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Request
 from backend.auth_utils import check_auth, decoy_response
+from backend.i18n import t, get_lang
 
 router = APIRouter()
 
@@ -31,6 +32,7 @@ async def get_active_sessions(request: Request):
 async def terminate_session(request: Request):
     if not check_auth(request):
         return decoy_response()
+    lang = get_lang(request)
     try:
         body = await request.json()
         target_sid = body.get("session_id")
@@ -49,8 +51,8 @@ async def terminate_session(request: Request):
         
         if success:
             log_action(actor, "terminate_session", target=target_sid, details="Session terminated successfully")
-            return {"success": True, "msg": "Сессия успешно завершена"}
+            return {"success": True, "msg": t("security_session_terminated", lang=lang, category="backend")}
         else:
-            return {"success": False, "msg": "Сессия не найдена"}
+            return {"success": False, "msg": t("security_session_not_found", lang=lang, category="backend")}
     except Exception as e:
         return {"success": False, "msg": f"Failed to terminate session: {str(e)}"}

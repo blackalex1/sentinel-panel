@@ -19,6 +19,11 @@ echo "[+] Активация окружения и установка завис
 source .venv/bin/activate
 pip install -r requirements.txt
 
+echo "[+] Загрузка актуального ядра Sentinel-Core..."
+if [ -f "$SCRIPT_DIR/installation/fetch_core.sh" ]; then
+    bash "$SCRIPT_DIR/installation/fetch_core.sh" "$SCRIPT_DIR/bin"
+fi
+
 echo "[+] Запуск VPN-панели на случайном порту..."
 python backend/main.py &
 

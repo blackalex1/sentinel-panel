@@ -53,7 +53,7 @@ export function setupInboundListeners(loadInboundsCallback) {
             if (res && res.success) {
                 document.getElementById("ib-port").value = res.port;
             } else {
-                showToast(res ? res.msg : "Не удалось подобрать свободный порт", "error");
+                showToast(res ? res.msg : t("toast_inbound_port_fail", "Не удалось подобрать свободный порт"), "error");
             }
         });
     }
@@ -86,12 +86,6 @@ export function setupInboundListeners(loadInboundsCallback) {
         
         handleProtocolChange("vless");
         switchInboundModalTab("basic");
-        
-        const res = await apiFetch("/api/xray/x25519");
-        if (res && res.success) {
-            document.getElementById("ib-reality-pbk").value = res.publicKey;
-            document.getElementById("ib-reality-priv").value = res.privateKey;
-        }
         
         document.getElementById("inbound-modal").classList.add("active");
     });
@@ -141,7 +135,7 @@ export function setupInboundListeners(loadInboundsCallback) {
                 updateFormToggles();
             }
         } else {
-            showToast(res ? res.msg : "Не удалось сгенерировать ключи", "error");
+            showToast(res ? res.msg : t("toast_inbound_keys_fail", "Не удалось сгенерировать ключи"), "error");
         }
     };
 

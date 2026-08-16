@@ -15,58 +15,71 @@ DEFAULT_GEOSITE_URL = "https://github.com/Loyalsoldier/v2ray-rules-dat/releases/
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
 HEADERS = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 SentinelPanel/1.0"}
+import xml.etree.ElementTree as ET
 
-def get_latest_xray_version_info(include_prerelease: bool = False):
-    """Получает информацию о последнем релизе Xray-core с GitHub (включая пре-релизы)"""
-    if include_prerelease:
-        url = "https://api.github.com/repos/XTLS/Xray-core/releases"
-    else:
-        url = "https://api.github.com/repos/XTLS/Xray-core/releases/latest"
+_XRAY_RELEASES_CACHE = {}
+CACHE_TTL = 3600  # 1 hour cache for releases
+
+def _fetch_xray_releases_atom(include_prerelease: bool = False, limit: int = 20) -> list[dict]:
     try:
-        response = requests.get(url, headers=HEADERS, timeout=10)
-        if response.status_code == 200:
-            res_data = response.json()
-            if include_prerelease and isinstance(res_data, list):
-                if not res_data:
-                    return None
-                data = res_data[0]
-            elif isinstance(res_data, dict):
-                data = res_data
-            else:
-                return None
-
-            tag_name = data.get("tag_name")
-            is_prerelease = bool(data.get("prerelease", False))
-            assets = data.get("assets", [])
-
-            arch = platform.machine().lower()
-            is_arm = "arm64" in arch or "aarch64" in arch
+        url = "https://github.com/XTLS/Xray-core/releases.atom"
+        resp = requests.get(url, headers=HEADERS, timeout=3)
+        if resp.status_code != 200:
+            return []
+        raw_content = getattr(resp, "content", None)
+        if raw_content is None:
+            raw_content = getattr(resp, "text", "").encode("utf-8")
+        if not raw_content:
+            return []
+        root = ET.fromstring(raw_content)
+        ns = {"atom": "http://www.w3.org/2005/Atom"}
+        arch = platform.machine().lower()
+        is_arm = "arm64" in arch or "aarch64" in arch
+        releases = []
+        for entry in root.findall("atom:entry", ns):
+            title = entry.find("atom:title", ns)
+            title_text = title.text.strip() if title is not None and title.text else ""
+            tag = title_text.split()[-1] if title_text else ""
+            if not tag:
+                continue
+            if not tag.startswith("v"):
+                tag = "v" + tag
+            v_clean = tag.lstrip("v")
+            is_pre = any(k in tag.lower() for k in ("beta", "alpha", "rc", "pre"))
+            if not include_prerelease and is_pre:
+                continue
             if backend.xray.IS_WINDOWS:
-                target_name = "Xray-windows-arm64-v8a.zip" if is_arm else "Xray-windows-64.zip"
+                target_name = f"Xray-windows-arm64-v8a.zip" if is_arm else f"Xray-windows-64.zip"
             else:
-                target_name = "Xray-linux-arm64-v8a.zip" if is_arm else "Xray-linux-64.zip"
-
-            download_url = None
-            for asset in assets:
-                if asset.get("name") == target_name:
-                    download_url = asset.get("browser_download_url")
-                    break
-
-            return {
-                "version": tag_name,
+                target_name = f"Xray-linux-arm64-v8a.zip" if is_arm else f"Xray-linux-64.zip"
+            download_url = f"https://github.com/XTLS/Xray-core/releases/download/{tag}/{target_name}"
+            releases.append({
+                "version": tag,
                 "download_url": download_url,
-                "is_prerelease": is_prerelease
-            }
+                "is_prerelease": is_pre
+            })
+            if len(releases) >= limit:
+                break
+        return releases
     except Exception as e:
-        logging.error(f"Failed to fetch Xray version info from GitHub: {e}")
-    return None
+        logging.error(f"Failed to fetch Xray releases atom feed: {e}")
+        return []
 
 def get_xray_releases(include_prerelease: bool = False, limit: int = 20) -> list[dict]:
-    """Получает список всех доступных релизов Xray-core с GitHub"""
+    """Получает список всех доступных релизов Xray с GitHub с кэшированием в памяти"""
+    cache_key = f"releases_{include_prerelease}_{limit}"
+    now = time.time()
+
+    # Сначала проверяем горячий кэш
+    if cache_key in _XRAY_RELEASES_CACHE:
+        ts, cached = _XRAY_RELEASES_CACHE[cache_key]
+        if now - ts < CACHE_TTL and cached:
+            return cached
+
     url = "https://api.github.com/repos/XTLS/Xray-core/releases"
     releases = []
     try:
-        response = requests.get(url, headers=HEADERS, timeout=10)
+        response = requests.get(url, headers=HEADERS, timeout=3)
         if response.status_code == 200:
             data = response.json()
             if isinstance(data, list):
@@ -87,6 +100,8 @@ def get_xray_releases(include_prerelease: bool = False, limit: int = 20) -> list
                         if asset.get("name") == target_name:
                             download_url = asset.get("browser_download_url")
                             break
+                    if not download_url and item.get("assets"):
+                        download_url = item["assets"][0].get("browser_download_url")
                     if tag_name and download_url:
                         releases.append({
                             "version": tag_name,
@@ -96,8 +111,30 @@ def get_xray_releases(include_prerelease: bool = False, limit: int = 20) -> list
                     if len(releases) >= limit:
                         break
     except Exception as e:
-        logging.error(f"Failed to fetch Xray releases list from GitHub: {e}")
-    return releases
+        logging.error(f"Failed to fetch Xray releases list from GitHub API: {e}")
+
+    if releases:
+        _XRAY_RELEASES_CACHE[cache_key] = (now, releases)
+        return releases
+
+    # Резервный опрос через Atom feed
+    releases = _fetch_xray_releases_atom(include_prerelease=include_prerelease, limit=limit)
+    if releases:
+        _XRAY_RELEASES_CACHE[cache_key] = (now, releases)
+        return releases
+
+    # Если опрос не удался, но есть устаревший кэш — отдаем его
+    if cache_key in _XRAY_RELEASES_CACHE:
+        return _XRAY_RELEASES_CACHE[cache_key][1]
+
+    return []
+
+def get_latest_xray_version_info(include_prerelease: bool = False):
+    """Получает информацию о последнем релизе Xray-core из кэша релизов"""
+    releases = get_xray_releases(include_prerelease=include_prerelease, limit=5)
+    if releases and len(releases) > 0:
+        return releases[0]
+    return None
 
 def download_xray_core(download_url: str = None):
     """Скачивает и распаковывает ядро Xray"""
@@ -164,6 +201,14 @@ def download_xray_core(download_url: str = None):
         except Exception as e:
             raise Exception(f"Downloaded Xray binary failed self-test verification: {str(e)}")
             
+        # Ensure core process is stopped so Windows file lock is released
+        try:
+            from backend.xray.service import stop_xray
+            stop_xray()
+            time.sleep(0.5)
+        except Exception:
+            pass
+
         # Копируем/переносим файлы в рабочую папку BIN_DIR
         for item in temp_extract_dir.iterdir():
             dest = backend.xray.BIN_DIR / item.name
@@ -173,10 +218,12 @@ def download_xray_core(download_url: str = None):
                 shutil.move(str(item), str(dest))
             else:
                 if dest.exists():
-                    try:
-                        os.remove(dest)
-                    except Exception as e:
-                        logging.warning(f"Could not remove old file {dest.name} before replacing: {e}")
+                    for _ in range(5):
+                        try:
+                            os.remove(dest)
+                            break
+                        except Exception as e:
+                            time.sleep(0.3)
                 shutil.move(str(item), str(dest))
                 
         if not backend.xray.IS_WINDOWS:
@@ -309,40 +356,14 @@ def ensure_xray_installed():
             logging.error(f"Error during Xray core installation: {e}")
 
 def get_installed_xray_version() -> str:
-    """Runs 'xray version' to get the currently installed version dynamically."""
+    """Gets the currently installed version dynamically via sentinel-core."""
     if not backend.xray.XRAY_BIN_PATH.exists():
         return "Not Installed"
     try:
-        cmd = [str(backend.xray.XRAY_BIN_PATH), "version"]
-        result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, encoding="utf-8", timeout=5)  # nosec B603
-        if result.returncode == 0:
-            full_output = (result.stdout or "") + (result.stderr or "")
-            lines = [line.strip() for line in full_output.split("\n") if line.strip()]
-            
-            for line in lines:
-                parts = line.split()
-                if len(parts) >= 2 and parts[0].lower() == "xray":
-                    version = parts[1].strip(",()[]{}")
-                    if not version.startswith("v"):
-                        version = "v" + version
-                    return version
-                
-                for part in parts:
-                    part_clean = part.strip(",()[]{}")
-                    if part_clean.startswith("v") and len(part_clean) > 1 and part_clean[1].isdigit():
-                        return part_clean
-                    if len(part_clean) > 0 and part_clean[0].isdigit() and "." in part_clean:
-                        return "v" + part_clean
-            
-            if lines:
-                parts = lines[0].split()
-                if len(parts) >= 2:
-                    return parts[1].strip(",()[]{}")
-                return lines[0]
-            return "Unknown"
-        else:
-            logging.warning(f"Xray version command returned non-zero code {result.returncode}: {result.stderr}")
-            return f"Error (code {result.returncode}): {result.stderr.strip() or result.stdout.strip()}"
+        from backend.sentinel_core_bridge import get_core_version
+        v = get_core_version("xray", str(backend.xray.XRAY_BIN_PATH))
+        if v and v != "Unknown":
+            return v
     except Exception as e:
-        logging.error(f"Failed to check Xray version: {e}")
-        return f"Error: {str(e)}"
+        logging.error(f"Failed to check Xray version via sentinel-core: {e}")
+    return "Unknown"

@@ -4,6 +4,15 @@ import { t } from "../../i18n.js";
 import { loadHysteriaConfig } from "./config.js";
 
 export async function loadHysteriaCoreInfo() {
+    const currEl = document.getElementById("hysteria-curr-version");
+    const latestEl = document.getElementById("hysteria-latest-version");
+
+    // Instantly display cached versions if available to eliminate loading lag
+    const cachedCurr = localStorage.getItem("hysteria_cached_curr_ver");
+    const cachedLatest = localStorage.getItem("hysteria_cached_latest_ver");
+    if (currEl && cachedCurr && currEl.innerText === "...") currEl.innerText = cachedCurr;
+    if (latestEl && cachedLatest && latestEl.innerText === "...") latestEl.innerText = cachedLatest;
+
     const prereleaseToggle = document.getElementById("hysteria-prerelease-toggle");
     let includePrerelease = false;
     if (prereleaseToggle) {
@@ -18,10 +27,14 @@ export async function loadHysteriaCoreInfo() {
     const res = await apiFetch(versionUrl);
     if (!res || !res.success) return;
     
-    const currEl = document.getElementById("hysteria-curr-version");
-    const latestEl = document.getElementById("hysteria-latest-version");
-    if (currEl) currEl.innerText = res.current;
-    if (latestEl) latestEl.innerText = res.latest;
+    if (currEl && res.current) {
+        currEl.innerText = res.current;
+        localStorage.setItem("hysteria_cached_curr_ver", res.current);
+    }
+    if (latestEl && res.latest) {
+        latestEl.innerText = res.latest;
+        localStorage.setItem("hysteria_cached_latest_ver", res.latest);
+    }
 
     const prereleaseBadge = document.getElementById("hysteria-prerelease-badge");
     const versionSelect = document.getElementById("hysteria-version-select");
@@ -39,7 +52,7 @@ export async function loadHysteriaCoreInfo() {
             const tag = item.is_prerelease ? "Pre-release" : "Stable";
             opt.innerText = `${item.version} (${tag})`;
             if (normVer(item.version) === normVer(res.current)) {
-                opt.innerText += " — [Установлено]";
+                opt.innerText += ` — [${t("core_installed_tag", "Установлено")}]`;
             }
             versionSelect.appendChild(opt);
         });
@@ -79,7 +92,7 @@ export async function loadHysteriaCoreInfo() {
             } else {
                 updateBtn.disabled = false;
                 updateBtn.setAttribute("data-url", selUrl);
-                updateBtn.innerHTML = `<i class="fa-solid fa-download"></i> <span>Установить ${selVer}</span>`;
+                updateBtn.innerHTML = `<i class="fa-solid fa-download"></i> <span>${t("core_btn_install_version", "Установить")} ${selVer}</span>`;
             }
         };
 
@@ -131,43 +144,134 @@ export async function loadHysteriaCoreInfo() {
     await loadHysteriaConfig();
 }
 
+let _hysteriaSocket = null;
+let _hysteriaES = null;
+let _hysteriaReconnectTimer = null;
+let _hysteriaReconnectDelay = 1000;
 let lastHysteriaLogsStr = "";
 
-export async function loadHysteriaLogs() {
-    const res = await apiFetch("/api/hysteria/logs");
-    if (!res || !res.success) return;
-    
-    const terminal = document.getElementById("hysteria-logs-terminal");
-    if (terminal) {
-        const logsStr = JSON.stringify(res.logs);
-        if (logsStr === lastHysteriaLogsStr) {
-            return;
+function appendHysteriaLines(terminal, lines) {
+    const atBottom = terminal.scrollTop + terminal.clientHeight >= terminal.scrollHeight - 50;
+    const frag = document.createDocumentFragment();
+    lines.forEach(line => {
+        const div = document.createElement("div");
+        const cleanLine = (line || "").replace(/[\u001b\u009b][[()#;?]*(?:[0-9]{1,4}(?:;[0-9]{0,4})*)?[0-9A-ORZcf-nqry=><]/g, '');
+        div.innerText = cleanLine;
+
+        if (cleanLine.toLowerCase().includes("warn") || cleanLine.includes("[Warning]")) {
+            div.style.color = "var(--accent-orange)";
+        } else if (cleanLine.toLowerCase().includes("err") || cleanLine.includes("[Error]")) {
+            div.style.color = "var(--accent-rose)";
+        } else if (cleanLine.includes("connected") || cleanLine.includes("authenticate")) {
+            div.style.color = "var(--accent-blue)";
         }
-        lastHysteriaLogsStr = logsStr;
-        
-        const currentScroll = terminal.scrollTop + terminal.clientHeight >= terminal.scrollHeight - 50;
-        
-        terminal.innerHTML = "";
-        res.logs.forEach(line => {
-            const div = document.createElement("div");
-            const cleanLine = line.replace(/[\u001b\u009b][[()#;?]*(?:[0-9]{1,4}(?:;[0-9]{0,4})*)?[0-9A-ORZcf-nqry=><]/g, '');
-            div.innerText = cleanLine;
-            
-            if (cleanLine.toLowerCase().includes("warn") || cleanLine.includes("[Warning]")) {
-                div.style.color = "var(--accent-orange)";
-            } else if (cleanLine.toLowerCase().includes("err") || cleanLine.includes("[Error]")) {
-                div.style.color = "var(--accent-rose)";
-            } else if (cleanLine.includes("connected") || cleanLine.includes("authenticate")) {
-                div.style.color = "var(--accent-blue)";
-            }
-            
-            terminal.appendChild(div);
-        });
-        
-        if (currentScroll) {
-            terminal.scrollTop = terminal.scrollHeight;
+
+        frag.appendChild(div);
+    });
+    terminal.appendChild(frag);
+    while (terminal.childElementCount > 300) {
+        terminal.removeChild(terminal.firstChild);
+    }
+    if (atBottom) terminal.scrollTop = terminal.scrollHeight;
+}
+
+export async function loadHysteriaLogs() {
+    const terminal = document.getElementById("hysteria-logs-terminal");
+    if (!terminal) return;
+    try {
+        const res = await apiFetch("/api/hysteria/logs");
+        if (res && res.success && Array.isArray(res.logs) && res.logs.length > 0) {
+            terminal.innerHTML = "";
+            appendHysteriaLines(terminal, res.logs);
+        }
+    } catch (_) {}
+}
+
+export function startHysteriaLogsStream() {
+    stopHysteriaLogsStream();
+    const terminal = document.getElementById("hysteria-logs-terminal");
+    if (!terminal) return;
+
+    loadHysteriaLogs();
+
+    function connect() {
+        const proto = window.location.protocol === "https:" ? "wss:" : "ws:";
+        const wsUrl = `${proto}//${window.location.host}/api/hysteria/logs/ws`;
+
+        try {
+            const ws = new WebSocket(wsUrl);
+            _hysteriaSocket = ws;
+
+            ws.onopen = () => {
+                _hysteriaReconnectDelay = 1000;
+            };
+
+            ws.onmessage = (e) => {
+                try {
+                    const msg = JSON.parse(e.data);
+                    if (msg.event === "history" && Array.isArray(msg.data)) {
+                        terminal.innerHTML = "";
+                        appendHysteriaLines(terminal, msg.data);
+                    } else if (msg.event === "line" && msg.data) {
+                        appendHysteriaLines(terminal, [msg.data]);
+                    }
+                } catch (_) {}
+            };
+
+            ws.onerror = () => {
+                ws.close();
+            };
+
+            ws.onclose = (e) => {
+                _hysteriaSocket = null;
+                if (e.code === 4401 || e.code === 1008) return;
+                if (!_hysteriaES) {
+                    connectSSE();
+                }
+            };
+        } catch (_) {
+            connectSSE();
         }
     }
+
+    function connectSSE() {
+        if (_hysteriaES) return;
+        const es = new EventSource("/api/hysteria/logs/stream");
+        _hysteriaES = es;
+
+        es.addEventListener("history", (e) => {
+            try {
+                const lines = JSON.parse(e.data);
+                if (Array.isArray(lines) && lines.length > 0) {
+                    terminal.innerHTML = "";
+                    appendHysteriaLines(terminal, lines);
+                }
+                _hysteriaReconnectDelay = 1000;
+            } catch (_) {}
+        });
+
+        es.addEventListener("line", (e) => {
+            try {
+                appendHysteriaLines(terminal, [JSON.parse(e.data)]);
+            } catch (_) {}
+        });
+
+        es.onerror = () => {
+            es.close();
+            _hysteriaES = null;
+            _hysteriaReconnectDelay = Math.min(_hysteriaReconnectDelay * 2, 30000);
+            _hysteriaReconnectTimer = setTimeout(connect, _hysteriaReconnectDelay);
+        };
+    }
+
+    connect();
+}
+
+export function stopHysteriaLogsStream() {
+    if (_hysteriaReconnectTimer) { clearTimeout(_hysteriaReconnectTimer); _hysteriaReconnectTimer = null; }
+    if (_hysteriaSocket) { _hysteriaSocket.close(); _hysteriaSocket = null; }
+    if (_hysteriaES) { _hysteriaES.close(); _hysteriaES = null; }
+    _hysteriaReconnectDelay = 1000;
 }
 
 export function setupHysteriaCoreListeners() {

@@ -1,326 +1,244 @@
 import { apiFetch } from "../../../api.js";
 import { showToast } from "../../../ui.js";
 import { t } from "../../../i18n.js";
-import { updateOutboundFormFields } from "./fields.js";
-import { outboundsCache } from "./table_render.js";
+import { renderDynamicOutboundForm } from "../../inbounds/schema-renderer.js";
+import { outboundsCache, loadOutbounds } from "./table_render.js";
+import { enhanceAllSelects } from "../../../components/customSelect.js";
 
-window.selectedBackupOrder = [];
+let cachedSchema = null;
+let currentOutboundValues = {};
 
-export function updateBackupBadges() {
-    document.querySelectorAll(".backup-option-row").forEach(label => {
-        const cb = label.querySelector(".ob-backup-cb");
-        let badge = label.querySelector(".backup-priority-badge");
-        if (!cb) return;
-        
-        const idx = (window.selectedBackupOrder || []).indexOf(cb.value);
-        if (idx !== -1) {
-            cb.checked = true;
-            if (!badge) {
-                badge = document.createElement("span");
-                badge.className = "backup-priority-badge";
-                badge.style.cssText = "margin-left: auto; background: linear-gradient(135deg, #7c3aed, #6366f1); color: #fff; font-size: 11px; padding: 2px 8px; border-radius: 12px; font-weight: 600; box-shadow: 0 2px 4px rgba(0,0,0,0.2);";
-                label.appendChild(badge);
-            }
-            badge.innerText = `${t("routing_modal_priority_badge", "Приоритет №")}${idx + 1}`;
-        } else {
-            cb.checked = false;
-            if (badge) {
-                badge.remove();
-            }
+export async function fetchOutboundSchema() {
+    if (cachedSchema && cachedSchema.outboundProtocols) {
+        return cachedSchema;
+    }
+    try {
+        const res = await apiFetch("/api/schema/capabilities");
+        if (res && res.success && res.obj) {
+            cachedSchema = res.obj;
+            return cachedSchema;
         }
-    });
+    } catch (e) {
+        console.warn("Failed to fetch schema from core:", e);
+    }
+    return null;
 }
 
 export async function openOutboundModal(id = null) {
-    const form = document.getElementById("outbound-form");
-    if (!form) return;
-    form.reset();
-    
-    const protocolSelect = document.getElementById("ob-protocol");
-    protocolSelect.disabled = false;
+    const modal = document.getElementById("outbound-modal");
+    if (!modal) return;
 
-    // Populate backup outbounds checkbox list
-    const backupContainer = document.getElementById("ob-backup-outbounds-container");
-    if (backupContainer) {
-        backupContainer.innerHTML = "";
-        const allObsRes = await apiFetch("/api/routing/outbounds");
-        const allObs = (allObsRes && allObsRes.success) ? allObsRes.obj : outboundsCache;
-        const seenTags = new Set();
-        const validObs = allObs.filter(o => {
-            if (!o.tag || o.tag === "api" || o.tag === "blocked" || o.protocol === "blackhole" || (id && o.id === id)) {
-                return false;
-            }
-            if (seenTags.has(o.tag)) {
-                return false;
-            }
-            seenTags.add(o.tag);
-            return true;
-        });
-        
-        if (validObs.length === 0) {
-            backupContainer.innerHTML = `<span style="color: var(--text-secondary); font-size: 12px;">${t("routing_modal_no_other_outbounds", "Нет доступных других исходящих подключений")}</span>`;
-        } else {
-            validObs.forEach(o => {
-                const label = document.createElement("label");
-                label.className = "backup-option-row";
-                label.style.cssText = "display: flex; align-items: center; gap: 10px; cursor: pointer; padding: 6px 10px; border-radius: 6px; background: rgba(255,255,255,0.03); transition: background 0.2s;";
-                label.addEventListener("mouseenter", () => label.style.background = "rgba(255,255,255,0.08)");
-                label.addEventListener("mouseleave", () => label.style.background = "rgba(255,255,255,0.03)");
-                
-                const cb = document.createElement("input");
-                cb.type = "checkbox";
-                cb.className = "ob-backup-cb";
-                cb.value = o.tag;
-                cb.style.cssText = "width: 16px; height: 16px; accent-color: var(--primary-color); cursor: pointer;";
-                cb.addEventListener("change", () => {
-                    if (!Array.isArray(window.selectedBackupOrder)) {
-                        window.selectedBackupOrder = [];
-                    }
-                    if (cb.checked) {
-                        if (!window.selectedBackupOrder.includes(cb.value)) {
-                            window.selectedBackupOrder.push(cb.value);
-                        }
-                    } else {
-                        window.selectedBackupOrder = window.selectedBackupOrder.filter(t => t !== cb.value);
-                    }
-                    updateBackupBadges();
-                });
-                
-                const span = document.createElement("span");
-                span.style.cssText = "font-size: 13px; color: var(--text-primary); font-weight: 500;";
-                span.innerText = `${o.remark} (${o.tag})`;
-                
-                label.appendChild(cb);
-                label.appendChild(span);
-                backupContainer.appendChild(label);
-            });
-        }
+    const form = document.getElementById("outbound-form");
+    if (form) form.reset();
+
+    const titleEl = document.getElementById("outbound-modal-title");
+    if (titleEl) {
+        titleEl.innerText = id ? t("routing_modal_edit_outbound", "Редактирование исходящего подключения") : t("routing_modal_create_outbound", "Создание исходящего подключения");
     }
+
+    const idInput = document.getElementById("ob-id");
+    if (idInput) idInput.value = id || "";
+
+    const linkInput = document.getElementById("ob-import-link");
+    if (linkInput) linkInput.value = "";
+
+    const schema = await fetchOutboundSchema();
+    const outboundProtocols = (schema && schema.outboundProtocols) ? schema.outboundProtocols : {};
+
+    // 1. Populate Protocol Select Options Dynamically from Core Schema
+    const protocolSelect = document.getElementById("ob-protocol");
+    if (protocolSelect) {
+        protocolSelect.innerHTML = "";
+        const protoKeys = ["vless", "hysteria2", "trojan", "shadowsocks", "vmess", "wireguard", "socks", "http", "warp", "freedom", "blackhole"];
+        
+        protoKeys.forEach(pk => {
+            const cap = outboundProtocols[pk];
+            const opt = document.createElement("option");
+            opt.value = pk;
+            opt.textContent = cap ? cap.displayName : pk.toUpperCase();
+            protocolSelect.appendChild(opt);
+        });
+
+        // Add any extra protocols present in schema
+        Object.keys(outboundProtocols).forEach(pk => {
+            if (!protoKeys.includes(pk) && pk !== "direct" && pk !== "block" && pk !== "ss" && pk !== "socks5") {
+                const cap = outboundProtocols[pk];
+                const opt = document.createElement("option");
+                opt.value = pk;
+                opt.textContent = cap ? cap.displayName : pk.toUpperCase();
+                protocolSelect.appendChild(opt);
+            }
+        });
+    }
+
+    // 2. Prepare Current Values
+    currentOutboundValues = {};
 
     if (id) {
-        document.getElementById("outbound-modal-title").innerText = t("routing_modal_edit_outbound", "Редактирование исходящего подключения");
-        const res = await apiFetch(`/api/routing/outbounds`);
-        const ob = res.obj.find(x => x.id === id);
+        // Load existing outbound
+        const listRes = await apiFetch("/api/routing/outbounds");
+        const allObs = (listRes && listRes.success) ? listRes.obj : outboundsCache;
+        const ob = (allObs || []).find(x => String(x.id) === String(id));
         if (ob) {
-            document.getElementById("ob-id").value = ob.id;
-            document.getElementById("ob-remark").value = ob.remark;
-            protocolSelect.value = ob.protocol;
-            // Prevent changing protocol/tag of system outbounds to avoid breaking rules
-            if (ob.is_system === 1) {
-                protocolSelect.disabled = true;
-                document.getElementById("ob-tag").disabled = true;
-            } else {
-                document.getElementById("ob-tag").disabled = false;
-            }
-            document.getElementById("ob-tag").value = ob.tag;
-            document.getElementById("ob-enable").checked = ob.enable === 1;
-            
-            // Populate proxy settings
-            const settingsObj = JSON.parse(ob.settings || "{}");
-            const streamSettingsObj = JSON.parse(ob.stream_settings || "{}");
-            
-            let address = "";
-            let port = "";
-            let password = "";
-            
-            document.getElementById("ob-username").value = "";
-            document.getElementById("ob-password").value = "";
-            document.getElementById("ob-ss-method").value = "aes-256-gcm";
-            document.getElementById("ob-sni").value = "";
-            document.getElementById("ob-pbk").value = "";
-            document.getElementById("ob-shortid").value = "";
-            document.getElementById("ob-fingerprint").value = "chrome";
-            const spxEl = document.getElementById("ob-spx");
-            if (spxEl) spxEl.value = "";
-            document.getElementById("ob-alpn").value = "";
-            document.getElementById("ob-flow").value = "";
-            document.getElementById("ob-encryption").value = "";
-            document.getElementById("ob-security").value = "none";
-            document.getElementById("ob-up-mbps").value = "";
-            document.getElementById("ob-down-mbps").value = "";
-            document.getElementById("ob-allow-insecure").checked = false;
-            document.getElementById("ob-pinned-sha256").value = "";
-            document.getElementById("ob-hysteria-obfs").value = "";
-            document.getElementById("ob-hysteria-obfs-password").value = "";
-            
-            document.getElementById("ob-wg-private-key").value = "";
-            document.getElementById("ob-wg-addresses").value = "";
-            document.getElementById("ob-wg-reserved").value = "";
-            document.getElementById("ob-wg-peer-public-key").value = "";
-            document.getElementById("ob-wg-endpoint").value = "";
-            document.getElementById("ob-wg-mtu").value = "";
-            
-            if (ob.protocol === "socks" || ob.protocol === "http" || ob.protocol === "shadowsocks") {
-                const server = settingsObj.servers ? settingsObj.servers[0] : null;
-                if (server) {
-                    address = server.address || "";
-                    port = server.port || "";
-                    
-                    if (server.users && server.users.length > 0) {
-                        document.getElementById("ob-username").value = server.users[0].user || "";
-                        password = server.users[0].pass || "";
-                    } else if (server.password) {
-                        password = server.password || "";
-                    }
-                }
-                if (server && server.method) {
-                    document.getElementById("ob-ss-method").value = server.method;
-                }
-            } else if (ob.protocol === "vless") {
-                const server = settingsObj.vnext ? settingsObj.vnext[0] : null;
-                if (server) {
-                    address = server.address || "";
-                    port = server.port || "";
-                    if (server.users && server.users.length > 0) {
-                        password = server.users[0].id || "";
-                        document.getElementById("ob-flow").value = server.users[0].flow || "";
-                        document.getElementById("ob-encryption").value = server.users[0].encryption || "";
-                    }
-                }
-                
-                const security = streamSettingsObj.security || "none";
-                document.getElementById("ob-security").value = security;
-                
-                if (security === "tls") {
-                    const ts = streamSettingsObj.tlsSettings || {};
-                    document.getElementById("ob-sni").value = ts.serverName || "";
-                    document.getElementById("ob-alpn").value = (ts.alpn || []).join(", ");
-                    document.getElementById("ob-allow-insecure").checked = ts.allowInsecure === true;
-                    let pins = ts.pinnedPeerCertSha256 || "";
-                    if (typeof pins === "string") {
-                        pins = pins.replace(/~/g, ", ");
-                    } else if (Array.isArray(pins)) {
-                        pins = pins.join(", ");
-                    }
-                    document.getElementById("ob-pinned-sha256").value = pins;
-                } else if (security === "reality") {
-                    const rs = streamSettingsObj.realitySettings || {};
-                    document.getElementById("ob-sni").value = rs.serverName || "";
-                    document.getElementById("ob-pbk").value = rs.publicKey || "";
-                    document.getElementById("ob-shortid").value = rs.shortId || "";
-                    document.getElementById("ob-fingerprint").value = rs.fingerprint || "chrome";
-                    const spxEl = document.getElementById("ob-spx");
-                    if (spxEl) spxEl.value = rs.spiderX || "";
-                }
-            } else if (ob.protocol === "hysteria" || ob.protocol === "hysteria2") {
-                address = settingsObj.address || "";
-                port = settingsObj.port || "";
-                
-                const ts = streamSettingsObj.tlsSettings || {};
-                document.getElementById("ob-sni").value = ts.serverName || "";
-                document.getElementById("ob-alpn").value = (ts.alpn || []).join(", ");
-                document.getElementById("ob-allow-insecure").checked = ts.allowInsecure === true;
-                let pins = ts.pinnedPeerCertSha256 || "";
-                if (typeof pins === "string") {
-                    pins = pins.replace(/~/g, ", ");
-                } else if (Array.isArray(pins)) {
-                    pins = pins.join(", ");
-                }
-                document.getElementById("ob-pinned-sha256").value = pins;
-                
-                const hs = streamSettingsObj.hysteriaSettings || {};
-                password = hs.auth || "";
-                if (hs.hop) {
-                    port = hs.hop;
-                }
-                
-                const upRaw = hs.up || "";
-                const downRaw = hs.down || "";
-                document.getElementById("ob-up-mbps").value = upRaw ? parseInt(upRaw) : "";
-                document.getElementById("ob-down-mbps").value = downRaw ? parseInt(downRaw) : "";
-                
-                // Populate obfs settings
-                const obfsVal = hs.obfs || hs.obfs_type || "";
-                const obfsPwd = hs.obfsPassword || hs.obfs_password || "";
-                document.getElementById("ob-hysteria-obfs").value = obfsVal;
-                document.getElementById("ob-hysteria-obfs-password").value = obfsPwd;
-            } else if (ob.protocol === "wireguard") {
-                document.getElementById("ob-wg-private-key").value = settingsObj.secretKey || "";
-                document.getElementById("ob-wg-addresses").value = Array.isArray(settingsObj.address) ? settingsObj.address.join(", ") : (settingsObj.address || "");
-                document.getElementById("ob-wg-reserved").value = Array.isArray(settingsObj.reserved) ? settingsObj.reserved.join(",") : "";
-                
-                const peer = settingsObj.peers ? settingsObj.peers[0] : null;
-                if (peer) {
-                    document.getElementById("ob-wg-peer-public-key").value = peer.publicKey || "";
-                    document.getElementById("ob-wg-endpoint").value = peer.endpoint || "";
-                }
-                document.getElementById("ob-wg-mtu").value = settingsObj.mtu || "";
-            }
-            
-            document.getElementById("ob-address").value = address;
-            document.getElementById("ob-port").value = port;
-            document.getElementById("ob-password").value = password;
+            let settingsObj = {};
+            let streamObj = {};
+            try { settingsObj = JSON.parse(ob.settings || "{}"); } catch(e) {}
+            try { streamObj = JSON.parse(ob.stream_settings || "{}"); } catch(e) {}
 
-            // Populate backup outbounds selections
-            const backups = settingsObj.backup_outbounds;
-            window.selectedBackupOrder = Array.isArray(backups) ? [...backups] : [];
-            updateBackupBadges();
-            
-            const fallbackStratEl = document.getElementById("ob-fallback-strategy");
-            if (fallbackStratEl) {
-                fallbackStratEl.value = settingsObj.fallback_strategy || "priority";
+            let proto = (ob.protocol || "vless").toLowerCase();
+            if (proto === "direct") proto = "freedom";
+            if (proto === "block") proto = "blackhole";
+
+            currentOutboundValues = {
+                remark: ob.remark || "",
+                tag: ob.tag || "",
+                protocol: proto,
+                enable: ob.enable !== 0,
+                ...settingsObj,
+                ...streamObj
+            };
+
+            // Extract nested structures if present
+            if (settingsObj.vnext && settingsObj.vnext[0]) {
+                const vn = settingsObj.vnext[0];
+                currentOutboundValues.host = vn.address || currentOutboundValues.host;
+                currentOutboundValues.port = vn.port || currentOutboundValues.port;
+                if (vn.users && vn.users[0]) {
+                    currentOutboundValues.uuid = vn.users[0].id || vn.users[0].uuid || currentOutboundValues.uuid;
+                    currentOutboundValues.flow = vn.users[0].flow || currentOutboundValues.flow;
+                    currentOutboundValues.encryption = vn.users[0].encryption || currentOutboundValues.encryption;
+                }
             }
-            document.getElementById("ob-health-url").value = settingsObj.health_check_url || "";
-            document.getElementById("ob-health-interval").value = settingsObj.health_check_interval || "";
+
+            if (settingsObj.servers && settingsObj.servers[0]) {
+                const srv = settingsObj.servers[0];
+                currentOutboundValues.host = srv.address || currentOutboundValues.host;
+                currentOutboundValues.port = srv.port || currentOutboundValues.port;
+                currentOutboundValues.password = srv.password || currentOutboundValues.password;
+                currentOutboundValues.method = srv.method || currentOutboundValues.method;
+                currentOutboundValues.user = srv.user || currentOutboundValues.user;
+                currentOutboundValues.pass = srv.pass || currentOutboundValues.pass;
+            }
+
+            if (streamObj.realitySettings) {
+                currentOutboundValues.security = "reality";
+                currentOutboundValues.publicKey = streamObj.realitySettings.publicKey || currentOutboundValues.publicKey;
+                currentOutboundValues.shortId = streamObj.realitySettings.shortId || currentOutboundValues.shortId;
+                currentOutboundValues.spiderX = streamObj.realitySettings.spiderX || currentOutboundValues.spiderX;
+                currentOutboundValues.fingerprint = streamObj.realitySettings.fingerprint || currentOutboundValues.fingerprint;
+                currentOutboundValues.sni = streamObj.realitySettings.serverName || currentOutboundValues.sni;
+            } else if (streamObj.tlsSettings) {
+                currentOutboundValues.security = "tls";
+                currentOutboundValues.sni = streamObj.tlsSettings.serverName || currentOutboundValues.sni;
+                currentOutboundValues.fingerprint = streamObj.tlsSettings.fingerprint || currentOutboundValues.fingerprint;
+                currentOutboundValues.allowInsecure = streamObj.tlsSettings.allowInsecure === true;
+                if (streamObj.tlsSettings.alpn) {
+                    currentOutboundValues.alpn = Array.isArray(streamObj.tlsSettings.alpn) ? streamObj.tlsSettings.alpn.join(",") : streamObj.tlsSettings.alpn;
+                }
+            }
+
+            if (streamObj.wsSettings) {
+                currentOutboundValues.network = "ws";
+                currentOutboundValues.path = streamObj.wsSettings.path || currentOutboundValues.path;
+                if (streamObj.wsSettings.headers) {
+                    currentOutboundValues.wsHost = streamObj.wsSettings.headers.Host || currentOutboundValues.wsHost;
+                }
+            } else if (streamObj.grpcSettings) {
+                currentOutboundValues.network = "grpc";
+                currentOutboundValues.serviceName = streamObj.grpcSettings.serviceName || currentOutboundValues.serviceName;
+            }
+
+            if (protocolSelect) {
+                protocolSelect.value = proto;
+                if (ob.is_system === 1) {
+                    protocolSelect.disabled = true;
+                } else {
+                    protocolSelect.disabled = false;
+                }
+            }
         }
     } else {
-        document.getElementById("outbound-modal-title").innerText = t("routing_modal_create_outbound", "Создание исходящего подключения");
-        document.getElementById("ob-id").value = "";
-        document.getElementById("ob-tag").disabled = false;
-        document.getElementById("ob-enable").checked = true;
-        
-        window.selectedBackupOrder = [];
-        updateBackupBadges();
-        
-        const fallbackStratEl = document.getElementById("ob-fallback-strategy");
-        if (fallbackStratEl) {
-            fallbackStratEl.value = "priority";
+        // New Outbound Defaults
+        const activeProto = protocolSelect ? protocolSelect.value || "vless" : "vless";
+        currentOutboundValues = {
+            remark: "VLESS Reality",
+            tag: `out-${Math.random().toString(36).substring(2, 7)}`,
+            protocol: activeProto,
+            host: "",
+            port: 443,
+            security: "reality",
+            network: "tcp",
+            fingerprint: "chrome",
+            allowInsecure: false,
+            enable: true
+        };
+        if (protocolSelect) {
+            protocolSelect.disabled = false;
+            protocolSelect.value = activeProto;
         }
-        document.getElementById("ob-health-url").value = "";
-        document.getElementById("ob-health-interval").value = "";
     }
 
-    if (protocolSelect) protocolSelect.dispatchEvent(new Event("change"));
-    const secSelect = document.getElementById("ob-security");
-    if (secSelect) secSelect.dispatchEvent(new Event("change"));
-    const obfsSelect = document.getElementById("ob-hysteria-obfs");
-    if (obfsSelect) obfsSelect.dispatchEvent(new Event("change"));
-    const ssMethodSelect = document.getElementById("ob-ss-method");
-    if (ssMethodSelect) ssMethodSelect.dispatchEvent(new Event("change"));
-    const fallbackStratSelect = document.getElementById("ob-fallback-strategy");
-    if (fallbackStratSelect) fallbackStratSelect.dispatchEvent(new Event("change"));
+    // 3. Render Form via Dynamic Schema Engine
+    function renderCurrentProtocolForm() {
+        const proto = protocolSelect ? protocolSelect.value : (currentOutboundValues.protocol || "vless");
+        const cap = outboundProtocols[proto] || outboundProtocols["vless"] || { tabDefinitions: [] };
+        
+        const tabsContainer = document.getElementById("outbound-modal-tabs");
+        const schemaContainer = document.getElementById("outbound-schema-container");
 
-    const btnWarp = document.getElementById("btn-generate-warp-profile");
-    if (btnWarp && !btnWarp.dataset.bound) {
-        btnWarp.dataset.bound = "true";
-        btnWarp.addEventListener("click", async () => {
-            btnWarp.disabled = true;
-            btnWarp.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> ' + t("routing_warp_btn_registering", "Регистрация...");
-            showToast(t("routing_warp_toast_registering", "Регистрация аккаунта Cloudflare WARP..."), "info");
-            
-            try {
-                const res = await apiFetch("/api/routing/outbounds/generate-warp", { method: "POST" });
-                if (res && res.success) {
-                    const data = res.obj;
-                    document.getElementById("ob-wg-private-key").value = data.private_key || "";
-                    document.getElementById("ob-wg-addresses").value = `${data.address_v4 || ""}, ${data.address_v6 || ""}`.replace(/,\s*$/, "");
-                    document.getElementById("ob-wg-reserved").value = (data.reserved || []).join(",");
-                    document.getElementById("ob-wg-peer-public-key").value = data.peer_public_key || "";
-                    document.getElementById("ob-wg-endpoint").value = data.endpoint || "";
-                    document.getElementById("ob-wg-mtu").value = "1280";
-                    showToast(t("routing_warp_toast_register_success", "Аккаунт Cloudflare WARP успешно сгенерирован!"));
-                } else {
-                    showToast(res ? res.msg : t("routing_warp_toast_register_error", "Не удалось сгенерировать WARP-профиль"), "error");
+        renderDynamicOutboundForm(schemaContainer, tabsContainer, cap.tabDefinitions || [], currentOutboundValues, (updatedValues) => {
+            currentOutboundValues = updatedValues;
+        });
+
+        // Populate fallback routes dropdown options dynamically
+        populateFallbackDropdown();
+    }
+
+    async function populateFallbackDropdown() {
+        const fallbackSelect = document.getElementById("fallback_outbound") || document.getElementById("ob-fallback-outbound");
+        if (!fallbackSelect) return;
+
+        const listRes = await apiFetch("/api/routing/outbounds");
+        const allObs = (listRes && listRes.success) ? listRes.obj : outboundsCache;
+        const currentTag = currentOutboundValues.tag;
+        
+        fallbackSelect.innerHTML = `<option value="">${t("routing_opt_no_fallback", "Без резервного маршрута")}</option>`;
+        (allObs || []).forEach(o => {
+            if (o.tag && o.tag !== "api" && o.tag !== currentTag) {
+                const opt = document.createElement("option");
+                opt.value = o.tag;
+                opt.textContent = `${o.remark} (${o.tag})`;
+                if (currentOutboundValues.fallback_outbound === o.tag) {
+                    opt.selected = true;
                 }
-            } catch (err) {
-                showToast(t("routing_warp_toast_register_err_msg", "Ошибка генерации WARP: {error}").replace("{error}", err), "error");
-            } finally {
-                btnWarp.disabled = false;
-                btnWarp.innerHTML = '<i class="fa-solid fa-cloud-bolt" style="margin-right: 4px;"></i>' + t("routing_warp_btn_generate", "Сгенерировать WARP");
+                fallbackSelect.appendChild(opt);
             }
         });
+        enhanceAllSelects(fallbackSelect.parentElement);
     }
 
-    updateOutboundFormFields();
-    document.getElementById("outbound-modal").classList.add("active");
+    if (protocolSelect) {
+        protocolSelect.onchange = () => {
+            currentOutboundValues.protocol = protocolSelect.value;
+            renderCurrentProtocolForm();
+        };
+    }
+
+    renderCurrentProtocolForm();
+    enhanceAllSelects(modal);
+
+    modal.classList.add("active");
 }
+
+export function getCurrentOutboundValues() {
+    return currentOutboundValues;
+}
+
+export function setCurrentOutboundValues(newValues) {
+    currentOutboundValues = { ...currentOutboundValues, ...newValues };
+}
+
+export function updateBackupBadges() {
+    // Backward compatibility helper
+}
+

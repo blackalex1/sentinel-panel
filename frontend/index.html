@@ -1,10 +1,11 @@
 <!DOCTYPE html>
+
 <html lang="ru">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <!-- Diagnostic JS Error Logger -->
-    <script>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<!-- Diagnostic JS Error Logger -->
+<script>
         window.onerror = function(message, source, lineno, colno, error) {
             var errDiv = document.getElementById('diag-err-div');
             if (!errDiv) {
@@ -87,152 +88,144 @@
             console.error('Diag Promise Reject:', event.reason);
         };
     </script>
-    <title>Sentinel Control Panel</title>
-    <!-- Favicon -->
-    <link rel="icon" type="image/svg+xml" href="img/logo.svg">
-    <!-- Local Outfit Font -->
-    <link rel="stylesheet" href="libs/outfit/outfit.css" media="print" onload="this.media='all'">
-    <!-- Local FontAwesome Icons -->
-    <link rel="stylesheet" href="libs/font-awesome/css/all.min.css" media="print" onload="this.media='all'">
-    <!-- Local Chart.js -->
-    <script src="libs/chart.js" defer></script>
-    <!-- Local QRCode.js -->
-    <script src="libs/qrcode.min.js" defer></script>
-    <!-- Telegram WebApp SDK -->
-    <script src="https://telegram.org/js/telegram-web-app.js" defer></script>
-    <!-- Custom CSS -->
-    <link rel="stylesheet" href="css/style.css?v=upgrade_10">
+<title>Sentinel Control Panel</title>
+<!-- Favicon -->
+<link href="img/logo.svg" rel="icon" type="image/svg+xml"/>
+<!-- Local Outfit Font -->
+<link href="libs/outfit/outfit.css" media="print" onload="this.media='all'" rel="stylesheet"/>
+<!-- Local FontAwesome Icons -->
+<link href="libs/font-awesome/css/all.min.css" media="print" onload="this.media='all'" rel="stylesheet"/>
+<!-- Local Chart.js -->
+<script defer="" src="libs/chart.js"></script>
+<!-- Local QRCode.js -->
+<script defer="" src="libs/qrcode.min.js"></script>
+<!-- Telegram WebApp SDK -->
+<script defer="" src="https://telegram.org/js/telegram-web-app.js"></script>
+<!-- Custom CSS -->
+<link href="css/style.css?v=fast_load_61" rel="stylesheet"/>
+<link href="css/pages/dashboard.css?v=fast_load_61" rel="stylesheet"/>
+<link href="css/pages/inbounds.css?v=fast_load_61" rel="stylesheet"/>
+<link href="css/pages/settings.css?v=fast_load_61" rel="stylesheet"/>
+<link href="css/pages/routing.css?v=fast_load_61" rel="stylesheet"/>
 </head>
 <body class="dark-theme">
-    
-    <!-- Спиннер загрузки / авторизации -->
-    <div id="loading-overlay" class="overlay active">
-        <div class="glass-card loading-card">
-            <div class="spinner"></div>
-            <h2 id="loading-text">Загрузка панели...</h2>
-            <p id="loading-subtext">Пожалуйста, подождите</p>
-        </div>
-    </div>
 
-    <!-- Окно логина (показывается только если секретный путь открыт в обычном браузере без сессии) -->
-    <div id="login-overlay" class="overlay">
-        <div class="glass-card login-card">
-            <div class="brand">
-                <img src="img/logo.svg" class="brand-logo" alt="Sentinel Logo" style="width: 76px; height: 76px; filter: drop-shadow(0 4px 12px rgba(124, 58, 237, 0.4)); transition: transform 0.3s ease;">
-                <h2 data-i18n="login_title">SENTINEL CONTROL PANEL</h2>
-            </div>
-            <form id="login-form">
-                <!-- Credentials Section -->
-                <div id="login-credentials-group">
-                    <div class="input-group">
-                        <label for="username" data-i18n="login_username">Имя пользователя</label>
-                        <input type="text" id="username" placeholder="Введите логин" data-i18n-placeholder="login_username">
-                    </div>
-                    <div class="input-group" style="margin-top: 15px;">
-                        <label for="password" data-i18n="login_password">Пароль</label>
-                        <input type="password" id="password" placeholder="Введите пароль" data-i18n-placeholder="login_password">
-                    </div>
-                </div>
+<div class="overlay active" id="loading-overlay">
+<div class="glass-card loading-card">
+<div class="spinner"></div>
+<h2 data-i18n="loading_text" id="loading-text"></h2>
+<p data-i18n="loading_subtext" id="loading-subtext"></p>
+</div>
+</div>
 
-                <!-- 2FA Section (hidden initially) -->
-                <div id="login-2fa-group" style="display: none;">
-                    <div class="input-group" id="login-totp-group">
-                        <label for="login-totp-code" data-i18n="login_2fa_label">Код двухфакторной аутентификации</label>
-                        <input type="text" id="login-totp-code" maxlength="6" placeholder="000000" data-i18n-placeholder="login_2fa_placeholder" style="text-align: center; font-size: 20px; letter-spacing: 6px; font-weight: 600; background: var(--bg-input); border: 1px solid var(--border-color); color: var(--text-primary); border-radius: 8px; padding: 10px;">
-                    </div>
-                    <div id="login-tg-2fa-message" style="display: none; margin-top: 15px; font-size: 14px; color: var(--text-secondary); text-align: center;">
-                        <i class="fa-solid fa-spinner fa-spin"></i> Подтвердите вход в Telegram-боте...
-                    </div>
-                </div>
+<div class="overlay" id="login-overlay">
+<div class="glass-card login-card">
+<div class="brand">
+<img alt="Sentinel Logo" class="brand-logo" src="img/logo.svg" style="width: 76px; height: 76px; filter: drop-shadow(0 4px 12px rgba(124, 58, 237, 0.4)); transition: transform 0.3s ease;"/>
+<h2 data-i18n="login_title"></h2>
+</div>
+<form id="login-form">
+<!-- Credentials Section -->
+<div id="login-credentials-group">
+<div class="input-group">
+<label data-i18n="login_username" for="username"></label>
+<input data-i18n-placeholder="login_username" id="username" placeholder="" type="text"/>
+</div>
+<div class="input-group" style="margin-top: 15px;">
+<label data-i18n="login_password" for="password"></label>
+<input data-i18n-placeholder="login_password" id="password" placeholder="" type="password"/>
+</div>
+</div>
+<!-- 2FA Section (hidden initially) -->
+<div id="login-2fa-group" style="display: none;">
+<div class="input-group" id="login-totp-group">
+<label data-i18n="login_2fa_label" for="login-totp-code"></label>
+<input data-i18n-placeholder="login_2fa_placeholder" id="login-totp-code" maxlength="6" placeholder="" style="text-align: center; font-size: 20px; letter-spacing: 6px; font-weight: 600; background: var(--bg-input); border: 1px solid var(--border-color); color: var(--text-primary); border-radius: 8px; padding: 10px;" type="text"/>
+</div>
+<div id="login-tg-2fa-message" style="display: none; margin-top: 15px; font-size: 14px; color: var(--text-secondary); text-align: center;">
+<i class="fa-solid fa-spinner fa-spin"></i> <span data-i18n="login_tg_2fa_message"></span>
+</div>
+</div>
+<div style="margin-top: 20px; display: flex; gap: 10px;">
+<button class="btn secondary-btn w-100" id="btn-login-2fa-back" style="display: none; padding: 10px; font-weight: 600; border: 1px solid var(--border-color); color: var(--text-secondary);" type="button"><i class="fa-solid fa-arrow-left"></i> <span data-i18n="login_2fa_back"></span></button>
+<button class="btn primary-btn w-100" id="btn-login-submit" style="padding: 10px; font-weight: 600;" type="submit"><i class="fa-solid fa-right-to-bracket"></i> <span data-i18n="login_btn"></span></button>
+</div>
+</form>
+<div class="error-msg" id="login-error"></div>
+</div>
+</div>
 
-                <div style="margin-top: 20px; display: flex; gap: 10px;">
-                    <button type="button" id="btn-login-2fa-back" class="btn secondary-btn w-100" style="display: none; padding: 10px; font-weight: 600; border: 1px solid var(--border-color); color: var(--text-secondary);"><i class="fa-solid fa-arrow-left"></i> <span data-i18n="login_2fa_back">Назад</span></button>
-                    <button type="submit" id="btn-login-submit" class="btn primary-btn w-100" style="padding: 10px; font-weight: 600;"><i class="fa-solid fa-right-to-bracket"></i> <span data-i18n="login_btn">Войти</span></button>
-                </div>
-            </form>
-            <div id="login-error" class="error-msg"></div>
-        </div>
-    </div>
+<div class="app-layout" id="app-container">
 
-    <!-- Главная структура панели -->
-    <div id="app-container" class="app-layout">
-        
-        <!-- Боковая панель навигации -->
-        <aside class="sidebar">
-            <div class="sidebar-brand">
-                <img src="img/logo.svg" class="logo" alt="Sentinel Logo" style="width: 36px; height: 36px; vertical-align: middle; margin-right: 10px; filter: drop-shadow(0 2px 6px rgba(124, 58, 237, 0.3));">
-                <span>Sentinel Control Panel</span>
-            </div>
-            
-            <nav class="sidebar-menu">
-                <button class="nav-item active" data-tab="dashboard">
-                    <i class="fa-solid fa-chart-line"></i> <span data-i18n="nav_dashboard">Дашборд</span>
-                </button>
-                <button class="nav-item" data-tab="inbounds">
-                    <i class="fa-solid fa-network-wired"></i> <span data-i18n="nav_inbounds">Подключения</span>
-                </button>
-                <button class="nav-item" data-tab="xray">
-                    <svg class="nav-icon-svg" viewBox="0 0 24 24" width="16" height="16" fill="currentColor" style="display: inline-block; vertical-align: middle; margin-right: 6px;"><path d="M 11,1 C 9.5,7 7,9.5 1,11 L 11,11 Z M 13,1 L 13,11 L 23,11 C 17,9.5 14.5,7 13,1 Z M 13,23 C 14.5,17 17,14.5 23,13 L 13,13 Z M 11,23 L 11,13 L 1,13 C 7,14.5 9.5,17 11,23 Z"/></svg> <span data-i18n="nav_xray">Ядро Xray</span>
-                </button>
-                <button class="nav-item" data-tab="hysteria">
-                    <svg class="nav-icon-svg" viewBox="0 0 442.19 323.31" width="18" height="14" style="display: inline-block; vertical-align: middle; margin-right: 6px;"><polygon fill="currentColor" points="72.8 140.45 60.1 285.55 102.51 285.55 111.5 182.86 111.54 182.86 115.21 140.45 72.8 140.45"/><polygon fill="currentColor" points="124.16 37.75 81.76 37.75 76.19 101.36 118.59 101.36 124.16 37.75"/><polygon fill="currentColor" points="318.36 285.56 360.44 285.56 366.01 221.95 323.9 221.95 318.36 285.56"/><polygon fill="currentColor" points="382.09 37.76 340 37.76 329.16 161.66 221.09 161.66 206.95 323.31 292.78 201.84 438.67 201.84 442.19 161.66 371.25 161.66 382.09 37.76"/><polygon fill="#ffbc00" points="149.41 121.47 3.52 121.47 0 161.66 221.09 161.66 235.23 0 149.41 121.47"/></svg> <span data-i18n="nav_hysteria">Ядро Hysteria</span>
-                </button>
-                <button class="nav-item" data-tab="singbox">
-                    <svg class="nav-icon-svg" viewBox="0 0 24 24" width="16" height="16" style="display: inline-block; vertical-align: middle; margin-right: 6px;"><path d="M12 2.5 C12.6 2.5 13.2 2.8 13.8 3.1 L20.5 6.5 C21.4 7.0 21.6 7.8 21.2 8.5 L12 13.2 L2.8 8.5 C2.4 7.8 2.6 7.0 3.5 6.5 L10.2 3.1 C10.8 2.8 11.4 2.5 12 2.5 Z" fill="#546E7A"/><path d="M2.8 8.5 L12 13.2 V20.5 C12 21.3 11.3 21.9 10.5 21.5 L3.8 18.2 C2.9 17.7 2.4 16.8 2.4 15.8 V9.5 C2.4 8.9 2.5 8.6 2.8 8.5 Z" fill="#37474F"/><path d="M12 13.2 L21.2 8.5 C21.5 8.6 21.6 8.9 21.6 9.5 V15.8 C21.6 16.8 21.1 17.7 20.2 18.2 L13.5 21.5 C12.7 21.9 12 21.3 12 20.5 V13.2 Z" fill="#263238"/><path d="M6.5 4.7 L9.8 3.0 C10.2 3.2 10.6 3.4 11.0 3.6 L18.5 10.2 L15.2 11.8 L6.5 4.7 Z" fill="#ECEFF1"/><path d="M18.5 10.2 L18.5 14.5 C18.5 15.2 17.8 15.6 17.2 15.3 L15.2 14.2 V11.8 L18.5 10.2 Z" fill="#CFD8DC"/></svg> <span data-i18n="nav_singbox">Ядро sing-box</span>
-                </button>
-                <button class="nav-item" data-tab="routing">
-                    <i class="fa-solid fa-route"></i> <span data-i18n="nav_routing">Маршрутизация</span>
-                </button>
-                <button class="nav-item" data-tab="settings">
-                    <i class="fa-solid fa-gears"></i> <span data-i18n="nav_settings">Настройки</span>
-                </button>
-            </nav>
-            
-            <div class="sidebar-footer">
-                <div class="user-info">
-                    <i class="fa-regular fa-circle-user"></i>
-                    <span id="nav-username">Admin</span>
-                </div>
-                <button id="logout-btn" class="btn icon-btn" title="Выйти" data-i18n-title="nav_logout"><i class="fa-solid fa-right-from-bracket"></i></button>
-            </div>
-        </aside>
+<aside class="sidebar">
+<div class="sidebar-brand">
+<img alt="Sentinel Logo" class="logo" src="img/logo.svg" style="width: 36px; height: 36px; vertical-align: middle; margin-right: 10px; filter: drop-shadow(0 2px 6px rgba(124, 58, 237, 0.3));"/>
+<span>Sentinel Control Panel</span>
+</div>
+<nav class="sidebar-menu">
+<button class="nav-item active" data-tab="dashboard">
+<i class="fa-solid fa-chart-line"></i> <span data-i18n="nav_dashboard"></span>
+</button>
+<button class="nav-item" data-tab="inbounds">
+<i class="fa-solid fa-network-wired"></i> <span data-i18n="nav_inbounds"></span>
+</button>
+<button class="nav-item" data-tab="xray">
+<svg class="nav-icon-svg" fill="currentColor" height="16" style="display: inline-block; vertical-align: middle; margin-right: 6px;" viewbox="0 0 24 24" width="16"><path d="M 11,1 C 9.5,7 7,9.5 1,11 L 11,11 Z M 13,1 L 13,11 L 23,11 C 17,9.5 14.5,7 13,1 Z M 13,23 C 14.5,17 17,14.5 23,13 L 13,13 Z M 11,23 L 11,13 L 1,13 C 7,14.5 9.5,17 11,23 Z"></path></svg> <span data-i18n="nav_xray"></span>
+</button>
+<button class="nav-item" data-tab="hysteria">
+<svg class="nav-icon-svg" height="14" style="display: inline-block; vertical-align: middle; margin-right: 6px;" viewbox="0 0 442.19 323.31" width="18"><polygon fill="currentColor" points="72.8 140.45 60.1 285.55 102.51 285.55 111.5 182.86 111.54 182.86 115.21 140.45 72.8 140.45"></polygon><polygon fill="currentColor" points="124.16 37.75 81.76 37.75 76.19 101.36 118.59 101.36 124.16 37.75"></polygon><polygon fill="currentColor" points="318.36 285.56 360.44 285.56 366.01 221.95 323.9 221.95 318.36 285.56"></polygon><polygon fill="currentColor" points="382.09 37.76 340 37.76 329.16 161.66 221.09 161.66 206.95 323.31 292.78 201.84 438.67 201.84 442.19 161.66 371.25 161.66 382.09 37.76"></polygon><polygon fill="#ffbc00" points="149.41 121.47 3.52 121.47 0 161.66 221.09 161.66 235.23 0 149.41 121.47"></polygon></svg> <span data-i18n="nav_hysteria"></span>
+</button>
+<button class="nav-item" data-tab="singbox">
+<svg class="nav-icon-svg" height="16" style="display: inline-block; vertical-align: middle; margin-right: 6px;" viewbox="0 0 24 24" width="16"><path d="M12 2.5 C12.6 2.5 13.2 2.8 13.8 3.1 L20.5 6.5 C21.4 7.0 21.6 7.8 21.2 8.5 L12 13.2 L2.8 8.5 C2.4 7.8 2.6 7.0 3.5 6.5 L10.2 3.1 C10.8 2.8 11.4 2.5 12 2.5 Z" fill="#546E7A"></path><path d="M2.8 8.5 L12 13.2 V20.5 C12 21.3 11.3 21.9 10.5 21.5 L3.8 18.2 C2.9 17.7 2.4 16.8 2.4 15.8 V9.5 C2.4 8.9 2.5 8.6 2.8 8.5 Z" fill="#37474F"></path><path d="M12 13.2 L21.2 8.5 C21.5 8.6 21.6 8.9 21.6 9.5 V15.8 C21.6 16.8 21.1 17.7 20.2 18.2 L13.5 21.5 C12.7 21.9 12 21.3 12 20.5 V13.2 Z" fill="#263238"></path><path d="M6.5 4.7 L9.8 3.0 C10.2 3.2 10.6 3.4 11.0 3.6 L18.5 10.2 L15.2 11.8 L6.5 4.7 Z" fill="#ECEFF1"></path><path d="M18.5 10.2 L18.5 14.5 C18.5 15.2 17.8 15.6 17.2 15.3 L15.2 14.2 V11.8 L18.5 10.2 Z" fill="#CFD8DC"></path></svg> <span data-i18n="nav_singbox"></span>
+</button>
+<button class="nav-item" data-tab="routing">
+<i class="fa-solid fa-route"></i> <span data-i18n="nav_routing"></span>
+</button>
+<button class="nav-item" data-tab="settings">
+<i class="fa-solid fa-gears"></i> <span data-i18n="nav_settings"></span>
+</button>
+</nav>
+<div class="sidebar-footer">
+<div class="user-info">
+<i class="fa-regular fa-circle-user"></i>
+<span id="nav-username">Admin</span>
+</div>
+<button class="btn icon-btn" data-i18n-title="nav_logout" id="logout-btn" title=""><i class="fa-solid fa-right-from-bracket"></i></button>
+</div>
+</aside>
 
-        <!-- Основной контент -->
-        <main class="content-area">
-            
-            <!-- ВЕРХНЯЯ ПАНЕЛЬ -->
-            <header class="top-bar">
-                <div class="page-title">
-                    <h1 id="current-tab-title">Панель управления</h1>
-                </div>
-                <div style="display: flex; align-items: center; gap: 15px; margin-left: auto;">
-                    <!-- Языковой селектор -->
-                    <div class="lang-select-wrapper" style="position: relative; display: inline-block;">
-                        <select id="lang-select" class="glass-select" style="background: var(--bg-input); border: 1px solid var(--border-color); border-radius: 8px; padding: 6px 12px; font-size: 13px; cursor: pointer; outline: none; transition: var(--transition-fast);">
-                            <!-- Заполняется динамически -->
-                        </select>
-                    </div>
-                    <div class="status-badge" id="xray-status-badge">
-                        <span class="status-dot"></span>
-                        <span class="status-text">Xray: Проверка...</span>
-                    </div>
-                    <div class="status-badge" id="hysteria-status-badge">
-                        <span class="status-dot"></span>
-                        <span class="status-text">Hysteria: Проверка...</span>
-                    </div>
-                    <div class="status-badge" id="singbox-status-badge">
-                        <span class="status-dot"></span>
-                        <span class="status-text">sing-box: Проверка...</span>
-                    </div>
-                </div>
-            </header>
-        </main>
-    </div>
+<main class="content-area">
 
-    <!-- Toast Notifications -->
-    <div id="toast-container" class="toast-container"></div>
+<header class="top-bar">
+<div class="page-title">
+<h1 data-i18n="top_bar_title" id="current-tab-title"></h1>
+</div>
+<div style="display: flex; align-items: center; gap: 15px; margin-left: auto;">
 
-    <!-- Custom App JS -->
-    <script type="module" src="js/app.js?v=5"></script>
+<div class="lang-select-wrapper" style="position: relative; display: inline-block;">
+<select class="glass-select" id="lang-select" style="background: var(--bg-input); border: 1px solid var(--border-color); border-radius: 8px; padding: 6px 12px; font-size: 13px; cursor: pointer; outline: none; transition: var(--transition-fast);">
+
+</select>
+</div>
+<div class="status-badge" id="xray-status-badge">
+<span class="status-dot"></span>
+<span class="status-text">Xray: <span data-i18n="checking"></span></span>
+</div>
+<div class="status-badge" id="hysteria-status-badge">
+<span class="status-dot"></span>
+<span class="status-text">Hysteria: <span data-i18n="checking"></span></span>
+</div>
+<div class="status-badge" id="singbox-status-badge">
+<span class="status-dot"></span>
+<span class="status-text">sing-box: <span data-i18n="checking"></span></span>
+</div>
+</div>
+</header>
+</main>
+</div>
+<!-- Toast Notifications -->
+<div class="toast-container" id="toast-container"></div>
+<!-- Custom App JS -->
+<script src="js/app.js?v=fast_load_61" type="module"></script>
 </body>
 </html>

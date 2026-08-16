@@ -47,6 +47,11 @@ bin/sing-box
 bin/sing-box.exe
 bin/hysteria-*
 bin/hysteria-*.exe
+bin/sentinel-core
+bin/sentinel-core.exe
+bin/sentinel-core.dll
+bin/sentinel-core.h
+bin/libsentinel-core.*
 bin/config.json
 bin/singbox.json
 bin/xray.log
@@ -62,6 +67,7 @@ bin/LICENSE
 bin/LICENSE-*.txt
 bin/README.md
 warp_mock.json
+test_*.json
 scratch/
 run_remote_tests.py
 security-audit-results/

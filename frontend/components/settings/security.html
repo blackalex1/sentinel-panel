@@ -1,143 +1,125 @@
 <!-- SECTION 1: SECURITY -->
 <div class="settings-section-panel active" id="sec-security">
-    <!-- CARD 1: Реквизиты доступа панели -->
-    <div class="glass-card settings-card">
-        <h3 data-i18n="settings_access_credentials">Реквизиты доступа панели</h3>
-        <p class="card-desc" data-i18n="settings_access_desc">Эти значения сгенерированы случайно для обеспечения безопасности. Запишите их.</p>
-        <div class="settings-form-content" style="margin-top: auto;">
-            <div class="input-group">
-                <label data-i18n="settings_api_token">Токен API контроллера (Bearer Token)</label>
-                <div class="copy-input-group">
-                    <input type="text" id="setting-api-token" readonly value="...">
-                    <button class="btn copy-btn" data-target="setting-api-token" type="button"><i class="fa-regular fa-copy"></i></button>
-                </div>
-                <span class="field-desc" data-i18n="settings_api_desc">Используется вашим Telegram-ботом в заголовке Authorization.</span>
-            </div>
-            
-            <div class="input-group" style="margin-top: 20px;">
-                <label for="setting-secret-path-input" data-i18n="settings_secret_path">Секретный путь панели</label>
-                <div class="copy-input-group">
-                    <input type="text" id="setting-secret-path-input" placeholder="Например: ui_xyz" data-i18n-placeholder="settings_secret_path_placeholder">
-                    <button type="button" class="btn copy-btn" id="setting-secret-path-copy-btn" data-target="setting-secret-path-input"><i class="fa-regular fa-copy"></i></button>
-                </div>
-                <span class="field-desc" data-i18n="settings_secret_desc">При изменении секретного пути вам нужно будет заново зайти в panel по новому адресу. Используйте только латинские буквы и цифры.</span>
-            </div>
 
-            <div class="input-group" style="margin-top: 20px;">
-                <label for="setting-session-timeout" data-i18n="settings_session_timeout">Срок действия сессии (дней)</label>
-                <input type="number" id="setting-session-timeout" min="1" placeholder="7">
-                <span class="field-desc" data-i18n="settings_session_timeout_desc">Количество дней, в течение которых администратор остается авторизованным.</span>
-            </div>
+<div class="glass-card settings-card">
+<h3 data-i18n="settings_access_credentials"></h3>
+<p class="card-desc" data-i18n="settings_access_desc"></p>
+<div class="settings-form-content" style="margin-top: auto;">
+<div class="input-group">
+<label data-i18n="settings_api_token"></label>
+<div class="copy-input-group">
+<input id="setting-api-token" readonly="" type="text" value="..."/>
+<button class="btn copy-btn" data-target="setting-api-token" type="button"><i class="fa-regular fa-copy"></i></button>
+</div>
+<span class="field-desc" data-i18n="settings_api_desc"></span>
+</div>
+<div class="input-group" style="margin-top: 20px;">
+<label data-i18n="settings_secret_path" for="setting-secret-path-input"></label>
+<div class="copy-input-group">
+<input data-i18n-placeholder="settings_secret_path_placeholder" id="setting-secret-path-input" placeholder="" type="text"/>
+<button class="btn copy-btn" data-target="setting-secret-path-input" id="setting-secret-path-copy-btn" type="button"><i class="fa-regular fa-copy"></i></button>
+</div>
+<span class="field-desc" data-i18n="settings_secret_desc"></span>
+</div>
+<div class="input-group" style="margin-top: 20px;">
+<label data-i18n="settings_session_timeout" for="setting-session-timeout"></label>
+<input id="setting-session-timeout" min="1" placeholder="7" type="number"/>
+<span class="field-desc" data-i18n="settings_session_timeout_desc"></span>
+</div>
+<div class="input-group" style="margin-top: 20px;">
+<label data-i18n="settings_login_max_attempts" for="setting-login-max-attempts"></label>
+<input id="setting-login-max-attempts" min="1" placeholder="5" type="number"/>
+<span class="field-desc" data-i18n="settings_login_max_attempts_desc"></span>
+</div>
+<div class="input-group" style="margin-top: 20px;">
+<label data-i18n="settings_login_attempts_period" for="setting-login-attempts-period"></label>
+<input id="setting-login-attempts-period" min="1" placeholder="60" type="number"/>
+<span class="field-desc" data-i18n="settings_login_attempts_period_desc"></span>
+</div>
+<div class="input-group" style="margin-top: 20px;">
+<label data-i18n="settings_login_fail_delay" for="setting-login-fail-delay"></label>
+<input id="setting-login-fail-delay" min="0" placeholder="1.0" step="0.1" type="number"/>
+<span class="field-desc" data-i18n="settings_login_fail_delay_desc"></span>
+</div>
+<div style="margin-top: 24px;">
+<button class="btn primary-btn w-100" id="btn-save-access" style="padding: 10px; font-weight: 600;" type="button"><i class="fa-solid fa-floppy-disk"></i> <span data-i18n="settings_btn_save_short"></span></button>
+</div>
+</div>
+</div>
 
-            <div class="input-group" style="margin-top: 20px;">
-                <label for="setting-login-max-attempts" data-i18n="settings_login_max_attempts">Максимум попыток входа</label>
-                <input type="number" id="setting-login-max-attempts" min="1" placeholder="5">
-                <span class="field-desc" data-i18n="settings_login_max_attempts_desc">Количество неверных попыток ввода пароля до временной блокировки IP-адреса.</span>
-            </div>
+<div class="glass-card settings-card">
+<h3 data-i18n="settings_credentials_title"></h3>
+<p class="card-desc" data-i18n="settings_credentials_desc"></p>
+<div class="settings-form-content" style="margin-top: auto;">
+<div class="input-group">
+<label data-i18n="settings_current_password" for="setting-cred-current-pwd"></label>
+<input id="setting-cred-current-pwd" placeholder="••••••••" type="password"/>
+</div>
+<div class="input-group" style="margin-top: 20px;">
+<label data-i18n="settings_new_username" for="setting-cred-new-user"></label>
+<input data-i18n-placeholder="settings_new_username_placeholder" id="setting-cred-new-user" placeholder="" type="text"/>
+</div>
+<div class="input-group" style="margin-top: 20px;">
+<label data-i18n="settings_new_password" for="setting-cred-new-pwd"></label>
+<input data-i18n-placeholder="settings_new_password_placeholder" id="setting-cred-new-pwd" placeholder="" type="password"/>
+</div>
+<div class="input-group" style="margin-top: 20px;">
+<label data-i18n="settings_confirm_password" for="setting-cred-confirm-pwd"></label>
+<input data-i18n-placeholder="settings_confirm_password_placeholder" id="setting-cred-confirm-pwd" placeholder="" type="password"/>
+</div>
+<div style="margin-top: 24px;">
+<button class="btn primary-btn w-100" id="btn-save-credentials" style="padding: 10px; font-weight: 600;" type="button"><i class="fa-solid fa-key"></i> <span data-i18n="settings_btn_save_credentials"></span></button>
+</div>
+</div>
+</div>
 
-            <div class="input-group" style="margin-top: 20px;">
-                <label for="setting-login-attempts-period" data-i18n="settings_login_attempts_period">Период блокировки (секунд)</label>
-                <input type="number" id="setting-login-attempts-period" min="1" placeholder="60">
-                <span class="field-desc" data-i18n="settings_login_attempts_period_desc">Время в секундах, на которое блокируется IP-адрес при превышении попыток.</span>
-            </div>
-
-            <div class="input-group" style="margin-top: 20px;">
-                <label for="setting-login-fail-delay" data-i18n="settings_login_fail_delay">Задержка после неверного ввода (сек)</label>
-                <input type="number" id="setting-login-fail-delay" min="0" step="0.1" placeholder="1.0">
-                <span class="field-desc" data-i18n="settings_login_fail_delay_desc">Искусственная задержка выполнения проверки пароля для замедления автоматического перебора.</span>
-            </div>
-            
-            <div style="margin-top: 24px;">
-                <button type="button" id="btn-save-access" class="btn primary-btn w-100" style="padding: 10px; font-weight: 600;"><i class="fa-solid fa-floppy-disk"></i> <span data-i18n="settings_btn_save_short">Сохранить</span></button>
-            </div>
-        </div>
-    </div>
-
-    <!-- CARD 1.5: Смена логина и пароля -->
-    <div class="glass-card settings-card">
-        <h3 data-i18n="settings_credentials_title">Смена логина и пароля</h3>
-        <p class="card-desc" data-i18n="settings_credentials_desc">Смена логина и пароля администратора панели.</p>
-        <div class="settings-form-content" style="margin-top: auto;">
-            <div class="input-group">
-                <label for="setting-cred-current-pwd" data-i18n="settings_current_password">Текущий пароль</label>
-                <input type="password" id="setting-cred-current-pwd" placeholder="••••••••">
-            </div>
-            
-            <div class="input-group" style="margin-top: 20px;">
-                <label for="setting-cred-new-user" data-i18n="settings_new_username">Новый логин</label>
-                <input type="text" id="setting-cred-new-user" placeholder="Введите новый логин">
-            </div>
-
-            <div class="input-group" style="margin-top: 20px;">
-                <label for="setting-cred-new-pwd" data-i18n="settings_new_password">Новый пароль</label>
-                <input type="password" id="setting-cred-new-pwd" placeholder="Введите новый пароль (необязательно)">
-            </div>
-
-            <div class="input-group" style="margin-top: 20px;">
-                <label for="setting-cred-confirm-pwd" data-i18n="settings_confirm_password">Подтвердите новый пароль</label>
-                <input type="password" id="setting-cred-confirm-pwd" placeholder="Повторите новый пароль">
-            </div>
-            
-            <div style="margin-top: 24px;">
-                <button type="button" id="btn-save-credentials" class="btn primary-btn w-100" style="padding: 10px; font-weight: 600;"><i class="fa-solid fa-key"></i> <span data-i18n="settings_btn_save_credentials">Сохранить учетные данные</span></button>
-            </div>
-        </div>
-    </div>
-
-    <!-- CARD 1.7: Двухфакторная аутентификация (2FA) -->
-    <div class="glass-card settings-card">
-        <h3 data-i18n="settings_2fa_title">Двухфакторная аутентификация (2FA)</h3>
-        <p class="card-desc" data-i18n="settings_2fa_desc">Защита аккаунта с помощью одноразовых кодов (TOTP).</p>
-        <div class="settings-form-content" style="margin-top: auto;">
-            <div style="display: flex; justify-content: space-between; align-items: center; background: var(--bg-input); border: 1px solid var(--border-color); border-radius: 12px; padding: 15px 20px; margin-bottom: 20px;">
-                <span style="color: var(--text-secondary); font-size: 14px;" data-i18n="settings_2fa_status">Статус 2FA</span>
-                <span id="2fa-status-badge" class="badge warning-badge" style="font-weight: 600; padding: 6px 12px; border-radius: 20px; font-size: 13px;" data-i18n="settings_2fa_disabled">Выключена</span>
-            </div>
-
-            <!-- 2FA Setup Panel -->
-            <div id="2fa-setup-panel" style="display: none; flex-direction: column; gap: 15px; margin-bottom: 20px; padding: 15px; border: 1px dashed var(--border-color); border-radius: 12px; background: rgba(255, 255, 255, 0.02);">
-                <p style="font-size: 13px; color: var(--text-secondary); line-height: 1.5;" data-i18n="settings_2fa_setup_instructions">
-                    1. Отсканируйте QR-код приложением-аутентификатором или введите секретный ключ вручную. 2. Введите 6-значный код подтверждения ниже, чтобы завершить настройку.
-                </p>
-                <div style="display: flex; justify-content: center; margin: 10px 0;">
-                    <div id="2fa-qrcode" style="padding: 10px; background: white; border-radius: 8px; display: inline-block;"></div>
-                </div>
-                <div class="input-group">
-                    <label data-i18n="settings_2fa_secret_label">Секретный ключ (Base32)</label>
-                    <div class="copy-input-group">
-                        <input type="text" id="setting-2fa-secret" readonly value="...">
-                        <button class="btn copy-btn" data-target="setting-2fa-secret" type="button"><i class="fa-regular fa-copy"></i></button>
-                    </div>
-                </div>
-                <div class="input-group">
-                    <label for="setting-2fa-code-input" data-i18n="login_2fa_placeholder">Введите 6-значный код</label>
-                    <input type="text" id="setting-2fa-code-input" maxlength="6" placeholder="000000" style="text-align: center; font-size: 18px; letter-spacing: 5px; font-weight: 600; background: var(--bg-input); border: 1px solid var(--border-color); color: var(--text-primary); border-radius: 8px; padding: 10px;">
-                </div>
-                <button type="button" id="btn-2fa-confirm" class="btn success-btn w-100" style="padding: 10px; font-weight: 600;"><i class="fa-solid fa-check"></i> <span data-i18n="settings_2fa_btn_confirm">Подтвердить и включить</span></button>
-            </div>
-
-            <!-- 2FA Disable Panel -->
-            <div id="2fa-disable-panel" style="display: none; flex-direction: column; gap: 15px; margin-bottom: 20px; padding: 15px; border: 1px dashed var(--border-color); border-radius: 12px; background: rgba(255, 255, 255, 0.02);">
-                <div class="input-group">
-                    <label for="setting-2fa-disable-code-input" data-i18n="login_2fa_placeholder">Введите 6-значный код</label>
-                    <input type="text" id="setting-2fa-disable-code-input" maxlength="6" placeholder="000000" style="text-align: center; font-size: 18px; letter-spacing: 5px; font-weight: 600; background: var(--bg-input); border: 1px solid var(--border-color); color: var(--text-primary); border-radius: 8px; padding: 10px;">
-                </div>
-                <button type="button" id="btn-2fa-disable-confirm" class="btn danger-btn w-100" style="padding: 10px; font-weight: 600; border: 1px solid rgba(255, 71, 87, 0.3);"><i class="fa-solid fa-xmark"></i> <span data-i18n="settings_2fa_btn_disable">Отключить 2FA</span></button>
-            </div>
-
-            <!-- Primary Actions -->
-            <div id="2fa-actions-panel">
-                <button type="button" id="btn-2fa-setup-trigger" class="btn primary-btn w-100" style="padding: 10px; font-weight: 600;"><i class="fa-solid fa-shield-halved"></i> <span data-i18n="settings_2fa_btn_setup">Настроить 2FA</span></button>
-                <button type="button" id="btn-2fa-disable-trigger" class="btn danger-btn w-100" style="display: none; padding: 10px; font-weight: 600; border: 1px solid rgba(255, 71, 87, 0.3);"><i class="fa-solid fa-lock-open"></i> <span data-i18n="settings_2fa_btn_disable">Отключить 2FA</span></button>
-            </div>
-
-            <!-- Telegram 2FA Toggle -->
-            <div style="margin-top: 20px; padding: 15px 20px; background: var(--bg-input); border: 1px solid var(--border-color); border-radius: 12px;">
-                <label class="checkbox-container" style="display: flex; align-items: center; gap: 10px; cursor: pointer; color: var(--text-secondary); font-size: 14px; font-weight: normal; text-transform: none; margin-bottom: 0;">
-                    <input type="checkbox" id="setting-telegram-2fa-enable">
-                    <span data-i18n="settings_telegram_2fa_enable">Использовать подтверждение входа через Telegram (2FA)</span>
-                </label>
-            </div>
-        </div>
-    </div>
+<div class="glass-card settings-card">
+<h3 data-i18n="settings_2fa_title"></h3>
+<p class="card-desc" data-i18n="settings_2fa_desc"></p>
+<div class="settings-form-content" style="margin-top: auto;">
+<div style="display: flex; justify-content: space-between; align-items: center; background: var(--bg-input); border: 1px solid var(--border-color); border-radius: 12px; padding: 15px 20px; margin-bottom: 20px;">
+<span data-i18n="settings_2fa_status" style="color: var(--text-secondary); font-size: 14px;"></span>
+<span class="badge warning-badge" data-i18n="settings_2fa_disabled" id="2fa-status-badge" style="font-weight: 600; padding: 6px 12px; border-radius: 20px; font-size: 13px;"></span>
+</div>
+<!-- 2FA Setup Panel -->
+<div id="2fa-setup-panel" style="display: none; flex-direction: column; gap: 15px; margin-bottom: 20px; padding: 15px; border: 1px dashed var(--border-color); border-radius: 12px; background: rgba(255, 255, 255, 0.02);">
+<p data-i18n="settings_2fa_setup_instructions" style="font-size: 13px; color: var(--text-secondary); line-height: 1.5;"></p>
+<div style="display: flex; justify-content: center; margin: 10px 0;">
+<div id="2fa-qrcode" style="padding: 10px; background: white; border-radius: 8px; display: inline-block;"></div>
+</div>
+<div class="input-group">
+<label data-i18n="settings_2fa_secret_label"></label>
+<div class="copy-input-group">
+<input id="setting-2fa-secret" readonly="" type="text" value="..."/>
+<button class="btn copy-btn" data-target="setting-2fa-secret" type="button"><i class="fa-regular fa-copy"></i></button>
+</div>
+</div>
+<div class="input-group">
+<label data-i18n="login_2fa_placeholder" for="setting-2fa-code-input"></label>
+<input id="setting-2fa-code-input" maxlength="6" placeholder="000000" style="text-align: center; font-size: 18px; letter-spacing: 5px; font-weight: 600; background: var(--bg-input); border: 1px solid var(--border-color); color: var(--text-primary); border-radius: 8px; padding: 10px;" type="text"/>
+</div>
+<button class="btn success-btn w-100" id="btn-2fa-confirm" style="padding: 10px; font-weight: 600;" type="button"><i class="fa-solid fa-check"></i> <span data-i18n="settings_2fa_btn_confirm"></span></button>
+</div>
+<!-- 2FA Disable Panel -->
+<div id="2fa-disable-panel" style="display: none; flex-direction: column; gap: 15px; margin-bottom: 20px; padding: 15px; border: 1px dashed var(--border-color); border-radius: 12px; background: rgba(255, 255, 255, 0.02);">
+<div class="input-group">
+<label data-i18n="login_2fa_placeholder" for="setting-2fa-disable-code-input"></label>
+<input id="setting-2fa-disable-code-input" maxlength="6" placeholder="000000" style="text-align: center; font-size: 18px; letter-spacing: 5px; font-weight: 600; background: var(--bg-input); border: 1px solid var(--border-color); color: var(--text-primary); border-radius: 8px; padding: 10px;" type="text"/>
+</div>
+<button class="btn danger-btn w-100" id="btn-2fa-disable-confirm" style="padding: 10px; font-weight: 600; border: 1px solid rgba(255, 71, 87, 0.3);" type="button"><i class="fa-solid fa-xmark"></i> <span data-i18n="settings_2fa_btn_disable"></span></button>
+</div>
+<!-- Primary Actions -->
+<div id="2fa-actions-panel">
+<button class="btn primary-btn w-100" id="btn-2fa-setup-trigger" style="padding: 10px; font-weight: 600;" type="button"><i class="fa-solid fa-shield-halved"></i> <span data-i18n="settings_2fa_btn_setup"></span></button>
+<button class="btn danger-btn w-100" id="btn-2fa-disable-trigger" style="display: none; padding: 10px; font-weight: 600; border: 1px solid rgba(255, 71, 87, 0.3);" type="button"><i class="fa-solid fa-lock-open"></i> <span data-i18n="settings_2fa_btn_disable"></span></button>
+</div>
+<!-- Telegram 2FA Toggle -->
+<div style="margin-top: 20px; padding: 15px 20px; background: var(--bg-input); border: 1px solid var(--border-color); border-radius: 12px;">
+<label class="checkbox-container" style="display: flex; align-items: center; gap: 10px; cursor: pointer; color: var(--text-secondary); font-size: 14px; font-weight: normal; text-transform: none; margin-bottom: 0;">
+<input id="setting-telegram-2fa-enable" type="checkbox"/>
+<span data-i18n="settings_telegram_2fa_enable"></span>
+</label>
+</div>
+</div>
+</div>
 </div>

@@ -31,7 +31,13 @@ else
     echo "[!] Git update failed. If you have local changes, stash them or resolve conflicts."
 fi
 
-# 2. Rebuild and restart Docker containers
+# 2. Update Sentinel-Core engine binary from sentinel-core repository
+echo "[+] Updating sentinel-core engine..."
+if [ -f "$SCRIPT_DIR/installation/fetch_core.sh" ]; then
+    bash "$SCRIPT_DIR/installation/fetch_core.sh" "$SCRIPT_DIR/bin"
+fi
+
+# 3. Rebuild and restart Docker containers
 echo "[+] Rebuilding and restarting Docker containers..."
 pkill -9 -f "sing-box" 2>/dev/null || true
 pkill -9 -f "xray" 2>/dev/null || true
@@ -62,7 +68,7 @@ else
     echo "[!] Failed to rebuild or start Docker containers."
 fi
 
-# 3. Update and restart host agent system service (sentinel-agent)
+# 4. Update and restart host agent system service (sentinel-agent)
 echo "[+] Configuring and restarting sentinel-agent system service..."
 if systemctl is-active --quiet spectre-agent 2>/dev/null || [ -f "/etc/systemd/system/spectre-agent.service" ]; then
     echo "[+] Cleaning up legacy spectre-agent service..."

@@ -46,7 +46,7 @@ export function generateUUID() {
 
 import { enhanceAllSelects } from "./components/customSelect.js";
 
-const loadedComponents = new Set();
+export const loadedComponents = new Set();
 
 export async function loadComponent(id, filePath, targetSelector) {
     if (loadedComponents.has(id)) return true;

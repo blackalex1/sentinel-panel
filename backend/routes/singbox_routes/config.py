@@ -4,6 +4,7 @@ import backend.routes.singbox
 from backend.auth_utils import decoy_response
 from backend.config import SINGBOX_CONFIG_PATH
 from backend.singbox import generate_singbox_config_json, write_singbox_config, is_singbox_running, restart_singbox
+from backend.i18n import t, get_lang
 
 router = APIRouter()
 
@@ -12,20 +13,21 @@ async def singbox_config(request: Request):
     if not backend.routes.singbox.check_auth(request):
         return decoy_response()
 
+    lang = get_lang(request)
     config_dict = None
     if SINGBOX_CONFIG_PATH.exists():
         try:
             with open(SINGBOX_CONFIG_PATH, "r", encoding="utf-8") as f:
                 config_dict = json.load(f)
         except Exception as e:
-            return {"success": False, "msg": f"Ошибка чтения конфигурационного файла: {e}"}
+            return {"success": False, "msg": t("singbox_read_config_error", lang=lang, category="backend", error=str(e))}
 
     if not config_dict:
         try:
             config_dict = generate_singbox_config_json()
             write_singbox_config(config_dict)
         except Exception as e:
-            return {"success": False, "msg": f"Ошибка генерации конфигурации: {e}"}
+            return {"success": False, "msg": t("singbox_generate_config_error", lang=lang, category="backend", error=str(e))}
 
     from backend.database import get_setting
     use_custom = get_setting("use_custom_singbox_config") == "true"

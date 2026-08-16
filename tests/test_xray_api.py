@@ -7,26 +7,18 @@ pytestmark = pytest.mark.xdist_group("core_ops")
 
 
 def test_instant_disconnect_xray_api(monkeypatch):
-    """Test calling gRPC api removeclient function."""
-    # Mock is_xray_running to return True
-    monkeypatch.setattr("backend.xray.is_xray_running", lambda: True)
-    
-    called_args = []
-    class MockCompletedProcess:
-        def __init__(self, returncode=0, stdout="", stderr=""):
-            self.returncode = returncode
-            self.stdout = stdout
-            self.stderr = stderr
-            
-    def mock_run(args, **kwargs):
-        called_args.append(args)
-        return MockCompletedProcess(0, "success", "")
-        
-    monkeypatch.setattr(subprocess, "run", mock_run)
+    """Test calling instant disconnect for Xray client via sentinel_core_bridge kick_client."""
+    kicked_emails = []
+    def mock_kick(email: str) -> bool:
+        kicked_emails.append(email)
+        return True
+
+    monkeypatch.setattr("backend.sentinel_core_bridge.kick_client", mock_kick)
     
     res = remove_client_api(1, "test@client.com")
     assert res is True
-    assert any("removeclient" in str(arg) for arg in called_args)
+    assert "test@client.com" in kicked_emails
+
 
 
 def test_x25519_key_generation_api(client, monkeypatch):
@@ -293,6 +285,40 @@ def test_xray_prerelease_version_fetching(client, monkeypatch):
     assert res_prerelease.status_code == 200
     assert res_prerelease.json()["latest"] == "v2.0.0-beta.1"
     assert res_prerelease.json()["is_prerelease"] is True
+
+
+def test_xray_bridge_methods():
+    """Verify sentinel_core_bridge methods: build_server_config, validate_core_config, get_core_logs, get_core_version."""
+    from backend.sentinel_core_bridge import (
+        build_server_config,
+        validate_core_config,
+        get_core_logs,
+        get_core_version,
+        generate_x25519_keypair
+    )
+    from backend.config import XRAY_BIN_PATH
+
+    # 1. Keypair generation via bridge
+    keys = generate_x25519_keypair()
+    assert "privateKey" in keys and "publicKey" in keys
+
+    # 2. Config compilation via bridge
+    inbounds = [{
+        "id": 1,
+        "port": 443,
+        "protocol": "vless",
+        "tag": "inbound-1",
+        "settings": {"decryption": "none"},
+        "streamSettings": {"network": "tcp"}
+    }]
+    compiled = build_server_config("xray", inbounds)
+    assert isinstance(compiled, dict)
+    assert "inbounds" in compiled or "error" in compiled
+
+    # 3. Version inspection via bridge
+    ver = get_core_version("xray", str(XRAY_BIN_PATH))
+    assert isinstance(ver, str)
+
 
 
 

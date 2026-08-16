@@ -4,6 +4,7 @@ import ipaddress
 from fastapi import APIRouter, Request
 
 from backend.auth_utils import check_auth, decoy_response
+from backend.i18n import t, get_lang
 
 router = APIRouter()
 
@@ -27,6 +28,7 @@ async def block_ip_api(request: Request, payload: dict = None):
     if not check_auth(request):
         return decoy_response()
 
+    lang = get_lang(request)
     if payload is None:
         try:
             payload = await request.json()
@@ -37,11 +39,11 @@ async def block_ip_api(request: Request, payload: dict = None):
     email = str(payload.get("email") or "").strip()
 
     if not ip:
-        return {"success": False, "msg": "IP адрес обязателен"}
+        return {"success": False, "msg": t("security_ip_required", lang=lang, category="backend")}
 
     if not _is_valid_ip_or_cidr(ip):
         logging.warning(f"[Block IP API] Rejected invalid IP format: {ip!r}")
-        return {"success": False, "msg": "Некорректный формат IP-адреса"}
+        return {"success": False, "msg": t("security_invalid_ip_format", lang=lang, category="backend")}
 
     # 1. Add IP to OS firewall / ban table
     try:
@@ -63,36 +65,9 @@ async def block_ip_api(request: Request, payload: dict = None):
     try:
         # Xray kick
         if email:
-            import backend.scheduler
-            backend.scheduler.remove_client_api(0, email)
-            kicked_count += 1
-    except Exception:
-        pass
-
-    try:
-        # Hysteria 2 kick
-        if email:
-            import backend.scheduler
-            backend.scheduler.kick_client_hysteria_api(0, email)
-            kicked_count += 1
-    except Exception:
-        pass
-
-    try:
-        # Sing-box Clash API connection drop over loopback
-        import requests
-        url = "http://127.0.0.1:9090/connections"
-        resp = requests.get(url, timeout=1)
-        if resp.status_code == 200:
-            data = resp.json()
-            for conn in data.get("connections", []):
-                conn_id = conn.get("id")
-                metadata = conn.get("metadata", {})
-                conn_user = metadata.get("user") or metadata.get("username") or ""
-                conn_ip = metadata.get("sourceIP") or metadata.get("srcIP") or ""
-                if conn_id and (conn_ip == ip or (email and conn_user == email)):
-                    requests.delete(f"http://127.0.0.1:9090/connections/{conn_id}", timeout=1)
-                    kicked_count += 1
+            from backend.sentinel_core_bridge import kick_client
+            if kick_client(email):
+                kicked_count += 1
     except Exception:
         pass
 
@@ -100,7 +75,7 @@ async def block_ip_api(request: Request, payload: dict = None):
     actor = get_actor_username(request) or "TelegramBot"
     log_action(actor, "block_ip", target=ip, details=f"user:{email}, kicked:{kicked_count}")
 
-    return {"success": True, "msg": f"IP {ip} заблокирован. Активные соединения сброшены.", "ip": ip, "email": email}
+    return {"success": True, "msg": t("security_ip_blocked_reset", lang=lang, category="backend", ip=ip), "ip": ip, "email": email}
 
 @router.post("/api/security/allow-ip")
 async def allow_ip_api(request: Request):
@@ -108,6 +83,7 @@ async def allow_ip_api(request: Request):
     if not check_auth(request):
         return decoy_response()
 
+    lang = get_lang(request)
     payload = {}
     try:
         payload = await request.json()
@@ -138,7 +114,7 @@ async def allow_ip_api(request: Request):
         return False
 
     if not ip or not is_valid_ip(ip):
-        return {"success": False, "msg": "Невалидный IP адрес"}
+        return {"success": False, "msg": t("security_invalid_ip_address", lang=lang, category="backend")}
 
     try:
         if os.name != "nt":
@@ -170,4 +146,4 @@ async def allow_ip_api(request: Request):
     actor = get_actor_username(request) or "TelegramBot"
     log_action(actor, "allow_ip", target=ip, details=f"user:{email}")
 
-    return {"success": True, "msg": f"IP {ip} разрешен для пользователя {email}."}
+    return {"success": True, "msg": t("security_ip_allowed_for_user", lang=lang, category="backend", ip=ip, email=email)}

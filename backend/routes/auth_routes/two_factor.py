@@ -9,6 +9,7 @@ from backend.config import settings
 from backend.auth_utils import (
     decoy_response, check_auth, ACTIVE_SESSIONS, CSRF_TOKENS
 )
+from backend.i18n import t, get_lang
 
 router = APIRouter()
 
@@ -18,6 +19,7 @@ async def setup_2fa_api(request: Request):
     if not check_auth(request):
         return decoy_response()
         
+    lang = get_lang(request)
     from backend.audit import get_actor_username
     actor = get_actor_username(request)
     
@@ -28,10 +30,10 @@ async def setup_2fa_api(request: Request):
     with db_session() as session:
         user = session.query(User).filter_by(username=actor).first()
         if not user:
-            return {"success": False, "msg": "Пользователь не найден"}
+            return {"success": False, "msg": t("user_not_found", lang=lang, category="backend")}
             
         if user.totp_enabled == 1:
-            return {"success": False, "msg": "Двухфакторная аутентификация уже включена"}
+            return {"success": False, "msg": t("two_factor_already_enabled", lang=lang, category="backend")}
             
         secret = generate_totp_secret()
         user.totp_secret = secret
@@ -50,14 +52,15 @@ async def enable_2fa_api(request: Request):
     if not check_auth(request):
         return decoy_response()
         
+    lang = get_lang(request)
     try:
         body = await request.json()
         code = body.get("code")
     except Exception:
-        return {"success": False, "msg": "Неверный формат запроса"}
+        return {"success": False, "msg": t("invalid_request_format", lang=lang, category="backend")}
         
     if not code:
-        return {"success": False, "msg": "Код подтверждения обязателен"}
+        return {"success": False, "msg": t("two_factor_code_required", lang=lang, category="backend")}
         
     from backend.audit import log_action, get_actor_username
     actor = get_actor_username(request)
@@ -69,10 +72,10 @@ async def enable_2fa_api(request: Request):
     with db_session() as session:
         user = session.query(User).filter_by(username=actor).first()
         if not user or not user.totp_secret:
-            return {"success": False, "msg": "2FA не настроена. Сначала получите секретный ключ."}
+            return {"success": False, "msg": t("two_factor_not_configured", lang=lang, category="backend")}
             
         if user.totp_enabled == 1:
-            return {"success": False, "msg": "2FA уже включена"}
+            return {"success": False, "msg": t("two_factor_already_enabled", lang=lang, category="backend")}
             
         if verify_totp_token(user.totp_secret, code):
             user.totp_enabled = 1
@@ -89,9 +92,9 @@ async def enable_2fa_api(request: Request):
                     session.delete(s)
             session.commit()
             log_action(actor, "enable_2fa", details="TOTP enabled successfully")
-            return {"success": True, "msg": "Двухфакторная аутентификация успешно включена"}
+            return {"success": True, "msg": t("two_factor_enabled_success", lang=lang, category="backend")}
         else:
-            return {"success": False, "msg": "Неверный код подтверждения"}
+            return {"success": False, "msg": t("two_factor_invalid_code", lang=lang, category="backend")}
 
 @router.post("/api/settings/2fa/disable")
 async def disable_2fa_api(request: Request):
@@ -99,14 +102,15 @@ async def disable_2fa_api(request: Request):
     if not check_auth(request):
         return decoy_response()
         
+    lang = get_lang(request)
     try:
         body = await request.json()
         code = body.get("code")
     except Exception:
-        return {"success": False, "msg": "Неверный формат запроса"}
+        return {"success": False, "msg": t("invalid_request_format", lang=lang, category="backend")}
         
     if not code:
-        return {"success": False, "msg": "Код подтверждения обязателен"}
+        return {"success": False, "msg": t("two_factor_code_required", lang=lang, category="backend")}
         
     from backend.audit import log_action, get_actor_username
     actor = get_actor_username(request)
@@ -118,7 +122,7 @@ async def disable_2fa_api(request: Request):
     with db_session() as session:
         user = session.query(User).filter_by(username=actor).first()
         if not user or user.totp_enabled == 0:
-            return {"success": False, "msg": "2FA не включена для этого пользователя"}
+            return {"success": False, "msg": t("two_factor_not_enabled", lang=lang, category="backend")}
             
         if verify_totp_token(user.totp_secret, code):
             user.totp_enabled = 0
@@ -136,9 +140,9 @@ async def disable_2fa_api(request: Request):
                     session.delete(s)
             session.commit()
             log_action(actor, "disable_2fa", details="TOTP disabled successfully")
-            return {"success": True, "msg": "Двухфакторная аутентификация успешно отключена"}
+            return {"success": True, "msg": t("two_factor_disabled_success", lang=lang, category="backend")}
         else:
-            return {"success": False, "msg": "Неверный код подтверждения"}
+            return {"success": False, "msg": t("two_factor_invalid_code", lang=lang, category="backend")}
 
 @router.get("/api/auth/tg-2fa/poll")
 async def tg_2fa_poll(request: Request, response: Response, token: str):
@@ -148,6 +152,7 @@ async def tg_2fa_poll(request: Request, response: Response, token: str):
     import json
     import time
     
+    lang = get_lang(request)
     with db_session() as session:
         setting = session.query(SystemSetting).filter_by(key=f"tg_2fa_req_{token}").first()
         if not setting:
@@ -190,7 +195,7 @@ async def tg_2fa_poll(request: Request, response: Response, token: str):
             
             from backend.audit import log_action
             log_action(uname, "login_success", target=data.get("client_ip"), details="Web Telegram 2FA login approved")
-            return {"success": True, "status": "approved", "msg": "Успешный вход"}
+            return {"success": True, "status": "approved", "msg": t("login_success", lang=lang, category="backend")}
             
         elif status == "blocked":
             session.delete(setting)
@@ -214,24 +219,25 @@ async def tg_2fa_action(payload: Tg2faActionBody, request: Request):
     import json
     import subprocess
     
+    lang = get_lang(request)
     token = payload.token
     action = payload.action
     
     with db_session() as session:
         setting = session.query(SystemSetting).filter_by(key=f"tg_2fa_req_{token}").first()
         if not setting:
-            return {"success": False, "msg": "Запрос не найден или истек"}
+            return {"success": False, "msg": t("two_factor_request_not_found_or_expired", lang=lang, category="backend")}
             
         try:
             data = json.loads(setting.value)
         except Exception:
-            return {"success": False, "msg": "Неверный формат запроса"}
+            return {"success": False, "msg": t("invalid_request_format", lang=lang, category="backend")}
             
         if action == "approve":
             data["status"] = "approved"
             setting.value = json.dumps(data)
             session.commit()
-            return {"success": True, "msg": "Вход разрешен"}
+            return {"success": True, "msg": t("two_factor_login_approved", lang=lang, category="backend")}
             
         elif action == "block":
             data["status"] = "blocked"
@@ -242,7 +248,7 @@ async def tg_2fa_action(payload: Tg2faActionBody, request: Request):
                 from backend.routes.auth_routes.login import is_ip_whitelisted_sync
                 if is_ip_whitelisted_sync(client_ip) or client_ip in ("127.0.0.1", "::1", "localhost"):
                     session.commit()
-                    return {"success": True, "msg": "IP в белом списке, блокировка пропущена"}
+                    return {"success": True, "msg": t("two_factor_ip_whitelisted_skip_block", lang=lang, category="backend")}
                     
                 banned_ips = get_setting("banned_login_ips", "")
                 banned_list = [ip.strip() for ip in banned_ips.split(",") if ip.strip()]
@@ -256,6 +262,6 @@ async def tg_2fa_action(payload: Tg2faActionBody, request: Request):
                     logging.warning(f"Failed to block IP via iptables: {ex}")
                     
             session.commit()
-            return {"success": True, "msg": "IP заблокирован"}
+            return {"success": True, "msg": t("two_factor_ip_blocked", lang=lang, category="backend")}
             
-        return {"success": False, "msg": "Неверное действие"}
+        return {"success": False, "msg": t("invalid_action", lang=lang, category="backend")}

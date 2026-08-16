@@ -1,71 +1,70 @@
-<!-- Tab panel 2: Protocol (Протокол) -->
-<div id="tab-panel-protocol" class="tab-panel" style="display: none;">
-    <!-- Shadowsocks settings -->
-    <div id="shadowsocks-settings-group" class="settings-subgroup" style="display: none;">
-        <h4 data-i18n="ib_title_ss">Настройки Shadowsocks</h4>
-        <div class="input-group">
-            <label for="ib-ss-method" data-i18n="ib_label_ss_method">Метод шифрования</label>
-            <select id="ib-ss-method">
-                <option value="aes-128-gcm">aes-128-gcm</option>
-                <option value="aes-256-gcm" selected>aes-256-gcm</option>
-                <option value="chacha20-ietf-poly1305">chacha20-ietf-poly1305</option>
-                <option value="2022-blake3-aes-128-gcm">2022-blake3-aes-128-gcm</option>
-                <option value="2022-blake3-aes-256-gcm">2022-blake3-aes-256-gcm</option>
-                <option value="2022-blake3-chacha20-poly1305">2022-blake3-chacha20-poly1305</option>
-            </select>
-        </div>
-    </div>
 
-    <!-- VLESS settings -->
-    <div id="vless-protocol-settings-group" class="settings-subgroup" style="display: none;">
-        <h4 data-i18n="ib_title_vless">VLESS Шифрование (VLESS Encryption)</h4>
-        <div class="input-group">
-            <label for="ib-vless-decryption" data-i18n="ib_label_vless_decryption">Расшифрование (decryption)</label>
-            <input type="text" id="ib-vless-decryption" placeholder="none" value="none">
-            <small id="ib-vless-decryption-note" style="color: var(--text-muted); font-size: 11px; margin-top: 4px; display: block;" data-i18n="validation_inbound_vless_decryption_incompatible_note">
-                ⚠️ Взаимоисключающая опция: несовместима с настройками Fallbacks (перенаправления).
-            </small>
-        </div>
-        <div class="input-group" style="margin-top: 10px;">
-            <label for="ib-vless-encryption" data-i18n="ib_label_vless_encryption">Шифрование (encryption - для ссылок клиента)</label>
-            <input type="text" id="ib-vless-encryption" placeholder="none" value="none">
-        </div>
-        <div class="input-group" style="margin-top: 15px; display: flex; gap: 10px; flex-wrap: wrap;">
-            <button type="button" id="gen-vless-x25519-btn" class="btn secondary-btn" style="padding: 6px 12px; font-size: 13px;" data-i18n="ib_btn_auth_x25519"><i class="fa-solid fa-key"></i> Аутентификация X25519</button>
-            <button type="button" id="gen-vless-mlkem-btn" class="btn secondary-btn" style="padding: 6px 12px; font-size: 13px;" data-i18n="ib_btn_auth_mlkem"><i class="fa-solid fa-shield-halved"></i> Аутентификация ML-KEM-768</button>
-            <button type="button" id="clear-vless-enc-btn" class="btn secondary-btn" style="padding: 6px 12px; font-size: 13px; color: var(--accent-rose);" data-i18n="ib_btn_clear"><i class="fa-solid fa-eraser"></i> Очистить</button>
-        </div>
-    </div>
-
-    <!-- Fallbacks (VLESS / Trojan) -->
-    <div id="fallbacks-settings-group" class="settings-subgroup" style="display: none;">
-        <h4 data-i18n="ib_title_fallbacks">Настройки Fallbacks (Перенаправления)</h4>
-        <div class="input-row">
-            <div class="input-group">
-                <label for="ib-fallback-dest" data-i18n="ib_label_fallback_dest">Куда перенаправлять (Dest)</label>
-                <input type="text" id="ib-fallback-dest" placeholder="80 или 127.0.0.1:80" data-i18n-placeholder="ib_placeholder_fallback_dest">
-                <small id="ib-fallback-dest-note" style="color: var(--text-muted); font-size: 11px; margin-top: 4px; display: block;" data-i18n="validation_inbound_vless_fallbacks_incompatible_note">
-                    ⚠️ Взаимоисключающая опция: несовместима с VLESS Decryption (Расшифрование).
-                </small>
-            </div>
-            <div class="input-group">
-                <label for="ib-fallback-path" data-i18n="ib_label_fallback_path">Путь (Path)</label>
-                <input type="text" id="ib-fallback-path" placeholder="/masquerade">
-            </div>
-        </div>
-        <div class="input-row" style="margin-top: 15px;">
-            <div class="input-group">
-                <label for="ib-fallback-xver" data-i18n="ib_label_fallback_xver">Proxy Protocol (xver)</label>
-                <select id="ib-fallback-xver">
-                    <option value="0">0 (отключен)</option>
-                    <option value="1">1</option>
-                    <option value="2">2</option>
-                </select>
-            </div>
-            <div class="input-group">
-                <label for="ib-fallback-alpn" data-i18n="ib_label_fallback_alpn">ALPN</label>
-                <input type="text" id="ib-fallback-alpn" placeholder="h2">
-            </div>
-        </div>
-    </div>
+<div class="tab-panel" id="tab-panel-protocol" style="display: none;">
+<!-- Shadowsocks settings -->
+<div class="settings-subgroup" id="shadowsocks-settings-group" style="display: none;">
+<h4 data-i18n="ib_title_ss"></h4>
+<div class="input-group">
+<label data-i18n="ib_label_ss_method" for="ib-ss-method"></label>
+<select id="ib-ss-method">
+<option value="aes-128-gcm">aes-128-gcm</option>
+<option selected="" value="aes-256-gcm">aes-256-gcm</option>
+<option value="chacha20-ietf-poly1305">chacha20-ietf-poly1305</option>
+<option value="2022-blake3-aes-128-gcm">2022-blake3-aes-128-gcm</option>
+<option value="2022-blake3-aes-256-gcm">2022-blake3-aes-256-gcm</option>
+<option value="2022-blake3-chacha20-poly1305">2022-blake3-chacha20-poly1305</option>
+</select>
+</div>
+</div>
+<!-- VLESS settings -->
+<div class="settings-subgroup" id="vless-protocol-settings-group">
+<h4 data-i18n="ib_title_vless"></h4>
+<div class="input-group">
+<label data-i18n="ib_label_vless_decryption" for="ib-vless-decryption"></label>
+<input id="ib-vless-decryption" placeholder="none" type="text" value="none"/>
+<small data-i18n="validation_inbound_vless_decryption_incompatible_note" id="ib-vless-decryption-note" style="color: var(--text-muted); font-size: 11px; margin-top: 4px; display: block;"></small>
+</div>
+<div class="input-group" style="margin-top: 10px;">
+<label data-i18n="ib_label_vless_encryption" for="ib-vless-encryption"></label>
+<input id="ib-vless-encryption" placeholder="none" type="text" value="none"/>
+</div>
+<div class="input-group" style="margin-top: 15px; display: flex; gap: 10px; flex-wrap: wrap;">
+<button class="btn secondary-btn" data-i18n="ib_btn_auth_x25519" id="gen-vless-x25519-btn" style="padding: 6px 12px; font-size: 13px;" type="button"><i class="fa-solid fa-key"></i></button>
+<button class="btn secondary-btn" data-i18n="ib_btn_auth_mlkem" id="gen-vless-mlkem-btn" style="padding: 6px 12px; font-size: 13px;" type="button"><i class="fa-solid fa-shield-halved"></i></button>
+<button class="btn secondary-btn" data-i18n="ib_btn_clear" id="clear-vless-enc-btn" style="padding: 6px 12px; font-size: 13px; color: var(--accent-rose);" type="button"><i class="fa-solid fa-eraser"></i></button>
+</div>
+</div>
+<!-- Fallbacks (VLESS / Trojan) -->
+<div class="settings-subgroup" id="fallbacks-settings-group">
+<h4 data-i18n="ib_title_fallbacks"></h4>
+<div class="input-row">
+<div class="input-group">
+<label data-i18n="ib_label_fallback_dest" for="ib-fallback-dest"></label>
+<input data-i18n-placeholder="ib_placeholder_fallback_dest" id="ib-fallback-dest" placeholder="" type="text"/>
+<small data-i18n="validation_inbound_vless_fallbacks_incompatible_note" id="ib-fallback-dest-note" style="color: var(--text-muted); font-size: 11px; margin-top: 4px; display: block;"></small>
+</div>
+<div class="input-group">
+<label data-i18n="ib_label_fallback_path" for="ib-fallback-path"></label>
+<input id="ib-fallback-path" placeholder="/masquerade" type="text"/>
+</div>
+</div>
+<div class="input-row" style="margin-top: 15px;">
+<div class="input-group">
+<label data-i18n="ib_label_fallback_xver" for="ib-fallback-xver"></label>
+<select id="ib-fallback-xver">
+<option data-i18n="ib_opt_disabled" value="0"></option>
+<option value="1">1</option>
+<option value="2">2</option>
+</select>
+</div>
+<div class="input-group">
+<label data-i18n="ib_label_fallback_alpn" for="ib-fallback-alpn"></label>
+<input id="ib-fallback-alpn" placeholder="h2" type="text"/>
+</div>
+</div>
+</div>
+<!-- No protocol settings notice -->
+<div class="settings-subgroup" id="no-protocol-settings-group" style="display: none; text-align: center; padding: 30px 15px;">
+<i class="fa-solid fa-circle-check" style="font-size: 32px; color: var(--accent-green); margin-bottom: 12px; display: inline-block;"></i>
+<p data-i18n="ib_no_protocol_settings" style="color: var(--text-secondary); font-size: 13px; margin: 0;"></p>
+</div>
 </div>

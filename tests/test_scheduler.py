@@ -7,7 +7,6 @@ from backend.scheduler import enforce_client_limits_and_rules, ACTIVE_IP_CACHE
 
 @pytest.fixture(autouse=True)
 def mock_subsystems(monkeypatch):
-    monkeypatch.setattr("backend.scheduler_jobs.watchdog.run_service_watchdog", lambda: None)
     monkeypatch.setattr("backend.scheduler_jobs.backups.check_and_run_backups", lambda: None)
     monkeypatch.setattr("backend.scheduler_jobs.maintenance.truncate_logs_if_large", lambda: None)
     monkeypatch.setattr("backend.scheduler_jobs.maintenance.run_db_cleanup_maintenance", lambda: None)

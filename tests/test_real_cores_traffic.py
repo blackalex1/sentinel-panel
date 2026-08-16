@@ -89,15 +89,11 @@ def test_real_cores_traffic_accounting_and_dashboard_aggregation(client, monkeyp
     # -------------------------------------------------------------
     # 2. SIMULATE TRAFFIC FOR HYSTERIA 2
     # -------------------------------------------------------------
-    # Hysteria 2 Admin API returns 300 MB tx (download), 30 MB rx (upload) for user_hysteria@domain.com
-    mock_hysteria_resp = MagicMock()
-    mock_hysteria_resp.status_code = 200
-    mock_hysteria_resp.json.return_value = {
-        email_hysteria: {"tx": 300 * 1024 * 1024, "rx": 30 * 1024 * 1024}
-    }
-
-    with patch("requests.get", return_value=mock_hysteria_resp):
-        query_hysteria_traffic()
+    monkeypatch.setattr("backend.hysteria.service.is_hysteria_running", lambda: True)
+    monkeypatch.setattr("backend.sentinel_core_bridge.get_unified_traffic", lambda: {
+        email_hysteria: {"downBytes": 300 * 1024 * 1024, "upBytes": 30 * 1024 * 1024}
+    })
+    query_hysteria_traffic()
 
     with db_session() as session:
         h_rec = session.query(ClientStats).filter_by(email=email_hysteria).first()
@@ -110,9 +106,8 @@ def test_real_cores_traffic_accounting_and_dashboard_aggregation(client, monkeyp
     monkeypatch.setattr("backend.singbox.service.is_singbox_running", lambda: True)
 
     # Phase 1: Connection 1 open (200 MB down, 20 MB up)
-    sb_resp_1 = MagicMock()
-    sb_resp_1.status_code = 200
-    sb_resp_1.json.return_value = {
+    from backend.singbox.service import _process_singbox_connection_data
+    sb_data_1 = {
         "connections": [
             {
                 "id": "sb-conn-1",
@@ -122,13 +117,10 @@ def test_real_cores_traffic_accounting_and_dashboard_aggregation(client, monkeyp
             }
         ]
     }
-    with patch("requests.get", return_value=sb_resp_1):
-        query_singbox_traffic()
+    _process_singbox_connection_data(sb_data_1)
 
     # Phase 2: Connection 1 CLOSED, Connection 2 open (100 MB down, 10 MB up)
-    sb_resp_2 = MagicMock()
-    sb_resp_2.status_code = 200
-    sb_resp_2.json.return_value = {
+    sb_data_2 = {
         "connections": [
             {
                 "id": "sb-conn-2",
@@ -138,8 +130,7 @@ def test_real_cores_traffic_accounting_and_dashboard_aggregation(client, monkeyp
             }
         ]
     }
-    with patch("requests.get", return_value=sb_resp_2):
-        query_singbox_traffic()
+    _process_singbox_connection_data(sb_data_2)
 
     with db_session() as session:
         s_rec = session.query(ClientStats).filter_by(email=email_singbox).first()

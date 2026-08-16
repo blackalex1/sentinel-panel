@@ -172,7 +172,7 @@ export function setupSecurityListeners() {
                     });
                 }
             } else {
-                showToast(res ? res.msg : "Не удалось настроить 2FA", "error");
+                showToast(res ? res.msg : t("settings_2fa_setup_error", "Не удалось настроить 2FA"), "error");
                 setupPanel.style.display = "none";
             }
         });
@@ -186,7 +186,7 @@ export function setupSecurityListeners() {
             const code = codeInput ? codeInput.value.trim() : "";
 
             if (!code || code.length !== 6 || isNaN(code)) {
-                showToast("Введите корректный 6-значный код", "error");
+                showToast(t("settings_2fa_code_invalid", "Введите корректный 6-значный код"), "error");
                 return;
             }
 
@@ -199,11 +199,11 @@ export function setupSecurityListeners() {
             btn2faConfirm.disabled = false;
 
             if (res && res.success) {
-                showToast(res.msg || "2FA успешно включена!");
+                showToast(res.msg || t("settings_2fa_enabled", "2FA успешно включена!"));
                 if (codeInput) codeInput.value = "";
                 await loadSettings();
             } else {
-                showToast(res ? res.msg : "Ошибка при включении 2FA", "error");
+                showToast(res ? res.msg : t("settings_2fa_enable_error", "Ошибка при включении 2FA"), "error");
             }
         });
     }
@@ -229,7 +229,7 @@ export function setupSecurityListeners() {
             const code = codeInput ? codeInput.value.trim() : "";
 
             if (!code || code.length !== 6 || isNaN(code)) {
-                showToast("Введите корректный 6-значный код", "error");
+                showToast(t("settings_2fa_code_invalid", "Введите корректный 6-значный код"), "error");
                 return;
             }
 
@@ -242,11 +242,11 @@ export function setupSecurityListeners() {
             btn2faDisableConfirm.disabled = false;
 
             if (res && res.success) {
-                showToast(res.msg || "2FA успешно отключена!");
+                showToast(res.msg || t("settings_2fa_disabled_toast", "2FA успешно отключена!"));
                 if (codeInput) codeInput.value = "";
                 await loadSettings();
             } else {
-                showToast(res ? res.msg : "Ошибка при отключении 2FA", "error");
+                showToast(res ? res.msg : t("settings_2fa_disable_error", "Ошибка при отключении 2FA"), "error");
             }
         });
     }

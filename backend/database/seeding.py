@@ -224,15 +224,38 @@ def init_db():
             session.add(Outbound(remark="Block Connection", protocol="blackhole", tag="blocked", settings="{}", enable=1, is_system=1))
             logging.info("Default outbounds seeded.")
 
-        # 4. Семена правил маршрутизации (Routing Rules) по умолчанию
+        # 4. Семена правил маршрутизации (Routing Rules) по умолчанию из sentinel-core
         if session.query(RoutingRule).count() == 0:
-            # Читаем старые настройки для миграции
+            from backend.sentinel_core_bridge import get_preset_details
+            bt_spec = get_preset_details("bittorrent")
+            if isinstance(bt_spec, dict) and "id" in bt_spec:
+                remark = bt_spec.get("name", "Block BitTorrent")
+                out_tag = "blocked" if bt_spec.get("defaultTarget") == "block" else bt_spec.get("defaultTarget", "blocked")
+                protos = json.dumps(bt_spec.get("protocols", ["bittorrent"]))
+                domains = json.dumps(bt_spec.get("domains", []))
+                ips = json.dumps(bt_spec.get("ips", []))
+            else:
+                remark = "Block BitTorrent"
+                out_tag = "blocked"
+                protos = '["bittorrent"]'
+                domains = "[]"
+                ips = "[]"
+
             block_torrent_val = session.query(SystemSetting).filter_by(key="block_torrent").first()
             bt_enable = 1 if (block_torrent_val and block_torrent_val.value == "true") else 0
             
-            session.add(RoutingRule(remark="API Traffic", outbound_tag="api", inbound_tags='["api"]', enable=1, sort_order=1))
-            session.add(RoutingRule(remark="Block BitTorrent", outbound_tag="blocked", protocols='["bittorrent"]', enable=bt_enable, sort_order=2))
-            logging.info("Default routing rules seeded and migrated.")
+            session.add(RoutingRule(
+                remark=remark,
+                outbound_tag=out_tag,
+                protocols=protos,
+                domains=domains,
+                ips=ips,
+                inbound_tags="[]",
+                users="[]",
+                enable=bt_enable,
+                sort_order=1
+            ))
+            logging.info("Default routing rules seeded from sentinel-core presets.")
 
         # 5. Семена входящих подключений (Inbounds) по умолчанию
         if session.query(Inbound).count() == 0:

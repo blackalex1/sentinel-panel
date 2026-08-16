@@ -1,81 +1,146 @@
+import { apiFetch } from "../../../../api.js";
 import { showToast } from "../../../../ui.js";
 import { t } from "../../../../i18n.js";
 import { parseProxyLink } from "../../link-parser.js";
-import { updateOutboundFormFields } from "../fields.js";
+import { fetchOutboundSchema, setCurrentOutboundValues, getCurrentOutboundValues } from "../modal_manager.js";
+import { renderDynamicOutboundForm } from "../../../inbounds/schema-renderer.js";
 
 export function bindLinkImporterListener() {
     const importLinkInput = document.getElementById("ob-import-link");
     if (!importLinkInput) return;
 
-    importLinkInput.addEventListener("input", (e) => {
+    importLinkInput.addEventListener("input", async (e) => {
         const val = e.target.value.trim();
         if (!val) return;
         
         const lowerVal = val.toLowerCase();
         if (lowerVal.startsWith("vless://") || 
+            lowerVal.startsWith("vmess://") || 
+            lowerVal.startsWith("trojan://") || 
             lowerVal.startsWith("ss://") || 
             lowerVal.startsWith("socks://") || 
             lowerVal.startsWith("socks5://") || 
             lowerVal.startsWith("http://") || 
+            lowerVal.startsWith("https://") || 
             lowerVal.startsWith("hysteria2://") || 
             lowerVal.startsWith("hy2://") || 
-            lowerVal.startsWith("hysteria://")) {
+            lowerVal.startsWith("hysteria://") ||
+            lowerVal.startsWith("wireguard://") ||
+            lowerVal.startsWith("wg://") ||
+            lowerVal.startsWith("tuic://")) {
             
-            const parsed = parseProxyLink(val);
-            if (parsed) {
-                document.getElementById("ob-protocol").value = parsed.protocol;
-                document.getElementById("ob-remark").value = parsed.remark || "";
-                
-                const sanitizedHost = (parsed.host || "").replace(/[^a-zA-Z0-9]/g, "-").toLowerCase();
-                document.getElementById("ob-tag").value = `${parsed.protocol}-${sanitizedHost || Math.floor(Math.random() * 1000)}`;
-                
-                document.getElementById("ob-address").value = parsed.host || "";
-                document.getElementById("ob-port").value = parsed.port || "";
-                
-                document.getElementById("ob-username").value = "";
-                document.getElementById("ob-password").value = "";
-                
-                if (parsed.protocol === "vless") {
-                    document.getElementById("ob-password").value = parsed.uuid || "";
-                    document.getElementById("ob-security").value = parsed.security || "none";
-                    document.getElementById("ob-sni").value = parsed.sni || "";
-                    document.getElementById("ob-pbk").value = parsed.pbk || "";
-                    document.getElementById("ob-shortid").value = parsed.sid || "";
-                    document.getElementById("ob-fingerprint").value = parsed.fp || "chrome";
-                    document.getElementById("ob-alpn").value = parsed.alpn || "";
-                    document.getElementById("ob-flow").value = parsed.flow || "";
-                    document.getElementById("ob-encryption").value = parsed.encryption || "";
-                    document.getElementById("ob-pinned-sha256").value = parsed.pinSHA256 || "";
-                    const spxEl = document.getElementById("ob-spx");
-                    if (spxEl) spxEl.value = parsed.spx || "";
-                } else if (parsed.protocol === "hysteria" || parsed.protocol === "hysteria2") {
-                    document.getElementById("ob-port").value = parsed.hop || parsed.mport || parsed.ports || parsed.port || "";
-                    document.getElementById("ob-password").value = parsed.password || "";
-                    document.getElementById("ob-sni").value = parsed.sni || "";
-                    document.getElementById("ob-alpn").value = parsed.alpn || "";
-                    document.getElementById("ob-up-mbps").value = parsed.up || "";
-                    document.getElementById("ob-down-mbps").value = parsed.down || "";
-                    document.getElementById("ob-allow-insecure").checked = parsed.insecure === true;
-                    document.getElementById("ob-hysteria-obfs").value = parsed.obfs || "";
-                    document.getElementById("ob-hysteria-obfs-password").value = parsed.obfsPassword || "";
-                    document.getElementById("ob-pinned-sha256").value = parsed.pinSHA256 || "";
-                } else if (parsed.protocol === "shadowsocks") {
-                    document.getElementById("ob-password").value = parsed.password || "";
-                    document.getElementById("ob-ss-method").value = parsed.method || "aes-256-gcm";
-                } else if (parsed.protocol === "socks" || parsed.protocol === "http") {
-                    document.getElementById("ob-username").value = parsed.username || "";
-                    document.getElementById("ob-password").value = parsed.password || "";
+            let parsed = null;
+            try {
+                const res = await apiFetch("/api/routing/outbounds/parse-link", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ link: val })
+                });
+                if (res && res.success && res.obj) {
+                    const obj = res.obj;
+                    let proto = (obj.protocol || "").toLowerCase();
+                    if (proto === "ss") proto = "shadowsocks";
+                    if (proto === "hy2" || proto === "hysteria") proto = "hysteria2";
+
+                    parsed = {
+                        protocol: proto,
+                        remark: obj.name || obj.remark || `${proto.toUpperCase()} Proxy`,
+                        tag: `${proto}-${(obj.address || "out").replace(/[^a-zA-Z0-9]/g, "-").toLowerCase()}`,
+                        host: obj.address || "",
+                        port: obj.port || 443,
+                        uuid: obj.uuid || "",
+                        password: obj.password || obj.uuid || "",
+                        security: obj.security || (proto === "vless" ? "reality" : (proto === "hysteria2" || proto === "trojan" ? "tls" : "none")),
+                        sni: obj.sni || "",
+                        publicKey: obj.publicKey || "",
+                        shortId: obj.shortId || "",
+                        spiderX: obj.spiderX || "",
+                        fingerprint: obj.fingerprint || "chrome",
+                        alpn: obj.alpn ? (Array.isArray(obj.alpn) ? obj.alpn.join(",") : obj.alpn) : "",
+                        flow: obj.flow || "",
+                        encryption: obj.encryption || "",
+                        method: obj.method || "2022-blake3-aes-128-gcm",
+                        allowInsecure: obj.allowInsecure === true,
+                        upMbps: obj.upMbps || 100,
+                        downMbps: obj.downMbps || 100,
+                        obfs: obj.obfs || "",
+                        obfsPassword: obj.obfsPassword || "",
+                        pinnedPeerCertSha256: obj.pinnedPeerCertSha256 || "",
+                        network: obj.network || obj.type || "tcp",
+                        path: obj.path || "",
+                        wsHost: obj.host || obj.wsHost || "",
+                        serviceName: obj.serviceName || "",
+                        privateKey: obj.privateKey || obj.secretKey || "",
+                        peerPublicKey: obj.peerPublicKey || "",
+                        localAddress: obj.localAddress || (Array.isArray(obj.address) ? obj.address.join(",") : ""),
+                        mtu: obj.mtu || 1420,
+                        reserved: obj.reserved ? (Array.isArray(obj.reserved) ? obj.reserved.join(",") : obj.reserved) : "",
+                        enable: true
+                    };
                 }
-                
-                e.target.value = ""; 
-                updateOutboundFormFields();
-                
-                const inputs = document.querySelectorAll("#outbound-form input, #outbound-form select, #outbound-form textarea");
-                inputs.forEach(el => el.classList.remove("input-invalid"));
-                
-                showToast(t("routing_modal_import_success", "Ссылка успешно импортирована!"));
+            } catch (err) {
+                console.warn("Failed to parse via core bridge, using fallback:", err);
+            }
+
+            if (!parsed) {
+                // Fallback to local JS parser
+                const fallbackParsed = parseProxyLink(val);
+                if (fallbackParsed) {
+                    let proto = fallbackParsed.protocol;
+                    if (proto === "ss") proto = "shadowsocks";
+                    if (proto === "hy2" || proto === "hysteria") proto = "hysteria2";
+
+                    parsed = {
+                        protocol: proto,
+                        remark: fallbackParsed.remark || `${proto.toUpperCase()} Proxy`,
+                        tag: `${proto}-${(fallbackParsed.host || "out").replace(/[^a-zA-Z0-9]/g, "-").toLowerCase()}`,
+                        host: fallbackParsed.host || "",
+                        port: fallbackParsed.port || 443,
+                        uuid: fallbackParsed.uuid || "",
+                        password: fallbackParsed.password || fallbackParsed.uuid || "",
+                        security: fallbackParsed.security || "none",
+                        sni: fallbackParsed.sni || "",
+                        publicKey: fallbackParsed.pbk || "",
+                        shortId: fallbackParsed.sid || "",
+                        spiderX: fallbackParsed.spx || "",
+                        fingerprint: fallbackParsed.fp || "chrome",
+                        flow: fallbackParsed.flow || "",
+                        encryption: fallbackParsed.encryption || "",
+                        method: fallbackParsed.method || "2022-blake3-aes-128-gcm",
+                        allowInsecure: fallbackParsed.insecure === true,
+                        upMbps: fallbackParsed.up || 100,
+                        downMbps: fallbackParsed.down || 100,
+                        obfs: fallbackParsed.obfs || "",
+                        obfsPassword: fallbackParsed.obfsPassword || "",
+                        pinnedPeerCertSha256: fallbackParsed.pinSHA256 || "",
+                        enable: true
+                    };
+                }
+            }
+
+            if (parsed && parsed.protocol) {
+                setCurrentOutboundValues(parsed);
+                const currentVals = getCurrentOutboundValues();
+
+                const protocolSelect = document.getElementById("ob-protocol");
+                if (protocolSelect) {
+                    protocolSelect.value = parsed.protocol;
+                }
+
+                const schema = await fetchOutboundSchema();
+                const outboundProtocols = (schema && schema.outboundProtocols) ? schema.outboundProtocols : {};
+                const cap = outboundProtocols[parsed.protocol] || outboundProtocols["vless"] || { tabDefinitions: [] };
+
+                const tabsContainer = document.getElementById("outbound-modal-tabs");
+                const schemaContainer = document.getElementById("outbound-schema-container");
+
+                renderDynamicOutboundForm(schemaContainer, tabsContainer, cap.tabDefinitions || [], currentVals, (updated) => {
+                    setCurrentOutboundValues(updated);
+                });
+
+                showToast(t("routing_link_imported_success", "Ссылка успешно импортирована из ядра!"));
             } else {
-                showToast(t("routing_modal_import_error", "Не удалось распознать ссылку. Проверьте формат."), "warning");
+                showToast(t("routing_link_parse_failed", "Не удалось распознать ссылку"), "error");
             }
         }
     });
