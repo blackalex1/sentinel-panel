@@ -106,10 +106,15 @@ def _init_sentinel_lib(lib: Any) -> Any:
         ("SentinelRestartCore", [ctypes.c_char_p, ctypes.c_char_p, ctypes.c_char_p]),
         ("SentinelValidateCore", [ctypes.c_char_p, ctypes.c_char_p, ctypes.c_char_p]),
         ("SentinelGenerateVlessEncKeys", []),
+        ("SentinelRegisterHysteriaPort", [ctypes.c_int]),
+        ("SentinelConfigureSupervisor", [ctypes.c_char_p, ctypes.c_char_p, ctypes.c_char_p]),
         ("SentinelGetCoreVersion", [ctypes.c_char_p, ctypes.c_char_p]),
         ("SentinelPopLogLine", [ctypes.c_char_p, ctypes.c_int]),
         ("SentinelGetInMemoryLogs", [ctypes.c_char_p, ctypes.c_int]),
         ("SentinelClearInMemoryLogs", [ctypes.c_char_p]),
+        ("SentinelGetSecuritySchema", [ctypes.c_char_p]),
+        ("SentinelGetDefaultSecurityConfig", []),
+        ("SentinelValidateSecurityConfig", [ctypes.c_char_p]),
     ]
 
     for name, argtypes in func_signatures:
@@ -164,6 +169,9 @@ def _ffi_call_str(func_name: str, *args) -> Optional[str]:
         return None
 
     func = getattr(lib, func_name)
+    if func.restype != ctypes.c_void_p and func_name != "SentinelFreeString":
+        func.restype = ctypes.c_void_p
+
     c_args = []
     for a in args:
         if isinstance(a, str):
