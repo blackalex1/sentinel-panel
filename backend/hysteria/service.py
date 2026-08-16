@@ -200,9 +200,42 @@ def query_hysteria_traffic():
 
     try:
         from backend.sentinel_core_bridge import get_unified_traffic
-        traffic_data = get_unified_traffic()
-        if not traffic_data or not isinstance(traffic_data, dict):
-            return
+        traffic_data = get_unified_traffic() or {}
+        
+        # Direct query to active Hysteria instances to guarantee stats collection
+        for ib in hysteria_inbounds:
+            ib_id = ib["id"]
+            admin_port = 10100 + (ib["port"] % 1000)
+            config_path = backend.hysteria.BIN_DIR / f"hysteria_{ib_id}.json"
+            if config_path.exists():
+                try:
+                    with open(config_path, "r", encoding="utf-8") as f:
+                        h_cfg = json.load(f)
+                        ts_listen = h_cfg.get("trafficStats", {}).get("listen", "")
+                        if ":" in ts_listen:
+                            admin_port = int(ts_listen.split(":")[-1])
+                except Exception:
+                    pass
+
+            try:
+                import urllib.request
+                req = urllib.request.Request(f"http://127.0.0.1:{admin_port}/traffic", headers={"User-Agent": "Sentinel-Panel"})
+                with urllib.request.urlopen(req, timeout=0.4) as resp:
+                    if resp.status == 200:
+                        raw_data = json.loads(resp.read().decode("utf-8"))
+                        for email, t in raw_data.items():
+                            if email not in traffic_data:
+                                traffic_data[email] = {
+                                    "email": email,
+                                    "upBytes": t.get("rx", 0),
+                                    "downBytes": t.get("tx", 0),
+                                    "online": True
+                                }
+                            else:
+                                traffic_data[email]["upBytes"] = max(int(traffic_data[email].get("upBytes", 0)), int(t.get("rx", 0)))
+                                traffic_data[email]["downBytes"] = max(int(traffic_data[email].get("downBytes", 0)), int(t.get("tx", 0)))
+            except Exception:
+                pass
 
         for email, stats in traffic_data.items():
             if not isinstance(stats, dict):

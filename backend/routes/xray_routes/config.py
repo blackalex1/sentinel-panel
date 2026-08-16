@@ -50,8 +50,14 @@ async def save_xray_config(request: Request, payload: dict):
         
         if isinstance(config, dict) and "log" in config and isinstance(config["log"], dict):
             new_loglevel = config["log"].get("loglevel")
-            if new_loglevel:
+            if new_loglevel is not None:
                 set_setting("xray_loglevel", str(new_loglevel))
+            new_access = config["log"].get("access")
+            if new_access is not None:
+                set_setting("xray_access_log", str(new_access))
+            new_error = config["log"].get("error")
+            if new_error is not None:
+                set_setting("xray_error_log", str(new_error))
 
         with open(XRAY_CONFIG_PATH, "w", encoding="utf-8") as f:
             json.dump(config, f, indent=2)

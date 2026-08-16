@@ -319,7 +319,9 @@ def build_server_config(
     routing: Optional[Dict[str, Any]] = None,
     clash_api: str = "",
     log_path: str = "",
-    log_level: str = ""
+    log_level: str = "",
+    access_log: str = "",
+    error_log: str = ""
 ) -> Dict[str, Any]:
     """Compiles complete core configuration (Xray, Sing-box, Hysteria 2) via sentinel-core AST engine."""
     spec = {
@@ -328,7 +330,9 @@ def build_server_config(
         "routing": routing or {},
         "clashApiAddress": clash_api,
         "logPath": log_path,
-        "logLevel": log_level or "info"
+        "logLevel": log_level,
+        "accessLog": access_log,
+        "errorLog": error_log
     }
     input_json = json.dumps(spec)
 
@@ -889,10 +893,22 @@ def compile_node_server_config(target_core: str) -> Dict[str, Any]:
         setting_key = "xray_loglevel" if target_core == "xray" else ("singbox_loglevel" if target_core in ("singbox", "sing-box") else "hysteria_loglevel")
         db_lvl = (get_setting(setting_key) or "").lower()
         if db_lvl not in ("trace", "debug", "info", "warn", "warning", "error", "none"):
-            db_lvl = "info"
+            db_lvl = "warning"
         log_level = db_lvl
         
-        return build_server_config(target_core, server_inbounds, routing_spec, clash_api, log_path=log_path, log_level=log_level)
+        access_log = get_setting("xray_access_log") or ""
+        error_log = get_setting("xray_error_log") or ""
+        
+        return build_server_config(
+            target_core,
+            server_inbounds,
+            routing_spec,
+            clash_api,
+            log_path=log_path,
+            log_level=log_level,
+            access_log=access_log,
+            error_log=error_log
+        )
     except Exception as e:
         logger.exception("Error compiling server config via sentinel-core: %s", e)
         return {}

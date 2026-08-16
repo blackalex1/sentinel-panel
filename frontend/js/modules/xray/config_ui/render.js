@@ -80,26 +80,42 @@ export async function loadXrayConfig() {
 
     // -- 1. LOGGING & GLOBAL SETTINGS --
     config.log = config.log || {};
-    const currLevel = config.log.loglevel || "info";
+    const currLevel = config.log.loglevel || "warning";
+    const currAccess = config.log.access || "none";
+    const currError = config.log.error || "";
     html += `<div style="margin-bottom: 25px;">
         <h4 style="margin-top: 0; margin-bottom: 12px; font-size: 15px; font-weight: 600; color: var(--accent-orange); display: flex; align-items: center; gap: 8px; width: 100%;">
             <i class="fa-solid fa-file-invoice"></i> <span data-i18n="config_log_title">${t("config_log_title", "Системные настройки и логирование")}</span>
             <button class="btn secondary-btn edit-json-btn" data-type="xray-log" style="margin-left: auto; padding: 4px 8px; font-size: 11px; display: inline-flex; align-items: center; gap: 4px; height: auto;"><i class="fa-regular fa-pen-to-square"></i> JSON</button>
         </h4>
         <div class="glass-card" style="padding: 15px; border-radius: 10px; background: rgba(255,255,255,0.015);">
-            <div style="font-size: 13px; line-height: 1.6; color: var(--text-secondary);">
-                <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 6px;">
-                    <span style="font-weight: 500;">LogLevel:</span>
+            <div style="font-size: 13px; line-height: 1.6; color: var(--text-secondary); display: flex; flex-direction: column; gap: 10px;">
+                <div style="display: flex; align-items: center; gap: 12px;">
+                    <span style="font-weight: 500; min-width: 90px;">LogLevel:</span>
                     <select id="xray-loglevel-select" class="inline-select">
                         <option value="debug" ${currLevel === 'debug' ? 'selected' : ''}>debug</option>
                         <option value="info" ${currLevel === 'info' ? 'selected' : ''}>info</option>
-                        <option value="warning" ${currLevel === 'warning' ? 'selected' : ''}>warning</option>
+                        <option value="warning" ${(currLevel === 'warning' || currLevel === 'warn') ? 'selected' : ''}>warning</option>
                         <option value="error" ${currLevel === 'error' ? 'selected' : ''}>error</option>
                         <option value="none" ${currLevel === 'none' ? 'selected' : ''}>none</option>
                     </select>
                 </div>
-                <div style="margin-top: 5px;">Access Log: <code style="font-size: 11px; word-break: break-all; color: var(--text-primary);">${config.log.access || "—"}</code></div>
-                <div style="margin-top: 5px;">Error Log: <code style="font-size: 11px; word-break: break-all; color: var(--text-primary);">${config.log.error || "—"}</code></div>
+                <div style="display: flex; align-items: center; gap: 12px;">
+                    <span style="font-weight: 500; min-width: 90px;">Access Log:</span>
+                    <select id="xray-access-select" class="inline-select">
+                        <option value="none" ${(currAccess === 'none' || !currAccess) ? 'selected' : ''}>none (Отключен)</option>
+                        <option value="console" ${(currAccess === 'console' || currAccess === 'stdout') ? 'selected' : ''}>console (Терминал)</option>
+                        <option value="/var/log/xray/access.log" ${currAccess === '/var/log/xray/access.log' ? 'selected' : ''}>/var/log/xray/access.log</option>
+                    </select>
+                </div>
+                <div style="display: flex; align-items: center; gap: 12px;">
+                    <span style="font-weight: 500; min-width: 90px;">Error Log:</span>
+                    <select id="xray-error-select" class="inline-select">
+                        <option value="console" ${(currError === 'console' || currError === 'stderr' || !currError) ? 'selected' : ''}>console (Терминал)</option>
+                        <option value="none" ${currError === 'none' ? 'selected' : ''}>none (Отключен)</option>
+                        <option value="/var/log/xray/error.log" ${currError === '/var/log/xray/error.log' ? 'selected' : ''}>/var/log/xray/error.log</option>
+                    </select>
+                </div>
             </div>
         </div>
     </div>`;
@@ -328,6 +344,28 @@ export async function loadXrayConfig() {
             const newLevel = e.target.value;
             window.xrayConfig.log = window.xrayConfig.log || {};
             window.xrayConfig.log.loglevel = newLevel;
+            await saveXrayConfigToServer();
+        });
+    }
+
+    const xrayAccessSelect = parsedContainer.querySelector("#xray-access-select");
+    if (xrayAccessSelect) {
+        initCustomSelect(xrayAccessSelect);
+        xrayAccessSelect.addEventListener("change", async (e) => {
+            const newAccess = e.target.value;
+            window.xrayConfig.log = window.xrayConfig.log || {};
+            window.xrayConfig.log.access = (newAccess === "console") ? "" : newAccess;
+            await saveXrayConfigToServer();
+        });
+    }
+
+    const xrayErrorSelect = parsedContainer.querySelector("#xray-error-select");
+    if (xrayErrorSelect) {
+        initCustomSelect(xrayErrorSelect);
+        xrayErrorSelect.addEventListener("change", async (e) => {
+            const newError = e.target.value;
+            window.xrayConfig.log = window.xrayConfig.log || {};
+            window.xrayConfig.log.error = (newError === "console") ? "" : newError;
             await saveXrayConfigToServer();
         });
     }
