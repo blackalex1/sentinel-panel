@@ -101,6 +101,19 @@ export async function openOutboundModal(id = null) {
                 ...streamObj
             };
 
+            // Extract direct settings fields with aliases
+            currentOutboundValues.host = settingsObj.host || settingsObj.address || settingsObj.server || currentOutboundValues.host || "";
+            currentOutboundValues.port = settingsObj.port || settingsObj.server_port || settingsObj.port_hopping || settingsObj.hop || currentOutboundValues.port || 443;
+            currentOutboundValues.password = settingsObj.password || settingsObj.auth || settingsObj.auth_str || settingsObj.auth_password || currentOutboundValues.password || "";
+            currentOutboundValues.uuid = settingsObj.uuid || settingsObj.id || currentOutboundValues.uuid || currentOutboundValues.password;
+            currentOutboundValues.upMbps = settingsObj.upMbps || settingsObj.up_mbps || currentOutboundValues.upMbps || 100;
+            currentOutboundValues.downMbps = settingsObj.downMbps || settingsObj.down_mbps || currentOutboundValues.downMbps || 100;
+            currentOutboundValues.obfs = settingsObj.obfs_type || (settingsObj.obfs && typeof settingsObj.obfs === "object" ? settingsObj.obfs.type : settingsObj.obfs) || currentOutboundValues.obfs || "";
+            currentOutboundValues.obfsPassword = settingsObj.obfs_password || (settingsObj.obfs && settingsObj.obfs.salamander && settingsObj.obfs.salamander.password) || (settingsObj.obfs && settingsObj.obfs.password) || settingsObj.obfsPassword || "";
+            currentOutboundValues.sni = settingsObj.sni || settingsObj.server_name || currentOutboundValues.sni || "";
+            currentOutboundValues.pinnedPeerCertSha256 = settingsObj.pinnedPeerCertSha256 || settingsObj.pin_sha256 || currentOutboundValues.pinnedPeerCertSha256 || "";
+            currentOutboundValues.allowInsecure = (settingsObj.allowInsecure === true || settingsObj.insecure === true || currentOutboundValues.allowInsecure === true);
+
             // Extract nested structures if present
             if (settingsObj.vnext && settingsObj.vnext[0]) {
                 const vn = settingsObj.vnext[0];
@@ -115,12 +128,21 @@ export async function openOutboundModal(id = null) {
 
             if (settingsObj.servers && settingsObj.servers[0]) {
                 const srv = settingsObj.servers[0];
-                currentOutboundValues.host = srv.address || currentOutboundValues.host;
-                currentOutboundValues.port = srv.port || currentOutboundValues.port;
-                currentOutboundValues.password = srv.password || currentOutboundValues.password;
+                currentOutboundValues.host = srv.address || srv.server || currentOutboundValues.host;
+                currentOutboundValues.port = srv.port || srv.server_port || currentOutboundValues.port;
+                currentOutboundValues.password = srv.password || srv.auth || currentOutboundValues.password;
                 currentOutboundValues.method = srv.method || currentOutboundValues.method;
                 currentOutboundValues.user = srv.user || currentOutboundValues.user;
                 currentOutboundValues.pass = srv.pass || currentOutboundValues.pass;
+            }
+
+            if (streamObj.hysteriaSettings) {
+                if (streamObj.hysteriaSettings.hop) currentOutboundValues.port = streamObj.hysteriaSettings.hop;
+                if (streamObj.hysteriaSettings.auth) currentOutboundValues.password = streamObj.hysteriaSettings.auth;
+                if (streamObj.hysteriaSettings.upMbps) currentOutboundValues.upMbps = streamObj.hysteriaSettings.upMbps;
+                if (streamObj.hysteriaSettings.downMbps) currentOutboundValues.downMbps = streamObj.hysteriaSettings.downMbps;
+                if (streamObj.hysteriaSettings.obfs) currentOutboundValues.obfs = streamObj.hysteriaSettings.obfs;
+                if (streamObj.hysteriaSettings.obfsPassword) currentOutboundValues.obfsPassword = streamObj.hysteriaSettings.obfsPassword;
             }
 
             if (streamObj.realitySettings) {
@@ -135,6 +157,7 @@ export async function openOutboundModal(id = null) {
                 currentOutboundValues.sni = streamObj.tlsSettings.serverName || currentOutboundValues.sni;
                 currentOutboundValues.fingerprint = streamObj.tlsSettings.fingerprint || currentOutboundValues.fingerprint;
                 currentOutboundValues.allowInsecure = streamObj.tlsSettings.allowInsecure === true;
+                if (streamObj.tlsSettings.pinnedPeerCertSha256) currentOutboundValues.pinnedPeerCertSha256 = streamObj.tlsSettings.pinnedPeerCertSha256;
                 if (streamObj.tlsSettings.alpn) {
                     currentOutboundValues.alpn = Array.isArray(streamObj.tlsSettings.alpn) ? streamObj.tlsSettings.alpn.join(",") : streamObj.tlsSettings.alpn;
                 }

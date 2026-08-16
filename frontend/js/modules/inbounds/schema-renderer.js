@@ -269,6 +269,7 @@ export function renderDynamicOutboundForm(containerEl, tabsContainerEl, tabDefin
                             input.type = (field.type === "number") ? "number" : ((field.type === "password") ? "password" : "text");
                             input.className = "glass-input";
                             input.setAttribute("data-target-field", field.targetField);
+                            input.autocomplete = (field.type === "password") ? "new-password" : "off";
                             input.placeholder = field.placeholder || "";
                             input.value = (val !== undefined && val !== null) ? val : "";
 

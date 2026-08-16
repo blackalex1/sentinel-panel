@@ -29,7 +29,8 @@ export function bindSubmitListener() {
         const enable = (document.getElementById("ob-enable") ? document.getElementById("ob-enable").checked : (vals.enable !== false)) ? 1 : 0;
         
         const host = (document.getElementById("ob-host") ? document.getElementById("ob-host").value.trim() : vals.host) || "";
-        const port = (document.getElementById("ob-port") ? (parseInt(document.getElementById("ob-port").value) || 443) : (parseInt(vals.port) || 443));
+        const rawPort = document.getElementById("ob-port") ? document.getElementById("ob-port").value.trim() : String(vals.port || 443);
+        const port = (rawPort.includes("-") || rawPort.includes(",") || rawPort.includes(":") || isNaN(Number(rawPort))) ? rawPort : (parseInt(rawPort) || 443);
         const uuid = (document.getElementById("ob-uuid") ? document.getElementById("ob-uuid").value.trim() : (vals.uuid || vals.password)) || "";
         const password = (document.getElementById("ob-password") ? document.getElementById("ob-password").value.trim() : (vals.password || vals.uuid)) || "";
         
@@ -131,7 +132,9 @@ export function bindSubmitListener() {
 
             settings = {
                 server: host,
+                address: host,
                 port: port,
+                password: password || uuid,
                 auth: password || uuid,
                 up_mbps: upMbps,
                 down_mbps: downMbps
