@@ -4,7 +4,7 @@ from fastapi import APIRouter, Request
 from pydantic import BaseModel, Field
 
 from backend.database import (
-    get_all_inbounds, get_clients_for_inbound, add_inbound, update_inbound, delete_inbound
+    get_all_inbounds, get_clients_for_inbound, add_inbound, update_inbound, delete_inbound, add_client_db
 )
 from backend.xray import restart_xray
 from backend.hysteria import restart_hysteria
@@ -166,6 +166,39 @@ async def create_inbound_ui(request: Request, payload: InboundCreate):
     )
     lang = get_lang(request)
     if inbound_id:
+        import secrets
+        import uuid
+        clients = payload.settings.get("clients", [])
+        if clients:
+            for c in clients:
+                email = c.get("email") or "default"
+                uid = c.get("id") or c.get("uuid") or c.get("password") or ""
+                limit_ip = c.get("limitIp") or c.get("limit_ip") or 0
+                allowed_ips = c.get("allowedIps") or c.get("allowed_ips") or ""
+                total_gb = c.get("totalGB") or c.get("total_gb") or 0
+                expiry_time = c.get("expiryTime") or c.get("expiry_time") or 0
+                enable = 1 if c.get("enable", True) else 0
+                add_client_db(inbound_id, email, uid, total_gb, expiry_time, limit_ip, enable, allowed_ips=allowed_ips)
+        else:
+            proto = payload.protocol.lower()
+            if proto == "shadowsocks":
+                method = str(payload.settings.get("method", ""))
+                pwd = payload.settings.get("password")
+                if not pwd:
+                    if method.startswith("2022-blake3-aes-128"):
+                        pwd = secrets.token_urlsafe(16)
+                    elif method.startswith("2022-blake3-aes-256") or method.startswith("2022-blake3-chacha20"):
+                        pwd = secrets.token_urlsafe(32)
+                    else:
+                        pwd = secrets.token_urlsafe(16)
+                add_client_db(inbound_id, "default", pwd)
+            elif proto in ("vless", "vmess"):
+                uid = str(uuid.uuid4())
+                add_client_db(inbound_id, "default", uid)
+            elif proto in ("trojan", "hysteria2"):
+                pwd = secrets.token_urlsafe(16)
+                add_client_db(inbound_id, "default", pwd)
+
         from backend.audit import log_action, get_actor_username
         actor = get_actor_username(request)
         log_action(actor, "create_inbound", target=f"port:{payload.port}", details=f"remark:{payload.remark}, protocol:{payload.protocol}, core:{payload.core}")
