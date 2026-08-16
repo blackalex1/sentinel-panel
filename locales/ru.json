@@ -775,7 +775,7 @@
     "config_no_outbounds_direct": "Исходящие подключения отсутствуют (Direct Output)",
     "config_no_rules_direct": "Правила маршрутизации отсутствуют (Прямой доступ)",
     "config_structure_error": "Ошибка отображения структуры конфигурации: ",
-    "core_installed_tag": " — [Установлено]",
+    "core_installed_tag": "Установлено",
     "core_btn_install_version": "Установить {version}",
     "validation_vless_decryption_format": "Неверный формат ключа Decryption (должен начинаться с 'mlkem768x25519plus.')",
     "validation_vless_encryption_format": "Неверный формат ключа Encryption (должен начинаться с 'mlkem768x25519plus.')",

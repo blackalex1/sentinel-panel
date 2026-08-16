@@ -56,6 +56,20 @@ def push_log_line(core: CoreName, line: str) -> None:
         _subscribers[core] -= dead
 
 
+def clear_history(core: CoreName) -> None:
+    """Clears buffered in-memory lines in Python log_streamer and drains subscriber queues."""
+    with _lock:
+        if core in _history:
+            _history[core].clear()
+        if core in _subscribers:
+            for q in list(_subscribers[core]):
+                while not q.empty():
+                    try:
+                        q.get_nowait()
+                    except Exception:
+                        break
+
+
 def get_history(core: CoreName) -> list[str]:
     """Returns a snapshot of recent lines for the initial SSE burst."""
     with _lock:

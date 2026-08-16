@@ -775,7 +775,7 @@
     "config_no_outbounds_direct": "No outbound connections (Direct Output)",
     "config_no_rules_direct": "No routing rules (Direct Access)",
     "config_structure_error": "Failed to render config structure: ",
-    "core_installed_tag": " — [Installed]",
+    "core_installed_tag": "Installed",
     "core_btn_install_version": "Install {version}",
     "validation_vless_decryption_format": "Invalid Decryption key format (must start with 'mlkem768x25519plus.')",
     "validation_vless_encryption_format": "Invalid Encryption key format (must start with 'mlkem768x25519plus.')",

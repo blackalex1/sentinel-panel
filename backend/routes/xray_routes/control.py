@@ -118,7 +118,9 @@ async def clear_xray_logs(request: Request):
     try:
         from backend.config import XRAY_LOG_PATH
         from backend.sentinel_core_bridge import clear_in_memory_core_logs
+        from backend.log_streamer import clear_history
         clear_in_memory_core_logs("xray")
+        clear_history("xray")
         if XRAY_LOG_PATH.exists():
             with open(XRAY_LOG_PATH, "w", encoding="utf-8") as f:
                 f.truncate(0)

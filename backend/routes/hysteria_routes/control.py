@@ -105,7 +105,9 @@ async def clear_hysteria_logs(request: Request):
         return decoy_response()
     try:
         from backend.sentinel_core_bridge import clear_in_memory_core_logs
+        from backend.log_streamer import clear_history
         clear_in_memory_core_logs("hysteria")
+        clear_history("hysteria")
         if HYSTERIA_LOG_PATH.exists():
             with open(HYSTERIA_LOG_PATH, "w", encoding="utf-8") as f:
                 f.truncate(0)

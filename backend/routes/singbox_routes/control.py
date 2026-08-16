@@ -106,7 +106,9 @@ async def clear_singbox_logs(request: Request):
         return decoy_response()
     try:
         from backend.sentinel_core_bridge import clear_in_memory_core_logs
+        from backend.log_streamer import clear_history
         clear_in_memory_core_logs("singbox")
+        clear_history("singbox")
         if SINGBOX_LOG_PATH.exists():
             with open(SINGBOX_LOG_PATH, "w", encoding="utf-8") as f:
                 f.truncate(0)
