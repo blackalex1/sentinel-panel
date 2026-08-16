@@ -219,6 +219,12 @@ export function updateFormToggles() {
         
         // Hysteria 2 Protection Mode (masq vs obfs)
         const hystModeElem = document.getElementById("ib-hysteria-mode");
+        if (hystModeElem && !hystModeElem.dataset.bound) {
+            hystModeElem.dataset.bound = "true";
+            hystModeElem.addEventListener("change", () => {
+                updateFormToggles();
+            });
+        }
         const hystMode = hystModeElem ? hystModeElem.value : "masq";
         const masqGroup = document.getElementById("hysteria-masq-group");
         const obfsGroup = document.getElementById("hysteria-obfs-group");
@@ -227,6 +233,12 @@ export function updateFormToggles() {
 
         // Hysteria 2 Certificate Mode (self vs custom)
         const certModeElem = document.getElementById("ib-hysteria-cert-mode");
+        if (certModeElem && !certModeElem.dataset.bound) {
+            certModeElem.dataset.bound = "true";
+            certModeElem.addEventListener("change", () => {
+                updateFormToggles();
+            });
+        }
         const certMode = certModeElem ? certModeElem.value : "self";
         const customCertFields = document.getElementById("hysteria-custom-cert-fields");
         if (customCertFields) customCertFields.style.display = (certMode === "custom") ? "block" : "none";

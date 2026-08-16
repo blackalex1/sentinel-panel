@@ -120,10 +120,6 @@ def _sanitize_hysteria_payload(payload):
         if hysteria_opts.get("ignoreClientBandwidth"):
             hysteria_opts["upMbps"] = 0
             hysteria_opts["downMbps"] = 0
-        if not hysteria_opts.get("masqType"):
-            hysteria_opts["masqType"] = "proxy"
-        if not hysteria_opts.get("masqValue"):
-            hysteria_opts["masqValue"] = "https://yahoo.com"
         if hysteria_opts.get("routingViaXray"):
             import secrets
             if not hysteria_opts.get("socksUsername"):
