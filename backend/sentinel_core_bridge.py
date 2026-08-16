@@ -760,6 +760,14 @@ def compile_node_server_config(target_core: str) -> Dict[str, Any]:
 
                 ib_spec["clients"] = client_list
                 ib_spec["settings"]["clients"] = client_list
+
+                if ib.get("protocol") == "shadowsocks" and client_list:
+                    ss_pwd = client_list[0].get("password") or client_list[0].get("id") or client_list[0].get("uuid")
+                    if ss_pwd:
+                        ib_spec["settings"]["password"] = ss_pwd
+                    method = str(ib_spec["settings"].get("method", ""))
+                    if target_core == "xray" and not method.startswith("2022-"):
+                        ib_spec["settings"].pop("clients", None)
             server_inbounds.append(ib_spec)
             
         compiled_rules = []
