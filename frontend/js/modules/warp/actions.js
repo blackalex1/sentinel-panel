@@ -1,5 +1,5 @@
 import { apiFetch } from "../../api.js";
-import { showToast } from "../../ui.js";
+import { showToast, showConfirmDialog } from "../../ui.js";
 import { t } from "../../i18n.js";
 import { loadWarpStatus } from "./status.js";
 
@@ -55,7 +55,13 @@ export function setupWarpListeners() {
                     "Внимание! Отключение WARP приведет к временной деактивации следующих правил маршрутизации:\n\n{rules}\n\nДоступ к ресурсам в этих правилах пропадет! Вы уверены, что хотите продолжить?"
                 ).replace("{rules}", ruleNames);
                 
-                if (!confirm(warningMsg)) {
+                const confirmed = await showConfirmDialog({
+                    title: t("settings_warp_warn_disconnect_title", "Отключение WARP"),
+                    message: warningMsg,
+                    type: "warning",
+                    okText: t("disconnect", "Отключить")
+                });
+                if (!confirmed) {
                     return;
                 }
             }
@@ -88,12 +94,24 @@ export function setupWarpListeners() {
                     "Внимание! Удаление WARP приведет к временной деактивации следующих правил маршрутизации:\n\n{rules}\n\nДоступ к ресурсам в этих правилах пропадет! Вы уверены, что хотите продолжить?"
                 ).replace("{rules}", ruleNames);
                 
-                if (!confirm(warningMsg)) {
+                const confirmedRules = await showConfirmDialog({
+                    title: t("settings_warp_warn_uninstall_title", "Удаление WARP"),
+                    message: warningMsg,
+                    type: "danger",
+                    okText: t("confirm_ok_btn", "Продолжить")
+                });
+                if (!confirmedRules) {
                     return;
                 }
             }
             
-            if (!confirm(t("confirm_warp_uninstall", "Вы действительно хотите полностью удалить Cloudflare WARP с сервера?"))) {
+            const confirmed = await showConfirmDialog({
+                title: t("settings_warp_warn_uninstall_title", "Удаление WARP"),
+                message: t("confirm_warp_uninstall", "Вы действительно хотите полностью удалить Cloudflare WARP с сервера?"),
+                type: "danger",
+                okText: t("uninstall", "Удалить")
+            });
+            if (!confirmed) {
                 return;
             }
             
@@ -148,7 +166,13 @@ export function setupWarpListeners() {
     const btnWarpRegisterFree = document.getElementById("btn-warp-register-free");
     if (btnWarpRegisterFree) {
         btnWarpRegisterFree.addEventListener("click", async () => {
-            if (!confirm(t("confirm_warp_reset_free", "Вы действительно хотите сбросить аккаунт WARP+ на бесплатный?"))) {
+            const confirmed = await showConfirmDialog({
+                title: t("settings_warp_reset_free_title", "Сброс аккаунта"),
+                message: t("confirm_warp_reset_free", "Вы действительно хотите сбросить аккаунт WARP+ на бесплатный?"),
+                type: "warning",
+                okText: t("confirm_ok_btn", "Сбросить")
+            });
+            if (!confirmed) {
                 return;
             }
             btnWarpRegisterFree.disabled = true;

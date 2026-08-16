@@ -1,5 +1,5 @@
 import { apiFetch } from "../../api.js";
-import { showToast } from "../../ui.js";
+import { showToast, showConfirmDialog } from "../../ui.js";
 import { t, translatePage } from "../../i18n.js";
 import { initCustomSelect } from "../../components/customSelect.js";
 import { initEditorModal } from "../xray/config_ui/editor_modal.js";
@@ -380,7 +380,8 @@ export function setupSingboxConfigListeners() {
 
     if (resetBtn) {
         resetBtn.addEventListener("click", async () => {
-            if (!confirm(t("confirm_reset_config", "Вы уверены, что хотите сбросить конфигурацию к дефолтной?"))) return;
+            const confirmed = await showConfirmDialog(t("confirm_reset_config", "Вы уверены, что хотите сбросить конфигурацию к дефолтной?"));
+            if (!confirmed) return;
             const res = await apiFetch("/api/singbox/config/reset", { method: "POST" });
             if (res && res.success) {
                 showToast(t("singbox_config_reset", "Конфигурация сброшена"));

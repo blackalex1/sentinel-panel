@@ -1,5 +1,5 @@
 import { apiFetch } from "../../../api.js";
-import { showToast } from "../../../ui.js";
+import { showToast, showConfirmDialog } from "../../../ui.js";
 import { t } from "../../../i18n.js";
 import { loadHysteriaConfig, renderSelectedHysteriaConfig } from "./render.js";
 
@@ -73,7 +73,8 @@ export function setupHysteriaConfigListeners() {
             if (isNaN(selectedIdx) || !window.hysteriaConfigs[selectedIdx]) return;
             
             const inboundId = window.hysteriaConfigs[selectedIdx].inbound_id;
-            if (!confirm(t("config_confirm_reset", "Вы уверены, что хотите сбросить конфигурацию на автоматическую генерацию из БД?"))) {
+            const confirmed = await showConfirmDialog(t("config_confirm_reset", "Вы уверены, что хотите сбросить конфигурацию на автоматическую генерацию из БД?"));
+            if (!confirmed) {
                 return;
             }
             

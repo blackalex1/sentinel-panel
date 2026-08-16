@@ -1,5 +1,5 @@
 import { apiFetch } from "../../api.js";
-import { showToast } from "../../ui.js";
+import { showToast, showConfirmDialog } from "../../ui.js";
 import { t } from "../../i18n.js";
 import { loadSettings } from "./core.js";
 
@@ -75,7 +75,8 @@ export async function loadActiveSessions() {
         document.querySelectorAll(".btn-terminate-session").forEach(btn => {
             btn.addEventListener("click", async (e) => {
                 const sid = e.currentTarget.getAttribute("data-id");
-                if (!confirm(t("sessions_confirm_terminate", "Are you sure you want to terminate this session?"))) return;
+                const confirmed = await showConfirmDialog(t("sessions_confirm_terminate", "Are you sure you want to terminate this session?"));
+                if (!confirmed) return;
                 
                 const deleteRes = await apiFetch("/api/security/sessions/terminate", {
                     method: "POST",

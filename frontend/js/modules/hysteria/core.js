@@ -1,5 +1,5 @@
 import { apiFetch } from "../../api.js";
-import { showToast } from "../../ui.js";
+import { showToast, showConfirmDialog } from "../../ui.js";
 import { t } from "../../i18n.js";
 import { loadHysteriaConfig } from "./config.js";
 
@@ -378,11 +378,16 @@ export function setupHysteriaCoreListeners() {
     const reissueBtn = document.getElementById("hysteria-reissue-cert-btn");
     if (reissueBtn) {
         reissueBtn.addEventListener("click", async () => {
-            const confirmed = window.confirm(t("hysteria_cert_reissue_confirm", 
-                "Внимание!\n\nПеревыпуск SSL-сертификата изменит SHA-256 хеш (pinSHA256).\n" +
-                "Все клиенты с жесткой проверкой пина потеряют доступ, пока не обновят свои ключи/подписку.\n\n" +
-                "Вы действительно хотите перевыпустить сертификат?"
-            ));
+            const confirmed = await showConfirmDialog({
+                title: t("hysteria_cert_alert_title", "Перевыпуск сертификата"),
+                message: t("hysteria_cert_reissue_confirm", 
+                    "Внимание!\n\nПеревыпуск SSL-сертификата изменит SHA-256 хеш (pinSHA256).\n" +
+                    "Все клиенты с жесткой проверкой пина потеряют доступ, пока не обновят свои ключи/подписку.\n\n" +
+                    "Вы действительно хотите перевыпустить сертификат?"
+                ),
+                type: "danger",
+                okText: t("reissue_cert", "Перевыпустить")
+            });
             if (!confirmed) return;
 
             reissueBtn.disabled = true;
