@@ -2,11 +2,20 @@
 
 # ==============================================================================
 # Sentinel-Core Binary & Library Downloader
-# Automatically fetches the latest compiled sentinel-core engine for current OS/Arch
+# Fetches compiled sentinel-core engine for current OS/Arch with interactive version selector
 # ==============================================================================
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-BIN_DIR="${1:-$SCRIPT_DIR/bin}"
+BIN_DIR="$SCRIPT_DIR/bin"
+AUTO_MODE=0
+
+for arg in "$@"; do
+    case "$arg" in
+        --auto|-y) AUTO_MODE=1 ;;
+        -*) ;;
+        *) BIN_DIR="$arg" ;;
+    esac
+done
 
 mkdir -p "$BIN_DIR"
 
@@ -28,13 +37,9 @@ case "$ARCH_RAW" in
     *)              ARCH="amd64" ;;
 esac
 
-echo "[+] Detecting platform: OS=$OS, ARCH=$ARCH..."
-
 REPO="blackalex1/sentinel-core"
-GITHUB_API="https://api.github.com/repos/$REPO/releases/latest"
-GITHUB_DL_BASE="https://github.com/$REPO/releases/latest/download"
 
-# Determine target binary name
+# Determine target binary & library names
 if [ "$OS" = "windows" ]; then
     BIN_NAME="sentinel-core-windows-${ARCH}.exe"
     DEST_BIN="$BIN_DIR/sentinel-core.exe"
@@ -47,65 +52,197 @@ else
     DEST_LIB="$BIN_DIR/libsentinel-core.so"
 fi
 
-echo "[+] Downloading $BIN_NAME from $REPO releases..."
-
-DOWNLOAD_CMD=""
-if command -v curl &>/dev/null; then
-    DOWNLOAD_CMD="curl -fsSL --connect-timeout 10 --retry 3"
-elif command -v wget &>/dev/null; then
-    DOWNLOAD_CMD="wget -qO-"
+# 3. Detect currently installed version
+CURRENT_VER="Не установлено (Not installed)"
+if [ -x "$DEST_BIN" ] || [ -f "$DEST_BIN" ]; then
+    DETECTED_RAW=$("$DEST_BIN" version 2>/dev/null || "$DEST_BIN" --version 2>/dev/null || true)
+    if [ -n "$DETECTED_RAW" ]; then
+        CURRENT_VER=$(echo "$DETECTED_RAW" | head -n 1)
+    else
+        CURRENT_VER="Установлено (версия не определена)"
+    fi
 fi
 
-if [ -z "$DOWNLOAD_CMD" ]; then
-    echo "[!] Neither curl nor wget is available. Skipping sentinel-core binary download."
-    exit 0
+# 4. Fetch available releases from GitHub API
+STABLE_VER=""
+PRERELEASE_VER=""
+LATEST_ANY=""
+
+echo "[+] Опрос GitHub Releases для $REPO..."
+
+# Use python3 to fetch and categorize releases safely
+if command -v python3 &>/dev/null; then
+    RELEASE_DATA=$(python3 -c "
+import urllib.request, json, sys
+try:
+    req = urllib.request.Request('https://api.github.com/repos/$REPO/releases', headers={'User-Agent': 'SentinelPanel'})
+    with urllib.request.urlopen(req, timeout=6) as response:
+        releases = json.loads(response.read().decode('utf-8'))
+        stable = next((r['tag_name'] for r in releases if not r.get('prerelease')), '')
+        prerelease = next((r['tag_name'] for r in releases if r.get('prerelease')), '')
+        latest_any = releases[0]['tag_name'] if releases else ''
+        print(f'{stable}|{prerelease}|{latest_any}')
+except Exception:
+    print('||')
+" 2>/dev/null || echo "||")
+    STABLE_VER=$(echo "$RELEASE_DATA" | cut -d'|' -f1)
+    PRERELEASE_VER=$(echo "$RELEASE_DATA" | cut -d'|' -f2)
+    LATEST_ANY=$(echo "$RELEASE_DATA" | cut -d'|' -f3)
 fi
 
-# Download CLI binary
-TMP_BIN="/tmp/$BIN_NAME.$$"
-if curl -fsSL --connect-timeout 10 --retry 2 "$GITHUB_DL_BASE/$BIN_NAME" -o "$TMP_BIN" 2>/dev/null; then
-    if [ -s "$TMP_BIN" ]; then
-        mv "$TMP_BIN" "$DEST_BIN"
-        chmod +x "$DEST_BIN"
-        echo "[+] Successfully installed sentinel-core binary at $DEST_BIN"
-        
-        # Quick verification test
-        if "$DEST_BIN" version &>/dev/null || "$DEST_BIN" --help &>/dev/null || "$DEST_BIN" preset list &>/dev/null; then
-            echo "[+] sentinel-core binary verified successfully!"
+# Fallback with curl if python didn't get results
+if [ -z "$LATEST_ANY" ] && command -v curl &>/dev/null; then
+    LATEST_ANY=$(curl -fsSL --connect-timeout 5 "https://api.github.com/repos/$REPO/releases" 2>/dev/null | grep -m1 '"tag_name":' | cut -d'"' -f4 | tr -d '\r\n ')
+fi
+
+# 5. Interactive version selection UI
+SELECTED_TAG=""
+
+# Check if running interactively in a TTY terminal
+if [ -t 0 ] && [ "$AUTO_MODE" -eq 0 ]; then
+    echo ""
+    echo "===================================================="
+    echo "🛡️  ВЫБОР ВЕРСИИ ЯДРА SENTINEL-CORE"
+    echo "===================================================="
+    echo "📌 Текущая версия:              $CURRENT_VER"
+    echo "🟢 Последняя стабильная (Stable): ${STABLE_VER:-Отсутствует (нет стабильного релиза)}"
+    echo "🟡 Пре-релиз / Бета (Pre-release): ${PRERELEASE_VER:-Отсутствует}"
+    echo "===================================================="
+
+    DEFAULT_OPTION=1
+    DEFAULT_TAG="${LATEST_ANY:-$PRERELEASE_VER}"
+    [ -n "$STABLE_VER" ] && DEFAULT_TAG="$STABLE_VER"
+
+    echo "Варианты установки:"
+    if [ -n "$PRERELEASE_VER" ] && [ -n "$STABLE_VER" ]; then
+        echo "  1) Установить стабильную версию ($STABLE_VER) [Рекомендуется]"
+        echo "  2) Установить бета/пре-релиз ($PRERELEASE_VER)"
+        echo "  3) Оставить текущую версию (пропустить обновление ядра)"
+        echo "  4) Ввести тег/версию вручную"
+        read -t 15 -p "Выберите вариант [1-4] (по умолчанию 1): " USER_CHOICE || USER_CHOICE="1"
+        echo ""
+        case "$USER_CHOICE" in
+            2) SELECTED_TAG="$PRERELEASE_VER" ;;
+            3) echo "[+] Обновление ядра пропущено пользователем."; exit 0 ;;
+            4) read -p "Введите тег релиза (например v0.0.0.1-beta): " SELECTED_TAG ;;
+            *) SELECTED_TAG="$STABLE_VER" ;;
+        esac
+    elif [ -n "$PRERELEASE_VER" ]; then
+        echo "  1) Установить актуальную версию ($PRERELEASE_VER) [По умолчанию]"
+        echo "  2) Оставить текущую версию (пропустить)"
+        echo "  3) Ввести тег/версию вручную"
+        read -t 15 -p "Выберите вариант [1-3] (по умолчанию 1): " USER_CHOICE || USER_CHOICE="1"
+        echo ""
+        case "$USER_CHOICE" in
+            2) echo "[+] Обновление ядра пропущено пользователем."; exit 0 ;;
+            3) read -p "Введите тег релиза (например v0.0.0.1-beta): " SELECTED_TAG ;;
+            *) SELECTED_TAG="$PRERELEASE_VER" ;;
+        esac
+    elif [ -n "$STABLE_VER" ]; then
+        echo "  1) Установить стабильную версию ($STABLE_VER) [По умолчанию]"
+        echo "  2) Оставить текущую версию (пропустить)"
+        echo "  3) Ввести тег/версию вручную"
+        read -t 15 -p "Выберите вариант [1-3] (по умолчанию 1): " USER_CHOICE || USER_CHOICE="1"
+        echo ""
+        case "$USER_CHOICE" in
+            2) echo "[+] Обновление ядра пропущено пользователем."; exit 0 ;;
+            3) read -p "Введите тег релиза (например v1.0.0): " SELECTED_TAG ;;
+            *) SELECTED_TAG="$STABLE_VER" ;;
+        esac
+    else
+        echo "[-] Не удалось получить список версий через API."
+        echo "  1) Попробовать скачать последний релиз напрямую"
+        echo "  2) Ввести версию вручную"
+        echo "  3) Пропустить"
+        read -t 15 -p "Выберите вариант [1-3] (по умолчанию 1): " USER_CHOICE || USER_CHOICE="1"
+        echo ""
+        case "$USER_CHOICE" in
+            2) read -p "Введите тег релиза (например v0.0.0.1-beta): " SELECTED_TAG ;;
+            3) echo "[+] Обновление ядра пропущено."; exit 0 ;;
+            *) SELECTED_TAG="" ;;
+        esac
+    fi
+else
+    # Non-interactive / unattended automated mode
+    if [ -n "$STABLE_VER" ]; then
+        SELECTED_TAG="$STABLE_VER"
+    elif [ -n "$PRERELEASE_VER" ]; then
+        SELECTED_TAG="$PRERELEASE_VER"
+    else
+        SELECTED_TAG="$LATEST_ANY"
+    fi
+fi
+
+echo "[+] Выбранная версия для загрузки: ${SELECTED_TAG:-latest}"
+
+# 6. Build Candidate Download URLs
+URL_CANDIDATES=()
+if [ -n "$SELECTED_TAG" ]; then
+    URL_CANDIDATES+=("https://github.com/$REPO/releases/download/$SELECTED_TAG")
+fi
+URL_CANDIDATES+=("https://github.com/$REPO/releases/latest/download")
+
+# Helper function to download asset
+download_asset() {
+    local ASSET_NAME="$1"
+    local DEST_PATH="$2"
+    local IS_EXEC="$3"
+    local SUCCESS=0
+
+    for BASE_URL in "${URL_CANDIDATES[@]}"; do
+        local URL="$BASE_URL/$ASSET_NAME"
+        local TMP_FILE="/tmp/${ASSET_NAME}.$$"
+        rm -f "$TMP_FILE"
+
+        if command -v curl &>/dev/null; then
+            curl -fsSL --connect-timeout 10 --retry 2 "$URL" -o "$TMP_FILE" 2>/dev/null
+        elif command -v wget &>/dev/null; then
+            wget -q -T 10 -t 2 "$URL" -O "$TMP_FILE" 2>/dev/null
+        elif command -v python3 &>/dev/null; then
+            python3 -c "import urllib.request; urllib.request.urlretrieve('$URL', '$TMP_FILE')" 2>/dev/null || true
         fi
-    else
-        rm -f "$TMP_BIN"
-        echo "[-] Release asset $BIN_NAME empty or not found yet on GitHub Releases."
-    fi
-else
-    rm -f "$TMP_BIN"
-    echo "[-] Release asset $BIN_NAME not yet published or unreachable. Preserving local version if present."
-fi
 
-# Download C-Shared library if applicable (optional enhancement)
-TMP_LIB="/tmp/$LIB_NAME.$$"
-if curl -fsSL --connect-timeout 10 --retry 2 "$GITHUB_DL_BASE/$LIB_NAME" -o "$TMP_LIB" 2>/dev/null; then
-    if [ -s "$TMP_LIB" ]; then
-        mv "$TMP_LIB" "$DEST_LIB"
-        chmod +x "$DEST_LIB" 2>/dev/null || true
-        echo "[+] Successfully installed sentinel-core C-Shared library at $DEST_LIB"
-    else
-        rm -f "$TMP_LIB"
-    fi
-else
-    rm -f "$TMP_LIB"
-fi
+        if [ -s "$TMP_FILE" ]; then
+            # Verify it is not an HTML error response
+            if ! head -n 1 "$TMP_FILE" | grep -iq "<!DOCTYPE html>"; then
+                mv "$TMP_FILE" "$DEST_PATH"
+                if [ "$IS_EXEC" = "1" ]; then
+                    chmod +x "$DEST_PATH" 2>/dev/null || true
+                fi
+                echo "[+] Успешно установлен $ASSET_NAME -> $DEST_PATH"
+                SUCCESS=1
+                break
+            fi
+        fi
+        rm -f "$TMP_FILE"
+    done
 
-# Download header file (sentinel-core.h)
-TMP_HDR="/tmp/sentinel-core.h.$$"
-if curl -fsSL --connect-timeout 10 --retry 2 "$GITHUB_DL_BASE/sentinel-core.h" -o "$TMP_HDR" 2>/dev/null; then
-    if [ -s "$TMP_HDR" ]; then
-        mv "$TMP_HDR" "$BIN_DIR/sentinel-core.h"
-    else
-        rm -f "$TMP_HDR"
+    if [ "$SUCCESS" -eq 0 ]; then
+        if [ -f "$DEST_PATH" ]; then
+            echo "[-] Не удалось загрузить $ASSET_NAME из релиза. Сохранена текущая локальная версия."
+        else
+            echo "[!] Ошибка: Не удалось скачать $ASSET_NAME."
+        fi
     fi
-else
-    rm -f "$TMP_HDR"
+}
+
+# 7. Download CLI binary
+echo "[+] Загрузка бинарника $BIN_NAME..."
+download_asset "$BIN_NAME" "$DEST_BIN" 1
+
+# 8. Download C-Shared library
+echo "[+] Загрузка библиотеки $LIB_NAME..."
+download_asset "$LIB_NAME" "$DEST_LIB" 0
+
+# 9. Download header file
+download_asset "sentinel-core.h" "$BIN_DIR/sentinel-core.h" 0
+
+# 10. Verification
+if [ -x "$DEST_BIN" ] || [ -f "$DEST_BIN" ]; then
+    echo "[+] Проверка работоспособности sentinel-core..."
+    if "$DEST_BIN" version &>/dev/null || "$DEST_BIN" --help &>/dev/null || "$DEST_BIN" preset list &>/dev/null; then
+        echo "[+] sentinel-core успешно проверен и готов к работе!"
+    fi
 fi
 
 exit 0
