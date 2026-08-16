@@ -143,8 +143,10 @@ export function bindSubmitListener() {
             if (obfsType === "salamander") {
                 settings.obfs = {
                     type: "salamander",
-                    salamander: { password: obfsPassword }
+                    password: obfsPassword
                 };
+                settings.obfs_type = "salamander";
+                settings.obfs_password = obfsPassword;
             }
 
             streamSettings = {

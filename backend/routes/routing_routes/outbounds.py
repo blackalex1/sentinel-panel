@@ -35,8 +35,26 @@ async def create_outbound_api(request: Request, payload: dict):
     if ob_id is None:
         return {"success": False, "msg": t("outbound_tag_must_be_unique", lang=lang, category="backend")}
         
-    from backend.utils.service_restart import restart_services_background
-    restart_services_background(delay=0.5)
+    from backend.singbox import write_singbox_config, restart_singbox
+    from backend.xray import write_xray_config, restart_xray
+    from backend.hysteria import restart_hysteria
+
+    write_singbox_config(force=True)
+    write_xray_config()
+
+    singbox_ok = restart_singbox()
+    xray_ok = restart_xray()
+    restart_hysteria()
+
+    if singbox_ok is False:
+        from backend.singbox.service import get_last_singbox_error
+        last_err = get_last_singbox_error() or "Failed to start or validate Sing-box process"
+        return {"success": False, "msg": t("singbox_config_error", lang=lang, category="backend", error=last_err)}
+
+    if xray_ok is False:
+        from backend.xray.service import get_last_xray_error
+        last_err = get_last_xray_error() or "Failed to start or validate Xray process"
+        return {"success": False, "msg": t("xray_config_error", lang=lang, category="backend", error=last_err)}
     
     actor = get_actor_username(request)
     log_action(actor, "create_outbound", target=tag, details=f"protocol:{protocol}, remark:{remark}")
@@ -64,8 +82,26 @@ async def update_outbound_api(request: Request, id: int, payload: dict):
     if not success:
         return {"success": False, "msg": t("outbound_update_tag_conflict", lang=lang, category="backend")}
         
-    from backend.utils.service_restart import restart_services_background
-    restart_services_background(delay=0.5)
+    from backend.singbox import write_singbox_config, restart_singbox
+    from backend.xray import write_xray_config, restart_xray
+    from backend.hysteria import restart_hysteria
+
+    write_singbox_config(force=True)
+    write_xray_config()
+
+    singbox_ok = restart_singbox()
+    xray_ok = restart_xray()
+    restart_hysteria()
+
+    if singbox_ok is False:
+        from backend.singbox.service import get_last_singbox_error
+        last_err = get_last_singbox_error() or "Failed to start or validate Sing-box process"
+        return {"success": False, "msg": t("singbox_config_error", lang=lang, category="backend", error=last_err)}
+
+    if xray_ok is False:
+        from backend.xray.service import get_last_xray_error
+        last_err = get_last_xray_error() or "Failed to start or validate Xray process"
+        return {"success": False, "msg": t("xray_config_error", lang=lang, category="backend", error=last_err)}
     
     actor = get_actor_username(request)
     log_action(actor, "update_outbound", target=tag, details=f"protocol:{protocol}, remark:{remark}, enable:{enable}")
