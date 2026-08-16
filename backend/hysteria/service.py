@@ -143,6 +143,21 @@ def start_hysteria():
             
         logging.info(f"Starting Hysteria 2 on port {ib['port']} via sentinel-core...")
         try:
+            admin_port = 0
+            if isinstance(config, dict) and "trafficStats" in config:
+                ts_listen = config["trafficStats"].get("listen", "")
+                if ":" in ts_listen:
+                    try:
+                        admin_port = int(ts_listen.split(":")[-1])
+                    except Exception:
+                        pass
+            if admin_port > 0:
+                try:
+                    from backend.sentinel_core_bridge import register_hysteria_port
+                    register_hysteria_port(admin_port)
+                except Exception:
+                    pass
+
             from backend.sentinel_core_bridge import start_core
             if start_core("hysteria2", str(backend.hysteria.HYSTERIA_BIN_PATH), str(config_path)):
                 logging.info(f"Hysteria 2 started successfully via sentinel-core for inbound {ib_id}.")

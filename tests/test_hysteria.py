@@ -250,6 +250,16 @@ def test_download_hysteria_core_verification_failure_actual(monkeypatch, tmp_pat
             return [b"mock binary content"]
         def raise_for_status(self):
             pass
+        def json(self):
+            return [
+                {
+                    "tag_name": "app/v2.5.0",
+                    "assets": [
+                        {"name": "hysteria-windows-amd64.exe", "browser_download_url": "https://github.com/apernet/hysteria/releases/download/v2.5.0/hysteria"},
+                        {"name": "hysteria-linux-amd64", "browser_download_url": "https://github.com/apernet/hysteria/releases/download/v2.5.0/hysteria"}
+                    ]
+                }
+            ]
             
     monkeypatch.setattr(requests, "get", lambda *args, **kwargs: MockResponse())
     

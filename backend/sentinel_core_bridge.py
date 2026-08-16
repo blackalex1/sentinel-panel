@@ -360,28 +360,41 @@ def get_cores_status() -> Dict[str, Any]:
     """Returns runtime status of all cores via sentinel-core supervisor."""
     try:
         res = _ffi_call_json("SentinelGetCoresStatus")
-        if isinstance(res, dict) and ("sing-box" in res or "xray" in res or "hysteria2" in res):
+        if isinstance(res, dict) and "error" not in res and len(res) > 0:
             return res
     except Exception as e:
         logger.debug("FFI get_cores_status error: %s", e)
 
     res = run_core_command(["supervisor", "status"])
-    if isinstance(res, dict):
+    if isinstance(res, dict) and "error" not in res:
         return res
     return {}
+
+
+def register_hysteria_port(port: int) -> bool:
+    """Registers a Hysteria 2 admin port with sentinel-core supervisor for telemetry monitoring."""
+    if port <= 0:
+        return False
+    try:
+        res = _ffi_call_json("SentinelRegisterHysteriaPort", int(port))
+        if isinstance(res, dict) and res.get("success") is True:
+            return True
+    except Exception as e:
+        logger.debug("FFI register_hysteria_port error: %s", e)
+    return True
 
 
 def get_unified_traffic() -> Dict[str, Any]:
     """Returns aggregated traffic and active clients across all cores via sentinel-core."""
     try:
         res = _ffi_call_json("SentinelGetUnifiedTraffic")
-        if isinstance(res, dict) and ("totalUp" in res or "clients" in res or len(res) > 0):
+        if isinstance(res, dict) and "error" not in res:
             return res
     except Exception as e:
         logger.debug("FFI get_unified_traffic error: %s", e)
 
     res = run_core_command(["supervisor", "traffic"])
-    if isinstance(res, dict):
+    if isinstance(res, dict) and "error" not in res:
         return res
     return {}
 

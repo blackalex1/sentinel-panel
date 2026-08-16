@@ -185,11 +185,82 @@ def parse_recent_singbox_ips():
     except Exception as e:
         logging.error(f"[Scheduler] Error parsing Sing-box logs: {e}")
 
+def parse_recent_hysteria_ips():
+    """Scans Hysteria 2 log files and collects active IPs/sessions for each client in the last 3 minutes."""
+    global ACTIVE_IP_CACHE
+    import json
+    import re
+    from backend.config import HYSTERIA_LOG_PATH
+    
+    now_ts = time.time()
+    cutoff_ts = now_ts - 180  # 3 minutes
+
+    # Incorporate active client IPs from sentinel-core bridge
+    try:
+        from backend.sentinel_core_bridge import get_unified_traffic
+        traffic = get_unified_traffic()
+        if traffic and isinstance(traffic, dict):
+            for email, stats in traffic.items():
+                if isinstance(stats, dict):
+                    if "activeIps" in stats and stats["activeIps"]:
+                        for ip in stats["activeIps"]:
+                            if email not in ACTIVE_IP_CACHE:
+                                ACTIVE_IP_CACHE[email] = {}
+                            ACTIVE_IP_CACHE[email][ip] = now_ts
+                    elif stats.get("online") or stats.get("connections", 0) > 0:
+                        if email not in ACTIVE_IP_CACHE:
+                            ACTIVE_IP_CACHE[email] = {}
+                        ACTIVE_IP_CACHE[email]["127.0.0.1"] = now_ts
+    except Exception:
+        pass
+
+    if not HYSTERIA_LOG_PATH.exists():
+        return
+
+    try:
+        from backend.sentinel_core_bridge import get_core_logs
+        lines = get_core_logs(str(HYSTERIA_LOG_PATH), 1000)
+        if not lines:
+            lines = read_last_lines(HYSTERIA_LOG_PATH, 1000)
+
+        for line in lines:
+            if "client connected" in line:
+                match = re.search(r"client connected\s+(\{.*\})", line)
+                if match:
+                    try:
+                        data = json.loads(match.group(1))
+                        username = data.get("id") or "Unknown"
+                        raw_addr = data.get("addr", "")
+                        ip = raw_addr.split(":")[0].strip("[]") if raw_addr else "127.0.0.1"
+                        if username != "Unknown":
+                            if username not in ACTIVE_IP_CACHE:
+                                ACTIVE_IP_CACHE[username] = {}
+                            ACTIVE_IP_CACHE[username][ip] = now_ts
+                    except Exception:
+                        pass
+            elif "client disconnected" in line:
+                match = re.search(r"client disconnected\s+(\{.*\})", line)
+                if match:
+                    try:
+                        data = json.loads(match.group(1))
+                        username = data.get("id") or "Unknown"
+                        raw_addr = data.get("addr", "")
+                        ip = raw_addr.split(":")[0].strip("[]") if raw_addr else "127.0.0.1"
+                        if username in ACTIVE_IP_CACHE and ip in ACTIVE_IP_CACHE[username]:
+                            del ACTIVE_IP_CACHE[username][ip]
+                            if not ACTIVE_IP_CACHE[username]:
+                                del ACTIVE_IP_CACHE[username]
+                    except Exception:
+                        pass
+    except Exception as e:
+        logging.error(f"[Scheduler] Error parsing Hysteria logs: {e}")
+
 def enforce_client_limits_and_rules():
     """Main background client limits scheduler running every 30 seconds."""
     import backend.scheduler
     backend.scheduler.parse_recent_xray_ips()
     backend.scheduler.parse_recent_singbox_ips()
+    backend.scheduler.parse_recent_hysteria_ips()
     try:
         from backend.client_alerts import check_xray_inactivity_timeouts, check_singbox_inactivity_timeouts
         check_xray_inactivity_timeouts()

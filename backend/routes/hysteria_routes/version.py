@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Request
-import backend.routes.hysteria as hysteria_facade
+import backend.routes.hysteria
+from backend.auth_utils import decoy_response
 from backend.hysteria import (
     get_latest_hysteria_version_info, get_hysteria_releases, get_installed_hysteria_version,
     download_hysteria_core, start_hysteria, stop_hysteria
@@ -9,8 +10,8 @@ router = APIRouter()
 
 @router.get("/api/hysteria/version")
 async def hysteria_version(request: Request, include_prerelease: bool = False):
-    if not hysteria_facade.check_auth(request):
-        return hysteria_facade.decoy_response()
+    if not backend.routes.hysteria.check_auth(request):
+        return decoy_response()
     info = get_latest_hysteria_version_info()
     releases = get_hysteria_releases(include_prerelease=include_prerelease)
     current_installed = get_installed_hysteria_version()
@@ -41,8 +42,8 @@ async def hysteria_version(request: Request, include_prerelease: bool = False):
 
 @router.post("/api/hysteria/update")
 async def hysteria_update(request: Request, payload: dict):
-    if not hysteria_facade.check_auth(request):
-        return hysteria_facade.decoy_response()
+    if not backend.routes.hysteria.check_auth(request):
+        return decoy_response()
 
     download_url = payload.get("download_url")
     try:

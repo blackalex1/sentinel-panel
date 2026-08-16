@@ -108,25 +108,25 @@ async def hysteria_client_auth(request: Request, payload: dict, secret: str = No
                         logging.error(f"Failed to trigger Telegram IP rejected alert: {alert_err}")
                     return {"ok": False}
 
-            # Проверка лимита IP-адресов
-            if client.limit_ip > 0:
-                if client_ip:
-                    now_ts = time.time()
-                    cutoff_ts = now_ts - 180
+            # Фиксация активного IP-адреса для отслеживания статуса Онлайн и лимитов IP
+            if client_ip:
+                now_ts = time.time()
+                cutoff_ts = now_ts - 180
 
-                    if email not in ACTIVE_IP_CACHE:
-                        ACTIVE_IP_CACHE[email] = {}
+                if email not in ACTIVE_IP_CACHE:
+                    ACTIVE_IP_CACHE[email] = {}
 
-                    ip_map = ACTIVE_IP_CACHE[email]
-                    for ip in list(ip_map.keys()):
-                        if ip_map[ip] < cutoff_ts:
-                            del ip_map[ip]
+                ip_map = ACTIVE_IP_CACHE[email]
+                for ip in list(ip_map.keys()):
+                    if ip_map[ip] < cutoff_ts:
+                        del ip_map[ip]
 
-                    ip_map[client_ip] = now_ts
+                ip_map[client_ip] = now_ts
 
-                    if len(ip_map) > client.limit_ip:
-                        logging.warning(f"Hysteria 2 connection rejected for {email}: IP limit exceeded ({len(ip_map)} > {client.limit_ip})")
-                        return {"ok": False}
+                # Проверка лимита IP-адресов
+                if client.limit_ip > 0 and len(ip_map) > client.limit_ip:
+                    logging.warning(f"Hysteria 2 connection rejected for {email}: IP limit exceeded ({len(ip_map)} > {client.limit_ip})")
+                    return {"ok": False}
 
             return {"ok": True, "id": email}
 

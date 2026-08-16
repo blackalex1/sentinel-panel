@@ -10,6 +10,7 @@ from backend.scheduler_jobs.limits import (
     enforce_client_limits_and_rules,
     parse_recent_xray_ips,
     parse_recent_singbox_ips,
+    parse_recent_hysteria_ips,
     asyncio_notify_admin
 )
 from backend.scheduler_jobs.backups import check_and_run_backups

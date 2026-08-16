@@ -2,7 +2,8 @@ import asyncio
 import json
 from fastapi import APIRouter, Request, WebSocket, status
 from fastapi.responses import StreamingResponse
-from backend.auth_utils import check_auth, decoy_response, check_ws_auth
+import backend.routes.hysteria
+from backend.auth_utils import decoy_response, check_ws_auth
 from backend.config import HYSTERIA_LOG_PATH
 from backend.hysteria import (
     start_hysteria, stop_hysteria, restart_hysteria, get_hysteria_logs, is_hysteria_running
@@ -13,13 +14,13 @@ router = APIRouter()
 
 @router.get("/api/hysteria/status")
 async def hysteria_status(request: Request):
-    if not check_auth(request):
+    if not backend.routes.hysteria.check_auth(request):
         return decoy_response()
     return {"running": is_hysteria_running()}
 
 @router.post("/api/hysteria/action")
 async def hysteria_action(request: Request, payload: dict):
-    if not check_auth(request):
+    if not backend.routes.hysteria.check_auth(request):
         return decoy_response()
 
     lang = get_lang(request)
@@ -38,7 +39,7 @@ async def hysteria_action(request: Request, payload: dict):
 
 @router.get("/api/hysteria/logs")
 async def hysteria_logs(request: Request):
-    if not check_auth(request):
+    if not backend.routes.hysteria.check_auth(request):
         return decoy_response()
     logs = get_hysteria_logs()
     return {"success": True, "logs": logs}
@@ -46,7 +47,7 @@ async def hysteria_logs(request: Request):
 @router.get("/api/hysteria/logs/stream")
 async def hysteria_logs_stream(request: Request):
     """SSE endpoint for real-time Hysteria log streaming."""
-    if not check_auth(request):
+    if not backend.routes.hysteria.check_auth(request):
         return decoy_response()
 
     from backend.log_streamer import get_history, subscribe, unsubscribe
@@ -101,7 +102,7 @@ async def hysteria_logs_ws(websocket: WebSocket):
 
 @router.post("/api/hysteria/logs/clear")
 async def clear_hysteria_logs(request: Request):
-    if not check_auth(request):
+    if not backend.routes.hysteria.check_auth(request):
         return decoy_response()
     try:
         from backend.sentinel_core_bridge import clear_in_memory_core_logs
@@ -118,7 +119,7 @@ async def clear_hysteria_logs(request: Request):
 @router.get("/api/hysteria/certificate/status")
 async def hysteria_certificate_status(request: Request):
     """Returns detailed status and validation results for the active Hysteria 2 SSL certificate."""
-    if not check_auth(request):
+    if not backend.routes.hysteria.check_auth(request):
         return decoy_response()
     from backend.hysteria import get_hysteria_cert_status
     status = get_hysteria_cert_status()
@@ -127,7 +128,7 @@ async def hysteria_certificate_status(request: Request):
 @router.post("/api/hysteria/certificate/regenerate")
 async def hysteria_certificate_regenerate(request: Request, payload: dict = None):
     """Explicitly re-issues Hysteria 2 SSL certificate and updates all hashes upon user confirmation."""
-    if not check_auth(request):
+    if not backend.routes.hysteria.check_auth(request):
         return decoy_response()
     from backend.hysteria import reissue_hysteria_cert, get_hysteria_cert_status
     success, msg = reissue_hysteria_cert()

@@ -112,6 +112,12 @@ def _core_log_worker(core: CoreName):
                         process_xray_log_line(line)
                     except Exception:
                         pass
+                elif core in ("hysteria", "hysteria2"):
+                    try:
+                        from backend.client_alerts import process_hysteria_log_line
+                        process_hysteria_log_line(line)
+                    except Exception:
+                        pass
 
             if had_activity:
                 time.sleep(0.005)

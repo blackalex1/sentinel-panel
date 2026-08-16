@@ -163,3 +163,51 @@ def test_hysteria_standalone_online_status():
 
     assert "hy2_standalone_user@test.com" in ACTIVE_IP_CACHE
     assert "192.0.2.100" in ACTIVE_IP_CACHE["hy2_standalone_user@test.com"]
+
+    from backend.routes.clients.actions import update_online_emails
+    onlines = update_online_emails()
+    assert "hy2_standalone_user@test.com" in onlines
+
+
+def test_hysteria_auth_endpoint_populates_active_ip_cache_for_unlimited_clients():
+    """
+    Verifies that authenticating via /api/hysteria/auth immediately registers client as online
+    in ACTIVE_IP_CACHE even when limit_ip == 0 (unlimited).
+    """
+    import asyncio
+    from backend.routes.hysteria_routes.auth import hysteria_client_auth
+    from backend.routes.clients.actions import update_online_emails
+    from starlette.requests import Request
+
+    email = "unlimited_hy2_user@test.com"
+    with db_session() as session:
+        ib = Inbound(remark="Hysteria Unlim IB", port=31004, protocol="hysteria2", core="hysteria", enable=1)
+        session.add(ib)
+        session.commit()
+
+        c = ClientStats(inbound_id=ib.id, email=email, client_uuid_or_pwd="pwd_unlimited", enable=1, limit_ip=0)
+        session.add(c)
+        session.commit()
+
+    scope = {
+        "type": "http",
+        "method": "POST",
+        "path": "/api/hysteria/auth",
+        "headers": [],
+        "client": ("127.0.0.1", 54321),
+    }
+    request = Request(scope)
+    payload = {
+        "auth": f"{email}:pwd_unlimited",
+        "addr": "198.51.100.99:43210"
+    }
+
+    res = asyncio.run(hysteria_client_auth(request, payload))
+    assert res.get("ok") is True
+    assert res.get("id") == email
+    assert email in ACTIVE_IP_CACHE
+    assert "198.51.100.99" in ACTIVE_IP_CACHE[email]
+
+    onlines = update_online_emails()
+    assert email in onlines
+

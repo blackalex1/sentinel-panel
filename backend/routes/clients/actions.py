@@ -12,11 +12,15 @@ router = APIRouter()
 _last_traffic_check_time = 0
 _online_emails = []
 
+import asyncio
+
 def update_online_emails():
     """Queries online clients from sentinel-core supervisor and updates the cache in the background."""
     global _last_traffic_check_time, _online_emails
     
     emails = []
+    now_ts = time.time()
+    cutoff_ts = now_ts - 180  # 3 minutes window
     
     # 1. Primary: query unified traffic from sentinel-core supervisor
     try:
@@ -29,11 +33,26 @@ def update_online_emails():
     except Exception as e:
         logging.error(f"Error querying unified traffic from sentinel-core: {e}")
 
-    # 2. Add active IP cache if available
+    # 2. Add active IP cache if available (with timestamp check)
     try:
-        from backend.scheduler import ACTIVE_IP_CACHE
+        from backend.scheduler_jobs.limits import ACTIVE_IP_CACHE
         if ACTIVE_IP_CACHE:
-            emails.extend(ACTIVE_IP_CACHE.keys())
+            for email, ip_map in list(ACTIVE_IP_CACHE.items()):
+                if isinstance(ip_map, dict):
+                    if any(ts >= cutoff_ts for ts in ip_map.values()):
+                        emails.append(email)
+                elif ip_map:
+                    emails.append(email)
+    except Exception:
+        pass
+
+    # 3. Add active Xray sessions if available
+    try:
+        from backend.client_alerts import active_xray_sessions
+        if active_xray_sessions:
+            for (em, _), sess in list(active_xray_sessions.items()):
+                if isinstance(sess, dict) and (now_ts - sess.get('last_seen_at', 0) <= 180):
+                    emails.append(em)
     except Exception:
         pass
 
@@ -48,12 +67,18 @@ def update_online_emails():
         logging.error(f"Error filtering online emails by enabled status: {e}")
         _online_emails = list(set(emails))
     _last_traffic_check_time = time.time()
+    return _online_emails
 
 @router.post("/panel/api/clients/onlines")
 async def online_clients_api(request: Request):
     if not backend.routes.clients.check_auth(request):
         return backend.routes.clients.decoy_response()
-    return {"success": True, "obj": _online_emails}
+    
+    # Auto-refresh if cache is older than 2 seconds
+    if time.time() - _last_traffic_check_time > 2:
+        await asyncio.to_thread(update_online_emails)
+        
+    return {"success": True, "obj": _online_emails, "onlines": _online_emails}
 
 @router.get("/api/clients/{email}/traffic")
 async def get_client_daily_traffic_api(request: Request, email: str):

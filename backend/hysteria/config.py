@@ -37,6 +37,19 @@ def generate_hysteria_config(inbound_id: int, port: int, clients: list, stream_s
         masq_type = hysteria_opts.get("masqType", "")
         masq_value = hysteria_opts.get("masqValue", "")
         masq_status_code = hysteria_opts.get("masqStatusCode", 0)
+        if not masq_type:
+            central_decoy_type = get_setting("decoy_type", "none")
+            central_decoy_val = get_setting("decoy_value", "")
+            if central_decoy_type == "drop":
+                masq_type = "status"
+                masq_status_code = 444
+            elif central_decoy_type == "proxy" and central_decoy_val:
+                masq_type = "proxy"
+                masq_value = central_decoy_val
+            elif central_decoy_type == "none":
+                masq_type = "status"
+                masq_status_code = 404
+
         if masq_type and not masq_status_code and masq_type == "status" and masq_value:
             try:
                 masq_status_code = int(masq_value)
