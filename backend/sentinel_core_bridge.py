@@ -701,16 +701,42 @@ def compile_node_server_config(target_core: str) -> Dict[str, Any]:
                     ib_spec["fallbacks"] = ib_spec["settings"]["fallbacks"]
                 
             if clients:
-                client_list = [
-                    {
-                        "id": c.get("client_uuid_or_pwd", ""),
-                        "uuid": c.get("client_uuid_or_pwd", ""),
-                        "password": c.get("client_uuid_or_pwd", ""),
-                        "email": c.get("email", ""),
-                        "enable": bool(c.get("enable", 1))
+                # Build client lookup from inbound raw settings if available
+                raw_clients_map = {}
+                if isinstance(ib_spec.get("settings"), dict):
+                    for rc in ib_spec["settings"].get("clients", []):
+                        if isinstance(rc, dict):
+                            if rc.get("email"):
+                                raw_clients_map[rc["email"]] = rc
+                            if rc.get("id"):
+                                raw_clients_map[rc["id"]] = rc
+
+                client_list = []
+                for c in clients:
+                    if not c.get("enable", 1):
+                        continue
+                    email = c.get("email", "")
+                    uid = c.get("client_uuid_or_pwd", "")
+                    raw_c = raw_clients_map.get(email) or raw_clients_map.get(uid) or {}
+                    
+                    flow = c.get("flow") or raw_c.get("flow") or (ib_spec.get("settings", {}) if isinstance(ib_spec.get("settings"), dict) else {}).get("flow", "")
+                    
+                    client_entry = {
+                        "id": uid,
+                        "uuid": uid,
+                        "password": uid,
+                        "email": email,
+                        "enable": True
                     }
-                    for c in clients if c.get("enable", 1)
-                ]
+                    if flow:
+                        client_entry["flow"] = flow
+                    if raw_c.get("alterId") is not None:
+                        client_entry["alterId"] = raw_c["alterId"]
+                    if raw_c.get("security"):
+                        client_entry["security"] = raw_c["security"]
+                        
+                    client_list.append(client_entry)
+
                 ib_spec["clients"] = client_list
                 ib_spec["settings"]["clients"] = client_list
             server_inbounds.append(ib_spec)
