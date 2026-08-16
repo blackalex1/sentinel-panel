@@ -182,20 +182,22 @@ async def create_inbound_ui(request: Request, payload: InboundCreate):
         else:
             proto = payload.protocol.lower()
             if proto == "shadowsocks":
+                import base64
+                import os
                 method = str(payload.settings.get("method", ""))
                 pwd = payload.settings.get("password")
                 if not pwd:
                     if method.startswith("2022-blake3-aes-128"):
-                        pwd = secrets.token_urlsafe(16)
+                        pwd = base64.b64encode(os.urandom(16)).decode()
                     elif method.startswith("2022-blake3-aes-256") or method.startswith("2022-blake3-chacha20"):
-                        pwd = secrets.token_urlsafe(32)
+                        pwd = base64.b64encode(os.urandom(32)).decode()
                     else:
                         pwd = secrets.token_urlsafe(16)
                 add_client_db(inbound_id, "default", pwd)
             elif proto in ("vless", "vmess"):
                 uid = str(uuid.uuid4())
                 add_client_db(inbound_id, "default", uid)
-            elif proto in ("trojan", "hysteria2"):
+            else:
                 pwd = secrets.token_urlsafe(16)
                 add_client_db(inbound_id, "default", pwd)
 
