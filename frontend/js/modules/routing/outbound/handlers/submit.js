@@ -205,10 +205,21 @@ export function bindSubmitListener() {
             };
         }
 
-        // Attach fallback route if set
-        const fallbackRoute = document.getElementById("fallback_outbound") ? document.getElementById("fallback_outbound").value : vals.fallback_outbound;
+        // Attach fallback route and failover strategy if set
+        const fallbackRoute = (document.getElementById("fallback_outbound") ? document.getElementById("fallback_outbound").value : vals.fallback_outbound) || "";
+        const fallbackStrategy = (document.getElementById("fallback_strategy") ? document.getElementById("fallback_strategy").value : vals.fallback_strategy) || "priority";
+        const healthCheckInt = parseInt(document.getElementById("health_check_interval") ? document.getElementById("health_check_interval").value : vals.health_check_interval) || 300;
+
         if (fallbackRoute) {
             settings.backup_outbounds = [fallbackRoute];
+            settings.fallback_outbound = fallbackRoute;
+            settings.fallback_strategy = fallbackStrategy;
+            settings.health_check_interval = healthCheckInt;
+        } else {
+            delete settings.backup_outbounds;
+            delete settings.fallback_outbound;
+            delete settings.fallback_strategy;
+            delete settings.health_check_interval;
         }
 
         const url = id ? `/api/routing/outbounds/update/${id}` : "/api/routing/outbounds/create";
