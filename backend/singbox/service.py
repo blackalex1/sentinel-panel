@@ -24,16 +24,16 @@ def is_singbox_running() -> bool:
         else:
             singbox_process = None
 
-    if not SINGBOX_BIN_PATH.exists():
-        return False
-
     try:
         from backend.sentinel_core_bridge import get_cores_status
         status = get_cores_status()
-        if isinstance(status, dict) and "cores" in status:
-            for c in status["cores"]:
-                if c.get("name") in ("singbox", "sing-box") and c.get("running"):
-                    return True
+        if isinstance(status, dict):
+            if "cores" in status and isinstance(status["cores"], list):
+                for c in status["cores"]:
+                    if c.get("name") in ("singbox", "sing-box") and c.get("running"):
+                        return True
+            elif status.get("sing-box", {}).get("running") or status.get("singbox", {}).get("running"):
+                return True
     except Exception:
         pass
 
@@ -44,14 +44,27 @@ def is_singbox_running() -> bool:
                 cmdline = proc.info.get("cmdline") or []
                 if any("check" in str(arg) for arg in cmdline):
                     continue
-                name = proc.info.get("name") or ""
-                if name.lower() == SINGBOX_BIN_PATH.name.lower():
+                name = (proc.info.get("name") or "").lower()
+                if name in ("sing-box", "singbox", "sing-box.exe", "singbox.exe", SINGBOX_BIN_PATH.name.lower()):
+                    return True
+                if any("sing-box" in str(arg).lower() or "singbox" in str(arg).lower() for arg in cmdline):
                     return True
             except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.ZombieProcess):
                 continue
-        return False
     except Exception:
-        return False
+        pass
+
+    # Quick port / API probe fallback (Clash API on 127.0.0.1:9090)
+    try:
+        import socket
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            s.settimeout(0.2)
+            if s.connect_ex(("127.0.0.1", 9090)) == 0:
+                return True
+    except Exception:
+        pass
+
+    return False
 
 def start_singbox(force_generate: bool = False) -> bool:
     """Запускает процесс sing-box через sentinel-core"""
