@@ -89,9 +89,9 @@ export async function loadXrayConfig() {
             <button class="btn secondary-btn edit-json-btn" data-type="xray-log" style="margin-left: auto; padding: 4px 8px; font-size: 11px; display: inline-flex; align-items: center; gap: 4px; height: auto;"><i class="fa-regular fa-pen-to-square"></i> JSON</button>
         </h4>
         <div class="glass-card" style="padding: 15px; border-radius: 10px; background: rgba(255,255,255,0.015);">
-            <div style="font-size: 13px; line-height: 1.6; color: var(--text-secondary); display: flex; flex-direction: column; gap: 10px;">
-                <div style="display: flex; align-items: center; gap: 12px;">
-                    <span style="font-weight: 500; min-width: 90px;">LogLevel:</span>
+            <div style="font-size: 13px; line-height: 1.6; color: var(--text-secondary); display: flex; flex-direction: row; flex-wrap: wrap; align-items: center; gap: 24px;">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <span style="font-weight: 500;">LogLevel:</span>
                     <select id="xray-loglevel-select" class="inline-select">
                         <option value="debug" ${currLevel === 'debug' ? 'selected' : ''}>debug</option>
                         <option value="info" ${currLevel === 'info' ? 'selected' : ''}>info</option>
@@ -100,16 +100,16 @@ export async function loadXrayConfig() {
                         <option value="none" ${currLevel === 'none' ? 'selected' : ''}>none</option>
                     </select>
                 </div>
-                <div style="display: flex; align-items: center; gap: 12px;">
-                    <span style="font-weight: 500; min-width: 90px;">Access Log:</span>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <span style="font-weight: 500;">Access Log:</span>
                     <select id="xray-access-select" class="inline-select">
                         <option value="none" ${(currAccess === 'none' || !currAccess) ? 'selected' : ''}>none (Отключен)</option>
                         <option value="console" ${(currAccess === 'console' || currAccess === 'stdout') ? 'selected' : ''}>console (Терминал)</option>
                         <option value="/var/log/xray/access.log" ${currAccess === '/var/log/xray/access.log' ? 'selected' : ''}>/var/log/xray/access.log</option>
                     </select>
                 </div>
-                <div style="display: flex; align-items: center; gap: 12px;">
-                    <span style="font-weight: 500; min-width: 90px;">Error Log:</span>
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <span style="font-weight: 500;">Error Log:</span>
                     <select id="xray-error-select" class="inline-select">
                         <option value="console" ${(currError === 'console' || currError === 'stderr' || !currError) ? 'selected' : ''}>console (Терминал)</option>
                         <option value="none" ${currError === 'none' ? 'selected' : ''}>none (Отключен)</option>
