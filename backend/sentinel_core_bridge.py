@@ -769,6 +769,33 @@ def compile_node_server_config(target_core: str) -> Dict[str, Any]:
         # Collect referenced outbound tags in active rules
         referenced_outbounds = {r.get("outboundTag") for r in compiled_rules if r.get("enable", True)}
         
+        # Also collect referenced backup outbounds recursively
+        added_new = True
+        while added_new:
+            added_new = False
+            for ob in outbounds:
+                if not ob.get("enable", 1):
+                    continue
+                tag = ob.get("tag", "")
+                if tag in referenced_outbounds:
+                    ob_settings = ob.get("settings", {})
+                    if isinstance(ob_settings, str):
+                        try:
+                            ob_settings = json.loads(ob_settings or "{}")
+                        except Exception:
+                            ob_settings = {}
+                    if isinstance(ob_settings, dict):
+                        backups = ob_settings.get("backup_outbounds") or []
+                        if isinstance(backups, str):
+                            backups = [backups]
+                        fallback_single = ob_settings.get("fallback_outbound")
+                        if fallback_single and fallback_single not in backups:
+                            backups = list(backups) + [fallback_single]
+                        for b in backups:
+                            if b and b not in referenced_outbounds:
+                                referenced_outbounds.add(b)
+                                added_new = True
+        
         # Sort and filter outbounds: direct #0, blocked/block #1, then used custom outbounds
         direct_ob = None
         block_ob = None
