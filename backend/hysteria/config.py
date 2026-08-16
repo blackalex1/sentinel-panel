@@ -86,14 +86,22 @@ def generate_hysteria_config(inbound_id: int, port: int, clients: list, stream_s
         }]
 
         res = build_server_config("hysteria2", inbound_spec)
+        cfg_dict = {}
         if isinstance(res, dict):
             if "config" in res:
                 cfg = res["config"]
                 if isinstance(cfg, str):
-                    return json.loads(cfg)
+                    cfg_dict = json.loads(cfg)
                 elif isinstance(cfg, dict):
-                    return cfg
-            return res
+                    cfg_dict = cfg
+            else:
+                cfg_dict = res
+
+        if isinstance(cfg_dict, dict) and "listen" in cfg_dict:
+            listen_val = str(cfg_dict["listen"]).strip()
+            if "-" in listen_val:
+                cfg_dict["listen"] = listen_val.split("-")[0]
+        return cfg_dict
     except Exception as e:
         logging.error(f"Error compiling hysteria2 config via sentinel-core: {e}")
     return {}
