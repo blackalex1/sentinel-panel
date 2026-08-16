@@ -1,16 +1,14 @@
 """
-log_streamer.py — shared log streaming bus for all VPN cores.
+log_streamer.py — Pure high-speed in-memory log streaming bus for all VPN cores.
 
 Architecture:
-  - Each VPN core (xray, hysteria, singbox) has a background thread that reads
-    its log file in real-time (tail -f style).
-  - That thread calls push_log_line(core, line) whenever a new line arrives.
-  - Browser SSE connections call subscribe(core) to get an asyncio.Queue; they
-    receive lines as they are pushed, without polling.
-  - The last HISTORY_SIZE lines are buffered in a deque so a freshly-opened
-    browser tab gets recent history immediately before live streaming starts.
-
-This eliminates the 2-second poll + 150-line full JSON payload per tick.
+  - Each VPN core (xray, hysteria, singbox) has an in-memory worker thread that
+    pops real-time stdout/stderr lines from the sentinel-core Go supervisor pipes.
+  - That thread calls push_log_line(core, line) with zero disk I/O and zero delay.
+  - Browser SSE / WebSocket connections subscribe(core) to get an asyncio.Queue;
+    they receive lines instantly as they are emitted by the core engine.
+  - The last HISTORY_SIZE lines are stored in memory in a deque so newly-opened
+    browser tabs get recent history immediately before live streaming starts.
 """
 
 import asyncio
@@ -40,7 +38,7 @@ _subscribers: dict[CoreName, set] = {
 
 
 def push_log_line(core: CoreName, line: str) -> None:
-    """Called by tail threads (sync context) when a new log line arrives."""
+    """Called by streamer threads when a new log line arrives from sentinel-core."""
     line = line.rstrip("\n\r")
     if not line:
         return
@@ -71,37 +69,20 @@ def clear_history(core: CoreName) -> None:
 
 
 def get_history(core: CoreName) -> list[str]:
-    """Returns a snapshot of recent lines for the initial SSE burst."""
+    """Returns a snapshot of recent lines from in-memory ring buffer."""
     with _lock:
         hist = list(_history[core])
         if hist:
             return hist
 
     try:
-        from backend.sentinel_core_bridge import get_in_memory_core_logs, get_core_logs
-        # 1. Try in-memory ring buffer from sentinel-core
+        from backend.sentinel_core_bridge import get_in_memory_core_logs
         mem_logs = get_in_memory_core_logs(core, HISTORY_SIZE)
         if mem_logs:
             with _lock:
                 for l in mem_logs:
                     _history[core].append(l)
             return mem_logs
-
-        # 2. Fall back to file logs
-        from backend.config import XRAY_LOG_PATH, HYSTERIA_LOG_PATH, SINGBOX_LOG_PATH
-        path_map = {
-            "xray": XRAY_LOG_PATH,
-            "hysteria": HYSTERIA_LOG_PATH,
-            "singbox": SINGBOX_LOG_PATH
-        }
-        log_path = path_map.get(core)
-        if log_path and log_path.exists():
-            lines = get_core_logs(str(log_path), HISTORY_SIZE)
-            if lines:
-                with _lock:
-                    for l in lines:
-                        _history[core].append(l)
-                return lines
     except Exception:
         pass
 
@@ -110,15 +91,20 @@ def get_history(core: CoreName) -> list[str]:
 
 _tail_threads_started = False
 
-def _tail_file_worker(core: CoreName, get_path_fn):
+def _core_log_worker(core: CoreName):
+    """High-speed worker that drains in-memory pipes from sentinel-core."""
     import time
     from backend.sentinel_core_bridge import pop_core_log_line
-    last_pos = 0
+
     while True:
         try:
-            # 1. High-speed in-memory OS pipe streaming from sentinel-core
-            line = pop_core_log_line(core, timeout_ms=50)
-            if line:
+            had_activity = False
+            # Batch drain all available lines in the in-memory queue
+            while True:
+                line = pop_core_log_line(core, timeout_ms=0)
+                if not line:
+                    break
+                had_activity = True
                 push_log_line(core, line)
                 if core == "xray":
                     try:
@@ -126,49 +112,33 @@ def _tail_file_worker(core: CoreName, get_path_fn):
                         process_xray_log_line(line)
                     except Exception:
                         pass
-                continue
 
-            # 2. File tail fallback
-            log_path = get_path_fn()
-            if log_path and log_path.exists():
-                with open(log_path, "r", encoding="utf-8", errors="ignore") as f:
-                    f.seek(last_pos)
-                    f_line = f.readline()
-                    if f_line:
-                        last_pos = f.tell()
-                        push_log_line(core, f_line)
-                        if core == "xray":
-                            try:
-                                from backend.client_alerts import process_xray_log_line
-                                process_xray_log_line(f_line)
-                            except Exception:
-                                pass
-                    else:
-                        if log_path.exists() and log_path.stat().st_size < last_pos:
-                            f.seek(0)
-                            last_pos = 0
-            time.sleep(0.02)
+            if had_activity:
+                time.sleep(0.005)
+            else:
+                time.sleep(0.03)
         except Exception:
-            time.sleep(0.5)
+            time.sleep(0.2)
+
 
 def ensure_log_tailers():
+    """Ensures background in-memory log streamer threads are active."""
     global _tail_threads_started
     with _lock:
         if _tail_threads_started:
             return
         _tail_threads_started = True
 
-    from backend.config import XRAY_LOG_PATH, HYSTERIA_LOG_PATH, SINGBOX_LOG_PATH
-    t1 = threading.Thread(target=_tail_file_worker, args=("xray", lambda: XRAY_LOG_PATH), daemon=True, name="tail-xray")
-    t2 = threading.Thread(target=_tail_file_worker, args=("hysteria", lambda: HYSTERIA_LOG_PATH), daemon=True, name="tail-hysteria")
-    t3 = threading.Thread(target=_tail_file_worker, args=("singbox", lambda: SINGBOX_LOG_PATH), daemon=True, name="tail-singbox")
+    t1 = threading.Thread(target=_core_log_worker, args=("xray",), daemon=True, name="stream-xray")
+    t2 = threading.Thread(target=_core_log_worker, args=("hysteria",), daemon=True, name="stream-hysteria")
+    t3 = threading.Thread(target=_core_log_worker, args=("singbox",), daemon=True, name="stream-singbox")
     t1.start()
     t2.start()
     t3.start()
 
 
 def subscribe(core: CoreName) -> asyncio.Queue:
-    """Creates and registers an asyncio.Queue for a new SSE client."""
+    """Creates and registers an asyncio.Queue for a new SSE / WebSocket client."""
     ensure_log_tailers()
     q: asyncio.Queue = asyncio.Queue(maxsize=500)
     with _lock:
@@ -177,6 +147,6 @@ def subscribe(core: CoreName) -> asyncio.Queue:
 
 
 def unsubscribe(core: CoreName, q: asyncio.Queue) -> None:
-    """Removes the queue when the SSE client disconnects."""
+    """Removes the queue when the SSE / WebSocket client disconnects."""
     with _lock:
         _subscribers[core].discard(q)
