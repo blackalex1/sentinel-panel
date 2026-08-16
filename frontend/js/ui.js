@@ -121,13 +121,13 @@ export function showConfirmDialog(options) {
         // Overlay Modal Container
         const modal = document.createElement("div");
         modal.id = "custom-confirm-modal";
-        modal.className = "modal custom-confirm-overlay";
+        modal.className = "modal active custom-confirm-overlay";
         modal.style.position = "fixed";
         modal.style.top = "0";
         modal.style.left = "0";
         modal.style.width = "100vw";
         modal.style.height = "100vh";
-        modal.style.zIndex = "9999";
+        modal.style.zIndex = "99999";
         modal.style.display = "flex";
         modal.style.justifyContent = "center";
         modal.style.alignItems = "center";
@@ -135,6 +135,7 @@ export function showConfirmDialog(options) {
         modal.style.background = "rgba(4, 7, 18, 0.82)";
         modal.style.backdropFilter = "blur(20px) saturate(180%)";
         modal.style.webkitBackdropFilter = "blur(20px) saturate(180%)";
+        modal.style.pointerEvents = "auto";
         modal.style.opacity = "0";
         modal.style.transition = "opacity 0.25s cubic-bezier(0.16, 1, 0.3, 1)";
 
@@ -149,7 +150,9 @@ export function showConfirmDialog(options) {
         card.style.background = "rgba(13, 18, 36, 0.94)";
         card.style.boxShadow = `0 25px 60px -10px rgba(0, 0, 0, 0.85), 0 0 35px ${glowColor}`;
         card.style.transform = "scale(0.92) translateY(12px)";
+        card.style.pointerEvents = "auto";
         card.style.transition = "transform 0.25s cubic-bezier(0.16, 1, 0.3, 1)";
+        card.addEventListener("click", (e) => e.stopPropagation());
 
         // Header
         const header = document.createElement("div");
@@ -304,19 +307,35 @@ export function showConfirmDialog(options) {
         };
 
         document.addEventListener("keydown", keyHandler);
-        okBtn.addEventListener("click", () => cleanup(true));
-        cancelBtn.addEventListener("click", () => cleanup(false));
-        closeBtn.addEventListener("click", () => cleanup(false));
+        okBtn.addEventListener("click", (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            cleanup(true);
+        });
+        cancelBtn.addEventListener("click", (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            cleanup(false);
+        });
+        closeBtn.addEventListener("click", (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            cleanup(false);
+        });
 
         // Click outside
         modal.addEventListener("click", (e) => {
             if (e.target === modal) {
+                e.preventDefault();
+                e.stopPropagation();
                 cleanup(false);
             }
         });
 
         // Focus confirm button
-        setTimeout(() => okBtn.focus(), 50);
+        setTimeout(() => {
+            try { okBtn.focus(); } catch (e) {}
+        }, 50);
     });
 }
 
