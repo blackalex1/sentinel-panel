@@ -21,7 +21,7 @@ CACHE_TTL = 3600  # 1 hour cache for releases
 def _fetch_hysteria_releases_atom(include_prerelease: bool = False, limit: int = 20) -> list[dict]:
     try:
         url = "https://github.com/apernet/hysteria/releases.atom"
-        resp = requests.get(url, headers=HEADERS, timeout=3)
+        resp = requests.get(url, headers=HEADERS, timeout=6)
         if resp.status_code != 200:
             return []
         raw_content = getattr(resp, "content", None)
@@ -31,10 +31,8 @@ def _fetch_hysteria_releases_atom(include_prerelease: bool = False, limit: int =
             return []
         root = ET.fromstring(raw_content)
         ns = {"atom": "http://www.w3.org/2005/Atom"}
-        target_name = backend.hysteria.HYSTERIA_BIN_NAME
-        arch_suffix = _get_bin_suffix()
-        os_prefix = "windows" if backend.hysteria.IS_WINDOWS else "linux"
-
+        arch = platform.machine().lower()
+        is_arm = "arm64" in arch or "aarch64" in arch
         releases = []
         for entry in root.findall("atom:entry", ns):
             title = entry.find("atom:title", ns)
@@ -42,16 +40,19 @@ def _fetch_hysteria_releases_atom(include_prerelease: bool = False, limit: int =
             tag = title_text.split()[-1] if title_text else ""
             if not tag:
                 continue
-            if tag.startswith("app/"):
-                tag = tag[4:]
-            if not tag.startswith("v") and not tag.startswith("app/"):
-                tag = "v" + tag
+            if not tag.startswith("v") and not tag.startswith("app/v"):
+                tag = "app/v" + tag
             is_pre = any(k in tag.lower() for k in ("beta", "alpha", "rc", "pre"))
             if not include_prerelease and is_pre:
                 continue
+            clean_tag = tag.replace("app/", "")
+            if backend.hysteria.IS_WINDOWS:
+                target_name = f"hysteria-windows-arm64.exe" if is_arm else f"hysteria-windows-amd64.exe"
+            else:
+                target_name = f"hysteria-linux-arm64" if is_arm else f"hysteria-linux-amd64"
             download_url = f"https://github.com/apernet/hysteria/releases/download/{tag}/{target_name}"
             releases.append({
-                "version": tag,
+                "version": clean_tag,
                 "download_url": download_url,
                 "is_prerelease": is_pre
             })
@@ -63,7 +64,7 @@ def _fetch_hysteria_releases_atom(include_prerelease: bool = False, limit: int =
         return []
 
 def get_hysteria_releases(include_prerelease: bool = False, limit: int = 20) -> list[dict]:
-    """Получает список всех доступных релизов Hysteria с GitHub с кэшированием в памяти"""
+    """Получает список всех доступных релизов Hysteria 2 с GitHub с кэшированием в памяти"""
     cache_key = f"releases_{include_prerelease}_{limit}"
     now = time.time()
 
@@ -76,7 +77,7 @@ def get_hysteria_releases(include_prerelease: bool = False, limit: int = 20) -> 
     url = "https://api.github.com/repos/apernet/hysteria/releases"
     releases = []
     try:
-        response = requests.get(url, headers=HEADERS, timeout=3)
+        response = requests.get(url, headers=HEADERS, timeout=6)
         if response.status_code == 200:
             data = response.json()
             if isinstance(data, dict):

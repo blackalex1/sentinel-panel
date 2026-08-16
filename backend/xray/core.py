@@ -23,7 +23,7 @@ CACHE_TTL = 3600  # 1 hour cache for releases
 def _fetch_xray_releases_atom(include_prerelease: bool = False, limit: int = 20) -> list[dict]:
     try:
         url = "https://github.com/XTLS/Xray-core/releases.atom"
-        resp = requests.get(url, headers=HEADERS, timeout=3)
+        resp = requests.get(url, headers=HEADERS, timeout=6)
         if resp.status_code != 200:
             return []
         raw_content = getattr(resp, "content", None)
@@ -79,7 +79,7 @@ def get_xray_releases(include_prerelease: bool = False, limit: int = 20) -> list
     url = "https://api.github.com/repos/XTLS/Xray-core/releases"
     releases = []
     try:
-        response = requests.get(url, headers=HEADERS, timeout=3)
+        response = requests.get(url, headers=HEADERS, timeout=6)
         if response.status_code == 200:
             data = response.json()
             if isinstance(data, list):
