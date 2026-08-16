@@ -46,20 +46,32 @@ docker ps -a --filter "name=sentinel" -q | xargs -r docker rm -f 2>/dev/null || 
 docker compose down --remove-orphans 2>/dev/null || true
 
 # Auto-migrate legacy database volume (spectre-panel_pgdata / panel_pgdata / installation_pgdata -> sentinel-panel_pgdata)
-LEGACY_VOL=""
 for v in spectre-panel_pgdata panel_pgdata installation_pgdata; do
     if docker volume inspect "$v" &>/dev/null; then
-        LEGACY_VOL="$v"
-        break
+        echo "[+] Found legacy database volume '$v'."
+        if ! docker volume inspect sentinel-panel_pgdata &>/dev/null; then
+            echo "[+] Migrating data from '$v' to 'sentinel-panel_pgdata'..."
+            docker volume create --label "com.docker.compose.project=sentinel-panel" --label "com.docker.compose.volume=pgdata" sentinel-panel_pgdata >/dev/null 2>&1
+            docker run --rm -v "$v":/from -v sentinel-panel_pgdata:/to postgres:16-alpine sh -c "rm -rf /to/* 2>/dev/null || true; cp -a /from/. /to/"
+            echo "[+] Original database volume migrated to sentinel-panel_pgdata successfully!"
+        fi
+        echo "[+] Cleaning up legacy volume '$v'..."
+        docker volume rm -f "$v" >/dev/null 2>&1 || true
     fi
 done
 
-if [ -n "$LEGACY_VOL" ]; then
-    echo "[+] Detected legacy database volume '$LEGACY_VOL'. Overwriting 'sentinel-panel_pgdata' with original database..."
-    docker volume rm -f sentinel-panel_pgdata 2>/dev/null || true
-    docker volume create sentinel-panel_pgdata >/dev/null 2>&1
-    docker run --rm -v "$LEGACY_VOL":/from -v sentinel-panel_pgdata:/to postgres:16-alpine sh -c "rm -rf /to/* 2>/dev/null || true; cp -a /from/. /to/"
-    echo "[+] Original database volume migrated to sentinel-panel_pgdata successfully!"
+# Ensure sentinel-panel_pgdata has compose labels to eliminate 'not created by Docker Compose' warning
+if docker volume inspect sentinel-panel_pgdata &>/dev/null; then
+    LABEL_CHECK=$(docker volume inspect sentinel-panel_pgdata --format '{{index .Labels "com.docker.compose.volume"}}' 2>/dev/null || true)
+    if [ "$LABEL_CHECK" != "pgdata" ]; then
+        echo "[+] Adding Docker Compose labels to 'sentinel-panel_pgdata'..."
+        docker volume create --label "com.docker.compose.project=sentinel-panel" --label "com.docker.compose.volume=pgdata" sentinel-panel_pgdata_migrated >/dev/null 2>&1
+        docker run --rm -v sentinel-panel_pgdata:/from -v sentinel-panel_pgdata_migrated:/to postgres:16-alpine sh -c "cp -a /from/. /to/"
+        docker volume rm -f sentinel-panel_pgdata >/dev/null 2>&1
+        docker volume create --label "com.docker.compose.project=sentinel-panel" --label "com.docker.compose.volume=pgdata" sentinel-panel_pgdata >/dev/null 2>&1
+        docker run --rm -v sentinel-panel_pgdata_migrated:/from -v sentinel-panel_pgdata:/to postgres:16-alpine sh -c "cp -a /from/. /to/"
+        docker volume rm -f sentinel-panel_pgdata_migrated >/dev/null 2>&1
+    fi
 fi
 
 if docker compose up -d --build; then
