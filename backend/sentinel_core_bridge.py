@@ -169,7 +169,7 @@ def _ffi_call_str(func_name: str, *args) -> Optional[str]:
         return None
 
     func = getattr(lib, func_name)
-    if func.restype != ctypes.c_void_p and func_name != "SentinelFreeString":
+    if hasattr(func, "restype") and func.restype != ctypes.c_void_p and func_name != "SentinelFreeString":
         func.restype = ctypes.c_void_p
 
     c_args = []
