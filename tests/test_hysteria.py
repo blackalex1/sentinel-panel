@@ -486,6 +486,34 @@ def test_hysteria_auth_endpoint(client, monkeypatch):
     })
     assert res_denied.json() == {"ok": False}
 
+    # 9. URL-encoded username/email authentication (e.g. test%40mail.com:pwd)
+    c_encoded = MockClient("test@mail.com", "pwd")
+    @contextlib.contextmanager
+    def mock_db_session_encoded():
+        yield MockSessionValid(c_encoded)
+    monkeypatch.setattr("backend.database.db_session", mock_db_session_encoded)
+
+    res_encoded = client.post(f"/api/hysteria/auth?secret={settings.API_TOKEN}", json={
+        "auth": "test%40mail.com:pwd",
+        "addr": "127.0.0.1:54321"
+    })
+    assert res_encoded.status_code == 200
+    assert res_encoded.json() == {"ok": True, "id": "test@mail.com"}
+
+    # 10. Direct user:pass authentication (e.g. mock_user:mock_password)
+    c_custom = MockClient("mock_user", "mock_password")
+    @contextlib.contextmanager
+    def mock_db_session_custom():
+        yield MockSessionValid(c_custom)
+    monkeypatch.setattr("backend.database.db_session", mock_db_session_custom)
+
+    res_custom = client.post(f"/api/hysteria/auth?secret={settings.API_TOKEN}", json={
+        "auth": "mock_user:mock_password",
+        "addr": "127.0.0.1:54321"
+    })
+    assert res_custom.status_code == 200
+    assert res_custom.json() == {"ok": True, "id": "mock_user"}
+
 
 def test_hysteria_bridge_methods():
     """Verify sentinel_core_bridge methods: build_server_config, validate_core_config, get_core_version."""

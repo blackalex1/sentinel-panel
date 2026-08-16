@@ -4,6 +4,8 @@ import json
 import logging
 from backend.sentinel_core_bridge import build_server_config
 from backend.database import get_setting
+from backend.config import settings
+from backend.ssl_utils import SSL_CERT_PATH, SSL_KEY_PATH
 
 def generate_hysteria_config(inbound_id: int, port: int, clients: list, stream_settings: dict = None) -> dict:
     """Generates Hysteria 2 configuration JSON via sentinel-core."""
@@ -26,8 +28,11 @@ def generate_hysteria_config(inbound_id: int, port: int, clients: list, stream_s
             cert_path = str(backend.hysteria.HYSTERIA_CERT_PATH)
             key_path = str(backend.hysteria.HYSTERIA_KEY_PATH)
 
-        secret_key = get_setting("telegram_bot_token") or "secret"
-        auth_url = f"http://127.0.0.1:8000/api/hysteria/auth?secret={secret_key}"
+        use_https = SSL_CERT_PATH.exists() and SSL_KEY_PATH.exists()
+        panel_proto = "https" if use_https else "http"
+        secret_key = get_setting("telegram_bot_token") or settings.API_TOKEN or "secret"
+        panel_port = getattr(settings, "PANEL_PORT", 2053)
+        auth_url = f"{panel_proto}://127.0.0.1:{panel_port}/api/hysteria/auth?secret={secret_key}"
 
         masq_type = hysteria_opts.get("masqType", "")
         masq_value = hysteria_opts.get("masqValue", "")

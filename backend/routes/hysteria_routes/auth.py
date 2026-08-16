@@ -38,6 +38,7 @@ def is_ip_allowed(client_ip: str, allowed_ips_str: str) -> bool:
             
     return False
 
+from urllib.parse import unquote
 from backend.auth_utils import decoy_response
 
 @router.post("/api/hysteria/auth")
@@ -47,12 +48,20 @@ async def hysteria_client_auth(request: Request, payload: dict, secret: str = No
     is_local = client_host in ("127.0.0.1", "::1", "localhost")
     bot_token = backend.database.get_setting("telegram_bot_token")
 
+    auth_header = request.headers.get("Authorization", "").replace("Bearer ", "").strip()
+    x_secret = request.headers.get("X-Secret", "").strip()
+    provided_secret = secret or auth_header or x_secret
+
     if not is_local:
         valid_secrets = {s for s in [settings.API_TOKEN, bot_token, "secret"] if s}
-        if not secret or secret not in valid_secrets:
+        if not provided_secret or provided_secret not in valid_secrets:
             return decoy_response()
 
-    auth_str = payload.get("auth", "")
+    raw_auth = payload.get("auth", "")
+    if not raw_auth:
+        return {"ok": False}
+
+    auth_str = unquote(raw_auth.strip())
     if not auth_str:
         return {"ok": False}
 
@@ -61,9 +70,14 @@ async def hysteria_client_auth(request: Request, payload: dict, secret: str = No
     client_ip = raw_addr.split(":")[0].strip() if raw_addr else None
 
     with backend.database.db_session() as session:
+        client = None
+        email = ""
         if ":" in auth_str:
-            email, password = auth_str.split(":", 1)
-            client = session.query(ClientStats).filter_by(email=email, client_uuid_or_pwd=password).first()
+            email_part, pass_part = auth_str.split(":", 1)
+            client = session.query(ClientStats).filter_by(email=email_part, client_uuid_or_pwd=pass_part).first()
+            if not client:
+                client = session.query(ClientStats).filter_by(client_uuid_or_pwd=email_part).first()
+            email = client.email if client else email_part
         else:
             client = session.query(ClientStats).filter_by(client_uuid_or_pwd=auth_str).first()
             if not client:
