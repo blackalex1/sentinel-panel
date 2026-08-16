@@ -13,6 +13,49 @@ export let currentTab = "dashboard";
 let logsInterval = null;
 let statsInterval = null;
 
+export function updateCurrentTabTitle() {
+    const titleEl = document.getElementById("current-tab-title");
+    if (!titleEl) return;
+
+    switch (currentTab) {
+        case "dashboard":
+            titleEl.innerText = t("dashboard_title", "Мониторинг ресурсов");
+            break;
+        case "inbounds":
+            titleEl.innerText = t("inbounds_title", "Входящие подключения (Inbounds)");
+            break;
+        case "xray":
+            titleEl.innerText = t("xray_title", "Логи и управление ядром");
+            break;
+        case "xray-config":
+            titleEl.innerText = t("xray_config_title", "Конфигурация Xray");
+            break;
+        case "hysteria":
+            titleEl.innerText = t("hysteria_title", "Hysteria 2 - Управление");
+            break;
+        case "hysteria-config":
+            titleEl.innerText = t("hysteria_config_title", "Конфигурация Hysteria 2");
+            break;
+        case "singbox":
+            titleEl.innerText = t("singbox_title", "sing-box - Управление");
+            break;
+        case "singbox-config":
+            titleEl.innerText = t("singbox_config_title", "Конфигурация sing-box");
+            break;
+        case "routing":
+            titleEl.innerText = t("routing_title", "Маршрутизация");
+            break;
+        case "settings":
+            titleEl.innerText = t("settings_title", "Настройки панели");
+            break;
+        case "audit-logs":
+            titleEl.innerText = t("audit_logs_title", "Журнал аудита");
+            break;
+        default:
+            break;
+    }
+}
+
 export function switchTab(tabId, loadInbounds, loadCoreInfo, loadLogs) {
     currentTab = tabId;
     
@@ -46,9 +89,10 @@ export function switchTab(tabId, loadInbounds, loadCoreInfo, loadLogs) {
         clearInterval(statsInterval);
         statsInterval = null;
     }
+
+    updateCurrentTabTitle();
     
     if (tabId === "dashboard") {
-        document.getElementById("current-tab-title").innerText = t("dashboard_title", "Мониторинг ресурсов");
         const p = Promise.all([
             loadStats(),
             loadGlobalTrafficChart(),
@@ -57,37 +101,27 @@ export function switchTab(tabId, loadInbounds, loadCoreInfo, loadLogs) {
         statsInterval = setInterval(loadStats, 5000);
         return p;
     } else if (tabId === "inbounds") {
-        document.getElementById("current-tab-title").innerText = t("inbounds_title", "Входящие подключения (Inbounds)");
         return loadInbounds();
     } else if (tabId === "xray") {
-        document.getElementById("current-tab-title").innerText = t("xray_title", "Логи и управление ядром");
         startLogsStream();
         return Promise.all([loadCoreInfo(), loadLogs(), loadGeoInfo()]);
     } else if (tabId === "xray-config") {
-        document.getElementById("current-tab-title").innerText = t("xray_config_title", "Конфигурация Xray");
         return loadXrayConfig();
     } else if (tabId === "hysteria") {
-        document.getElementById("current-tab-title").innerText = t("hysteria_title", "Hysteria 2 - Управление");
         startHysteriaLogsStream();
         return Promise.all([loadHysteriaCoreInfo(), loadHysteriaLogs()]);
     } else if (tabId === "hysteria-config") {
-        document.getElementById("current-tab-title").innerText = t("hysteria_config_title", "Конфигурация Hysteria 2");
         return loadHysteriaConfig();
     } else if (tabId === "singbox") {
-        document.getElementById("current-tab-title").innerText = t("singbox_title", "sing-box - Управление");
         startSingboxLogsStream();
         return Promise.all([loadSingboxCoreInfo(), loadSingboxLogs()]);
     } else if (tabId === "singbox-config") {
-        document.getElementById("current-tab-title").innerText = t("singbox_config_title", "Конфигурация sing-box");
         return loadSingboxConfig();
     } else if (tabId === "routing") {
-        document.getElementById("current-tab-title").innerText = t("routing_title", "Маршрутизация");
         return Promise.all([loadOutbounds(), loadRoutingRules()]);
     } else if (tabId === "settings") {
-        document.getElementById("current-tab-title").innerText = t("settings_title", "Настройки панели");
         return Promise.all([loadSettings(), loadOptimizationStatus()]);
     } else if (tabId === "audit-logs") {
-        document.getElementById("current-tab-title").innerText = t("audit_logs_title", "Журнал аудита");
         return loadAuditLogs();
     }
 }

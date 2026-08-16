@@ -139,9 +139,11 @@ export function t(key, fallback = "") {
 /**
  * Переводит все элементы текущей страницы с data-i18n, data-i18n-placeholder и data-i18n-title
  */
-export function translatePage() {
+export function translatePage(root = document) {
+    if (!root) root = document;
+
     // 1. Текстовое содержимое (textContent)
-    document.querySelectorAll("[data-i18n]").forEach(el => {
+    root.querySelectorAll("[data-i18n]").forEach(el => {
         const key = el.getAttribute("data-i18n");
         if (translations[key]) {
             // Если внутри элемента есть иконки (<i> или <svg>), сохраняем их и меняем только текст
@@ -162,7 +164,7 @@ export function translatePage() {
     });
 
     // 2. Плейсхолдеры полей ввода (placeholder)
-    document.querySelectorAll("[data-i18n-placeholder]").forEach(el => {
+    root.querySelectorAll("[data-i18n-placeholder]").forEach(el => {
         const key = el.getAttribute("data-i18n-placeholder");
         if (translations[key]) {
             el.placeholder = translations[key];
@@ -170,10 +172,21 @@ export function translatePage() {
     });
 
     // 3. Всплывающие подсказки кнопок (title)
-    document.querySelectorAll("[data-i18n-title]").forEach(el => {
+    root.querySelectorAll("[data-i18n-title]").forEach(el => {
         const key = el.getAttribute("data-i18n-title");
         if (translations[key]) {
             el.title = translations[key];
         }
     });
+
+    // 4. Актуализация заголовка текущей активной вкладки
+    if (root === document) {
+        try {
+            import("./modules/router.js").then(m => {
+                if (m && m.updateCurrentTabTitle) {
+                    m.updateCurrentTabTitle();
+                }
+            }).catch(() => {});
+        } catch (e) {}
+    }
 }
