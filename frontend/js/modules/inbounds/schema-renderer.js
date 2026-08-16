@@ -264,9 +264,10 @@ export function renderDynamicOutboundForm(containerEl, tabsContainerEl, tabDefin
                             fieldWrap.appendChild(checkLabel);
                         } else {
                             // Text, Number, Password inputs
+                            const isNumeric = (field.type === "number" && field.targetField !== "port" && field.id !== "ob-port" && !String(val).includes("-") && !String(val).includes(",") && !String(val).includes(":"));
                             const input = document.createElement("input");
                             input.id = field.id;
-                            input.type = (field.type === "number") ? "number" : ((field.type === "password") ? "password" : "text");
+                            input.type = isNumeric ? "number" : ((field.type === "password") ? "password" : "text");
                             input.className = "glass-input";
                             input.setAttribute("data-target-field", field.targetField);
                             input.autocomplete = (field.type === "password") ? "new-password" : "off";
@@ -274,7 +275,11 @@ export function renderDynamicOutboundForm(containerEl, tabsContainerEl, tabDefin
                             input.value = (val !== undefined && val !== null) ? val : "";
 
                             input.addEventListener("input", (e) => {
-                                const inputVal = (field.type === "number") ? (e.target.value === "" ? "" : Number(e.target.value)) : e.target.value;
+                                const raw = e.target.value;
+                                let inputVal = raw;
+                                if (isNumeric && raw !== "") {
+                                    inputVal = Number(raw);
+                                }
                                 setByPath(currentValues, field.targetField, inputVal);
                                 refreshVisibility();
                                 if (typeof onFieldChange === "function") onFieldChange(currentValues);
