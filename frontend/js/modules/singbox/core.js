@@ -95,7 +95,7 @@ export async function loadSingboxCoreInfo() {
             } else {
                 updateBtn.disabled = false;
                 updateBtn.setAttribute("data-url", selUrl);
-                updateBtn.innerHTML = `<i class="fa-solid fa-download"></i> <span>${t("core_btn_install_version", "Установить")} ${selVer}</span>`;
+                updateBtn.innerHTML = `<i class="fa-solid fa-download"></i> <span>${t("core_btn_install_version", "Установить {version}").replace("{version}", selVer)}</span>`;
             }
         };
 
