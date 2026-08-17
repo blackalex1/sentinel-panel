@@ -168,7 +168,7 @@ async def create_inbound_ui(request: Request, payload: InboundCreate):
     if inbound_id:
         import secrets
         import uuid
-        clients = payload.settings.get("clients", [])
+        clients = payload.settings.get("clients", []) if payload.settings else []
         if clients:
             for c in clients:
                 email = c.get("email") or "default"
@@ -179,13 +179,13 @@ async def create_inbound_ui(request: Request, payload: InboundCreate):
                 expiry_time = c.get("expiryTime") or c.get("expiry_time") or 0
                 enable = 1 if c.get("enable", True) else 0
                 add_client_db(inbound_id, email, uid, total_gb, expiry_time, limit_ip, enable, allowed_ips=allowed_ips)
-        else:
+        elif payload.settings is None:
             proto = payload.protocol.lower()
             if proto == "shadowsocks":
                 import base64
                 import os
-                method = str(payload.settings.get("method", ""))
-                pwd = payload.settings.get("password")
+                method = str(payload.settings.get("method", "") if payload.settings else "")
+                pwd = payload.settings.get("password") if payload.settings else None
                 if not pwd:
                     if method.startswith("2022-blake3-aes-128"):
                         pwd = base64.b64encode(os.urandom(16)).decode()

@@ -133,17 +133,21 @@ def delete_client_db(inbound_id: int, email: str):
         session.delete(c)
         return True
 
-def update_client_traffic(inbound_id: int, email: str, up_add: int, down_add: int):
+def update_client_traffic(inbound_id: int, email: str, up_add: int, down_add: int) -> bool:
     with backend.database.db_session() as session:
         c = session.query(ClientStats).filter_by(inbound_id=inbound_id, email=email).first()
         if c:
             c.up += up_add
             c.down += down_add
+            return True
+        return False
 
-def update_client_traffic_by_email(email: str, up_add: int, down_add: int):
+def update_client_traffic_by_email(email: str, up_add: int, down_add: int) -> bool:
     with backend.database.db_session() as session:
         c = session.query(ClientStats).filter_by(email=email).first()
         if c:
             c.up += up_add
             c.down += down_add
+            return True
+        return False
 

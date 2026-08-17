@@ -158,41 +158,63 @@ def is_xray_running():
     return False
 
 def query_traffic_stats():
-    """Считывает статистику трафика Xray через sentinel-core и обновляет БД"""
+    """Считывает статистику трафика Xray и обновляет БД"""
     if not backend.xray.is_xray_running():
         return
-        
+
+    # 1. Primary: Direct query to Xray Stats API via CLI (127.0.0.1:10085)
+    stats_queried = False
+    try:
+        xray_bin = str(backend.xray.XRAY_BIN_PATH)
+        if os.path.exists(xray_bin) or shutil.which(xray_bin):
+            res = subprocess.run(
+                [xray_bin, "api", "statsquery", "--server=127.0.0.1:10085"],
+                capture_output=True,
+                text=True,
+                timeout=1.5
+            )
+            if res.returncode == 0 and res.stdout.strip():
+                try:
+                    data = json.loads(res.stdout.strip())
+                    stat_list = data.get("stat", [])
+                    if stat_list:
+                        process_stats_deltas(stat_list)
+                        stats_queried = True
+                except json.JSONDecodeError:
+                    pass
+    except Exception as e:
+        logging.debug(f"Direct Xray statsquery error: {e}")
+
+    # 2. Secondary / Unified: query sentinel-core bridge
     try:
         from backend.sentinel_core_bridge import get_unified_traffic
         traffic_data = get_unified_traffic()
-        if not traffic_data or not isinstance(traffic_data, dict):
-            return
+        if traffic_data and isinstance(traffic_data, dict):
+            from backend.database import get_all_inbounds
+            inbounds = get_all_inbounds()
+            xray_inbounds = [ib for ib in inbounds if ib.get("core") != "singbox" and ib.get("protocol") != "hysteria2" and ib.get("enable")]
 
-        from backend.database import get_all_inbounds
-        inbounds = get_all_inbounds()
-        xray_inbounds = [ib for ib in inbounds if ib.get("core") != "singbox" and ib.get("protocol") != "hysteria2" and ib.get("enable")]
+            for email, stats in traffic_data.items():
+                if not isinstance(stats, dict):
+                    continue
+                rx = int(stats.get("upBytes", 0))
+                tx = int(stats.get("downBytes", 0))
 
-        for email, stats in traffic_data.items():
-            if not isinstance(stats, dict):
-                continue
-            rx = int(stats.get("upBytes", 0))
-            tx = int(stats.get("downBytes", 0))
+                up_key = f"user>>>{email}>>>traffic>>>uplink"
+                prev_up = _last_session_stats.get(up_key, 0)
+                up_delta = rx - prev_up if rx >= prev_up else rx
+                _last_session_stats[up_key] = rx
 
-            up_key = f"user>>>{email}>>>traffic>>>uplink"
-            prev_up = _last_session_stats.get(up_key, 0)
-            up_delta = rx - prev_up if rx >= prev_up else rx
-            _last_session_stats[up_key] = rx
+                down_key = f"user>>>{email}>>>traffic>>>downlink"
+                prev_down = _last_session_stats.get(down_key, 0)
+                down_delta = tx - prev_down if tx >= prev_down else tx
+                _last_session_stats[down_key] = tx
 
-            down_key = f"user>>>{email}>>>traffic>>>downlink"
-            prev_down = _last_session_stats.get(down_key, 0)
-            down_delta = tx - prev_down if tx >= prev_down else tx
-            _last_session_stats[down_key] = tx
-
-            if up_delta > 0 or down_delta > 0:
-                update_client_traffic_by_email(email, up_delta, down_delta)
-                for ib in xray_inbounds:
-                    update_inbound_traffic(ib["id"], up_delta, down_delta)
-                    
+                if (up_delta > 0 or down_delta > 0) and not stats_queried:
+                    update_client_traffic_by_email(email, up_delta, down_delta)
+                    for ib in xray_inbounds:
+                        update_inbound_traffic(ib["id"], up_delta, down_delta)
+                        
     except Exception as e:
         logging.debug(f"Error querying Xray stats: {e}")
 

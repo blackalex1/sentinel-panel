@@ -202,62 +202,59 @@ def query_hysteria_traffic():
         from backend.sentinel_core_bridge import get_unified_traffic
         traffic_data = get_unified_traffic() or {}
         
-        # Direct query to active Hysteria instances to guarantee stats collection
-        for ib in hysteria_inbounds:
-            ib_id = ib["id"]
-            admin_port = 10100 + (ib["port"] % 1000)
-            config_path = backend.hysteria.BIN_DIR / f"hysteria_{ib_id}.json"
-            if config_path.exists():
-                try:
-                    with open(config_path, "r", encoding="utf-8") as f:
-                        h_cfg = json.load(f)
-                        ts_listen = h_cfg.get("trafficStats", {}).get("listen", "")
-                        if ":" in ts_listen:
-                            admin_port = int(ts_listen.split(":")[-1])
-                except Exception:
-                    pass
+        # If sentinel-core returned cumulative traffic, compute deltas and update database
+        if traffic_data and isinstance(traffic_data, dict):
+            for email, stats in traffic_data.items():
+                if not isinstance(stats, dict):
+                    continue
+                rx = int(stats.get("upBytes", 0) or stats.get("up", 0) or stats.get("rx", 0))
+                tx = int(stats.get("downBytes", 0) or stats.get("down", 0) or stats.get("tx", 0))
 
-            try:
-                import urllib.request
-                req = urllib.request.Request(f"http://127.0.0.1:{admin_port}/traffic", headers={"User-Agent": "Sentinel-Panel"})
-                with urllib.request.urlopen(req, timeout=0.4) as resp:
-                    if resp.status == 200:
-                        raw_data = json.loads(resp.read().decode("utf-8"))
-                        for email, t in raw_data.items():
-                            if email not in traffic_data:
-                                traffic_data[email] = {
-                                    "email": email,
-                                    "upBytes": t.get("rx", 0),
-                                    "downBytes": t.get("tx", 0),
-                                    "online": True
-                                }
-                            else:
-                                traffic_data[email]["upBytes"] = max(int(traffic_data[email].get("upBytes", 0)), int(t.get("rx", 0)))
-                                traffic_data[email]["downBytes"] = max(int(traffic_data[email].get("downBytes", 0)), int(t.get("tx", 0)))
-            except Exception:
-                pass
+                for ib in hysteria_inbounds:
+                    ib_id = ib["id"]
+                    up_key = f"{ib_id}:{email}:up"
+                    prev_up = _last_hysteria_stats.get(up_key, 0)
+                    up_delta = rx - prev_up if rx >= prev_up else rx
+                    _last_hysteria_stats[up_key] = rx
 
-        for email, stats in traffic_data.items():
-            if not isinstance(stats, dict):
-                continue
-            rx = int(stats.get("upBytes", 0) or stats.get("up", 0) or stats.get("rx", 0))
-            tx = int(stats.get("downBytes", 0) or stats.get("down", 0) or stats.get("tx", 0))
+                    down_key = f"{ib_id}:{email}:down"
+                    prev_down = _last_hysteria_stats.get(down_key, 0)
+                    down_delta = tx - prev_down if tx >= prev_down else tx
+                    _last_hysteria_stats[down_key] = tx
 
+                    if up_delta > 0 or down_delta > 0:
+                        if update_client_traffic(ib_id, email, up_delta, down_delta):
+                            update_inbound_traffic(ib_id, up_delta, down_delta)
+        else:
+            # Fallback direct query to active Hysteria instances (where /traffic yields deltas directly)
             for ib in hysteria_inbounds:
                 ib_id = ib["id"]
-                up_key = f"{ib_id}:{email}:up"
-                prev_up = _last_hysteria_stats.get(up_key, 0)
-                up_delta = rx - prev_up if rx >= prev_up else rx
-                _last_hysteria_stats[up_key] = rx
+                admin_port = 10100 + (ib["port"] % 1000)
+                config_path = backend.hysteria.BIN_DIR / f"hysteria_{ib_id}.json"
+                if config_path.exists():
+                    try:
+                        with open(config_path, "r", encoding="utf-8") as f:
+                            h_cfg = json.load(f)
+                            ts_listen = h_cfg.get("trafficStats", {}).get("listen", "")
+                            if ":" in ts_listen:
+                                admin_port = int(ts_listen.split(":")[-1])
+                    except Exception:
+                        pass
 
-                down_key = f"{ib_id}:{email}:down"
-                prev_down = _last_hysteria_stats.get(down_key, 0)
-                down_delta = tx - prev_down if tx >= prev_down else tx
-                _last_hysteria_stats[down_key] = tx
-
-                if up_delta > 0 or down_delta > 0:
-                    update_client_traffic(ib_id, email, up_delta, down_delta)
-                    update_inbound_traffic(ib_id, up_delta, down_delta)
+                try:
+                    import urllib.request
+                    req = urllib.request.Request(f"http://127.0.0.1:{admin_port}/traffic", headers={"User-Agent": "Sentinel-Panel"})
+                    with urllib.request.urlopen(req, timeout=0.4) as resp:
+                        if resp.status == 200:
+                            raw_data = json.loads(resp.read().decode("utf-8"))
+                            for email, t in raw_data.items():
+                                rx_delta = int(t.get("rx", 0))
+                                tx_delta = int(t.get("tx", 0))
+                                if rx_delta > 0 or tx_delta > 0:
+                                    if update_client_traffic(ib_id, email, rx_delta, tx_delta):
+                                        update_inbound_traffic(ib_id, rx_delta, tx_delta)
+                except Exception:
+                    pass
                     
     except Exception as e:
         logging.debug(f"Hysteria traffic stats poll error: {e}")

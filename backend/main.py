@@ -68,7 +68,7 @@ async def poll_xray_stats_loop():
     last_releases_refresh = time.time()
     while True:
         try:
-            await asyncio.sleep(30)
+            await asyncio.sleep(5)
             await asyncio.to_thread(query_traffic_stats)
             await asyncio.to_thread(query_hysteria_traffic)
             await asyncio.to_thread(query_singbox_traffic)
