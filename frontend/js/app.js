@@ -188,8 +188,11 @@ async function startPanel() {
             import("./panel-main.js")
         ]);
         
-        // Populate initial dashboard data before revealing so nothing flashes empty
-        await initPanel();
+        // Populate initial dashboard data before revealing so nothing flashes empty (with 3.5s max wait)
+        await Promise.race([
+            initPanel(),
+            new Promise(resolve => setTimeout(resolve, 3500))
+        ]);
         enhanceAllSelects();
     } catch (err) {
         console.error("Error starting panel:", err);

@@ -92,45 +92,76 @@ function generateRandomUsername() {
 }
 
 export function setupClientListeners(loadInboundsCallback) {
-    document.getElementById("add-client-btn").addEventListener("click", () => {
-        document.getElementById("client-form").reset();
-        setEditModeEmail(null);
-        document.getElementById("c-email").disabled = false;
-        document.getElementById("client-modal-title").innerText = t("client_add_title", "Добавление клиента");
-        document.getElementById("client-ib-id").value = activeInboundId || "";
-        document.getElementById("c-email").value = generateRandomUsername();
-        
-        const flowGroup = document.getElementById("client-flow-group");
-        const vmessGroup = document.getElementById("client-vmess-group");
-        
-        flowGroup.style.display = (activeInboundProtocol === "vless") ? "block" : "none";
-        vmessGroup.style.display = (activeInboundProtocol === "vmess") ? "block" : "none";
-        
-        if (activeInboundProtocol === "vless" || activeInboundProtocol === "vmess") {
-            document.getElementById("c-uuid").value = generateUUID();
-        } else {
-            document.getElementById("c-uuid").value = generateClientPassword(16);
-        }
-        
-        document.getElementById("c-limit-ip").value = 0;
-        document.getElementById("c-allowed-ips").value = "";
-        document.getElementById("c-enable").checked = true;
-        document.getElementById("client-modal").classList.add("active");
-    });
+    const addClientBtn = document.getElementById("add-client-btn");
+    if (addClientBtn) {
+        addClientBtn.addEventListener("click", () => {
+            const clientForm = document.getElementById("client-form");
+            if (clientForm) clientForm.reset();
+            setEditModeEmail(null);
+            const emailInput = document.getElementById("c-email");
+            if (emailInput) {
+                emailInput.disabled = false;
+                emailInput.value = generateRandomUsername();
+            }
+            const modalTitle = document.getElementById("client-modal-title");
+            if (modalTitle) modalTitle.innerText = t("client_add_title", "Добавление клиента");
+            
+            const ibIdInput = document.getElementById("client-ib-id");
+            if (ibIdInput) ibIdInput.value = activeInboundId || "";
+            
+            const flowGroup = document.getElementById("client-flow-group");
+            const vmessGroup = document.getElementById("client-vmess-group");
+            
+            if (flowGroup) flowGroup.style.display = (activeInboundProtocol === "vless") ? "block" : "none";
+            if (vmessGroup) vmessGroup.style.display = (activeInboundProtocol === "vmess") ? "block" : "none";
+            
+            const uuidInput = document.getElementById("c-uuid");
+            if (uuidInput) {
+                if (activeInboundProtocol === "vless" || activeInboundProtocol === "vmess") {
+                    uuidInput.value = generateUUID();
+                } else {
+                    uuidInput.value = generateClientPassword(16);
+                }
+            }
+            
+            const limitIpInput = document.getElementById("c-limit-ip");
+            if (limitIpInput) limitIpInput.value = 0;
+            const allowedIpsInput = document.getElementById("c-allowed-ips");
+            if (allowedIpsInput) allowedIpsInput.value = "";
+            const enableInput = document.getElementById("c-enable");
+            if (enableInput) enableInput.checked = true;
+            
+            const clientModal = document.getElementById("client-modal");
+            if (clientModal) clientModal.classList.add("active");
+        });
+    }
     
-    document.getElementById("c-gen-email-btn").addEventListener("click", () => {
-        document.getElementById("c-email").value = generateRandomUsername();
-    });
+    const genEmailBtn = document.getElementById("c-gen-email-btn");
+    if (genEmailBtn) {
+        genEmailBtn.addEventListener("click", () => {
+            const emailInput = document.getElementById("c-email");
+            if (emailInput) emailInput.value = generateRandomUsername();
+        });
+    }
     
-    document.getElementById("c-gen-uuid-btn").addEventListener("click", () => {
-        if (activeInboundProtocol === "vless" || activeInboundProtocol === "vmess") {
-            document.getElementById("c-uuid").value = generateUUID();
-        } else {
-            document.getElementById("c-uuid").value = generateClientPassword(16);
-        }
-    });
+    const genUuidBtn = document.getElementById("c-gen-uuid-btn");
+    if (genUuidBtn) {
+        genUuidBtn.addEventListener("click", () => {
+            const uuidInput = document.getElementById("c-uuid");
+            if (uuidInput) {
+                if (activeInboundProtocol === "vless" || activeInboundProtocol === "vmess") {
+                    uuidInput.value = generateUUID();
+                } else {
+                    uuidInput.value = generateClientPassword(16);
+                }
+            }
+        });
+    }
     
-    document.getElementById("client-form").addEventListener("submit", (e) => {
-        handleClientFormSubmit(e, loadInboundsCallback);
-    });
+    const clientForm = document.getElementById("client-form");
+    if (clientForm) {
+        clientForm.addEventListener("submit", (e) => {
+            handleClientFormSubmit(e, loadInboundsCallback);
+        });
+    }
 }
