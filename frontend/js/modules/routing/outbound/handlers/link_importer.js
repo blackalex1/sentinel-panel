@@ -42,12 +42,13 @@ export function bindLinkImporterListener() {
                     if (proto === "ss") proto = "shadowsocks";
                     if (proto === "hy2" || proto === "hysteria") proto = "hysteria2";
 
+                    const hopPort = obj.portHopping || obj.hop || obj.ports || obj.mport || "";
                     parsed = {
                         protocol: proto,
                         remark: obj.name || obj.remark || `${proto.toUpperCase()} Proxy`,
                         tag: `${proto}-${(obj.address || "out").replace(/[^a-zA-Z0-9]/g, "-").toLowerCase()}`,
                         host: obj.address || "",
-                        port: obj.port || 443,
+                        port: hopPort || obj.port || 443,
                         uuid: obj.uuid || "",
                         password: obj.password || obj.uuid || "",
                         security: obj.security || (proto === "vless" ? "reality" : (proto === "hysteria2" || proto === "trojan" ? "tls" : "none")),
@@ -60,12 +61,12 @@ export function bindLinkImporterListener() {
                         flow: obj.flow || "",
                         encryption: obj.encryption || "",
                         method: obj.method || "2022-blake3-aes-128-gcm",
-                        allowInsecure: obj.allowInsecure === true,
-                        upMbps: obj.upMbps || 100,
-                        downMbps: obj.downMbps || 100,
-                        obfs: obj.obfs || "",
-                        obfsPassword: obj.obfsPassword || "",
-                        pinnedPeerCertSha256: obj.pinnedPeerCertSha256 || "",
+                        allowInsecure: Boolean(obj.allowInsecure || obj.insecure || obj.allow_insecure),
+                        upMbps: parseInt(obj.upMbps || obj.bandwidthUp || obj.up || 100) || 100,
+                        downMbps: parseInt(obj.downMbps || obj.bandwidthDown || obj.down || 100) || 100,
+                        obfs: obj.obfs || obj.obfsType || obj.obfs_type || "",
+                        obfsPassword: obj.obfsPassword || obj.obfs_password || "",
+                        pinnedPeerCertSha256: obj.pinnedPeerCertSha256 || obj.pinSHA256 || obj.pin_sha256 || "",
                         network: obj.network || obj.type || "tcp",
                         path: obj.path || "",
                         wsHost: obj.host || obj.wsHost || "",
@@ -98,7 +99,7 @@ export function bindLinkImporterListener() {
                         port: fallbackParsed.port || 443,
                         uuid: fallbackParsed.uuid || "",
                         password: fallbackParsed.password || fallbackParsed.uuid || "",
-                        security: fallbackParsed.security || "none",
+                        security: fallbackParsed.security || (proto === "vless" ? "reality" : (proto === "hysteria2" || proto === "trojan" ? "tls" : "none")),
                         sni: fallbackParsed.sni || "",
                         publicKey: fallbackParsed.pbk || "",
                         shortId: fallbackParsed.sid || "",
@@ -107,12 +108,12 @@ export function bindLinkImporterListener() {
                         flow: fallbackParsed.flow || "",
                         encryption: fallbackParsed.encryption || "",
                         method: fallbackParsed.method || "2022-blake3-aes-128-gcm",
-                        allowInsecure: fallbackParsed.insecure === true,
-                        upMbps: fallbackParsed.up || 100,
-                        downMbps: fallbackParsed.down || 100,
-                        obfs: fallbackParsed.obfs || "",
+                        allowInsecure: Boolean(fallbackParsed.insecure || fallbackParsed.allowInsecure),
+                        upMbps: parseInt(fallbackParsed.up) || 100,
+                        downMbps: parseInt(fallbackParsed.down) || 100,
+                        obfs: fallbackParsed.obfs || fallbackParsed.obfsType || "",
                         obfsPassword: fallbackParsed.obfsPassword || "",
-                        pinnedPeerCertSha256: fallbackParsed.pinSHA256 || "",
+                        pinnedPeerCertSha256: fallbackParsed.pinSHA256 || fallbackParsed.pinnedPeerCertSha256 || "",
                         enable: true
                     };
                 }

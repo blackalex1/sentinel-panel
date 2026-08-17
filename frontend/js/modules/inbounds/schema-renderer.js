@@ -227,12 +227,19 @@ export function renderDynamicOutboundForm(containerEl, tabsContainerEl, tabDefin
                             const sel = document.createElement("select");
                             sel.id = field.id;
                             sel.className = "glass-select";
-                            sel.setAttribute("data-target-field", field.targetField);
                             if (Array.isArray(field.options)) {
                                 field.options.forEach(opt => {
                                     const optEl = document.createElement("option");
                                     optEl.value = opt.value;
-                                    optEl.textContent = opt.label;
+                                    let labelText = opt.label || "";
+                                    if (labelText === "UI_OPT_NONE") {
+                                        labelText = t("opt_none_obfs", "Отсутствует (Без обфускации)");
+                                    } else if (labelText === "UI_OPT_NO_FLOW") {
+                                        labelText = t("opt_no_flow", "Без flow");
+                                    } else if (labelText === "UI_OPT_NO_ENCRYPTION") {
+                                        labelText = t("opt_no_encryption", "Без шифрования");
+                                    }
+                                    optEl.textContent = labelText;
                                     if (String(val) === String(opt.value)) {
                                         optEl.selected = true;
                                     }
