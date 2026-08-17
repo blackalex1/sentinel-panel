@@ -2,7 +2,7 @@ import { apiFetch } from "../../../../api.js";
 import { showToast } from "../../../../ui.js";
 import { t } from "../../../../i18n.js";
 import { parseProxyLink } from "../../link-parser.js";
-import { fetchOutboundSchema, setCurrentOutboundValues, getCurrentOutboundValues } from "../modal_manager.js";
+import { fetchOutboundSchema, setCurrentOutboundValues, getCurrentOutboundValues, populateFallbackDropdown } from "../modal_manager.js";
 import { renderDynamicOutboundForm } from "../../../inbounds/schema-renderer.js";
 
 export function bindLinkImporterListener() {
@@ -138,6 +138,9 @@ export function bindLinkImporterListener() {
                 renderDynamicOutboundForm(schemaContainer, tabsContainer, cap.tabDefinitions || [], currentVals, (updated) => {
                     setCurrentOutboundValues(updated);
                 });
+
+                // Populate fallback routes dropdown in the newly rendered form
+                await populateFallbackDropdown(currentVals);
 
                 showToast(t("routing_link_imported_success", "Ссылка успешно импортирована из ядра!"));
             } else {

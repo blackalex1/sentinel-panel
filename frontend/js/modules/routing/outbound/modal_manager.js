@@ -217,30 +217,7 @@ export async function openOutboundModal(id = null) {
         });
 
         // Populate fallback routes dropdown options dynamically
-        populateFallbackDropdown();
-    }
-
-    async function populateFallbackDropdown() {
-        const fallbackSelect = document.getElementById("fallback_outbound") || document.getElementById("ob-fallback-outbound");
-        if (!fallbackSelect) return;
-
-        const listRes = await apiFetch("/api/routing/outbounds");
-        const allObs = (listRes && listRes.success) ? listRes.obj : outboundsCache;
-        const currentTag = currentOutboundValues.tag;
-        
-        fallbackSelect.innerHTML = `<option value="">${t("routing_opt_no_fallback", "Без резервного маршрута")}</option>`;
-        (allObs || []).forEach(o => {
-            if (o.tag && o.tag !== "api" && o.tag !== currentTag) {
-                const opt = document.createElement("option");
-                opt.value = o.tag;
-                opt.textContent = `${o.remark} (${o.tag})`;
-                if (currentOutboundValues.fallback_outbound === o.tag) {
-                    opt.selected = true;
-                }
-                fallbackSelect.appendChild(opt);
-            }
-        });
-        enhanceAllSelects(fallbackSelect.parentElement);
+        populateFallbackDropdown(currentOutboundValues);
     }
 
     if (protocolSelect) {
@@ -254,6 +231,30 @@ export async function openOutboundModal(id = null) {
     enhanceAllSelects(modal);
 
     modal.classList.add("active");
+}
+
+export async function populateFallbackDropdown(customOutboundValues = null) {
+    const fallbackSelect = document.getElementById("fallback_outbound") || document.getElementById("ob-fallback-outbound");
+    if (!fallbackSelect) return;
+
+    const values = customOutboundValues || currentOutboundValues || {};
+    const listRes = await apiFetch("/api/routing/outbounds");
+    const allObs = (listRes && listRes.success) ? listRes.obj : outboundsCache;
+    const currentTag = values.tag;
+    
+    fallbackSelect.innerHTML = `<option value="">${t("routing_opt_no_fallback", "Без резервного маршрута")}</option>`;
+    (allObs || []).forEach(o => {
+        if (o.tag && o.tag !== "api" && o.tag !== currentTag) {
+            const opt = document.createElement("option");
+            opt.value = o.tag;
+            opt.textContent = `${o.remark || o.tag} (${o.tag})`;
+            if (values.fallback_outbound === o.tag) {
+                opt.selected = true;
+            }
+            fallbackSelect.appendChild(opt);
+        }
+    });
+    enhanceAllSelects(fallbackSelect.parentElement);
 }
 
 export function getCurrentOutboundValues() {
