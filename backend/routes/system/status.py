@@ -61,6 +61,18 @@ async def server_status_api(request: Request):
     from backend.singbox import is_singbox_running, get_installed_singbox_version
     singbox_status = "running" if (core_status.get("sing-box", {}).get("running") or is_singbox_running()) else "stopped"
     singbox_version = get_installed_singbox_version() or t("status_unknown", lang=lang, category="backend")
+
+    import os
+    bbr_enabled = False
+    try:
+        if os.path.exists("/proc/sys/net/ipv4/tcp_congestion_control"):
+            with open("/proc/sys/net/ipv4/tcp_congestion_control", "r") as f:
+                bbr_enabled = (f.read().strip() == "bbr")
+        else:
+            bbr_res = host_client.send_command("get_bbr_status", timeout=0.2)
+            bbr_enabled = bool(bbr_res.get("bbr_enabled", False))
+    except Exception:
+        pass
     
     return {
         "success": True,
@@ -96,6 +108,9 @@ async def server_status_api(request: Request):
             "singbox": {
                 "state": singbox_status,
                 "version": singbox_version
+            },
+            "bbr": {
+                "enabled": bbr_enabled
             }
         }
     }

@@ -82,6 +82,40 @@ export async function changeLanguage(langCode) {
                 text: currentLang === "ru" ? "Язык изменен на Русский" : "Language changed to English"
             }
         }));
+
+        // Dispatch custom language-changed event for reactive components
+        window.dispatchEvent(new CustomEvent("language-changed", {
+            detail: { lang: langCode }
+        }));
+
+        // Re-render current active tab so dynamically constructed labels (version selects, buttons) update
+        try {
+            const router = await import("./modules/router.js");
+            const activeTab = router.currentTab;
+            if (activeTab === "xray") {
+                const { loadCoreInfo } = await import("./modules/xray/core.js");
+                loadCoreInfo();
+            } else if (activeTab === "hysteria") {
+                const { loadHysteriaCoreInfo } = await import("./modules/hysteria/core.js");
+                loadHysteriaCoreInfo();
+            } else if (activeTab === "singbox") {
+                const { loadSingboxCoreInfo } = await import("./modules/singbox/core.js");
+                loadSingboxCoreInfo();
+            } else if (activeTab === "dashboard") {
+                const { loadStats } = await import("./modules/dashboard/metrics.js");
+                loadStats();
+            } else if (activeTab === "routing") {
+                const { loadOutbounds } = await import("./modules/routing/outbound/table_render.js");
+                const { loadRoutingRules } = await import("./modules/routing/rules/table_render.js");
+                loadOutbounds();
+                loadRoutingRules();
+            } else if (activeTab === "settings") {
+                const { loadWarpStatus } = await import("./modules/warp/status.js");
+                loadWarpStatus();
+            }
+        } catch (e) {
+            console.error("[i18n] Error refreshing current view on language change:", e);
+        }
         
         // Также синхронизируем выбор языка с настройками профиля на бэкенде
         try {

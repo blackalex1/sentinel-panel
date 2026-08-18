@@ -10,12 +10,12 @@ export async function loadOptimizationStatus() {
     const res = await apiFetch("/api/system/optimization/status");
     if (res && res.success) {
         if (res.optimized) {
-            badge.innerText = t("settings_sys_opt_active", "Оптимизировано (Тюнинг применен)");
+            badge.innerText = t("settings_sys_opt_active");
             badge.className = "badge success-badge";
             badge.style.background = "rgba(46, 213, 115, 0.15)";
             badge.style.color = "#2ed573";
         } else {
-            badge.innerText = t("settings_sys_opt_inactive", "Не оптимизировано (Стандартные настройки)");
+            badge.innerText = t("settings_sys_opt_inactive");
             badge.className = "badge warning-badge";
             badge.style.background = "rgba(255, 165, 2, 0.15)";
             badge.style.color = "#ffa502";
@@ -31,15 +31,15 @@ export function setupNetworkListeners() {
     if (enableBbrBtn) {
         enableBbrBtn.addEventListener("click", async () => {
             enableBbrBtn.disabled = true;
-            enableBbrBtn.innerText = t("dashboard_enabling_bbr", "Включение...");
+            enableBbrBtn.innerText = t("dashboard_enabling_bbr");
             const res = await apiFetch("/api/system/bbr/enable", { method: "POST" });
             enableBbrBtn.disabled = false;
-            enableBbrBtn.innerText = t("dashboard_enable_bbr", "Включить");
+            enableBbrBtn.innerText = t("dashboard_enable_bbr");
             if (res && res.success) {
-                showToast(t("bbr_enabled", "BBR ускорение успешно включено на хост-системе!"));
-                loadBbrStatus();
+                showToast(t("bbr_enabled"));
+                await loadBbrStatus();
             } else {
-                showToast(res ? res.msg : t("bbr_enable_error", "Не удалось включить BBR"), "error");
+                showToast(res ? res.msg : t("bbr_enable_error"), "error");
             }
         });
     }
@@ -49,17 +49,17 @@ export function setupNetworkListeners() {
         btnApplyOptimizations.addEventListener("click", async () => {
             btnApplyOptimizations.disabled = true;
             const originalText = btnApplyOptimizations.innerHTML;
-            btnApplyOptimizations.innerHTML = `<i class="fa-solid fa-circle-notch fa-spin"></i> ${t("settings_sys_opt_applying", "Применение...")}`;
+            btnApplyOptimizations.innerHTML = `<i class="fa-solid fa-circle-notch fa-spin"></i> ${t("settings_sys_opt_applying")}`;
             
             const res = await apiFetch("/api/system/optimization/apply", { method: "POST" });
             btnApplyOptimizations.disabled = false;
             btnApplyOptimizations.innerHTML = originalText;
             
             if (res && res.success) {
-                showToast(t("settings_sys_opt_success", "Системные оптимизации сети успешно применены!"));
+                showToast(t("settings_sys_opt_success"));
                 loadOptimizationStatus();
             } else {
-                showToast(res ? res.msg : t("settings_sys_opt_error", "Не удалось применить оптимизации"), "error");
+                showToast(res ? res.msg : t("settings_sys_opt_error"), "error");
             }
         });
     }

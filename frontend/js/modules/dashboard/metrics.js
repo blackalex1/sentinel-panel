@@ -20,14 +20,20 @@ export async function loadStats() {
     if (badge && statusText) {
         if (obj.xray.state === "running") {
             badge.className = "status-badge running";
-            statusText.innerText = t("xray_status_active", "Xray: Активен");
+            statusText.innerHTML = `<span data-i18n="xray_status_active">${t("xray_status_active")}</span>`;
             const stateEl = document.getElementById("sys-xray-state");
-            if (stateEl) stateEl.innerText = t("xray_state_running", "Запущен");
+            if (stateEl) {
+                stateEl.innerText = t("xray_state_running");
+                stateEl.setAttribute("data-i18n", "xray_state_running");
+            }
         } else {
             badge.className = "status-badge stopped";
-            statusText.innerText = t("xray_status_stopped", "Xray: Остановлен");
+            statusText.innerHTML = `<span data-i18n="xray_status_stopped">${t("xray_status_stopped")}</span>`;
             const stateEl = document.getElementById("sys-xray-state");
-            if (stateEl) stateEl.innerText = t("xray_state_stopped", "Остановлен");
+            if (stateEl) {
+                stateEl.innerText = t("xray_state_stopped");
+                stateEl.setAttribute("data-i18n", "xray_state_stopped");
+            }
         }
     }
     
@@ -37,14 +43,20 @@ export async function loadStats() {
     if (hBadge && hStatusText) {
         if (obj.hysteria.state === "running") {
             hBadge.className = "status-badge running";
-            hStatusText.innerText = t("hysteria_status_active", "Hysteria: Активен");
+            hStatusText.innerHTML = `<span data-i18n="hysteria_status_active">${t("hysteria_status_active")}</span>`;
             const stateEl = document.getElementById("sys-hysteria-state");
-            if (stateEl) stateEl.innerText = t("hysteria_state_running", "Запущен");
+            if (stateEl) {
+                stateEl.innerText = t("hysteria_state_running");
+                stateEl.setAttribute("data-i18n", "hysteria_state_running");
+            }
         } else {
             hBadge.className = "status-badge stopped";
-            hStatusText.innerText = t("hysteria_status_stopped", "Hysteria: Остановлен");
+            hStatusText.innerHTML = `<span data-i18n="hysteria_status_stopped">${t("hysteria_status_stopped")}</span>`;
             const stateEl = document.getElementById("sys-hysteria-state");
-            if (stateEl) stateEl.innerText = t("hysteria_state_stopped", "Остановлен");
+            if (stateEl) {
+                stateEl.innerText = t("hysteria_state_stopped");
+                stateEl.setAttribute("data-i18n", "hysteria_state_stopped");
+            }
         }
     }
     
@@ -115,11 +127,16 @@ export async function loadStats() {
         const sbStateEl = document.getElementById("sys-singbox-state");
         if (sbStateEl) {
             const isRunning = obj.singbox.state === "running";
-            sbStateEl.innerText = isRunning ? t("singbox_state_running", "Запущен") : t("singbox_state_stopped", "Остановлен");
+            sbStateEl.innerText = isRunning ? t("singbox_state_running") : t("singbox_state_stopped");
+            sbStateEl.setAttribute("data-i18n", isRunning ? "singbox_state_running" : "singbox_state_stopped");
             sbStateEl.style.color = isRunning ? "var(--accent-green)" : "var(--accent-rose)";
         }
         const sbVerEl = document.getElementById("sys-singbox-version");
         if (sbVerEl) sbVerEl.innerText = obj.singbox.version || "—";
+    }
+    
+    if (obj.bbr !== undefined) {
+        renderBbrStatus(obj.bbr.enabled);
     }
     
     const sysIpEl = document.getElementById("sys-ip");
@@ -129,23 +146,36 @@ export async function loadStats() {
     updateChart(obj.cpu, (memCurrent / memTotal) * 100, swapPercent, obj.disk ? obj.disk.percent : 0);
 }
 
-export async function loadBbrStatus() {
-    const bbrRes = await apiFetch("/api/system/bbr");
+export function renderBbrStatus(bbrEnabled) {
     const bbrEl = document.getElementById("sys-bbr");
     const enableBtn = document.getElementById("enable-bbr-btn");
-    if (bbrRes && bbrRes.success && bbrEl && enableBtn) {
-        if (bbrRes.bbr_enabled) {
-            bbrEl.innerText = t("bbr_status_active", "Активно");
-            bbrEl.style.color = "var(--accent-green)";
-            enableBtn.style.display = "none";
-        } else {
-            bbrEl.innerText = t("bbr_status_disabled", "Отключено");
-            bbrEl.style.color = "var(--accent-rose)";
-            enableBtn.style.display = "inline-block";
-        }
-    } else if (bbrEl && enableBtn) {
-        bbrEl.innerText = t("bbr_status_error", "Ошибка");
+    if (!bbrEl) return;
+
+    if (bbrEnabled) {
+        bbrEl.innerText = t("bbr_status_active");
+        bbrEl.setAttribute("data-i18n", "bbr_status_active");
+        bbrEl.style.color = "var(--accent-green)";
+        if (enableBtn) enableBtn.style.display = "none";
+    } else {
+        bbrEl.innerText = t("bbr_status_disabled");
+        bbrEl.setAttribute("data-i18n", "bbr_status_disabled");
         bbrEl.style.color = "var(--accent-rose)";
-        enableBtn.style.display = "none";
+        if (enableBtn) enableBtn.style.display = "inline-block";
+    }
+}
+
+export async function loadBbrStatus() {
+    const bbrRes = await apiFetch("/api/system/bbr");
+    if (bbrRes && bbrRes.success) {
+        renderBbrStatus(bbrRes.bbr_enabled);
+    } else {
+        const bbrEl = document.getElementById("sys-bbr");
+        const enableBtn = document.getElementById("enable-bbr-btn");
+        if (bbrEl) {
+            bbrEl.innerText = t("bbr_status_error");
+            bbrEl.setAttribute("data-i18n", "bbr_status_error");
+            bbrEl.style.color = "var(--accent-rose)";
+        }
+        if (enableBtn) enableBtn.style.display = "none";
     }
 }

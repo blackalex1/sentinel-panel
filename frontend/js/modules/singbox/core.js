@@ -52,10 +52,10 @@ export async function loadSingboxCoreInfo() {
             opt.value = item.download_url;
             opt.setAttribute("data-version", item.version);
             opt.setAttribute("data-prerelease", item.is_prerelease ? "true" : "false");
-            const tag = item.is_prerelease ? "Pre-release" : "Stable";
+            const tag = item.is_prerelease ? t("tag_prerelease") : t("tag_stable");
             opt.innerText = `${item.version} (${tag})`;
             if (normVer(item.version) === normVer(res.current)) {
-                opt.innerText += ` — [${t("core_installed_tag", "Установлено")}]`;
+                opt.innerText += ` — [${t("core_installed_tag")}]`;
             }
             versionSelect.appendChild(opt);
         });
@@ -77,12 +77,12 @@ export async function loadSingboxCoreInfo() {
             if (prereleaseBadge) {
                 prereleaseBadge.style.display = "inline-block";
                 if (isPre) {
-                    prereleaseBadge.innerText = "Pre-release";
+                    prereleaseBadge.innerText = t("tag_prerelease");
                     prereleaseBadge.style.background = "rgba(255, 171, 0, 0.15)";
                     prereleaseBadge.style.color = "#ffab00";
                     prereleaseBadge.style.borderColor = "rgba(255, 171, 0, 0.3)";
                 } else {
-                    prereleaseBadge.innerText = "Stable";
+                    prereleaseBadge.innerText = t("tag_stable");
                     prereleaseBadge.style.background = "rgba(0, 230, 118, 0.15)";
                     prereleaseBadge.style.color = "#00e676";
                     prereleaseBadge.style.borderColor = "rgba(0, 230, 118, 0.3)";
@@ -91,11 +91,11 @@ export async function loadSingboxCoreInfo() {
 
             if (normVer(selVer) === normVer(res.current)) {
                 updateBtn.disabled = true;
-                updateBtn.innerHTML = `<i class="fa-solid fa-check"></i> <span>${t("singbox_installed", "Установлено")}</span>`;
+                updateBtn.innerHTML = `<i class="fa-solid fa-check"></i> <span data-i18n="singbox_installed">${t("singbox_installed")}</span>`;
             } else {
                 updateBtn.disabled = false;
                 updateBtn.setAttribute("data-url", selUrl);
-                updateBtn.innerHTML = `<i class="fa-solid fa-download"></i> <span>${t("core_btn_install_version", "Установить {version}").replace("{version}", selVer)}</span>`;
+                updateBtn.innerHTML = `<i class="fa-solid fa-download"></i> <span>${t("core_btn_install_version").replace("{version}", selVer)}</span>`;
             }
         };
 
@@ -109,10 +109,10 @@ export async function loadSingboxCoreInfo() {
             if (normVer(res.current) !== normVer(res.latest) && res.latest !== "Unknown" && res.download_url) {
                 updateBtn.disabled = false;
                 updateBtn.setAttribute("data-url", res.download_url);
-                updateBtn.innerHTML = `<i class="fa-solid fa-download"></i> <span>${t("singbox_btn_update", "Обновить ядро")}</span>`;
+                updateBtn.innerHTML = `<i class="fa-solid fa-download"></i> <span data-i18n="singbox_btn_update">${t("singbox_btn_update")}</span>`;
             } else {
                 updateBtn.disabled = true;
-                updateBtn.innerHTML = `<i class="fa-solid fa-check"></i> <span>${t("singbox_updated", "Обновлено")}</span>`;
+                updateBtn.innerHTML = `<i class="fa-solid fa-check"></i> <span data-i18n="singbox_updated">${t("singbox_updated")}</span>`;
             }
         }
     }
@@ -123,11 +123,11 @@ export async function loadSingboxCoreInfo() {
         if (stopBtn) {
             if (statusRes.running) {
                 stopBtn.className = "btn danger-btn";
-                stopBtn.innerHTML = `<i class="fa-solid fa-stop"></i> <span>${t("singbox_btn_stop", "Остановить")}</span>`;
+                stopBtn.innerHTML = `<i class="fa-solid fa-stop"></i> <span data-i18n="singbox_btn_stop">${t("singbox_btn_stop")}</span>`;
                 stopBtn.setAttribute("data-action", "stop");
             } else {
                 stopBtn.className = "btn success-btn";
-                stopBtn.innerHTML = `<i class="fa-solid fa-play"></i> <span>${t("singbox_btn_start", "Запустить")}</span>`;
+                stopBtn.innerHTML = `<i class="fa-solid fa-play"></i> <span data-i18n="singbox_btn_start">${t("singbox_btn_start")}</span>`;
                 stopBtn.setAttribute("data-action", "start");
             }
         }
@@ -137,10 +137,10 @@ export async function loadSingboxCoreInfo() {
         if (badge && statusText) {
             if (statusRes.running) {
                 badge.className = "status-badge running";
-                statusText.innerText = t("singbox_status_active", "sing-box: Активен");
+                statusText.innerHTML = `<span data-i18n="singbox_status_active">${t("singbox_status_active")}</span>`;
             } else {
                 badge.className = "status-badge stopped";
-                statusText.innerText = t("singbox_status_stopped", "sing-box: Остановлен");
+                statusText.innerHTML = `<span data-i18n="singbox_status_stopped">${t("singbox_status_stopped")}</span>`;
             }
         }
     }
@@ -291,7 +291,7 @@ export function setupSingboxCoreListeners() {
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ action: "restart" })
             });
-            if (res && res.success) showToast(t("singbox_restarted", "Ядро sing-box перезапущено"));
+            if (res && res.success) showToast(t("singbox_restarted"));
         });
     }
 
@@ -306,9 +306,9 @@ export function setupSingboxCoreListeners() {
             });
             if (res && res.success) {
                 if (action === "stop") {
-                    showToast(t("singbox_stopped_toast", "Ядро sing-box остановлено"), "info");
+                    showToast(t("singbox_stopped_toast"), "info");
                 } else {
-                    showToast(t("singbox_started_toast", "Ядро sing-box запущено"));
+                    showToast(t("singbox_started_toast"));
                 }
                 loadSingboxCoreInfo();
             }
@@ -322,8 +322,8 @@ export function setupSingboxCoreListeners() {
             if (!url) return;
 
             updateBtn.disabled = true;
-            updateBtn.innerText = t("core_btn_updating", "Обновление...");
-            showToast(t("singbox_update_started", "Начался процесс обновления ядра sing-box. Пожалуйста, подождите"), "info");
+            updateBtn.innerText = t("core_btn_updating");
+            showToast(t("singbox_update_started"), "info");
 
             const res = await apiFetch("/api/singbox/update", {
                 method: "POST",
@@ -332,10 +332,10 @@ export function setupSingboxCoreListeners() {
             });
 
             if (res && res.success) {
-                showToast(t("singbox_update_success", "Ядро sing-box успешно обновлено до версии {version}!").replace("{version}", res.version));
+                showToast(t("singbox_update_success").replace("{version}", res.version));
                 loadSingboxCoreInfo();
             } else {
-                showToast(res ? res.msg : t("singbox_update_error", "Ошибка обновления ядра sing-box"), "error");
+                showToast(res ? res.msg : t("singbox_update_error"), "error");
                 loadSingboxCoreInfo();
             }
         });
@@ -347,7 +347,7 @@ export function setupSingboxCoreListeners() {
             const terminal = document.getElementById("singbox-logs-terminal");
             if (terminal) {
                 navigator.clipboard.writeText(terminal.innerText);
-                showToast(t("logs_copied", "Логи скопированы в буфер обмена"));
+                showToast(t("logs_copied"));
             }
         });
     }
@@ -360,9 +360,9 @@ export function setupSingboxCoreListeners() {
                 lastSingboxLogsStr = "[]";
                 const terminal = document.getElementById("singbox-logs-terminal");
                 if (terminal) terminal.innerText = "";
-                showToast(t("logs_cleared", "Логи очищены"));
+                showToast(t("logs_cleared"));
             } else {
-                showToast(t("logs_clear_error", "Ошибка при очистке логов"), "error");
+                showToast(t("logs_clear_error"), "error");
             }
         });
     }

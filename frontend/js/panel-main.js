@@ -78,7 +78,7 @@ function setupAuthorizedEventListeners() {
         } else {
             document.execCommand("copy");
         }
-        showToast(t("copied_to_clipboard", "Скопировано в буфер обмена!"));
+        showToast(t("copied_to_clipboard"));
     });
     
     document.addEventListener("click", (e) => {
@@ -90,8 +90,7 @@ function setupAuthorizedEventListeners() {
 
         const detailsBtn = e.target.closest ? e.target.closest("#btn-open-traffic-details, .open-traffic-details-btn") : null;
         if (detailsBtn) {
-            e.preventDefault();
-            openGlobalTrafficDetailsModal();
+            import("./modules/traffic/modal.js").then(m => m.openTrafficDetailsModal());
         }
     });
 
@@ -111,53 +110,36 @@ function setupAuthorizedEventListeners() {
 
 function startGlobalStatusPolling() {
     setInterval(async () => {
-        if (currentTab === "dashboard") return;
-        
         try {
-            const [xrayRes, hysteriaRes, singboxRes] = await Promise.all([
-                apiFetch("/api/xray/status"),
-                apiFetch("/api/hysteria/status"),
-                apiFetch("/api/singbox/status")
-            ]);
-            
-            if (xrayRes) {
-                const badge = document.getElementById("xray-status-badge");
-                const statusText = badge ? badge.querySelector(".status-text") : null;
-                if (badge && statusText) {
-                    if (xrayRes.running) {
-                        badge.className = "status-badge running";
-                        statusText.innerText = t("xray_status_active", "Xray: Активен");
-                    } else {
-                        badge.className = "status-badge stopped";
-                        statusText.innerText = t("xray_status_stopped", "Xray: Остановлен");
+            const stats = await apiFetch("/api/stats");
+            if (stats && stats.success) {
+                const xrayBadge = document.getElementById("xray-status-badge");
+                if (xrayBadge) {
+                    const isRunning = stats.cores?.xray?.status === "running" || stats.xray_status === "running";
+                    xrayBadge.className = `status-badge ${isRunning ? 'running' : 'stopped'}`;
+                    const statusText = xrayBadge.querySelector(".status-text");
+                    if (statusText) {
+                        statusText.innerHTML = `<span data-i18n="${isRunning ? 'xray_status_active' : 'xray_status_stopped'}">${t(isRunning ? 'xray_status_active' : 'xray_status_stopped')}</span>`;
                     }
                 }
-            }
-            
-            if (hysteriaRes) {
-                const hBadge = document.getElementById("hysteria-status-badge");
-                const hStatusText = hBadge ? hBadge.querySelector(".status-text") : null;
-                if (hBadge && hStatusText) {
-                    if (hysteriaRes.running) {
-                        hBadge.className = "status-badge running";
-                        hStatusText.innerText = t("hysteria_status_active", "Hysteria: Активен");
-                    } else {
-                        hBadge.className = "status-badge stopped";
-                        hStatusText.innerText = t("hysteria_status_stopped", "Hysteria: Остановлен");
-                    }
-                }
-            }
 
-            if (singboxRes) {
+                const hBadge = document.getElementById("hysteria-status-badge");
+                if (hBadge) {
+                    const isRunning = stats.cores?.hysteria?.status === "running" || stats.hysteria_status === "running";
+                    hBadge.className = `status-badge ${isRunning ? 'running' : 'stopped'}`;
+                    const hStatusText = hBadge.querySelector(".status-text");
+                    if (hStatusText) {
+                        hStatusText.innerHTML = `<span data-i18n="${isRunning ? 'hysteria_status_active' : 'hysteria_status_stopped'}">${t(isRunning ? 'hysteria_status_active' : 'hysteria_status_stopped')}</span>`;
+                    }
+                }
+
                 const sBadge = document.getElementById("singbox-status-badge");
-                const sStatusText = sBadge ? sBadge.querySelector(".status-text") : null;
-                if (sBadge && sStatusText) {
-                    if (singboxRes.running) {
-                        sBadge.className = "status-badge running";
-                        sStatusText.innerText = t("singbox_status_active", "sing-box: Активен");
-                    } else {
-                        sBadge.className = "status-badge stopped";
-                        sStatusText.innerText = t("singbox_status_stopped", "sing-box: Остановлен");
+                if (sBadge) {
+                    const isRunning = stats.cores?.singbox?.status === "running" || stats.singbox_status === "running";
+                    sBadge.className = `status-badge ${isRunning ? 'running' : 'stopped'}`;
+                    const sStatusText = sBadge.querySelector(".status-text");
+                    if (sStatusText) {
+                        sStatusText.innerHTML = `<span data-i18n="${isRunning ? 'singbox_status_active' : 'singbox_status_stopped'}">${t(isRunning ? 'singbox_status_active' : 'singbox_status_stopped')}</span>`;
                     }
                 }
             }

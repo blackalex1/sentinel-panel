@@ -50,10 +50,10 @@ export async function loadHysteriaCoreInfo() {
             opt.value = item.download_url;
             opt.setAttribute("data-version", item.version);
             opt.setAttribute("data-prerelease", item.is_prerelease ? "true" : "false");
-            const tag = item.is_prerelease ? "Pre-release" : "Stable";
+            const tag = item.is_prerelease ? t("tag_prerelease") : t("tag_stable");
             opt.innerText = `${item.version} (${tag})`;
             if (normVer(item.version) === normVer(res.current)) {
-                opt.innerText += ` — [${t("core_installed_tag", "Установлено")}]`;
+                opt.innerText += ` — [${t("core_installed_tag")}]`;
             }
             versionSelect.appendChild(opt);
         });
@@ -75,12 +75,12 @@ export async function loadHysteriaCoreInfo() {
             if (prereleaseBadge) {
                 prereleaseBadge.style.display = "inline-block";
                 if (isPre) {
-                    prereleaseBadge.innerText = "Pre-release";
+                    prereleaseBadge.innerText = t("tag_prerelease");
                     prereleaseBadge.style.background = "rgba(255, 171, 0, 0.15)";
                     prereleaseBadge.style.color = "#ffab00";
                     prereleaseBadge.style.borderColor = "rgba(255, 171, 0, 0.3)";
                 } else {
-                    prereleaseBadge.innerText = "Stable";
+                    prereleaseBadge.innerText = t("tag_stable");
                     prereleaseBadge.style.background = "rgba(0, 230, 118, 0.15)";
                     prereleaseBadge.style.color = "#00e676";
                     prereleaseBadge.style.borderColor = "rgba(0, 230, 118, 0.3)";
@@ -89,11 +89,11 @@ export async function loadHysteriaCoreInfo() {
 
             if (normVer(selVer) === normVer(res.current)) {
                 updateBtn.disabled = true;
-                updateBtn.innerHTML = `<i class="fa-solid fa-check"></i> <span>${t("hysteria_installed", "Установлено")}</span>`;
+                updateBtn.innerHTML = `<i class="fa-solid fa-check"></i> <span data-i18n="hysteria_installed">${t("hysteria_installed")}</span>`;
             } else {
                 updateBtn.disabled = false;
                 updateBtn.setAttribute("data-url", selUrl);
-                updateBtn.innerHTML = `<i class="fa-solid fa-download"></i> <span>${t("core_btn_install_version", "Установить {version}").replace("{version}", selVer)}</span>`;
+                updateBtn.innerHTML = `<i class="fa-solid fa-download"></i> <span>${t("core_btn_install_version").replace("{version}", selVer)}</span>`;
             }
         };
 
@@ -106,10 +106,10 @@ export async function loadHysteriaCoreInfo() {
         if (normVer(res.current) !== normVer(res.latest) && res.latest !== "Unknown" && res.download_url) {
             updateBtn.disabled = false;
             updateBtn.setAttribute("data-url", res.download_url);
-            updateBtn.innerHTML = `<i class="fa-solid fa-download"></i> <span>${t("hysteria_btn_update", "Обновить ядро")}</span>`;
+            updateBtn.innerHTML = `<i class="fa-solid fa-download"></i> <span data-i18n="hysteria_btn_update">${t("hysteria_btn_update")}</span>`;
         } else {
             updateBtn.disabled = true;
-            updateBtn.innerHTML = `<i class="fa-solid fa-check"></i> <span>${t("hysteria_updated", "Обновлено")}</span>`;
+            updateBtn.innerHTML = `<i class="fa-solid fa-check"></i> <span data-i18n="hysteria_updated">${t("hysteria_updated")}</span>`;
         }
     }
     
@@ -119,11 +119,11 @@ export async function loadHysteriaCoreInfo() {
         if (stopBtn) {
             if (statusRes.running) {
                 stopBtn.className = "btn danger-btn";
-                stopBtn.innerHTML = `<i class="fa-solid fa-stop"></i> <span>${t("hysteria_btn_stop", "Остановить")}</span>`;
+                stopBtn.innerHTML = `<i class="fa-solid fa-stop"></i> <span data-i18n="hysteria_btn_stop">${t("hysteria_btn_stop")}</span>`;
                 stopBtn.setAttribute("data-action", "stop");
             } else {
                 stopBtn.className = "btn success-btn";
-                stopBtn.innerHTML = `<i class="fa-solid fa-play"></i> <span>${t("hysteria_btn_start", "Запустить")}</span>`;
+                stopBtn.innerHTML = `<i class="fa-solid fa-play"></i> <span data-i18n="hysteria_btn_start">${t("hysteria_btn_start")}</span>`;
                 stopBtn.setAttribute("data-action", "start");
             }
         }
@@ -134,10 +134,10 @@ export async function loadHysteriaCoreInfo() {
         if (hBadge && hStatusText) {
             if (statusRes.running) {
                 hBadge.className = "status-badge running";
-                hStatusText.innerText = t("hysteria_status_active", "Hysteria: Активен");
+                hStatusText.innerHTML = `<span data-i18n="hysteria_status_active">${t("hysteria_status_active")}</span>`;
             } else {
                 hBadge.className = "status-badge stopped";
-                hStatusText.innerText = t("hysteria_status_stopped", "Hysteria: Остановлен");
+                hStatusText.innerHTML = `<span data-i18n="hysteria_status_stopped">${t("hysteria_status_stopped")}</span>`;
             }
         }
     }
@@ -292,9 +292,9 @@ export function setupHysteriaCoreListeners() {
                 lastHysteriaLogsStr = "[]";
                 const terminal = document.getElementById("hysteria-logs-terminal");
                 if (terminal) terminal.innerText = "";
-                showToast(t("logs_cleared", "Логи очищены"));
+                showToast(t("logs_cleared"));
             } else {
-                showToast(t("logs_clear_error", "Ошибка при очистке логов"), "error");
+                showToast(t("logs_clear_error"), "error");
             }
         });
     }
@@ -306,9 +306,9 @@ export function setupHysteriaCoreListeners() {
             if (terminal) {
                 const text = terminal.innerText;
                 navigator.clipboard.writeText(text).then(() => {
-                    showToast(t("logs_copied", "Логи скопированы в буфер обмена"));
+                    showToast(t("logs_copied"));
                 }).catch(err => {
-                    showToast(t("logs_copy_error", "Не удалось скопировать логи"), "error");
+                    showToast(t("logs_copy_error"), "error");
                 });
             }
         });
@@ -323,7 +323,7 @@ export function setupHysteriaCoreListeners() {
                 body: JSON.stringify({ action: "restart" })
             });
             if (res && res.success) {
-                showToast(t("hysteria_restarted", "Ядро Hysteria перезапущено"));
+                showToast(t("hysteria_restarted"));
                 loadHysteriaCoreInfo();
             }
         });
@@ -340,9 +340,9 @@ export function setupHysteriaCoreListeners() {
             });
             if (res && res.success) {
                 if (action === "stop") {
-                    showToast(t("hysteria_stopped_toast", "Ядро Hysteria остановлено"), "info");
+                    showToast(t("hysteria_stopped_toast"), "info");
                 } else {
-                    showToast(t("hysteria_started_toast", "Ядро Hysteria запущено"));
+                    showToast(t("hysteria_started_toast"));
                 }
                 loadHysteriaCoreInfo();
             }
@@ -356,8 +356,8 @@ export function setupHysteriaCoreListeners() {
             if (!url) return;
             
             updateBtn.disabled = true;
-            updateBtn.innerText = t("hysteria_updating", "Обновление...");
-            showToast(t("hysteria_update_started", "Начался процесс обновления ядра Hysteria. Пожалуйста, подождите"), "info");
+            updateBtn.innerText = t("hysteria_updating");
+            showToast(t("hysteria_update_started"), "info");
             
             const res = await apiFetch("/api/hysteria/update", {
                 method: "POST",
@@ -366,10 +366,10 @@ export function setupHysteriaCoreListeners() {
             });
             
             if (res && res.success) {
-                showToast(t("hysteria_update_success", "Ядро успешно обновлено до версии {version}!").replace("{version}", res.version));
+                showToast(t("hysteria_update_success").replace("{version}", res.version));
                 loadHysteriaCoreInfo();
             } else {
-                showToast(res ? res.msg : t("hysteria_update_error", "Ошибка обновления ядра"), "error");
+                showToast(res ? res.msg : t("hysteria_update_error"), "error");
                 loadHysteriaCoreInfo();
             }
         });
@@ -379,19 +379,15 @@ export function setupHysteriaCoreListeners() {
     if (reissueBtn) {
         reissueBtn.addEventListener("click", async () => {
             const confirmed = await showConfirmDialog({
-                title: t("hysteria_cert_alert_title", "Перевыпуск сертификата"),
-                message: t("hysteria_cert_reissue_confirm", 
-                    "Внимание!\n\nПеревыпуск SSL-сертификата изменит SHA-256 хеш (pinSHA256).\n" +
-                    "Все клиенты с жесткой проверкой пина потеряют доступ, пока не обновят свои ключи/подписку.\n\n" +
-                    "Вы действительно хотите перевыпустить сертификат?"
-                ),
+                title: t("hysteria_cert_alert_title"),
+                message: t("hysteria_cert_reissue_confirm"),
                 type: "danger",
-                okText: t("reissue_cert", "Перевыпустить")
+                okText: t("reissue_cert")
             });
             if (!confirmed) return;
 
             reissueBtn.disabled = true;
-            showToast(t("hysteria_cert_reissuing_toast", "Перевыпуск сертификата Hysteria 2..."), "info");
+            showToast(t("hysteria_cert_reissuing_toast"), "info");
 
             const res = await apiFetch("/api/hysteria/certificate/regenerate", {
                 method: "POST",
@@ -401,11 +397,11 @@ export function setupHysteriaCoreListeners() {
 
             reissueBtn.disabled = false;
             if (res && res.success) {
-                showToast(t("hysteria_cert_reissue_success", "SSL-сертификат Hysteria 2 успешно перевыпущен!"));
+                showToast(t("hysteria_cert_reissue_success"));
                 loadHysteriaCertStatus();
                 loadHysteriaCoreInfo();
             } else {
-                showToast(res && res.msg ? res.msg : t("hysteria_cert_reissue_error", "Ошибка при перевыпуске сертификата"), "error");
+                showToast(res && res.msg ? res.msg : t("hysteria_cert_reissue_error"), "error");
             }
         });
     }
@@ -416,9 +412,9 @@ export function setupHysteriaCoreListeners() {
             const fpEl = document.getElementById("hysteria-cert-fingerprint");
             if (fpEl && fpEl.innerText && fpEl.innerText !== "—") {
                 navigator.clipboard.writeText(fpEl.innerText).then(() => {
-                    showToast(t("hysteria_cert_fp_copied", "SHA-256 хеш скопирован в буфер обмена"));
+                    showToast(t("hysteria_cert_fp_copied"));
                 }).catch(() => {
-                    showToast(t("hysteria_cert_fp_copy_error", "Не удалось скопировать хеш"), "error");
+                    showToast(t("hysteria_cert_fp_copy_error"), "error");
                 });
             }
         });
@@ -443,7 +439,7 @@ export async function loadHysteriaCertStatus() {
     if (sansEl) sansEl.innerText = cert.sans && cert.sans.length > 0 ? cert.sans.join(", ") : "—";
     if (expiryEl) {
         if (cert.expires_at) {
-            const daysText = t("hysteria_cert_days_left", "{days} дн.").replace("{days}", cert.days_left);
+            const daysText = t("hysteria_cert_days_left").replace("{days}", cert.days_left);
             expiryEl.innerText = `${cert.expires_at} (${daysText})`;
             expiryEl.style.color = cert.days_left > 30 ? "var(--text-primary)" : "#f87171";
         } else {
@@ -453,7 +449,7 @@ export async function loadHysteriaCertStatus() {
 
     if (cert.needs_reissue || !cert.valid) {
         if (badgeEl) {
-            badgeEl.innerText = t("hysteria_cert_status_needs_reissue", "Требуется перевыпуск");
+            badgeEl.innerText = t("hysteria_cert_status_needs_reissue");
             badgeEl.style.background = "rgba(239, 68, 68, 0.15)";
             badgeEl.style.color = "#ef4444";
             badgeEl.style.border = "1px solid rgba(239, 68, 68, 0.3)";
@@ -461,7 +457,7 @@ export async function loadHysteriaCertStatus() {
         if (alertBox) alertBox.style.display = "block";
         if (alertList) {
             alertList.innerHTML = "";
-            (cert.reissue_reasons || [t("hysteria_cert_status_needs_reissue", "Сертификат не соответствует конфигурации")]).forEach(reason => {
+            (cert.reissue_reasons || [t("hysteria_cert_status_needs_reissue")]).forEach(reason => {
                 const li = document.createElement("li");
                 li.innerText = reason;
                 alertList.appendChild(li);
@@ -469,7 +465,7 @@ export async function loadHysteriaCertStatus() {
         }
     } else {
         if (badgeEl) {
-            badgeEl.innerText = t("hysteria_cert_status_valid", "Валиден");
+            badgeEl.innerText = t("hysteria_cert_status_valid");
             badgeEl.style.background = "rgba(16, 185, 129, 0.15)";
             badgeEl.style.color = "#10b981";
             badgeEl.style.border = "1px solid rgba(16, 185, 129, 0.3)";

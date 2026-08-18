@@ -26,7 +26,7 @@ export async function loadOutbounds() {
         try {
             const settingsObj = JSON.parse(ob.settings || "{}");
             if (Array.isArray(settingsObj.backup_outbounds) && settingsObj.backup_outbounds.length > 0) {
-                backupBadge = `<div style="font-size: 11px; color: var(--accent-green); margin-top: 2px;"><i class="fa-solid fa-shield-halved" style="margin-right: 3px;"></i>${t("routing_backup_badge_label", "Резерв")}: ${settingsObj.backup_outbounds.join(", ")}</div>`;
+                backupBadge = `<div style="font-size: 11px; color: var(--accent-green); margin-top: 2px;"><i class="fa-solid fa-shield-halved" style="margin-right: 3px;"></i><span data-i18n="routing_backup_badge_label">${t("routing_backup_badge_label")}</span>: ${settingsObj.backup_outbounds.join(", ")}</div>`;
             }
             if (ob.protocol === "socks" || ob.protocol === "http" || ob.protocol === "shadowsocks") {
                 const server = settingsObj.servers ? settingsObj.servers[0] : null;
@@ -64,14 +64,14 @@ export async function loadOutbounds() {
 
         const deleteBtn = ob.is_system === 1 
             ? `<button class="table-action-btn delete-btn" disabled><i class="fa-regular fa-trash-can"></i></button>`
-            : `<button class="table-action-btn delete-btn" onclick="window.deleteOutbound(${ob.id})" title="${t("routing_btn_delete", "Удалить")}"><i class="fa-regular fa-trash-can"></i></button>`;
+            : `<button class="table-action-btn delete-btn" onclick="window.deleteOutbound(${ob.id})" title="${t("routing_btn_delete")}"><i class="fa-regular fa-trash-can"></i></button>`;
             
         const downFormatted = formatBytes(ob.down || 0);
         const upFormatted = formatBytes(ob.up || 0);
         const trafficText = `<span style="color: var(--accent-blue);"><i class="fa-solid fa-arrow-down" style="margin-right: 4px; font-size: 11px;"></i>${downFormatted}</span> <span style="color: var(--text-secondary); margin: 0 4px;">/</span> <span style="color: var(--accent-purple);"><i class="fa-solid fa-arrow-up" style="margin-right: 4px; font-size: 11px;"></i>${upFormatted}</span>`;
 
-        const tcpTestBtn = `<button class="table-action-btn test-btn" onclick="window.testOutbound(${ob.id}, 'tcp', this)" title="${t("routing_btn_tcp_test", "TCP пинг")}"><i class="fa-solid fa-plug"></i></button>`;
-        const httpTestBtn = `<button class="table-action-btn test-btn test-btn-http" onclick="window.testOutbound(${ob.id}, 'http', this)" title="${t("routing_btn_http_test", "HTTP тест через прокси")}"><i class="fa-solid fa-globe"></i></button>`;
+        const tcpTestBtn = `<button class="table-action-btn test-btn" onclick="window.testOutbound(${ob.id}, 'tcp', this)" title="${t("routing_btn_tcp_test")}"><i class="fa-solid fa-plug"></i></button>`;
+        const httpTestBtn = `<button class="table-action-btn test-btn test-btn-http" onclick="window.testOutbound(${ob.id}, 'http', this)" title="${t("routing_btn_http_test")}"><i class="fa-solid fa-globe"></i></button>`;
 
         tr.innerHTML = `
             <td style="padding: 12px 15px; font-weight: 500;">${ob.remark}</td>
@@ -89,7 +89,7 @@ export async function loadOutbounds() {
                 <div style="display: flex; gap: 8px;">
                     ${tcpTestBtn}
                     ${httpTestBtn}
-                    <button class="table-action-btn edit-btn" onclick="window.openOutboundModal(${ob.id})" title="${t("routing_btn_edit", "Редактировать")}"><i class="fa-regular fa-pen-to-square"></i></button>
+                    <button class="table-action-btn edit-btn" onclick="window.openOutboundModal(${ob.id})" title="${t("routing_btn_edit")}"><i class="fa-regular fa-pen-to-square"></i></button>
                     ${deleteBtn}
                 </div>
             </td>

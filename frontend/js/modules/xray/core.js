@@ -51,10 +51,10 @@ export async function loadCoreInfo() {
             opt.value = item.download_url;
             opt.setAttribute("data-version", item.version);
             opt.setAttribute("data-prerelease", item.is_prerelease ? "true" : "false");
-            const tag = item.is_prerelease ? "Pre-release" : "Stable";
+            const tag = item.is_prerelease ? t("tag_prerelease") : t("tag_stable");
             opt.innerText = `${item.version} (${tag})`;
             if (normVer(item.version) === normVer(res.current)) {
-                opt.innerText += ` — [${t("core_installed_tag", "Установлено")}]`;
+                opt.innerText += ` — [${t("core_installed_tag")}]`;
             }
             versionSelect.appendChild(opt);
         });
@@ -78,12 +78,12 @@ export async function loadCoreInfo() {
             if (prereleaseBadge) {
                 prereleaseBadge.style.display = "inline-block";
                 if (isPre) {
-                    prereleaseBadge.innerText = "Pre-release";
+                    prereleaseBadge.innerText = t("tag_prerelease");
                     prereleaseBadge.style.background = "rgba(255, 171, 0, 0.15)";
                     prereleaseBadge.style.color = "#ffab00";
                     prereleaseBadge.style.borderColor = "rgba(255, 171, 0, 0.3)";
                 } else {
-                    prereleaseBadge.innerText = "Stable";
+                    prereleaseBadge.innerText = t("tag_stable");
                     prereleaseBadge.style.background = "rgba(0, 230, 118, 0.15)";
                     prereleaseBadge.style.color = "#00e676";
                     prereleaseBadge.style.borderColor = "rgba(0, 230, 118, 0.3)";
@@ -92,11 +92,11 @@ export async function loadCoreInfo() {
 
             if (normVer(selVer) === normVer(res.current)) {
                 updateBtn.disabled = true;
-                updateBtn.innerHTML = `<i class="fa-solid fa-check"></i> <span>${t("xray_installed", "Установлено")}</span>`;
+                updateBtn.innerHTML = `<i class="fa-solid fa-check"></i> <span data-i18n="xray_installed">${t("xray_installed")}</span>`;
             } else {
                 updateBtn.disabled = false;
                 updateBtn.setAttribute("data-url", selUrl);
-                updateBtn.innerHTML = `<i class="fa-solid fa-download"></i> <span>${t("core_btn_install_version", "Установить {version}").replace("{version}", selVer)}</span>`;
+                updateBtn.innerHTML = `<i class="fa-solid fa-download"></i> <span>${t("core_btn_install_version").replace("{version}", selVer)}</span>`;
             }
         };
 
@@ -113,10 +113,10 @@ export async function loadCoreInfo() {
         if (normVer(res.current) !== normVer(res.latest) && res.latest !== "Unknown" && res.download_url) {
             updateBtn.disabled = false;
             updateBtn.setAttribute("data-url", res.download_url);
-            updateBtn.innerHTML = `<i class="fa-solid fa-download"></i> <span>${t("xray_btn_update", "Обновить ядро")}</span>`;
+            updateBtn.innerHTML = `<i class="fa-solid fa-download"></i> <span data-i18n="xray_btn_update">${t("xray_btn_update")}</span>`;
         } else {
             updateBtn.disabled = true;
-            updateBtn.innerHTML = `<i class="fa-solid fa-check"></i> <span>${t("xray_updated", "Обновлено")}</span>`;
+            updateBtn.innerHTML = `<i class="fa-solid fa-check"></i> <span data-i18n="xray_updated">${t("xray_updated")}</span>`;
         }
     }
     
@@ -126,11 +126,11 @@ export async function loadCoreInfo() {
         if (stopBtn) {
             if (statusRes.running) {
                 stopBtn.className = "btn danger-btn";
-                stopBtn.innerHTML = `<i class="fa-solid fa-stop"></i> <span>${t("xray_btn_stop", "Остановить")}</span>`;
+                stopBtn.innerHTML = `<i class="fa-solid fa-stop"></i> <span data-i18n="xray_btn_stop">${t("xray_btn_stop")}</span>`;
                 stopBtn.setAttribute("data-action", "stop");
             } else {
                 stopBtn.className = "btn success-btn";
-                stopBtn.innerHTML = `<i class="fa-solid fa-play"></i> <span>${t("xray_btn_start", "Запустить")}</span>`;
+                stopBtn.innerHTML = `<i class="fa-solid fa-play"></i> <span data-i18n="xray_btn_start">${t("xray_btn_start")}</span>`;
                 stopBtn.setAttribute("data-action", "start");
             }
         }
@@ -140,10 +140,10 @@ export async function loadCoreInfo() {
         if (badge && statusText) {
             if (statusRes.running) {
                 badge.className = "status-badge running";
-                statusText.innerText = t("xray_status_active", "Xray: Активен");
+                statusText.innerHTML = `<span data-i18n="xray_status_active">${t("xray_status_active")}</span>`;
             } else {
                 badge.className = "status-badge stopped";
-                statusText.innerText = t("xray_status_stopped", "Xray: Остановлен");
+                statusText.innerHTML = `<span data-i18n="xray_status_stopped">${t("xray_status_stopped")}</span>`;
             }
         }
     }
@@ -300,7 +300,7 @@ export function setupXrayCoreListeners() {
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ action: "restart" })
             });
-            if (res && res.success) showToast(t("xray_restarted", "Ядро Xray перезапущено"));
+            if (res && res.success) showToast(t("xray_restarted"));
         });
     }
     
@@ -315,9 +315,9 @@ export function setupXrayCoreListeners() {
             });
             if (res && res.success) {
                 if (action === "stop") {
-                    showToast(t("xray_stopped_toast", "Ядро Xray остановлено"), "info");
+                    showToast(t("xray_stopped_toast"), "info");
                 } else {
-                    showToast(t("xray_started_toast", "Ядро Xray запущено"));
+                    showToast(t("xray_started_toast"));
                 }
                 loadCoreInfo();
             }
@@ -330,18 +330,18 @@ export function setupXrayCoreListeners() {
             const url = updateBtn.getAttribute("data-url");
             if (!url) return;
             updateBtn.disabled = true;
-            updateBtn.innerText = t("core_btn_updating", "Обновление...");
-            showToast(t("xray_update_started", "Начался процесс обновления ядра Xray. Пожалуйста, подождите"), "info");
+            updateBtn.innerText = t("core_btn_updating");
+            showToast(t("xray_update_started"), "info");
             const res = await apiFetch("/api/xray/update", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ download_url: url })
             });
             if (res && res.success) {
-                showToast(t("xray_update_success", "Ядро успешно обновлено до версии {version}!").replace("{version}", res.version));
+                showToast(t("xray_update_success").replace("{version}", res.version));
                 loadCoreInfo();
             } else {
-                showToast(res ? res.msg : t("xray_update_error", "Ошибка обновления ядра"), "error");
+                showToast(res ? res.msg : t("xray_update_error"), "error");
                 loadCoreInfo();
             }
         });
@@ -354,9 +354,9 @@ export function setupXrayCoreListeners() {
             if (res && res.success) {
                 const terminal = document.getElementById("logs-terminal");
                 if (terminal) terminal.innerHTML = "";
-                showToast(t("logs_cleared", "Логи очищены"));
+                showToast(t("logs_cleared"));
             } else {
-                showToast(t("logs_clear_error", "Ошибка при очистке логов"), "error");
+                showToast(t("logs_clear_error"), "error");
             }
         });
     }
@@ -367,9 +367,9 @@ export function setupXrayCoreListeners() {
             const terminal = document.getElementById("logs-terminal");
             if (terminal) {
                 navigator.clipboard.writeText(terminal.innerText).then(() => {
-                    showToast(t("logs_copied", "Логи скопированы в буфер обмена"));
+                    showToast(t("logs_copied"));
                 }).catch(() => {
-                    showToast(t("logs_copy_error", "Не удалось скопировать логи"), "error");
+                    showToast(t("logs_copy_error"), "error");
                 });
             }
         });
