@@ -48,8 +48,9 @@ export class SentinelServerMascot {
         this.resize();
         window.addEventListener("resize", () => this.resize());
         
-        if (this.canvas) {
-            this.canvas.addEventListener("click", () => {
+        const clickTarget = this.container || this.canvas;
+        if (clickTarget) {
+            clickTarget.addEventListener("click", () => {
                 this.triggerShock();
                 if (this.onClickCallback) this.onClickCallback();
             });
@@ -67,7 +68,7 @@ export class SentinelServerMascot {
         if (!this.canvas) return;
         const rect = this.canvas.getBoundingClientRect();
         const dpr = window.devicePixelRatio || 1;
-        const size = Math.min(rect.width || 180, rect.height || 180);
+        const size = Math.max(Math.min(rect.width || 76, rect.height || 76), 64);
         
         this.canvas.width = size * dpr;
         this.canvas.height = size * dpr;

@@ -1,7 +1,8 @@
-import { apiFetch } from "../../api.js";
+import { apiFetch, getCsrfToken } from "../../api.js";
 import { showToast } from "../../ui.js";
 import { t } from "../../i18n.js";
 import { loadSingboxConfig, setupSingboxConfigListeners } from "./config.js";
+
 
 export { loadSingboxConfig };
 
@@ -196,7 +197,9 @@ export function startSingboxLogsStream() {
 
     function connect() {
         const proto = window.location.protocol === "https:" ? "wss:" : "ws:";
-        const wsUrl = `${proto}//${window.location.host}/api/singbox/logs/ws`;
+        const csrf = getCsrfToken();
+        const wsUrl = `${proto}//${window.location.host}/api/singbox/logs/ws${csrf ? `?token=${encodeURIComponent(csrf)}` : ''}`;
+
 
         try {
             const ws = new WebSocket(wsUrl);

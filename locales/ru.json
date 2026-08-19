@@ -17,8 +17,9 @@
     "dashboard_ram": "Использование RAM",
     "dashboard_swap": "SWAP",
     "dashboard_disk": "Диск",
-    "dashboard_traffic": "Расход трафика",
+    "mascot_name": "Sentinel Guardian",
     "mascot_guardian": "Серверный страж",
+
     "mascot_status_online": "ОНЛАЙН",
     "mascot_status_standby": "ОЖИДАНИЕ",
     "mascot_node_cores": "ЯДРА НОДЫ",

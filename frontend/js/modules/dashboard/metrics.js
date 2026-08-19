@@ -181,13 +181,14 @@ export async function loadStats() {
 
     if (mascotStatusPill && mascotStatusText) {
         if (isAnyCoreRunning) {
-            mascotStatusPill.className = "mascot-status-pill";
+            mascotStatusPill.className = mascotStatusPill.classList.contains("sidebar-mascot-badge") ? "sidebar-mascot-badge" : "mascot-status-pill";
             mascotStatusText.innerText = t("mascot_status_online", "ONLINE");
         } else {
-            mascotStatusPill.className = "mascot-status-pill standby";
+            mascotStatusPill.className = (mascotStatusPill.classList.contains("sidebar-mascot-badge") ? "sidebar-mascot-badge" : "mascot-status-pill") + " standby";
             mascotStatusText.innerText = t("mascot_status_standby", "STANDBY");
         }
     }
+
 
     if (mascotActiveCores) {
         mascotActiveCores.innerText = t("mascot_cores_active", "{count} АКТИВНО").replace("{count}", activeCores);

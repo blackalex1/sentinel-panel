@@ -1,7 +1,8 @@
-import { apiFetch } from "../../api.js";
+import { apiFetch, getCsrfToken } from "../../api.js";
 import { showToast } from "../../ui.js";
 import { t } from "../../i18n.js";
 import { loadXrayConfig } from "./config.js";
+
 
 import { initCustomSelect } from "../../components/customSelect.js";
 
@@ -205,7 +206,9 @@ export function startLogsStream() {
 
     function connect() {
         const proto = window.location.protocol === "https:" ? "wss:" : "ws:";
-        const wsUrl = `${proto}//${window.location.host}/api/xray/logs/ws`;
+        const csrf = getCsrfToken();
+        const wsUrl = `${proto}//${window.location.host}/api/xray/logs/ws${csrf ? `?token=${encodeURIComponent(csrf)}` : ''}`;
+
 
         try {
             const ws = new WebSocket(wsUrl);

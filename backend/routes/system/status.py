@@ -11,7 +11,10 @@ from backend.i18n import t, get_lang
 router = APIRouter()
 
 @router.get("/panel/api/server/status")
+@router.get("/api/server/status")
+@router.get("/api/stats")
 async def server_status_api(request: Request):
+
     if not backend.routes.system.check_auth(request):
         return backend.routes.system.decoy_response()
         

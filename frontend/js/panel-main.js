@@ -14,6 +14,7 @@ import { loadXrayConfig, setupXrayConfigListeners } from "./modules/xray-config.
 import { loadCoreInfo, loadLogs, setupXrayCoreListeners, setupGeoListeners } from "./modules/xray-core.js";
 import { setupSingboxCoreListeners } from "./modules/singbox/core.js";
 import { openGlobalTrafficDetailsModal } from "./modules/dashboard/traffic_modal.js";
+import { initServerMascot } from "./modules/dashboard/metrics.js";
 
 export async function initPanel() {
     // Expose functions to window scope for HTML inline events compatibility
@@ -25,12 +26,14 @@ export async function initPanel() {
 
     setupAuthorizedEventListeners();
     setLoadInboundsCallback(loadInbounds);
+    initServerMascot();
 
     const initialDataPromise = switchTab("dashboard", loadInbounds, loadCoreInfo, loadLogs);
     loadBbrStatus();
-    startGlobalStatusPolling();
+
 
     // Загружаем имя администратора для отображения в сайдбаре
+
     const settingsPromise = (async () => {
         try {
             const res = await apiFetch("/api/settings");
@@ -108,43 +111,3 @@ function setupAuthorizedEventListeners() {
     setupSingboxCoreListeners();
 }
 
-function startGlobalStatusPolling() {
-    setInterval(async () => {
-        try {
-            const stats = await apiFetch("/api/stats");
-            if (stats && stats.success) {
-                const xrayBadge = document.getElementById("xray-status-badge");
-                if (xrayBadge) {
-                    const isRunning = stats.cores?.xray?.status === "running" || stats.xray_status === "running";
-                    xrayBadge.className = `status-badge ${isRunning ? 'running' : 'stopped'}`;
-                    const statusText = xrayBadge.querySelector(".status-text");
-                    if (statusText) {
-                        statusText.innerHTML = `<span data-i18n="${isRunning ? 'xray_status_active' : 'xray_status_stopped'}">${t(isRunning ? 'xray_status_active' : 'xray_status_stopped')}</span>`;
-                    }
-                }
-
-                const hBadge = document.getElementById("hysteria-status-badge");
-                if (hBadge) {
-                    const isRunning = stats.cores?.hysteria?.status === "running" || stats.hysteria_status === "running";
-                    hBadge.className = `status-badge ${isRunning ? 'running' : 'stopped'}`;
-                    const hStatusText = hBadge.querySelector(".status-text");
-                    if (hStatusText) {
-                        hStatusText.innerHTML = `<span data-i18n="${isRunning ? 'hysteria_status_active' : 'hysteria_status_stopped'}">${t(isRunning ? 'hysteria_status_active' : 'hysteria_status_stopped')}</span>`;
-                    }
-                }
-
-                const sBadge = document.getElementById("singbox-status-badge");
-                if (sBadge) {
-                    const isRunning = stats.cores?.singbox?.status === "running" || stats.singbox_status === "running";
-                    sBadge.className = `status-badge ${isRunning ? 'running' : 'stopped'}`;
-                    const sStatusText = sBadge.querySelector(".status-text");
-                    if (sStatusText) {
-                        sStatusText.innerHTML = `<span data-i18n="${isRunning ? 'singbox_status_active' : 'singbox_status_stopped'}">${t(isRunning ? 'singbox_status_active' : 'singbox_status_stopped')}</span>`;
-                    }
-                }
-            }
-        } catch (e) {
-            console.error("Global status poll failed", e);
-        }
-    }, 5000);
-}

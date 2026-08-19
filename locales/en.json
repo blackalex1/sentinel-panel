@@ -17,8 +17,9 @@
     "dashboard_ram": "RAM Usage",
     "dashboard_swap": "SWAP",
     "dashboard_disk": "Disk",
-    "dashboard_traffic": "Traffic Usage",
+    "mascot_name": "Sentinel Guardian",
     "mascot_guardian": "Sentinel Guardian",
+
     "mascot_status_online": "ONLINE",
     "mascot_status_standby": "STANDBY",
     "mascot_node_cores": "NODE CORES",
