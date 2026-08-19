@@ -100,24 +100,25 @@ export function serializeFormToJson() {
     let streamSettings = {};
     let sniffing = { enabled: false, destOverride: [] };
     
+    const sniffingInput = document.getElementById("ib-sniffing");
+    const isSniffingEnabled = sniffingInput ? sniffingInput.checked : false;
+    if (isSniffingEnabled) {
+        const dests = [];
+        if (document.getElementById("ib-sniffing-http")?.checked) dests.push("http");
+        if (document.getElementById("ib-sniffing-tls")?.checked) dests.push("tls");
+        if (document.getElementById("ib-sniffing-quic")?.checked) dests.push("quic");
+        if (document.getElementById("ib-sniffing-fakedns")?.checked) dests.push("fakedns");
+        
+        sniffing = {
+            enabled: true,
+            destOverride: dests,
+            routeOnly: document.getElementById("ib-sniffing-routeonly")?.checked || false
+        };
+    }
+    
     if (protocol === "vless" || protocol === "vmess" || protocol === "trojan") {
         const network = document.getElementById("ib-network").value;
         const security = document.getElementById("ib-security").value;
-        const isSniffingEnabled = document.getElementById("ib-sniffing").checked;
-        
-        if (isSniffingEnabled && core === "xray") {
-            const dests = [];
-            if (document.getElementById("ib-sniffing-http").checked) dests.push("http");
-            if (document.getElementById("ib-sniffing-tls").checked) dests.push("tls");
-            if (document.getElementById("ib-sniffing-quic").checked) dests.push("quic");
-            if (document.getElementById("ib-sniffing-fakedns").checked) dests.push("fakedns");
-            
-            sniffing = {
-                enabled: true,
-                destOverride: dests,
-                routeOnly: document.getElementById("ib-sniffing-routeonly").checked
-            };
-        }
         
         streamSettings = {
             network: network,
@@ -195,31 +196,32 @@ export function populateFormFromJson(payload) {
     
     const coreVal = payload.core || (protocol === "hysteria2" ? "hysteria" : "xray");
 
+    // Sniffing
+    const sniffingChecked = sniffing.enabled || false;
+    const sniffingInput = document.getElementById("ib-sniffing");
+    if (sniffingInput) sniffingInput.checked = sniffingChecked;
+    
+    if (document.getElementById("ib-sniffing-http")) document.getElementById("ib-sniffing-http").checked = false;
+    if (document.getElementById("ib-sniffing-tls")) document.getElementById("ib-sniffing-tls").checked = false;
+    if (document.getElementById("ib-sniffing-quic")) document.getElementById("ib-sniffing-quic").checked = false;
+    if (document.getElementById("ib-sniffing-fakedns")) document.getElementById("ib-sniffing-fakedns").checked = false;
+    if (document.getElementById("ib-sniffing-routeonly")) document.getElementById("ib-sniffing-routeonly").checked = false;
+    
+    if (sniffingChecked) {
+        const dests = sniffing.destOverride || [];
+        if (document.getElementById("ib-sniffing-http")) document.getElementById("ib-sniffing-http").checked = dests.includes("http");
+        if (document.getElementById("ib-sniffing-tls")) document.getElementById("ib-sniffing-tls").checked = dests.includes("tls");
+        if (document.getElementById("ib-sniffing-quic")) document.getElementById("ib-sniffing-quic").checked = dests.includes("quic");
+        if (document.getElementById("ib-sniffing-fakedns")) document.getElementById("ib-sniffing-fakedns").checked = dests.includes("fakedns");
+        if (document.getElementById("ib-sniffing-routeonly")) document.getElementById("ib-sniffing-routeonly").checked = sniffing.routeOnly || false;
+    }
+
     if (protocol === "vless" || protocol === "vmess" || protocol === "trojan") {
         if (streamSettings.network !== undefined) {
             document.getElementById("ib-network").value = streamSettings.network || "tcp";
         }
         if (streamSettings.security !== undefined) {
             document.getElementById("ib-security").value = streamSettings.security || "none";
-        }
-        
-        // Sniffing
-        const sniffingChecked = sniffing.enabled || false;
-        document.getElementById("ib-sniffing").checked = sniffingChecked;
-        
-        document.getElementById("ib-sniffing-http").checked = false;
-        document.getElementById("ib-sniffing-tls").checked = false;
-        document.getElementById("ib-sniffing-quic").checked = false;
-        document.getElementById("ib-sniffing-fakedns").checked = false;
-        document.getElementById("ib-sniffing-routeonly").checked = false;
-        
-        if (sniffingChecked) {
-            const dests = sniffing.destOverride || [];
-            document.getElementById("ib-sniffing-http").checked = dests.includes("http");
-            document.getElementById("ib-sniffing-tls").checked = dests.includes("tls");
-            document.getElementById("ib-sniffing-quic").checked = dests.includes("quic");
-            document.getElementById("ib-sniffing-fakedns").checked = dests.includes("fakedns");
-            document.getElementById("ib-sniffing-routeonly").checked = sniffing.routeOnly || false;
         }
         
         if (coreVal === "singbox") {
@@ -342,29 +344,31 @@ export async function openEditInboundModal(id) {
         document.getElementById("ib-expiry-time").value = "";
     }
     
+    // Sniffing
+    const sniffingChecked = sniffing.enabled || false;
+    const sniffingInput = document.getElementById("ib-sniffing");
+    if (sniffingInput) sniffingInput.checked = sniffingChecked;
+    
+    if (document.getElementById("ib-sniffing-http")) document.getElementById("ib-sniffing-http").checked = false;
+    if (document.getElementById("ib-sniffing-tls")) document.getElementById("ib-sniffing-tls").checked = false;
+    if (document.getElementById("ib-sniffing-quic")) document.getElementById("ib-sniffing-quic").checked = false;
+    if (document.getElementById("ib-sniffing-fakedns")) document.getElementById("ib-sniffing-fakedns").checked = false;
+    if (document.getElementById("ib-sniffing-routeonly")) document.getElementById("ib-sniffing-routeonly").checked = false;
+    
+    if (sniffingChecked) {
+        const dests = sniffing.destOverride || [];
+        if (document.getElementById("ib-sniffing-http")) document.getElementById("ib-sniffing-http").checked = dests.includes("http");
+        if (document.getElementById("ib-sniffing-tls")) document.getElementById("ib-sniffing-tls").checked = dests.includes("tls");
+        if (document.getElementById("ib-sniffing-quic")) document.getElementById("ib-sniffing-quic").checked = dests.includes("quic");
+        if (document.getElementById("ib-sniffing-fakedns")) document.getElementById("ib-sniffing-fakedns").checked = dests.includes("fakedns");
+        if (document.getElementById("ib-sniffing-routeonly")) document.getElementById("ib-sniffing-routeonly").checked = sniffing.routeOnly || false;
+    }
+
     if (target.protocol === "vless" || target.protocol === "vmess" || target.protocol === "trojan") {
         const net = streamSettings.network || "tcp";
         const sec = streamSettings.security || "none";
         document.getElementById("ib-network").value = net;
         document.getElementById("ib-security").value = sec;
-        
-        const sniffingChecked = sniffing.enabled || false;
-        document.getElementById("ib-sniffing").checked = sniffingChecked;
-        
-        document.getElementById("ib-sniffing-http").checked = false;
-        document.getElementById("ib-sniffing-tls").checked = false;
-        document.getElementById("ib-sniffing-quic").checked = false;
-        document.getElementById("ib-sniffing-fakedns").checked = false;
-        document.getElementById("ib-sniffing-routeonly").checked = false;
-        
-        if (sniffingChecked) {
-            const dests = sniffing.destOverride || [];
-            document.getElementById("ib-sniffing-http").checked = dests.includes("http");
-            document.getElementById("ib-sniffing-tls").checked = dests.includes("tls");
-            document.getElementById("ib-sniffing-quic").checked = dests.includes("quic");
-            document.getElementById("ib-sniffing-fakedns").checked = dests.includes("fakedns");
-            document.getElementById("ib-sniffing-routeonly").checked = sniffing.routeOnly || false;
-        }
         
         const inboundCore = target.core || (target.protocol === "hysteria2" ? "hysteria" : "xray");
         if (inboundCore === "singbox") {

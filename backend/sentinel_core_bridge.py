@@ -674,6 +674,11 @@ def compile_node_server_config(target_core: str) -> Dict[str, Any]:
                             "tag": f"inbound-{ib['id']}-socks",
                             "listenAddress": "127.0.0.1",
                             "core": "xray",
+                            "sniffing": {
+                                "enabled": True,
+                                "destOverride": ["http", "tls", "quic"],
+                                "routeOnly": False
+                            },
                             "settings": {
                                 "udp": True,
                                 "auth": "password" if socks_user else "noauth",
