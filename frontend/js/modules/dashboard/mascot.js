@@ -311,9 +311,9 @@ export class SentinelServerMascot {
 
         const w = this.width;
         const h = this.height;
-        const s = Math.min(w, h) / 100;
+        const s = Math.min(w, h) / 116;
         const fx = (x) => (x - 50) * s + w / 2;
-        const fy = (y) => (y - 50) * s + h / 2;
+        const fy = (y) => (y - 48) * s + h / 2;
 
         const isAwake = 1 - this.sleepProgress;
         const breatheFreq = 0.0022 * (1 - this.sleepProgress * 0.55);
@@ -347,7 +347,7 @@ export class SentinelServerMascot {
         ctx.fill();
         ctx.restore();
 
-        // 2. Beacons & Radio Wave Pulses
+        // 2. Beacons & Radio Wave Pulses (Generous headroom, zero clipping)
         ctx.save();
         ctx.fillStyle = "#1e293b";
         ctx.strokeStyle = `rgba(34, 211, 238, ${0.5 * isAwake + 0.2 * this.sleepProgress})`;
@@ -377,13 +377,13 @@ export class SentinelServerMascot {
         if (isAwake > 0.05) {
             const waveSpeed = 0.002 + Math.min((this.netSpeed || 0) / (1024 * 400), 0.006);
             const wavePhase = (now * waveSpeed) % 1;
-            const waveAlpha = (0.2 + Math.min((this.netSpeed || 0) / (1024 * 1000), 0.5)) * isAwake;
+            const waveAlpha = (0.25 + Math.min((this.netSpeed || 0) / (1024 * 1000), 0.5)) * isAwake * (1 - wavePhase);
             ctx.save();
-            ctx.strokeStyle = `rgba(34, 211, 238, ${waveAlpha * (1 - wavePhase)})`;
-            ctx.lineWidth = 1.4 * s;
+            ctx.strokeStyle = `rgba(34, 211, 238, ${waveAlpha})`;
+            ctx.lineWidth = 1.3 * s;
             ctx.beginPath();
-            ctx.arc(fx(20), fy(6 + shockOffsetY), 3.5 * s + wavePhase * 10 * s, 0, Math.PI * 2);
-            ctx.arc(fx(80), fy(6 + shockOffsetY), 3.5 * s + wavePhase * 10 * s, 0, Math.PI * 2);
+            ctx.arc(fx(20), fy(6 + shockOffsetY), 3.0 * s + wavePhase * 7.5 * s, 0, Math.PI * 2);
+            ctx.arc(fx(80), fy(6 + shockOffsetY), 3.0 * s + wavePhase * 7.5 * s, 0, Math.PI * 2);
             ctx.stroke();
             ctx.restore();
         }
