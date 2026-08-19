@@ -1,0 +1,147 @@
+/* Server Sentinel Mascot Dashboard Component Styles */
+
+.sentinel-mascot-card {
+    background: var(--bg-card);
+    backdrop-filter: var(--blur-glass);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+    padding: 20px;
+    margin-bottom: 20px;
+    position: relative;
+    overflow: hidden;
+    transition: border-color var(--transition-normal), box-shadow var(--transition-normal), transform var(--transition-normal);
+}
+
+.sentinel-mascot-card:hover {
+    border-color: rgba(16, 185, 129, 0.35);
+    box-shadow: 0 16px 40px -10px rgba(16, 185, 129, 0.15);
+}
+
+.sentinel-mascot-layout {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+}
+
+@media (max-width: 640px) {
+    .sentinel-mascot-layout {
+        flex-direction: column;
+        text-align: center;
+    }
+}
+
+.mascot-canvas-container {
+    position: relative;
+    width: 140px;
+    height: 140px;
+    min-width: 140px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    user-select: none;
+    border-radius: 50%;
+    transition: transform var(--transition-elastic);
+}
+
+.mascot-canvas-container:hover {
+    transform: scale(1.05);
+}
+
+.mascot-canvas-container:active {
+    transform: scale(0.95);
+}
+
+.mascot-canvas-container canvas {
+    width: 100%;
+    height: 100%;
+    display: block;
+}
+
+.mascot-info-panel {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.mascot-title-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.mascot-title {
+    font-size: 15px;
+    font-weight: 800;
+    letter-spacing: -0.2px;
+    color: var(--text-primary);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0;
+}
+
+.mascot-status-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    font-weight: 700;
+    font-family: var(--font-mono);
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    padding: 3px 10px;
+    border-radius: var(--radius-pill);
+    border: 1px solid rgba(16, 185, 129, 0.3);
+    background: rgba(16, 185, 129, 0.08);
+    color: var(--accent-green);
+    transition: all var(--transition-normal);
+}
+
+.mascot-status-pill.standby {
+    border-color: rgba(139, 92, 246, 0.3);
+    background: rgba(139, 92, 246, 0.08);
+    color: var(--primary-hover);
+}
+
+.mascot-telemetry-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+    gap: 8px;
+}
+
+.mascot-telemetry-chip {
+    display: flex;
+    flex-direction: column;
+    padding: 6px 10px;
+    border-radius: var(--radius-sm);
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.mascot-chip-label {
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.mascot-chip-value {
+    font-size: 12px;
+    font-weight: 700;
+    font-family: var(--font-mono);
+    color: var(--text-primary);
+    margin-top: 2px;
+}
+
+.mascot-action-hint {
+    font-size: 10.5px;
+    color: var(--text-dim);
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}

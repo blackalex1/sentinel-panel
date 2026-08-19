@@ -3,10 +3,23 @@ import { formatBytes } from "../../ui.js";
 import { t } from "../../i18n.js";
 import { updateChart, loadGlobalTrafficChart } from "./charts.js";
 import { loadDashboardClients } from "./clients_table.js";
+import { SentinelServerMascot } from "./mascot.js";
 
 let lastNetUp = null;
 let lastNetDown = null;
 let lastStatsTime = null;
+let serverMascotInstance = null;
+
+export function initServerMascot() {
+    if (!serverMascotInstance && document.getElementById("sentinelMascotCanvas")) {
+        serverMascotInstance = new SentinelServerMascot("sentinelMascotCanvas", "sentinel-mascot-wrapper");
+        serverMascotInstance.setOnClick(() => {
+            loadStats();
+        });
+    }
+    return serverMascotInstance;
+}
+
 
 export async function loadStats() {
     const res = await apiFetch("/panel/api/server/status");
@@ -84,14 +97,16 @@ export async function loadStats() {
     const netDownVal = document.getElementById("net-down-value");
     if (netDownVal) netDownVal.innerText = formatBytes(obj.netIO.down);
     
+    let speedUp = 0;
+    let speedDown = 0;
     const now = Date.now();
     if (lastNetUp !== null && lastNetDown !== null && lastStatsTime !== null) {
         const elapsedSeconds = (now - lastStatsTime) / 1000;
         if (elapsedSeconds > 0) {
             const diffUp = obj.netIO.up - lastNetUp;
             const diffDown = obj.netIO.down - lastNetDown;
-            const speedUp = diffUp >= 0 ? diffUp / elapsedSeconds : 0;
-            const speedDown = diffDown >= 0 ? diffDown / elapsedSeconds : 0;
+            speedUp = diffUp >= 0 ? diffUp / elapsedSeconds : 0;
+            speedDown = diffDown >= 0 ? diffDown / elapsedSeconds : 0;
             
             const netSpeedUpValUsage = document.getElementById("net-speed-up-value-usage");
             if (netSpeedUpValUsage) netSpeedUpValUsage.innerText = `${formatBytes(speedUp)}/s`;
@@ -100,6 +115,7 @@ export async function loadStats() {
             if (netSpeedDownValUsage) netSpeedDownValUsage.innerText = `${formatBytes(speedDown)}/s`;
         }
     }
+
     lastNetUp = obj.netIO.up;
     lastNetDown = obj.netIO.down;
     lastStatsTime = now;
@@ -142,9 +158,55 @@ export async function loadStats() {
     const sysIpEl = document.getElementById("sys-ip");
     if (sysIpEl) sysIpEl.innerText = window.location.hostname;
     
+    // Count active cores
+    let activeCores = 0;
+    if (obj.xray && obj.xray.state === "running") activeCores++;
+    if (obj.hysteria && obj.hysteria.state === "running") activeCores++;
+    if (obj.singbox && obj.singbox.state === "running") activeCores++;
+
+    const isAnyCoreRunning = activeCores > 0;
+
+    // Update Mascot Engine
+    const mascot = initServerMascot();
+    if (mascot) {
+        mascot.setRunningState(isAnyCoreRunning);
+        mascot.setMetrics(obj.cpu, (memCurrent / memTotal) * 100, (typeof speedUp !== 'undefined' ? speedUp : 0), (typeof speedDown !== 'undefined' ? speedDown : 0));
+    }
+
+    // Update Mascot UI telemetry badges
+    const mascotStatusPill = document.getElementById("mascot-status-pill");
+    const mascotStatusText = document.getElementById("mascot-status-text");
+    const mascotActiveCores = document.getElementById("mascot-active-cores");
+    const mascotLoadLevel = document.getElementById("mascot-load-level");
+
+    if (mascotStatusPill && mascotStatusText) {
+        if (isAnyCoreRunning) {
+            mascotStatusPill.className = "mascot-status-pill";
+            mascotStatusText.innerText = t("mascot_status_online", "ONLINE");
+        } else {
+            mascotStatusPill.className = "mascot-status-pill standby";
+            mascotStatusText.innerText = t("mascot_status_standby", "STANDBY");
+        }
+    }
+
+    if (mascotActiveCores) {
+        mascotActiveCores.innerText = t("mascot_cores_active", "{count} АКТИВНО").replace("{count}", activeCores);
+    }
+
+    if (mascotLoadLevel) {
+        if (obj.cpu > 75) {
+            mascotLoadLevel.innerText = t("mascot_load_high", "HIGH");
+            mascotLoadLevel.style.color = "var(--accent-rose)";
+        } else {
+            mascotLoadLevel.innerText = t("mascot_load_normal", "NORMAL");
+            mascotLoadLevel.style.color = "var(--text-primary)";
+        }
+    }
+
     // Update chart
     updateChart(obj.cpu, (memCurrent / memTotal) * 100, swapPercent, obj.disk ? obj.disk.percent : 0);
 }
+
 
 export function renderBbrStatus(bbrEnabled) {
     const bbrEl = document.getElementById("sys-bbr");
