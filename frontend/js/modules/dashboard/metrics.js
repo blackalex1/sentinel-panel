@@ -191,8 +191,15 @@ export async function loadStats() {
 
 
     if (mascotActiveCores) {
-        mascotActiveCores.innerText = t("mascot_cores_active", "{count} АКТИВНО").replace("{count}", activeCores);
+        const specificKey = `mascot_cores_active_${activeCores}`;
+        const translated = t(specificKey);
+        if (translated && translated !== specificKey) {
+            mascotActiveCores.innerText = translated;
+        } else {
+            mascotActiveCores.innerText = t("mascot_cores_active", "{count} ЯДРА АКТИВНО").replace("{count}", activeCores);
+        }
     }
+
 
     if (mascotLoadLevel) {
         if (obj.cpu > 75) {

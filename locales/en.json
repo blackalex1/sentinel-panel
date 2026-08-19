@@ -27,7 +27,12 @@
     "mascot_load_normal": "NORMAL",
     "mascot_load_high": "HIGH",
     "mascot_click_hint": "Click for diagnostic power pulse",
-    "mascot_cores_active": "{count} ACTIVE",
+    "mascot_cores_active_0": "ALL CORES STOPPED",
+    "mascot_cores_active_1": "1 CORE ACTIVE",
+    "mascot_cores_active_2": "2 CORES ACTIVE",
+    "mascot_cores_active_3": "3 CORES ACTIVE",
+    "mascot_cores_active": "{count} CORES ACTIVE",
+
 
     "loading": "Loading...",
     "xray_updated": "Updated",

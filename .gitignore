@@ -73,3 +73,5 @@ run_remote_tests.py
 security-audit-results/
 config/*.log
 config/*.sni
+test_preview/
+*.glb

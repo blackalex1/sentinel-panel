@@ -27,7 +27,12 @@
     "mascot_load_normal": "НОРМА",
     "mascot_load_high": "ВЫСОКАЯ",
     "mascot_click_hint": "Кликните для импульса диагностики",
-    "mascot_cores_active": "{count} АКТИВНО",
+    "mascot_cores_active_0": "ВСЕ ЯДРА ОСТАНОВЛЕНЫ",
+    "mascot_cores_active_1": "1 ЯДРО АКТИВНО",
+    "mascot_cores_active_2": "2 ЯДРА АКТИВНО",
+    "mascot_cores_active_3": "3 ЯДРА АКТИВНО",
+    "mascot_cores_active": "{count} ЯДРА АКТИВНО",
+
 
     "loading": "Загрузка...",
     "xray_updated": "Обновлено",
