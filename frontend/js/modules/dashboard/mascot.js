@@ -79,6 +79,26 @@ export class SentinelServerMascot {
         this.resize();
         window.addEventListener("resize", () => this.resize());
         
+        // Global mouse tracking across the entire screen
+        window.addEventListener("mousemove", (e) => {
+            if (!this.canvas || !this.isRunning) return;
+            this.lastMouseMoveTime = performance.now();
+            const rect = this.canvas.getBoundingClientRect();
+            const centerX = rect.left + rect.width / 2;
+            const centerY = rect.top + rect.height / 2;
+            
+            const dx = (e.clientX - centerX) / (window.innerWidth / 2);
+            const dy = (e.clientY - centerY) / (window.innerHeight / 2);
+            
+            this.targetGazeX = Math.max(-1, Math.min(1, dx * 1.4));
+            this.targetGazeY = Math.max(-1, Math.min(1, dy * 1.4));
+        });
+
+        window.addEventListener("mouseleave", () => {
+            this.targetGazeX = 0;
+            this.targetGazeY = 0;
+        });
+
         const trackTarget = this.container || this.canvas;
         if (trackTarget) {
             trackTarget.addEventListener("mouseenter", () => {
@@ -87,38 +107,12 @@ export class SentinelServerMascot {
             });
             trackTarget.addEventListener("mouseleave", () => {
                 this.isHovered = false;
-                this.targetGazeX = 0;
-                this.targetGazeY = 0;
             });
-            trackTarget.addEventListener("mousemove", (e) => {
-                if (!this.isRunning) return;
-                this.lastMouseMoveTime = performance.now();
-                const rect = trackTarget.getBoundingClientRect();
-                const dx = (e.clientX - (rect.left + rect.width / 2)) / (rect.width / 2);
-                const dy = (e.clientY - (rect.top + rect.height / 2)) / (rect.height / 2);
-                this.targetGazeX = Math.max(-1, Math.min(1, dx));
-                this.targetGazeY = Math.max(-1, Math.min(1, dy));
-            });
-
             trackTarget.addEventListener("click", () => {
                 this.triggerShock();
                 if (this.onClickCallback) this.onClickCallback();
             });
         }
-
-        // Global subtle cursor track
-        window.addEventListener("mousemove", (e) => {
-            if (!this.canvas || !this.isRunning || this.isHovered) return;
-            const rect = this.canvas.getBoundingClientRect();
-            const dist = Math.hypot(e.clientX - (rect.left + rect.width / 2), e.clientY - (rect.top + rect.height / 2));
-            if (dist < 400) {
-                this.lastMouseMoveTime = performance.now();
-                const dx = (e.clientX - (rect.left + rect.width / 2)) / 400;
-                const dy = (e.clientY - (rect.top + rect.height / 2)) / 400;
-                this.targetGazeX = Math.max(-0.6, Math.min(0.6, dx));
-                this.targetGazeY = Math.max(-0.6, Math.min(0.6, dy));
-            }
-        });
 
         this.startLoop();
     }
