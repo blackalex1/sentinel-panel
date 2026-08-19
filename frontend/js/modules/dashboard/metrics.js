@@ -72,6 +72,19 @@ export async function loadStats() {
             }
         }
     }
+
+    // Render Sing-box status badge
+    const sbBadge = document.getElementById("singbox-status-badge");
+    const sbStatusText = sbBadge ? sbBadge.querySelector(".status-text") : null;
+    if (sbBadge && sbStatusText) {
+        if (obj.singbox && obj.singbox.state === "running") {
+            sbBadge.className = "status-badge running";
+            sbStatusText.innerHTML = `<span data-i18n="singbox_status_active">${t("singbox_status_active", "sing-box: Активен")}</span>`;
+        } else {
+            sbBadge.className = "status-badge stopped";
+            sbStatusText.innerHTML = `<span data-i18n="singbox_status_stopped">${t("singbox_status_stopped", "sing-box: Остановлен")}</span>`;
+        }
+    }
     
     // Metrics values
     const cpuVal = document.getElementById("cpu-value");
