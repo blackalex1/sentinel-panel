@@ -30,6 +30,12 @@ def extract_common_outbound_params(settings: dict, stream_settings: dict) -> dic
     settings = parse_json_or_dict(settings)
     stream_settings = parse_json_or_dict(stream_settings)
 
+    tls_settings = stream_settings.get("tlsSettings") or stream_settings.get("tls_settings") or {}
+    reality_settings = stream_settings.get("realitySettings") or stream_settings.get("reality_settings") or {}
+    ws_settings = stream_settings.get("wsSettings") or stream_settings.get("ws_settings") or {}
+    grpc_settings = stream_settings.get("grpcSettings") or stream_settings.get("grpc_settings") or {}
+    hyst_settings = stream_settings.get("hysteria") or {}
+
     addr = settings.get("address") or settings.get("server") or settings.get("host")
     if not addr and "vnext" in settings and settings["vnext"]:
         addr = settings["vnext"][0].get("address")
@@ -84,12 +90,6 @@ def extract_common_outbound_params(settings: dict, stream_settings: dict) -> dic
 
     network_val = stream_settings.get("network") or settings.get("network") or "tcp"
     security_val = stream_settings.get("security") or settings.get("security") or "none"
-
-    tls_settings = stream_settings.get("tlsSettings") or stream_settings.get("tls_settings") or {}
-    reality_settings = stream_settings.get("realitySettings") or stream_settings.get("reality_settings") or {}
-    ws_settings = stream_settings.get("wsSettings") or stream_settings.get("ws_settings") or {}
-    grpc_settings = stream_settings.get("grpcSettings") or stream_settings.get("grpc_settings") or {}
-    hyst_settings = stream_settings.get("hysteria") or {}
 
     sni_val = (
         tls_settings.get("serverName")
