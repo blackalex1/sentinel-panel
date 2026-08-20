@@ -45,22 +45,20 @@ window.testOutbound = async function(id, testType, btnElement) {
     
     try {
         const res = await apiFetch(`/api/routing/outbounds/test/${id}?test_type=${testType}`, { method: "POST" });
+        const tr = btnElement.closest("tr");
+        const pingResultEl = tr ? tr.querySelector(".ob-ping-result") : null;
+        const typeLabel = testType.toUpperCase();
+
         if (res && res.success) {
             showToast(t("routing_test_success", "Соединение успешно!") + ` (${res.ping} ms)`);
-            const settingsCell = btnElement.closest("tr").querySelector("td:nth-child(4)");
-            if (settingsCell) {
-                const originalText = settingsCell.innerText.split(" (")[0];
-                const typeLabel = testType.toUpperCase();
-                settingsCell.innerHTML = `${originalText} <span style="color: var(--accent-green); font-size: 12px; font-weight: 600;">(${typeLabel}: ${res.ping} ms)</span>`;
+            if (pingResultEl) {
+                pingResultEl.innerHTML = `<span style="color: var(--accent-green); font-size: 12px; font-weight: 600;">(${typeLabel}: ${res.ping} ms)</span>`;
             }
         } else {
             showToast(res ? res.msg : t("routing_toast_test_error", "Ошибка проверки"), "error");
-            const settingsCell = btnElement.closest("tr").querySelector("td:nth-child(4)");
-            if (settingsCell) {
-                const originalText = settingsCell.innerText.split(" (")[0];
-                const typeLabel = testType.toUpperCase();
+            if (pingResultEl) {
                 const errMsg = res && res.msg ? res.msg : "Error";
-                settingsCell.innerHTML = `${originalText} <span style="color: var(--accent-rose); font-size: 11px; font-weight: 600;" title="${errMsg}">(${typeLabel}: Error)</span>`;
+                pingResultEl.innerHTML = `<span style="color: var(--accent-rose); font-size: 11px; font-weight: 600;" title="${errMsg}">(${typeLabel}: Error)</span>`;
             }
         }
     } catch(e) {

@@ -77,7 +77,13 @@ export async function loadOutbounds() {
             <td style="padding: 12px 15px; font-weight: 500;">${ob.remark}</td>
             <td style="padding: 12px 15px;"><span class="${badgeClass}">${ob.protocol}</span></td>
             <td style="padding: 12px 15px; color: var(--accent-blue); font-family: monospace;">${ob.tag}</td>
-            <td style="padding: 12px 15px; color: var(--text-secondary);">${settingsText}${backupBadge}</td>
+            <td style="padding: 12px 15px; color: var(--text-secondary);">
+                <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
+                    <span class="ob-settings-addr">${settingsText}</span>
+                    <span class="ob-ping-result"></span>
+                </div>
+                ${backupBadge}
+            </td>
             <td style="padding: 12px 15px; font-size: 13px; white-space: nowrap;">${trafficText}</td>
             <td style="padding: 12px 15px;">
                 <label class="switch-toggle">
