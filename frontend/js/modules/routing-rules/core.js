@@ -268,7 +268,7 @@ export async function loadQuickSecurityRules() {
         if (setObj && setObj.success) {
             const outbounds = (outboundsRes && outboundsRes.success) ? outboundsRes.obj : [];
             const presets = (presetsRes && presetsRes.success && Array.isArray(presetsRes.obj)) ? presetsRes.obj : [];
-            const quickPresets = presets.filter(p => p.type === "quick_rule" || (p.type !== "template" && p.id !== "global_proxy" && p.id !== "direct_all"));
+            const quickPresets = presets.filter(p => p.type === "quick_rule" || p.type !== "template");
             const gridContainer = document.getElementById("quick-security-rules-grid");
 
             if (gridContainer) {

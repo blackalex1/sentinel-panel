@@ -218,8 +218,6 @@ async def import_rules_preset_api(request: Request, payload: dict):
                 "protocols": preset_data.get("protocols", []),
                 "enable": 1
             }]
-        elif preset_data.get("id") == "direct_all":
-            rules = []
 
     if rules is None:
         return {"success": False, "msg": t("routing_preset_no_rules", lang=lang, category="backend")}
