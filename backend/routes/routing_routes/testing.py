@@ -235,16 +235,24 @@ def test_outbound_transit(protocol: str, settings: dict, stream_settings: dict =
                 else:
                     last_status = resp.status_code
             except requests.exceptions.RequestException as e:
-                last_error = str(e)
-                
+        detail_msg = ""
+        try:
+            from backend.sentinel_core_bridge import get_in_memory_core_logs
+            logs = get_in_memory_core_logs(core_type, limit=5)
+            err_lines = [line for line in logs if any(w in line.lower() for w in ("error", "fail", "refused", "timeout", "bad certificate", "auth", "rejected"))]
+            if err_lines:
+                detail_msg = f": {err_lines[-1].strip()}"
+        except Exception:
+            pass
+
         if last_status == 502:
-            return {"success": False, "msg": t("testing_gateway_error_502", lang=lang, category="backend", core=core_name)}
+            return {"success": False, "msg": f"{t('testing_gateway_error_502', lang=lang, category='backend', core=core_name)}{detail_msg}"}
         elif last_status == 504:
-            return {"success": False, "msg": t("testing_gateway_timeout_504", lang=lang, category="backend", core=core_name)}
+            return {"success": False, "msg": f"{t('testing_gateway_timeout_504', lang=lang, category='backend', core=core_name)}{detail_msg}"}
         elif last_status:
-            return {"success": False, "msg": t("testing_unexpected_status", lang=lang, category="backend", status=last_status, core=core_name)}
+            return {"success": False, "msg": f"{t('testing_unexpected_status', lang=lang, category='backend', status=last_status, core=core_name)}{detail_msg}"}
         else:
-            return {"success": False, "msg": t("testing_transit_check_error", lang=lang, category="backend", error=last_error or 'Connection timeout', core=core_name)}
+            return {"success": False, "msg": f"{t('testing_transit_check_error', lang=lang, category='backend', error=last_error or 'Connection timeout', core=core_name)}{detail_msg}"}
             
     finally:
         try:

@@ -55,14 +55,23 @@ def extract_common_outbound_params(settings: dict, stream_settings: dict) -> dic
         if users:
             uuid_val = users[0].get("id") or users[0].get("uuid")
 
-    password_val = settings.get("password") or settings.get("pass") or settings.get("auth") or settings.get("auth_str")
+    password_val = (
+        settings.get("password")
+        or settings.get("pass")
+        or settings.get("auth")
+        or settings.get("auth_str")
+        or stream_settings.get("auth")
+        or stream_settings.get("password")
+        or hyst_settings.get("auth")
+        or hyst_settings.get("password")
+    )
     if not password_val and "servers" in settings and settings["servers"]:
         srv = settings["servers"][0]
-        password_val = srv.get("password") or srv.get("pass")
+        password_val = srv.get("password") or srv.get("pass") or srv.get("auth") or srv.get("auth_str")
         if not password_val:
             users = srv.get("users", [])
             if users:
-                password_val = users[0].get("pass") or users[0].get("password")
+                password_val = users[0].get("pass") or users[0].get("password") or users[0].get("auth")
 
     username_val = settings.get("user") or settings.get("username")
     if not username_val and "servers" in settings and settings["servers"]:
@@ -89,6 +98,7 @@ def extract_common_outbound_params(settings: dict, stream_settings: dict) -> dic
         or reality_settings.get("sni")
         or hyst_settings.get("sni")
         or stream_settings.get("sni")
+        or settings.get("sni")
         or addr
     )
 
@@ -122,7 +132,7 @@ def build_singbox_outbound(protocol: str, settings: dict, stream_settings: dict 
     params = extract_common_outbound_params(settings, stream_settings or {})
     proto = (protocol or "").strip().lower()
 
-    if proto in ("hysteria", "hysteria2"):
+    if proto in ("hysteria", "hysteria2", "hy2"):
         sb_ob = {
             "type": "hysteria2",
             "tag": tag,
@@ -136,6 +146,20 @@ def build_singbox_outbound(protocol: str, settings: dict, stream_settings: dict 
         }
         if params["sni"]:
             sb_ob["tls"]["server_name"] = params["sni"]
+            
+        obfs_val = (
+            settings.get("obfs")
+            or (stream_settings or {}).get("obfs")
+            or params["hysteria_settings"].get("obfs")
+        )
+        if obfs_val:
+            if isinstance(obfs_val, str):
+                sb_ob["obfs"] = {
+                    "type": "salamander",
+                    "password": obfs_val
+                }
+            elif isinstance(obfs_val, dict):
+                sb_ob["obfs"] = obfs_val
         return sb_ob
 
     if proto in ("socks", "http"):
