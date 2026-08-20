@@ -4,6 +4,7 @@ import { t } from "../../../../i18n.js";
 import { parseProxyLink } from "../../link-parser.js";
 import { fetchOutboundSchema, setCurrentOutboundValues, getCurrentOutboundValues, populateFallbackDropdown } from "../modal_manager.js";
 import { renderDynamicOutboundForm } from "../../../inbounds/schema-renderer.js";
+import { outboundsCache } from "../table_render.js";
 
 export function bindLinkImporterListener() {
     const importLinkInput = document.getElementById("ob-import-link");
@@ -120,6 +121,45 @@ export function bindLinkImporterListener() {
             }
 
             if (parsed && parsed.protocol) {
+                const idInput = document.getElementById("ob-id");
+                const editingId = idInput && idInput.value ? parseInt(idInput.value) : null;
+                const existingVals = getCurrentOutboundValues() || {};
+
+                let targetTag = parsed.tag;
+                let targetRemark = parsed.remark;
+
+                if (editingId) {
+                    if (existingVals.tag) {
+                        targetTag = existingVals.tag;
+                    }
+                    if (existingVals.remark) {
+                        targetRemark = existingVals.remark;
+                    }
+                }
+
+                // If targetTag is taken by another outbound in outboundsCache, generate a unique suffix
+                if (Array.isArray(outboundsCache) && outboundsCache.length > 0) {
+                    const isTagTaken = (candidate) => outboundsCache.some(ob => (!editingId || ob.id !== editingId) && ob.tag === candidate);
+                    if (isTagTaken(targetTag)) {
+                        let counter = 2;
+                        let candidate = `${targetTag}-${counter}`;
+                        while (isTagTaken(candidate)) {
+                            counter++;
+                            candidate = `${targetTag}-${counter}`;
+                        }
+                        targetTag = candidate;
+                    }
+                }
+
+                parsed.tag = targetTag;
+                parsed.remark = targetRemark;
+
+                if (editingId && existingVals.fallback_outbound) {
+                    parsed.fallback_outbound = existingVals.fallback_outbound;
+                    parsed.fallback_strategy = existingVals.fallback_strategy || "priority";
+                    parsed.health_check_interval = existingVals.health_check_interval || 300;
+                }
+
                 setCurrentOutboundValues(parsed);
                 const currentVals = getCurrentOutboundValues();
 
