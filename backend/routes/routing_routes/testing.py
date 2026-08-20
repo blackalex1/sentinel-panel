@@ -235,6 +235,8 @@ def test_outbound_transit(protocol: str, settings: dict, stream_settings: dict =
                 else:
                     last_status = resp.status_code
             except requests.exceptions.RequestException as e:
+                last_error = str(e)
+                
         detail_msg = ""
         try:
             from backend.sentinel_core_bridge import get_in_memory_core_logs
