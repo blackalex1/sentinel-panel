@@ -243,7 +243,8 @@ def test_outbound_transit(protocol: str, settings: dict, stream_settings: dict =
             logs = get_in_memory_core_logs(core_type, limit=5)
             err_lines = [line for line in logs if any(w in line.lower() for w in ("error", "fail", "refused", "timeout", "bad certificate", "auth", "rejected"))]
             if err_lines:
-                detail_msg = f": {err_lines[-1].strip()}"
+                clean_err = re.sub(r'(\x1b\[[0-9;]*[a-zA-Z]|\[\d+m|\[\d+;\d+;\d+m)', '', err_lines[-1]).strip()
+                detail_msg = f": {clean_err}"
         except Exception:
             pass
 
