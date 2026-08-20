@@ -302,7 +302,7 @@ async def test_outbound_api(request: Request, payload: dict):
             else:
                 return {"success": False, "msg": t("testing_direct_unavailable", lang=lang, category="backend", error=res['msg'])}
                 
-        if protocol == "hysteria":
+        if protocol.lower() in ("hysteria", "hysteria2", "hy2", "tuic", "wireguard"):
             host, port = extract_address_port(protocol, settings, stream_settings)
             if not host:
                 return {"success": False, "msg": t("testing_cannot_determine_address_proto", lang=lang, category="backend")}
@@ -364,7 +364,7 @@ async def test_outbound_by_id_api(request: Request, id: int, test_type: str = "t
             return routing_facade.test_outbound_transit(protocol, settings, stream_settings, core=core)
         return routing_facade.test_outbound_transit(protocol, settings, stream_settings)
         
-    else:  # TCP Ping
+    else:  # TCP/ICMP Ping
         if protocol == "freedom":
             res = routing_facade.tcp_ping("8.8.8.8", 53, 3.0)
             if res["success"]:
@@ -372,7 +372,7 @@ async def test_outbound_by_id_api(request: Request, id: int, test_type: str = "t
             else:
                 return {"success": False, "msg": t("testing_direct_unavailable", lang=lang, category="backend", error=res['msg'])}
                 
-        if protocol == "hysteria":
+        if protocol.lower() in ("hysteria", "hysteria2", "hy2", "tuic", "wireguard"):
             host, port = extract_address_port(protocol, settings, stream_settings)
             if not host:
                 return {"success": False, "msg": t("testing_cannot_determine_address", lang=lang, category="backend")}
