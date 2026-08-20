@@ -4,7 +4,7 @@ import { loadSingboxCoreInfo, loadSingboxLogs, startSingboxLogsStream, stopSingb
 import { loadSingboxConfig } from "./singbox/config.js";
 import { loadXrayConfig } from "./xray-config.js";
 import { loadOutbounds, loadRoutingRules } from "../routing.js";
-import { loadSettings, loadOptimizationStatus } from "./settings-ui.js";
+import { loadSettings, loadOptimizationStatus, loadIpv6Status } from "./settings-ui.js";
 import { loadAuditLogs } from "./audit-logs.js";
 import { loadGeoInfo, startLogsStream, stopLogsStream } from "./xray-core.js";
 import { t } from "../i18n.js";
@@ -120,7 +120,7 @@ export function switchTab(tabId, loadInbounds, loadCoreInfo, loadLogs) {
     } else if (tabId === "routing") {
         return Promise.all([loadOutbounds(), loadRoutingRules()]);
     } else if (tabId === "settings") {
-        return Promise.all([loadSettings(), loadOptimizationStatus()]);
+        return Promise.all([loadSettings(), loadOptimizationStatus(), loadIpv6Status()]);
     } else if (tabId === "audit-logs") {
         return loadAuditLogs();
     }

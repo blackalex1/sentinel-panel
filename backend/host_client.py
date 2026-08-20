@@ -173,6 +173,12 @@ class HostClient:
             return {"success": True, "optimized": False}
         elif action == "apply_optimizations":
             return {"success": True, "msg": "[Mock] Network optimized."}
+        elif action == "get_ipv6_status":
+            return {"success": True, "ipv6_disabled": getattr(self, "mock_ipv6_disabled", False), "supported": True}
+        elif action == "set_ipv6_disabled":
+            disable = params.get("disable", True) if params else True
+            self.mock_ipv6_disabled = disable
+            return {"success": True, "msg": f"[Mock] IPv6 {'disabled' if disable else 'enabled'}."}
         elif action == "get_system_stats":
             # Try to get local stats using psutil if available
             stats = {

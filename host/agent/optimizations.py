@@ -187,3 +187,62 @@ root hard nofile 1000000
         return True, "Network optimized (sysctl parameters and security limits written)."
     except Exception as e:
         return False, f"Optimization failed: {str(e)}"
+
+def get_ipv6_status() -> dict:
+    """Checks if IPv6 is enabled or disabled in the Linux kernel."""
+    try:
+        ipv6_all = "/proc/sys/net/ipv6/conf/all/disable_ipv6"
+        if os.path.exists(ipv6_all):
+            with open(ipv6_all, "r") as f:
+                val = f.read().strip()
+                return {"ipv6_disabled": (val == "1"), "supported": True}
+        else:
+            return {"ipv6_disabled": True, "supported": False, "note": "IPv6 subsystem is not available in kernel"}
+    except Exception as e:
+        logging.error(f"Failed to check IPv6 status: {e}")
+        return {"ipv6_disabled": False, "supported": False, "error": str(e)}
+
+def set_ipv6_disabled(disable: bool) -> tuple[bool, str]:
+    """Disables or enables IPv6 on the Linux host by writing sysctl parameters."""
+    if sys.platform != "linux":
+        return False, "IPv6 management is only supported on Linux hosts."
+
+    val = "1" if disable else "0"
+    
+    try:
+        sysctl_conf_dir = Path("/etc/sysctl.d")
+        sysctl_conf_dir.mkdir(parents=True, exist_ok=True)
+        conf_file = sysctl_conf_dir / "99-disable-ipv6.conf"
+
+        content = f"""# Configured by Sentinel Panel
+net.ipv6.conf.all.disable_ipv6 = {val}
+net.ipv6.conf.default.disable_ipv6 = {val}
+net.ipv6.conf.lo.disable_ipv6 = {val}
+"""
+        with open(conf_file, "w") as f:
+            f.write(content)
+
+        # Apply directly to procfs if available
+        for iface in ["all", "default", "lo"]:
+            proc_path = f"/proc/sys/net/ipv6/conf/{iface}/disable_ipv6"
+            if os.path.exists(proc_path):
+                try:
+                    with open(proc_path, "w") as f:
+                        f.write(val)
+                except Exception as write_err:
+                    logging.warning(f"Could not write directly to {proc_path}: {write_err}")
+
+        # Reload sysctl
+        try:
+            subprocess.run(["sysctl", "-p", str(conf_file)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        except Exception:
+            pass
+        try:
+            subprocess.run(["sysctl", "--system"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        except Exception:
+            pass
+
+        return True, "IPv6 успешно отключен на сервере." if disable else "IPv6 успешно включен на сервере."
+    except Exception as e:
+        return False, f"Ошибка настройки IPv6: {str(e)}"
+

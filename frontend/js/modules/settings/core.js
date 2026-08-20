@@ -3,7 +3,7 @@ import { showToast } from "../../ui.js";
 import { t } from "../../i18n.js";
 import { loadWarpStatus, setupWarpListeners } from "../warp-ui.js";
 import { loadAuditLogs, setupAuditLogsListeners } from "../audit-logs.js";
-import { loadOptimizationStatus } from "./network.js";
+import { loadOptimizationStatus, loadIpv6Status } from "./network.js";
 import { loadActiveSessions } from "./security.js";
 
 export let originalSecretPath = "";
@@ -181,6 +181,7 @@ export async function loadSettings() {
         await loadWarpStatus();
         await loadAuditLogs();
         await loadOptimizationStatus();
+        await loadIpv6Status();
         await loadActiveSessions();
     }
 }

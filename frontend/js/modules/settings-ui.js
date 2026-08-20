@@ -6,7 +6,7 @@ import { setupNetworkListeners } from "./settings/network.js";
 
 export { originalSecretPath, setOriginalSecretPath, loadSettings, updateDecoyUI } from "./settings/core.js";
 export { loadActiveSessions } from "./settings/security.js";
-export { loadOptimizationStatus } from "./settings/network.js";
+export { loadOptimizationStatus, loadIpv6Status } from "./settings/network.js";
 
 export function setupSettingsListeners() {
     setupGeneralListeners();

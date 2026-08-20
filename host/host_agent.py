@@ -14,6 +14,8 @@ from agent.optimizations import (
     enable_bbr,
     get_optimization_status,
     apply_network_optimizations,
+    get_ipv6_status,
+    set_ipv6_disabled,
 )
 from agent.monitor import get_system_stats
 from agent.warp import (
@@ -61,6 +63,13 @@ def handle_client(conn):
                         response = {"success": True, "optimized": get_optimization_status()}
                     elif action == "apply_optimizations":
                         success, msg = apply_network_optimizations()
+                        response = {"success": success, "msg": msg}
+                    elif action == "get_ipv6_status":
+                        status = get_ipv6_status()
+                        response = {"success": True, "ipv6_disabled": status.get("ipv6_disabled", False), "supported": status.get("supported", True)}
+                    elif action == "set_ipv6_disabled":
+                        disable = request.get("disable", True)
+                        success, msg = set_ipv6_disabled(disable)
                         response = {"success": success, "msg": msg}
                     elif action == "get_warp_status":
                         response = get_warp_status()
