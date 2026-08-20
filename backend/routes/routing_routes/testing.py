@@ -218,13 +218,32 @@ def test_outbound_transit(protocol: str, settings: dict, stream_settings: dict =
         import urllib3
         urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
         
+        session = requests.Session()
+        session.proxies.update(proxies)
+        
         last_error = None
         last_status = None
         for target_url in test_urls:
-            start_time = time.perf_counter()
             try:
-                resp = requests.get(target_url, proxies=proxies, timeout=5.0, verify=False)
+                # 1. Initial warm-up request to initialize proxy tunnel & SSL handshake
+                warmup_ok = False
+                try:
+                    w_resp = session.get(target_url, timeout=3.0, verify=False)
+                    if w_resp.status_code in (200, 204):
+                        warmup_ok = True
+                    else:
+                        last_status = w_resp.status_code
+                except requests.exceptions.RequestException as we:
+                    last_error = str(we)
+
+                if not warmup_ok:
+                    continue
+
+                # 2. Precise measurement over active warm tunnel
+                start_time = time.perf_counter()
+                resp = session.get(target_url, timeout=3.0, verify=False)
                 latency = (time.perf_counter() - start_time) * 1000
+
                 if resp.status_code in (200, 204):
                     return {
                         "success": True,
