@@ -59,8 +59,11 @@
     --radius-pill: 9999px;
     
     /* Фильтры и эффекты Glassmorphism */
-    --blur-glass: blur(18px) saturate(180%);
-    --blur-modal: blur(24px) saturate(200%);
+    /* saturate() removed — costs a full separate GPU compositing pass per element.
+       Blur radius reduced: glass 18→8px, modal 24→12px.
+       On dark translucent backgrounds (0.55 alpha) the visual difference is negligible. */
+    --blur-glass: blur(8px);
+    --blur-modal: blur(12px);
     
     /* Анимации и переходы */
     --transition-fast: 0.15s cubic-bezier(0.16, 1, 0.3, 1);
