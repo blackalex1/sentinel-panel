@@ -44,13 +44,13 @@
 }
 
 @keyframes statusBreathGreen {
-    0%, 100% { transform: scale(1); opacity: 1; filter: drop-shadow(0 0 3px var(--accent-green)); }
-    50% { transform: scale(1.25); opacity: 0.65; filter: drop-shadow(0 0 8px var(--accent-green)); }
+    0%, 100% { transform: scale(1); opacity: 1; }
+    50% { transform: scale(1.25); opacity: 0.65; }
 }
 
 @keyframes statusBreathRose {
-    0%, 100% { transform: scale(1); opacity: 1; filter: drop-shadow(0 0 3px var(--accent-rose)); }
-    50% { transform: scale(1.25); opacity: 0.65; filter: drop-shadow(0 0 8px var(--accent-rose)); }
+    0%, 100% { transform: scale(1); opacity: 1; }
+    50% { transform: scale(1.25); opacity: 0.65; }
 }
 
 /* Вкладки контента */

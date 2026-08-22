@@ -3,6 +3,18 @@
  * Converts standard HTML <select> elements into modern animated glassmorphism dropdowns.
  */
 
+// Single global click listener — registered once for all select instances at module load time.
+// Previously it was inside initCustomSelect, causing N listeners for N select elements.
+function _closeAllSelects() {
+    document.querySelectorAll(".custom-select-container.open").forEach(c => {
+        c.classList.remove("open");
+    });
+    document.querySelectorAll(".custom-select-open-parent").forEach(p => {
+        p.classList.remove("custom-select-open-parent");
+    });
+}
+document.addEventListener("click", _closeAllSelects);
+
 export function initCustomSelect(selectElement) {
     if (!selectElement || selectElement.dataset.customSelectInit) return;
     selectElement.dataset.customSelectInit = "true";
@@ -95,19 +107,10 @@ export function initCustomSelect(selectElement) {
     
     buildOptions();
     
-    function closeAll() {
-        document.querySelectorAll(".custom-select-container.open").forEach(c => {
-            c.classList.remove("open");
-        });
-        document.querySelectorAll(".custom-select-open-parent").forEach(p => {
-            p.classList.remove("custom-select-open-parent");
-        });
-    }
-    
     trigger.addEventListener("click", (e) => {
         e.stopPropagation();
         const isOpen = container.classList.contains("open");
-        closeAll();
+        _closeAllSelects();
         if (!isOpen) {
             // Smart collision / drop direction calculation based on viewport space
             const triggerRect = trigger.getBoundingClientRect();
@@ -127,10 +130,6 @@ export function initCustomSelect(selectElement) {
                 p = p.parentElement;
             }
         }
-    });
-    
-    document.addEventListener("click", () => {
-        closeAll();
     });
     
     selectElement.addEventListener("change", () => {
