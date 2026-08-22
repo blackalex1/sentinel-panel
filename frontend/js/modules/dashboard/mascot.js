@@ -72,6 +72,17 @@ export class SentinelServerMascot {
         this.currentColor = { r: 16, g: 185, b: 129 };
         this.targetColor = { r: 16, g: 185, b: 129 };
 
+        // --- Optimization: gradient cache (recreated only on canvas resize) ---
+        this._cachedChassisGrad = null;
+        this._cachedChassisGradW = -1;
+
+        // --- Optimization: adaptive frame rate ---
+        this._lastRenderTime = 0;
+
+        // --- Optimization: pause rendering when off-screen / tab hidden ---
+        this._isVisible = true;
+        this._observer = null;
+
         this.init();
     }
 
@@ -115,6 +126,21 @@ export class SentinelServerMascot {
         }
 
         this.startLoop();
+
+        // Pause rendering entirely when mascot is off-screen (sidebar scrolled away etc.)
+        if (typeof IntersectionObserver !== 'undefined') {
+            this._observer = new IntersectionObserver(
+                (entries) => { this._isVisible = entries[0].isIntersecting; },
+                { threshold: 0.01 }
+            );
+            this._observer.observe(this.canvas);
+        }
+
+        // Pause rendering when browser tab is hidden (browser already pauses rAF, but
+        // this also stops the update() physics tick that runs before draw check)
+        document.addEventListener('visibilitychange', () => {
+            this._isVisible = !document.hidden;
+        });
     }
 
     setOnClick(cb) {
@@ -220,13 +246,30 @@ export class SentinelServerMascot {
 
     startLoop() {
         const render = (now) => {
+            this.animationFrameId = requestAnimationFrame(render);
+
+            // Skip entirely when off-screen or tab hidden
+            if (!this._isVisible) return;
+
+            // Adaptive frame rate:
+            //   - Active effects (EMP/shock/particles) → 60fps for smooth burst
+            //   - Running normally                     → 30fps (imperceptible vs 60fps)
+            //   - Fully asleep (sleepProgress > 0.97)  → 4fps (only slow breathing changes)
+            const hasEffects = this.shockParticles.length > 0 ||
+                               this.electricArcs.length > 0 ||
+                               this.isShocking;
+            const fullyAsleep = !this.isRunning && this.sleepProgress > 0.97;
+            const targetFPS   = hasEffects ? 60 : fullyAsleep ? 4 : 30;
+            const minInterval = 1000 / targetFPS;
+
+            if (now - this._lastRenderTime < minInterval) return;
+            this._lastRenderTime = now;
+
             const dt = Math.min((now - this.lastFrameTime) / 1000, 0.1);
             this.lastFrameTime = now;
 
             this.update(now, dt);
             this.draw(now);
-
-            this.animationFrameId = requestAnimationFrame(render);
         };
         this.animationFrameId = requestAnimationFrame(render);
     }
@@ -234,6 +277,9 @@ export class SentinelServerMascot {
     destroy() {
         if (this.animationFrameId) {
             cancelAnimationFrame(this.animationFrameId);
+        }
+        if (this._observer) {
+            this._observer.disconnect();
         }
     }
 
@@ -367,7 +413,7 @@ export class SentinelServerMascot {
         const beaconGlow = isAwake * (8 + Math.min((this.netSpeed || 0) / (1024 * 300), 8)) + this.sleepProgress * 4;
         ctx.fillStyle = this.isRunning ? (this.cpu > 80 ? "#EF4444" : accentCyan) : "#8B5CF6";
         ctx.shadowColor = ctx.fillStyle;
-        ctx.shadowBlur = beaconGlow * s;
+        ctx.shadowBlur = Math.min(beaconGlow, 6) * s;
         ctx.beginPath();
         ctx.arc(fx(20), fy(6 + shockOffsetY), 2.4 * s, 0, Math.PI * 2);
         ctx.arc(fx(80), fy(6 + shockOffsetY), 2.4 * s, 0, Math.PI * 2);
@@ -401,17 +447,23 @@ export class SentinelServerMascot {
         ctx.lineTo(fx(26), fy(16 + shockOffsetY));
         ctx.closePath();
 
-        const chassisGrad = ctx.createLinearGradient(fx(50), fy(12), fx(50), fy(94));
-        chassisGrad.addColorStop(0, "#111827");
-        chassisGrad.addColorStop(0.5, "#091811");
-        chassisGrad.addColorStop(1, "#030a06");
-        ctx.fillStyle = chassisGrad;
+        // Cache chassis gradient — recreate only when canvas size changes (not every frame)
+        if (this._cachedChassisGradW !== this.width) {
+            const g = ctx.createLinearGradient(fx(50), fy(12), fx(50), fy(94));
+            g.addColorStop(0, "#111827");
+            g.addColorStop(0.5, "#091811");
+            g.addColorStop(1, "#030a06");
+            this._cachedChassisGrad = g;
+            this._cachedChassisGradW = this.width;
+        }
+        ctx.fillStyle = this._cachedChassisGrad;
         ctx.fill();
 
         ctx.strokeStyle = armorBorderColor;
         ctx.lineWidth = 4.5 * s;
         ctx.shadowColor = armorBorderColor;
-        ctx.shadowBlur = (14 * isAwake + 6 * this.sleepProgress) * s;
+        // Reduced from 14→8: shadowBlur cost is roughly O(r²), halving saves ~75% GPU on this stroke
+        ctx.shadowBlur = (8 * isAwake + 4 * this.sleepProgress) * s;
         ctx.stroke();
 
         ctx.fillStyle = `rgba(16, 185, 129, ${0.45 * isAwake + 0.15 * this.sleepProgress})`;
@@ -437,9 +489,11 @@ export class SentinelServerMascot {
         for (let i = 0; i < 3; i++) {
             const isActive = i < level && isAwake > 0.3;
             const glyphAlpha = (isActive ? 0.95 : 0.15) * isAwake + 0.05 * this.sleepProgress;
+            // No shadowBlur on chevrons — tiny shapes, cost >> visual benefit.
+            // Use pure bright fill for active state instead.
             ctx.fillStyle = isActive ? "#22D3EE" : `rgba(255, 255, 255, ${glyphAlpha})`;
-            ctx.shadowColor = isActive ? "#22D3EE" : "transparent";
-            ctx.shadowBlur = isActive ? (8 * isAwake) * s : 0;
+            ctx.shadowColor = "transparent";
+            ctx.shadowBlur = 0;
 
             ctx.beginPath();
             ctx.moveTo(fx(19 + i * 1.5), fy(35 + i * 5.2 + shockOffsetY));
@@ -525,7 +579,8 @@ export class SentinelServerMascot {
         ctx.save();
         ctx.fillStyle = this.isRunning ? (this.cpu > 80 ? "#EF4444" : accentCyan) : "#8B5CF6";
         ctx.shadowColor = ctx.fillStyle;
-        ctx.shadowBlur = (14 * isAwake + 6 * this.sleepProgress) * s;
+        // Reduced 14→9: eyes are large fills — shadow cost scales with area × blur²
+        ctx.shadowBlur = (9 * isAwake + 4 * this.sleepProgress) * s;
 
         if (currentAperture > 0.18) {
             // Left Sharp Eye
@@ -578,7 +633,8 @@ export class SentinelServerMascot {
         // Outer Solid Diamond Shell (Razor Sharp)
         ctx.fillStyle = coreColor;
         ctx.shadowColor = coreColor;
-        ctx.shadowBlur = (10 + glowIntensity * 8 * isAwake + this.wakeFlash * 25) * s;
+        // Reduced 10+8→7+5; wakeFlash 25→18 (still prominent, just shorter blur radius)
+        ctx.shadowBlur = (7 + glowIntensity * 5 * isAwake + this.wakeFlash * 18) * s;
         ctx.beginPath();
         ctx.moveTo(fx(50), fy(centerY - 14 + shockOffsetY));
         ctx.lineTo(fx(64), fy(centerY + shockOffsetY));
@@ -590,7 +646,8 @@ export class SentinelServerMascot {
         // Inner Quantum Prism
         ctx.fillStyle = this.isRunning ? (this.cpu > 80 ? "#FFA3A3" : accentCyan) : "#A78BFA";
         ctx.shadowColor = ctx.fillStyle;
-        ctx.shadowBlur = (6 + glowIntensity * 6 * isAwake) * s;
+        // Reduced 6+6→4+4
+        ctx.shadowBlur = (4 + glowIntensity * 4 * isAwake) * s;
         ctx.beginPath();
         ctx.moveTo(fx(50), fy(centerY - 8 + shockOffsetY));
         ctx.lineTo(fx(58), fy(centerY + shockOffsetY));
@@ -603,7 +660,8 @@ export class SentinelServerMascot {
         const heartAlpha = 0.75 + glowIntensity * 0.25 * isAwake + this.wakeFlash * 0.8;
         ctx.fillStyle = `rgba(255, 255, 255, ${Math.min(1.0, heartAlpha)})`;
         ctx.shadowColor = "#FFFFFF";
-        ctx.shadowBlur = (8 + glowIntensity * 6 * isAwake + this.wakeFlash * 20) * s;
+        // Reduced 8+6→5+4; wakeFlash 20→14
+        ctx.shadowBlur = (5 + glowIntensity * 4 * isAwake + this.wakeFlash * 14) * s;
         ctx.beginPath();
         ctx.moveTo(fx(50), fy(centerY - 4 + shockOffsetY));
         ctx.lineTo(fx(54), fy(centerY + shockOffsetY));
