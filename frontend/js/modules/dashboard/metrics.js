@@ -186,44 +186,6 @@ export async function loadStats() {
         mascot.setMetrics(obj.cpu, (memCurrent / memTotal) * 100, (typeof speedUp !== 'undefined' ? speedUp : 0), (typeof speedDown !== 'undefined' ? speedDown : 0));
     }
 
-    // Update Mascot UI telemetry badges
-    const mascotStatusPill = document.getElementById("mascot-status-pill");
-    const mascotStatusText = document.getElementById("mascot-status-text");
-    const mascotActiveCores = document.getElementById("mascot-active-cores");
-    const mascotLoadLevel = document.getElementById("mascot-load-level");
-
-    if (mascotStatusPill && mascotStatusText) {
-        if (isAnyCoreRunning) {
-            mascotStatusPill.className = mascotStatusPill.classList.contains("sidebar-mascot-badge") ? "sidebar-mascot-badge" : "mascot-status-pill";
-            mascotStatusText.innerText = t("mascot_status_online", "ONLINE");
-        } else {
-            mascotStatusPill.className = (mascotStatusPill.classList.contains("sidebar-mascot-badge") ? "sidebar-mascot-badge" : "mascot-status-pill") + " standby";
-            mascotStatusText.innerText = t("mascot_status_standby", "STANDBY");
-        }
-    }
-
-
-    if (mascotActiveCores) {
-        const specificKey = `mascot_cores_active_${activeCores}`;
-        const translated = t(specificKey);
-        if (translated && translated !== specificKey) {
-            mascotActiveCores.innerText = translated;
-        } else {
-            mascotActiveCores.innerText = t("mascot_cores_active", "{count} ЯДРА АКТИВНО").replace("{count}", activeCores);
-        }
-    }
-
-
-    if (mascotLoadLevel) {
-        if (obj.cpu > 75) {
-            mascotLoadLevel.innerText = t("mascot_load_high", "HIGH");
-            mascotLoadLevel.style.color = "var(--accent-rose)";
-        } else {
-            mascotLoadLevel.innerText = t("mascot_load_normal", "NORMAL");
-            mascotLoadLevel.style.color = "var(--text-primary)";
-        }
-    }
-
     // Update chart
     updateChart(obj.cpu, (memCurrent / memTotal) * 100, swapPercent, obj.disk ? obj.disk.percent : 0);
 }

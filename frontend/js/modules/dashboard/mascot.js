@@ -88,41 +88,51 @@ export class SentinelServerMascot {
 
     init() {
         this.resize();
-        window.addEventListener("resize", () => this.resize());
-        
-        // Global mouse tracking across the entire screen
-        window.addEventListener("mousemove", (e) => {
+
+        // Named handlers — stored as instance properties so destroy() can removeEventListener
+        this._onResize = () => this.resize();
+        this._onMouseMove = (e) => {
             if (!this.canvas || !this.isRunning) return;
             this.lastMouseMoveTime = performance.now();
-            const rect = this.canvas.getBoundingClientRect();
+            // Use cached rect — no forced layout recalculation on every pointer event
+            const rect = this._canvasRect;
+            if (!rect) return;
             const centerX = rect.left + rect.width / 2;
             const centerY = rect.top + rect.height / 2;
-            
+
             const dx = (e.clientX - centerX) / (window.innerWidth / 2);
             const dy = (e.clientY - centerY) / (window.innerHeight / 2);
-            
+
             this.targetGazeX = Math.max(-1, Math.min(1, dx * 1.4));
             this.targetGazeY = Math.max(-1, Math.min(1, dy * 1.4));
-        });
-
-        window.addEventListener("mouseleave", () => {
+        };
+        this._onMouseLeave = () => {
             this.targetGazeX = 0;
             this.targetGazeY = 0;
-        });
+        };
+        this._onVisibilityChange = () => {
+            this._isVisible = !document.hidden;
+        };
+
+        window.addEventListener("resize", this._onResize);
+        window.addEventListener("mousemove", this._onMouseMove);
+        window.addEventListener("mouseleave", this._onMouseLeave);
 
         const trackTarget = this.container || this.canvas;
         if (trackTarget) {
-            trackTarget.addEventListener("mouseenter", () => {
+            this._onContainerEnter = () => {
                 this.isHovered = true;
                 if (this.isRunning) this.triggerMicroSparks(4);
-            });
-            trackTarget.addEventListener("mouseleave", () => {
-                this.isHovered = false;
-            });
-            trackTarget.addEventListener("click", () => {
+            };
+            this._onContainerLeave = () => { this.isHovered = false; };
+            this._onContainerClick = () => {
                 this.triggerShock();
                 if (this.onClickCallback) this.onClickCallback();
-            });
+            };
+            trackTarget.addEventListener("mouseenter", this._onContainerEnter);
+            trackTarget.addEventListener("mouseleave", this._onContainerLeave);
+            trackTarget.addEventListener("click", this._onContainerClick);
+            this._trackTarget = trackTarget;
         }
 
         this.startLoop();
@@ -138,9 +148,7 @@ export class SentinelServerMascot {
 
         // Pause rendering when browser tab is hidden (browser already pauses rAF, but
         // this also stops the update() physics tick that runs before draw check)
-        document.addEventListener('visibilitychange', () => {
-            this._isVisible = !document.hidden;
-        });
+        document.addEventListener('visibilitychange', this._onVisibilityChange);
     }
 
     setOnClick(cb) {
@@ -165,6 +173,9 @@ export class SentinelServerMascot {
         this.width = size;
         this.height = size;
         this.dpr = dpr;
+
+        // Cache rect for mousemove — avoids forced layout recalculation on every pointer event
+        this._canvasRect = this.canvas.getBoundingClientRect();
     }
 
     setRunningState(running) {
@@ -246,23 +257,27 @@ export class SentinelServerMascot {
 
     startLoop() {
         const render = (now) => {
-            this.animationFrameId = requestAnimationFrame(render);
-
             // Skip entirely when off-screen or tab hidden
-            if (!this._isVisible) return;
+            if (!this._isVisible) {
+                this.animationFrameId = requestAnimationFrame(render);
+                return;
+            }
 
             // Adaptive frame rate:
             //   - Active effects (EMP/shock/particles) → 60fps for smooth burst
             //   - Running normally                     → 30fps (imperceptible vs 60fps)
-            //   - Fully asleep (sleepProgress > 0.97)  → 4fps (only slow breathing changes)
+            //   - Fully asleep (sleepProgress > 0.97)  → 4fps via setTimeout (not rAF)
             const hasEffects = this.shockParticles.length > 0 ||
                                this.electricArcs.length > 0 ||
                                this.isShocking;
             const fullyAsleep = !this.isRunning && this.sleepProgress > 0.97;
-            const targetFPS   = hasEffects ? 60 : fullyAsleep ? 4 : 30;
+            const targetFPS   = hasEffects ? 60 : 30;
             const minInterval = 1000 / targetFPS;
 
-            if (now - this._lastRenderTime < minInterval) return;
+            if (!fullyAsleep && now - this._lastRenderTime < minInterval) {
+                this.animationFrameId = requestAnimationFrame(render);
+                return;
+            }
             this._lastRenderTime = now;
 
             const dt = Math.min((now - this.lastFrameTime) / 1000, 0.1);
@@ -270,6 +285,16 @@ export class SentinelServerMascot {
 
             this.update(now, dt);
             this.draw(now);
+
+            if (fullyAsleep) {
+                // Switch from rAF (60-144Hz) to setTimeout (~4fps) to save idle GPU/CPU cycles.
+                // rAF resumes automatically when isRunning becomes true on the next tick.
+                this._sleepTimeoutId = setTimeout(() => {
+                    this.animationFrameId = requestAnimationFrame(render);
+                }, 250);
+            } else {
+                this.animationFrameId = requestAnimationFrame(render);
+            }
         };
         this.animationFrameId = requestAnimationFrame(render);
     }
@@ -277,9 +302,24 @@ export class SentinelServerMascot {
     destroy() {
         if (this.animationFrameId) {
             cancelAnimationFrame(this.animationFrameId);
+            this.animationFrameId = null;
+        }
+        if (this._sleepTimeoutId) {
+            clearTimeout(this._sleepTimeoutId);
+            this._sleepTimeoutId = null;
         }
         if (this._observer) {
             this._observer.disconnect();
+        }
+        // Remove all global listeners — prevents memory leaks on SPA navigation
+        window.removeEventListener("resize", this._onResize);
+        window.removeEventListener("mousemove", this._onMouseMove);
+        window.removeEventListener("mouseleave", this._onMouseLeave);
+        document.removeEventListener('visibilitychange', this._onVisibilityChange);
+        if (this._trackTarget) {
+            this._trackTarget.removeEventListener("mouseenter", this._onContainerEnter);
+            this._trackTarget.removeEventListener("mouseleave", this._onContainerLeave);
+            this._trackTarget.removeEventListener("click", this._onContainerClick);
         }
     }
 
@@ -693,11 +733,12 @@ export class SentinelServerMascot {
 
         if (this.shockParticles.length > 0) {
             ctx.save();
+            // Set shadowBlur once for all particles — avoids per-particle Gaussian raster pass
+            ctx.shadowBlur = 6 * s;
             for (const p of this.shockParticles) {
                 ctx.fillStyle = p.color;
-                ctx.globalAlpha = Math.max(0, p.life);
                 ctx.shadowColor = p.color;
-                ctx.shadowBlur = 6 * s;
+                ctx.globalAlpha = Math.max(0, p.life);
                 ctx.beginPath();
                 ctx.arc(fx(p.x), fy(p.y), p.size * s, 0, Math.PI * 2);
                 ctx.fill();

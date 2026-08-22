@@ -21,6 +21,7 @@
     width: 140px;
     height: 140px;
     display: block;
-    filter: drop-shadow(0 8px 24px rgba(0, 0, 0, 0.45));
+    /* drop-shadow removed: browser was recomputing Gaussian blur on every canvas repaint.
+       Shadow is now on the wrapper — computed once, not tied to canvas frame rate. */
     transform: none !important;
 }
