@@ -191,3 +191,63 @@ def test_real_cores_traffic_accounting_and_dashboard_aggregation(client, monkeyp
 
     assert sum_all_top_down == expected_total_down, f"Sum of top traffic down expected {expected_total_down}, got {sum_all_top_down}"
     assert sum_all_top_up == expected_total_up, f"Sum of top traffic up expected {expected_total_up}, got {sum_all_top_up}"
+
+
+def test_custom_token_uuid_and_bot_search_client_traffic_integration(monkeypatch):
+    """
+    Verifies that clients connecting via custom UUIDs, passwords, or tokens (not matching full email)
+    accumulate traffic correctly in ClientStats and are found by the /api/security/search-client endpoint.
+    """
+    from backend.routes.security_routes.management import search_client
+    import asyncio
+
+    with db_session() as session:
+        ib_hy = Inbound(remark="Hysteria Dynamic IB", port=21010, protocol="hysteria2", core="hysteria", enable=1)
+        session.add(ib_hy)
+        session.commit()
+
+        # Client 1: Registered with email 'test_user_alpha@vpn.internal' and client_uuid_or_pwd 'token_alpha'
+        c1 = ClientStats(inbound_id=ib_hy.id, email="test_user_alpha@vpn.internal", client_uuid_or_pwd="token_alpha", up=0, down=0, enable=1)
+        # Client 2: Registered with email 'token_beta@vpn.internal' and password 'pwd_beta'
+        c2 = ClientStats(inbound_id=ib_hy.id, email="token_beta@vpn.internal", client_uuid_or_pwd="pwd_beta", up=0, down=0, enable=1)
+        session.add_all([c1, c2])
+        session.commit()
+
+    # 1. Simulate Hysteria 2 traffic arriving for tokens 'token_alpha' and 'token_beta'
+    monkeypatch.setattr("backend.hysteria.service.is_hysteria_running", lambda: True)
+    monkeypatch.setattr("backend.sentinel_core_bridge.get_unified_traffic", lambda: {
+        "token_alpha": {"downBytes": 45 * 1024 * 1024, "upBytes": 5 * 1024 * 1024},
+        "token_beta": {"downBytes": 80 * 1024 * 1024, "upBytes": 12 * 1024 * 1024}
+    })
+    query_hysteria_traffic()
+
+    # 2. Verify database records are updated non-zero
+    with db_session() as session:
+        rec1 = session.query(ClientStats).filter_by(client_uuid_or_pwd="token_alpha").first()
+        assert rec1.down == 45 * 1024 * 1024, f"Expected 45MB down, got {rec1.down}"
+        assert rec1.up == 5 * 1024 * 1024, f"Expected 5MB up, got {rec1.up}"
+
+        rec2 = session.query(ClientStats).filter_by(client_uuid_or_pwd="pwd_beta").first()
+        assert rec2.down == 80 * 1024 * 1024, f"Expected 80MB down, got {rec2.down}"
+        assert rec2.up == 12 * 1024 * 1024, f"Expected 12MB up, got {rec2.up}"
+
+    # 3. Simulate Telegram Bot calling GET /api/security/search-client?key=token_alpha
+    req_mock = MagicMock()
+    req_mock.cookies.get.return_value = None
+    monkeypatch.setattr("backend.routes.security_routes.management.check_auth", lambda r: True)
+
+    res_alpha = asyncio.run(search_client(req_mock, key="token_alpha"))
+    assert res_alpha.get("success") is True, f"Search for 'token_alpha' failed: {res_alpha}"
+    assert len(res_alpha.get("clients", [])) > 0
+    client_item = res_alpha["clients"][0]["client"]
+    assert client_item["down"] == 45 * 1024 * 1024
+    assert client_item["up"] == 5 * 1024 * 1024
+
+    # 4. Simulate Telegram Bot calling GET /api/security/search-client?key=token_beta
+    res_beta = asyncio.run(search_client(req_mock, key="token_beta"))
+    assert res_beta.get("success") is True, f"Search for 'token_beta' failed: {res_beta}"
+    assert len(res_beta.get("clients", [])) > 0
+    client_item_2 = res_beta["clients"][0]["client"]
+    assert client_item_2["down"] == 80 * 1024 * 1024
+    assert client_item_2["up"] == 12 * 1024 * 1024
+
