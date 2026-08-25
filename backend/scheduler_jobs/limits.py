@@ -142,6 +142,7 @@ def parse_recent_singbox_ips():
 
         import re
         ip_pattern = re.compile(r"(?:from|client)\s+(?:\[([^\]]+)\]|([0-9a-fA-F.:]+?)(?::\d+)?(?:\s|$))")
+        tz_pattern = re.compile(r"([+-]\d{4})\s+(\d{4}[-/]\d{2}[-/]\d{2}\s+\d{2}:\d{2}:\d{2})")
         time_pattern = re.compile(r"(\d{4}[-/]\d{2}[-/]\d{2}\s+\d{2}:\d{2}:\d{2})")
             
         for line in lines:
@@ -149,14 +150,30 @@ def parse_recent_singbox_ips():
                 continue
 
             log_ts = now_ts
-            time_match = time_pattern.search(line)
-            if time_match:
+            tz_match = tz_pattern.search(line)
+            if tz_match:
                 try:
-                    time_str = time_match.group(1).replace("-", "/")
-                    log_time = datetime.datetime.strptime(time_str[:19], "%Y/%m/%d %H:%M:%S")
-                    log_ts = log_time.timestamp()
+                    tz_str = tz_match.group(1)
+                    time_str = tz_match.group(2).replace("-", "/")
+                    dt = datetime.datetime.strptime(f"{time_str} {tz_str}", "%Y/%m/%d %H:%M:%S %z")
+                    log_ts = dt.timestamp()
                 except Exception:
                     pass
+            else:
+                time_match = time_pattern.search(line)
+                if time_match:
+                    try:
+                        time_str = time_match.group(1).replace("-", "/")
+                        dt_naive = datetime.datetime.strptime(time_str[:19], "%Y/%m/%d %H:%M:%S")
+                        ts_local = dt_naive.timestamp()
+                        ts_utc = dt_naive.replace(tzinfo=datetime.timezone.utc).timestamp()
+                        # Pick whichever timestamp is closest to now_ts
+                        if abs(now_ts - ts_utc) < abs(now_ts - ts_local):
+                            log_ts = ts_utc
+                        else:
+                            log_ts = ts_local
+                    except Exception:
+                        pass
 
             if log_ts < cutoff_ts:
                 continue
