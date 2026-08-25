@@ -211,3 +211,91 @@ def test_hysteria_auth_endpoint_populates_active_ip_cache_for_unlimited_clients(
     onlines = update_online_emails()
     assert email in onlines
 
+
+def test_end_to_end_multiclient_multicore_online_status(tmp_path, monkeypatch):
+    """
+    Creates multiple clients across Sing-box, Xray, and Hysteria 2,
+    simulates real log streams and Clash API connections, and verifies
+    that all clients are accurately marked as online in update_online_emails.
+    """
+    from backend.routes.clients.actions import update_online_emails
+    from backend.scheduler_jobs.limits import parse_recent_singbox_ips, ACTIVE_IP_CACHE
+
+    singbox_clients = ["phone", "laptop_singbox", "tablet_singbox"]
+    xray_clients = ["user_xray_vless", "user_xray_vmess", "user_xray_trojan"]
+    hy2_clients = ["user_hy2_fast", "user_hy2_mobile"]
+
+    with db_session() as session:
+        # Inbound 1: Sing-box VLESS
+        ib_sb = Inbound(remark="Singbox VLESS", port=32001, protocol="vless", core="singbox", enable=1)
+        session.add(ib_sb)
+        session.commit()
+        for u in singbox_clients:
+            session.add(ClientStats(inbound_id=ib_sb.id, email=u, client_uuid_or_pwd=f"pwd_{u}", enable=1))
+
+        # Inbound 2: Xray VMess
+        ib_xr = Inbound(remark="Xray VMess", port=32002, protocol="vmess", core="xray", enable=1)
+        session.add(ib_xr)
+        session.commit()
+        for u in xray_clients:
+            session.add(ClientStats(inbound_id=ib_xr.id, email=u, client_uuid_or_pwd=f"pwd_{u}", enable=1))
+
+        # Inbound 3: Hysteria 2
+        ib_hy = Inbound(remark="Hysteria 2", port=32003, protocol="hysteria2", core="hysteria", enable=1)
+        session.add(ib_hy)
+        session.commit()
+        for u in hy2_clients:
+            session.add(ClientStats(inbound_id=ib_hy.id, email=u, client_uuid_or_pwd=f"pwd_{u}", enable=1))
+        session.commit()
+
+    import datetime
+    now_utc = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+    now_local = datetime.datetime.now().strftime("%Y/%m/%d %H:%M:%S")
+    now_iso = datetime.datetime.now().strftime("%Y-%m-%dT%H:%M:%S.000+0300")
+
+    # 1. Simulate Sing-box log file with timezone offset and bracketed usernames
+    sb_log_file = tmp_path / "singbox.log"
+    sb_log_content = (
+        f"+0000 {now_utc} INFO [1035259714 0ms] inbound/vless[inbound-8]: inbound connection from 192.168.1.50:42944\n"
+        f"+0000 {now_utc} INFO [1035259714 40ms] inbound/vless[inbound-8]: [phone] inbound connection to www.google.com:443\n"
+        f"+0000 {now_utc} INFO [2287405019 40ms] inbound/vless[inbound-8]: [laptop_singbox] inbound connection to www.youtube.com:443\n"
+    )
+    sb_log_file.write_text(sb_log_content, encoding="utf-8")
+    monkeypatch.setattr("backend.config.SINGBOX_LOG_PATH", sb_log_file)
+
+    # 2. Simulate Sing-box Clash API connection for tablet_singbox
+    _process_singbox_connection_data({
+        "connections": [{
+            "id": "sb-tablet-conn-01",
+            "metadata": {"inboundUser": "tablet_singbox", "sourceIP": "192.168.1.77"},
+            "upload": 5000, "download": 15000
+        }]
+    })
+
+    # 3. Simulate Xray connections via log processor
+    process_xray_log_line(f"{now_local} [Info] [201] app/proxyman/inbound: connection from tcp:198.51.100.11:10001 accepted for tcp:google.com:443 email: user_xray_vless")
+    process_xray_log_line(f"{now_local} [Info] [202] app/proxyman/inbound: connection from tcp:198.51.100.12:10002 accepted for tcp:bing.com:443 email: user_xray_vmess")
+    process_xray_log_line(f"{now_local} [Info] [203] app/proxyman/inbound: connection from tcp:198.51.100.13:10003 accepted for tcp:cloudflare.com:443 email: user_xray_trojan")
+
+    # 4. Simulate Hysteria 2 connections via log processor
+    process_hysteria_log_line(f'{now_iso}\tINFO\tclient connected\t{{"id": "user_hy2_fast", "addr": "198.51.100.21:55551"}}')
+    process_hysteria_log_line(f'{now_iso}\tINFO\tclient connected\t{{"id": "user_hy2_mobile", "addr": "198.51.100.22:55552"}}')
+
+    # Execute update_online_emails
+    onlines = update_online_emails()
+
+    # Verify every client on Sing-box is online
+    assert "phone" in onlines, f"Expected 'phone' to be online, got: {onlines}"
+    assert "laptop_singbox" in onlines, f"Expected 'laptop_singbox' to be online, got: {onlines}"
+    assert "tablet_singbox" in onlines, f"Expected 'tablet_singbox' to be online, got: {onlines}"
+
+    # Verify every client on Xray is online
+    assert "user_xray_vless" in onlines, f"Expected 'user_xray_vless' to be online, got: {onlines}"
+    assert "user_xray_vmess" in onlines, f"Expected 'user_xray_vmess' to be online, got: {onlines}"
+    assert "user_xray_trojan" in onlines, f"Expected 'user_xray_trojan' to be online, got: {onlines}"
+
+    # Verify every client on Hysteria 2 is online
+    assert "user_hy2_fast" in onlines, f"Expected 'user_hy2_fast' to be online, got: {onlines}"
+    assert "user_hy2_mobile" in onlines, f"Expected 'user_hy2_mobile' to be online, got: {onlines}"
+
+

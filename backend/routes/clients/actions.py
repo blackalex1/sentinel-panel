@@ -33,9 +33,39 @@ def update_online_emails():
     except Exception as e:
         logging.error(f"Error querying unified traffic from sentinel-core: {e}")
 
-    # 2. Add active IP cache if available (with timestamp check)
+    # 2. Query Sing-box Clash API directly (127.0.0.1:9090/connections)
     try:
-        from backend.scheduler_jobs.limits import ACTIVE_IP_CACHE
+        import urllib.request
+        req = urllib.request.Request("http://127.0.0.1:9090/connections", headers={"User-Agent": "SentinelPanel"})
+        with urllib.request.urlopen(req, timeout=0.8) as response:
+            if response.status == 200:
+                raw_data = response.read().decode("utf-8", errors="ignore")
+                data = json.loads(raw_data)
+                for conn in data.get("connections", []):
+                    meta = conn.get("metadata", {})
+                    user = (
+                        meta.get("user") or meta.get("username") or meta.get("client") or
+                        meta.get("name") or meta.get("email") or meta.get("clientUser") or
+                        meta.get("inboundUser") or meta.get("auth_user") or conn.get("user") or ""
+                    )
+                    if user:
+                        emails.append(user)
+                        src_ip = meta.get("sourceIP") or meta.get("source_ip") or "127.0.0.1"
+                        try:
+                            from backend.scheduler_jobs.limits import ACTIVE_IP_CACHE
+                            if user not in ACTIVE_IP_CACHE:
+                                ACTIVE_IP_CACHE[user] = {}
+                            ACTIVE_IP_CACHE[user][src_ip] = now_ts
+                        except Exception:
+                            pass
+    except Exception:
+        pass
+
+    # 3. Trigger log parsers to ensure ACTIVE_IP_CACHE is freshly populated
+    try:
+        from backend.scheduler_jobs.limits import parse_recent_singbox_ips, parse_recent_hysteria_ips, ACTIVE_IP_CACHE
+        parse_recent_singbox_ips()
+        parse_recent_hysteria_ips()
         if ACTIVE_IP_CACHE:
             for email, ip_map in list(ACTIVE_IP_CACHE.items()):
                 if isinstance(ip_map, dict):
@@ -46,7 +76,7 @@ def update_online_emails():
     except Exception:
         pass
 
-    # 3. Add active Xray sessions if available
+    # 4. Add active Xray sessions if available
     try:
         from backend.client_alerts import active_xray_sessions
         if active_xray_sessions:
