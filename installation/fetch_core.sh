@@ -111,17 +111,26 @@ if [ -t 0 ] && [ "$AUTO_MODE" -eq 0 ]; then
     echo "🟡 Пре-релиз / Бета (Pre-release): ${PRERELEASE_VER:-Отсутствует}"
     echo "===================================================="
 
-    DEFAULT_CHOICE="1"
-    [ "$IS_INSTALLED" -eq 1 ] && DEFAULT_CHOICE="3"
+    CURRENT_VER_TAG=$(echo "$CURRENT_VER" | grep -o -E 'v[0-9]+\.[0-9]+(\.[0-9]+)*(-[a-zA-Z0-9.]+)?' | head -n 1)
+
+    # Smart default: If current version is already the latest stable, default is Skip (3).
+    # If current version is older, a beta, or missing, default is Update to Stable (1).
+    if [ "$IS_INSTALLED" -eq 1 ] && [ -n "$STABLE_VER" ] && [ "$CURRENT_VER_TAG" = "$STABLE_VER" ]; then
+        DEFAULT_CHOICE="3"
+    else
+        DEFAULT_CHOICE="1"
+    fi
 
     if [ -n "$PRERELEASE_VER" ] && [ -n "$STABLE_VER" ]; then
         echo "Варианты установки:"
-        echo "  1) 🟢 Установить стабильную версию ($STABLE_VER)"
-        echo "  2) 🟡 Установить пре-релиз / бету ($PRERELEASE_VER) [Экспериментальная]"
-        if [ "$IS_INSTALLED" -eq 1 ]; then
-            echo "  3) ⏹️  Оставить текущую версию (пропустить обновление ядра) [По умолчанию]"
+        if [ "$DEFAULT_CHOICE" = "1" ]; then
+            echo "  1) 🟢 Установить стабильную версию ($STABLE_VER) [Рекомендуется / По умолчанию]"
+            echo "  2) 🟡 Установить пре-релиз / бету ($PRERELEASE_VER) [Экспериментальная]"
+            echo "  3) ⏹️  Оставить текущую версию (пропустить обновление ядра)"
         else
-            echo "  3) ⏹️  Пропустить установку ядра"
+            echo "  1) 🟢 Установить стабильную версию ($STABLE_VER)"
+            echo "  2) 🟡 Установить пре-релиз / бету ($PRERELEASE_VER) [Экспериментальная]"
+            echo "  3) ⏹️  Оставить текущую версию (пропустить обновление ядра) [По умолчанию]"
         fi
         echo "  4) ✏️  Ввести тег/версию вручную"
         read -t 15 -p "Выберите вариант [1-4] (по умолчанию $DEFAULT_CHOICE): " USER_CHOICE || USER_CHOICE="$DEFAULT_CHOICE"
@@ -132,7 +141,7 @@ if [ -t 0 ] && [ "$AUTO_MODE" -eq 0 ]; then
             2) SELECTED_TAG="$PRERELEASE_VER" ;;
             3) echo "[+] Обновление ядра пропущено (оставлена текущая версия)."; exit 0 ;;
             4) read -p "Введите тег релиза (например $PRERELEASE_VER): " SELECTED_TAG ;;
-            *) echo "[+] Обновление ядра пропущено (оставлена текущая версия)."; exit 0 ;;
+            *) [ "$DEFAULT_CHOICE" = "3" ] && { echo "[+] Обновление ядра пропущено (оставлена текущая версия)."; exit 0; } || SELECTED_TAG="$STABLE_VER" ;;
         esac
     elif [ -n "$PRERELEASE_VER" ]; then
         echo "⚠️  Внимание: Стабильный релиз пока отсутствует (проект на стадии беты/пре-релиза)."
