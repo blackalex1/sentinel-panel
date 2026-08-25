@@ -76,6 +76,47 @@ async def poll_xray_stats_loop():
             from backend.routes.clients import update_online_emails
             await asyncio.to_thread(update_online_emails)
             
+            # Sync connection/disconnection events from native Go sentinel-core SessionTracker to AuditLog
+            try:
+                from backend.sentinel_core_bridge import get_recent_session_events
+                from backend.audit import log_action
+                from backend.client_alerts import get_singbox_user_traffic, get_xray_user_traffic
+                import json
+
+                events = get_recent_session_events(int(time.time()) - 15, limit=50)
+                if events and isinstance(events, list):
+                    for ev in events:
+                        action_type = ev.get("action")
+                        core_name = str(ev.get("core", "singbox")).replace("-", "")
+                        action = f"{core_name}_{action_type}"
+                        email = ev.get("email")
+                        ip = ev.get("ip")
+                        if email and ip:
+                            # Avoid duplicate logging if already recorded recently
+                            from backend.database import db_session
+                            from backend.models import AuditLog
+                            is_dup = False
+                            with db_session() as a_sess:
+                                dup_count = a_sess.query(AuditLog).filter(
+                                    AuditLog.action == action,
+                                    AuditLog.target == ip,
+                                    AuditLog.timestamp >= int(time.time()) - 10
+                                ).count()
+                                is_dup = dup_count > 0
+                            if not is_dup:
+                                tx, rx = get_singbox_user_traffic(email) if "sing" in core_name else get_xray_user_traffic(email)
+                                details_dict = {"username": email, "tx": tx, "rx": rx}
+                                if action_type == "disconnect":
+                                    details_dict["duration"] = ev.get("duration", "несколько секунд")
+                                log_action(
+                                    username="system",
+                                    action=action,
+                                    target=ip,
+                                    details=json.dumps(details_dict)
+                                )
+            except Exception as e:
+                logging.debug(f"Error syncing core session events: {e}")
+
             # Update active Telegram cards traffic on the panel
             try:
                 from backend.telegram_alerts import update_panel_active_cards_traffic
