@@ -123,10 +123,12 @@ async def hysteria_client_auth(request: Request, payload: dict, secret: str = No
 
                 ip_map[client_ip] = now_ts
 
-                # Проверка лимита IP-адресов
-                if client.limit_ip > 0 and len(ip_map) > client.limit_ip:
-                    logging.warning(f"Hysteria 2 connection rejected for {email}: IP limit exceeded ({len(ip_map)} > {client.limit_ip})")
-                    return {"ok": False}
+                # Register connection in Go sentinel-core session tracker
+                try:
+                    from backend.sentinel_core_bridge import register_external_connect
+                    register_external_connect("hysteria2", email, client_ip)
+                except Exception:
+                    pass
 
             return {"ok": True, "id": email}
 

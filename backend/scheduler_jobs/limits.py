@@ -144,6 +144,7 @@ def parse_recent_singbox_ips():
         ip_pattern = re.compile(r"(?:from|client)\s+(?:\[([^\]]+)\]|([0-9a-fA-F.:]+?)(?::\d+)?(?:\s|$))")
         tz_pattern = re.compile(r"([+-]\d{4})\s+(\d{4}[-/]\d{2}[-/]\d{2}\s+\d{2}:\d{2}:\d{2})")
         time_pattern = re.compile(r"(\d{4}[-/]\d{2}[-/]\d{2}\s+\d{2}:\d{2}:\d{2})")
+        conn_ip_map = {}
             
         for line in lines:
             if not line.strip():
@@ -167,7 +168,6 @@ def parse_recent_singbox_ips():
                         dt_naive = datetime.datetime.strptime(time_str[:19], "%Y/%m/%d %H:%M:%S")
                         ts_local = dt_naive.timestamp()
                         ts_utc = dt_naive.replace(tzinfo=datetime.timezone.utc).timestamp()
-                        # Pick whichever timestamp is closest to now_ts
                         if abs(now_ts - ts_utc) < abs(now_ts - ts_local):
                             log_ts = ts_utc
                         else:
@@ -178,6 +178,24 @@ def parse_recent_singbox_ips():
             if log_ts < cutoff_ts:
                 continue
 
+            conn_id = None
+            conn_id_match = re.search(r"\[(\d+)\s+\d+m?s\]", line)
+            if conn_id_match:
+                conn_id = conn_id_match.group(1)
+
+            # 1. Capture source IP from "inbound connection from <ip>"
+            if "inbound connection from" in line or "from " in line:
+                match = ip_pattern.search(line)
+                if match:
+                    src_ip = match.group(1) or match.group(2) or ""
+                    if ":" in src_ip and not src_ip.startswith("["):
+                        parts_ip = src_ip.split(":")
+                        if len(parts_ip) == 2:
+                            src_ip = parts_ip[0]
+                    if src_ip and conn_id:
+                        conn_ip_map[conn_id] = (src_ip, log_ts)
+
+            # 2. Capture email
             found_email = None
             for token in line.split():
                 clean_token = token.strip("[]():,\"'")
@@ -185,23 +203,11 @@ def parse_recent_singbox_ips():
                     found_email = clean_token
                     break
 
-            if found_email is None:
-                continue
-
-            match = ip_pattern.search(line)
-            if match:
-                ip = match.group(1) or match.group(2) or "127.0.0.1"
-                if ":" in ip and not ip.startswith("["):
-                    # Strip port if present in IPv4
-                    parts_ip = ip.split(":")
-                    if len(parts_ip) == 2:
-                        ip = parts_ip[0]
-            else:
-                ip = "127.0.0.1"
-
-            if found_email not in ACTIVE_IP_CACHE:
-                ACTIVE_IP_CACHE[found_email] = {}
-            ACTIVE_IP_CACHE[found_email][ip] = log_ts
+            if found_email is not None:
+                ip = conn_ip_map.get(conn_id, ("127.0.0.1", log_ts))[0] if conn_id else "127.0.0.1"
+                if found_email not in ACTIVE_IP_CACHE:
+                    ACTIVE_IP_CACHE[found_email] = {}
+                ACTIVE_IP_CACHE[found_email][ip] = log_ts
             
     except Exception as e:
         logging.error(f"[Scheduler] Error parsing Sing-box logs: {e}")

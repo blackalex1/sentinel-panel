@@ -49,29 +49,50 @@ def process_singbox_connection_event(username: str, client_ip: str):
     else:
         active_singbox_sessions[key]['last_seen_at'] = now
 
+_singbox_conn_ips = {}
+
 def process_singbox_log_line(line: str):
-    """Parses Singbox accepted log lines to track new connections."""
-    if "accepted" not in line:
+    """
+    Parses Singbox log lines to track new connections.
+    Line 1: inbound connection from 178.178.248.163:23662
+    Line 2: [phone] inbound connection to 149.154.167.50:443
+    """
+    if "inbound connection" not in line and "accepted" not in line:
         return
         
     try:
-        email = None
-        if "email: " in line:
-            email_part = line.split("email: ")
-            if len(email_part) >= 2:
-                email = email_part[1].strip()
-        
-        match = re.search(r"(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}):\d+\s+accepted", line)
-        if not match:
-            match = re.search(r"from\s+\[([^\]]+)\]", line)
-        if not match:
-            match = re.search(r"from\s+(?:tcp:|udp:)?([^:\s]+)", line)
-        if not match:
-            return
-            
-        client_ip = match.group(1)
-        if email:
-            process_singbox_connection_event(email, client_ip)
+        conn_id = None
+        conn_id_match = re.search(r"\[(\d+)\s+\d+m?s\]", line)
+        if conn_id_match:
+            conn_id = conn_id_match.group(1)
+
+        # 1. Line with source IP: "inbound connection from <ip>:<port>"
+        if "inbound connection from" in line or " accepted " in line:
+            from_match = re.search(r"from\s+(?:tcp:|udp:)?\[?([0-9a-fA-F.:]+)\]?(?::\d+)?", line)
+            if from_match:
+                raw_ip = from_match.group(1)
+                src_ip = parse_ip_from_addr(raw_ip)
+                if src_ip:
+                    if conn_id:
+                        _singbox_conn_ips[conn_id] = src_ip
+                        if len(_singbox_conn_ips) > 500:
+                            for old_k in list(_singbox_conn_ips.keys())[:100]:
+                                del _singbox_conn_ips[old_k]
+
+                    user_match = re.search(r"\[([a-zA-Z0-9_\-@.]+)\]\s+inbound connection", line)
+                    if user_match:
+                        email = user_match.group(1)
+                        if email not in ("INFO", "ERROR", "WARN", "DEBUG"):
+                            process_singbox_connection_event(email, src_ip)
+
+        # 2. Line with user & destination: "[phone] inbound connection to"
+        user_match = re.search(r"\[([a-zA-Z0-9_\-@.]+)\]\s+inbound connection to", line)
+        if user_match:
+            email = user_match.group(1)
+            if email not in ("INFO", "ERROR", "WARN", "DEBUG"):
+                src_ip = _singbox_conn_ips.get(conn_id) if conn_id else None
+                if src_ip and email:
+                    process_singbox_connection_event(email, src_ip)
     except Exception as e:
         logging.error(f"[Singbox Alert Tracker] Error parsing log line: {e}")
 

@@ -22,16 +22,33 @@ def update_online_emails():
     now_ts = time.time()
     cutoff_ts = now_ts - 180  # 3 minutes window
     
-    # 1. Primary: query unified traffic from sentinel-core supervisor
+    # 1. Primary: query online emails and active sessions directly from sentinel-core Go session tracker
     try:
-        from backend.sentinel_core_bridge import get_unified_traffic
+        from backend.sentinel_core_bridge import get_online_emails_core, get_active_sessions, get_unified_traffic
+        core_emails = get_online_emails_core()
+        if core_emails:
+            emails.extend(core_emails)
+
+        core_sessions = get_active_sessions()
+        if core_sessions and isinstance(core_sessions, list):
+            from backend.scheduler_jobs.limits import ACTIVE_IP_CACHE
+            for s in core_sessions:
+                s_email = s.get("email")
+                s_ip = s.get("ip")
+                if s_email:
+                    emails.append(s_email)
+                    if s_ip:
+                        if s_email not in ACTIVE_IP_CACHE:
+                            ACTIVE_IP_CACHE[s_email] = {}
+                        ACTIVE_IP_CACHE[s_email][s_ip] = s.get("last_seen_at", now_ts)
+
         traffic_data = get_unified_traffic()
         if traffic_data and isinstance(traffic_data, dict):
             for email, stats in traffic_data.items():
                 if isinstance(stats, dict) and (stats.get("online") or stats.get("connections", 0) > 0):
                     emails.append(email)
     except Exception as e:
-        logging.error(f"Error querying unified traffic from sentinel-core: {e}")
+        logging.debug(f"Querying native sessions from sentinel-core: {e}")
 
     # 2. Query Sing-box Clash API directly (127.0.0.1:9090/connections)
     try:
