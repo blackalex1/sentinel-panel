@@ -54,9 +54,16 @@ async def search_client(request: Request, key: str = Query("")):
         if not key or not key.strip():
             clients = session.query(ClientStats).all()
         else:
+            k = key.strip()
+            # 1. Exact match
             clients = session.query(ClientStats).filter(
-                (ClientStats.email == key) | (ClientStats.client_uuid_or_pwd == key)
+                (ClientStats.email == k) | (ClientStats.client_uuid_or_pwd == k)
             ).all()
+            # 2. Case-insensitive / partial match if exact didn't find any
+            if not clients:
+                clients = session.query(ClientStats).filter(
+                    (ClientStats.email.ilike(f"%{k}%")) | (ClientStats.client_uuid_or_pwd.ilike(f"%{k}%"))
+                ).all()
         
         for c in clients:
             ib = session.query(Inbound).filter_by(id=c.inbound_id).first()
