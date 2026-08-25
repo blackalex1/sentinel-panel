@@ -945,3 +945,45 @@ def get_core_version(core_name: str, bin_path: str) -> str:
         _CORE_VERSION_CACHE[cache_key] = version
         return version
     return "Unknown"
+
+
+def get_active_sessions() -> List[Dict[str, Any]]:
+    """Returns active client sessions tracked natively in Go sentinel-core."""
+    try:
+        res = _ffi_call_json("SentinelGetActiveSessions")
+        if isinstance(res, list):
+            return res
+    except Exception:
+        pass
+    return []
+
+
+def get_online_emails_core() -> List[str]:
+    """Returns active online client emails tracked natively in Go sentinel-core."""
+    try:
+        res = _ffi_call_json("SentinelGetOnlineEmails")
+        if isinstance(res, list):
+            return [str(x) for x in res if x]
+    except Exception:
+        pass
+    return []
+
+
+def get_recent_session_events(since_ts: int = 0, limit: int = 100) -> List[Dict[str, Any]]:
+    """Returns recent connect/disconnect events tracked natively in Go sentinel-core."""
+    try:
+        res = _ffi_call_json("SentinelGetRecentSessionEvents", since_ts, limit)
+        if isinstance(res, list):
+            return res
+    except Exception:
+        pass
+    return []
+
+
+def register_external_connect(core: str, email: str, ip: str) -> None:
+    """Registers an external connection (e.g. Hysteria HTTP Auth) in Go core session tracker."""
+    try:
+        _ffi_call_str("SentinelRegisterExternalConnect", core, email, ip)
+    except Exception:
+        pass
+

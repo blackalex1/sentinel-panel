@@ -118,6 +118,12 @@ def _core_log_worker(core: CoreName):
                         process_hysteria_log_line(line)
                     except Exception:
                         pass
+                elif core in ("singbox", "sing-box"):
+                    try:
+                        from backend.client_alerts import process_singbox_log_line
+                        process_singbox_log_line(line)
+                    except Exception:
+                        pass
 
             if had_activity:
                 time.sleep(0.005)
