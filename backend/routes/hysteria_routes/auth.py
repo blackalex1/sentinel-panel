@@ -121,6 +121,13 @@ async def hysteria_client_auth(request: Request, payload: dict, secret: str = No
                     if ip_map[ip] < cutoff_ts:
                         del ip_map[ip]
 
+                # Проверка лимита одновременных IP
+                if client.limit_ip > 0:
+                    current_active_ips = [ip for ip, ts in ip_map.items() if ts >= cutoff_ts and ip != client_ip]
+                    if len(current_active_ips) >= client.limit_ip:
+                        logging.warning(f"Hysteria 2 connection rejected for {email}: IP limit exceeded ({len(current_active_ips)} >= {client.limit_ip})")
+                        return {"ok": False}
+
                 ip_map[client_ip] = now_ts
 
                 # Register connection in Go sentinel-core session tracker
