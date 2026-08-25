@@ -79,13 +79,14 @@ async def poll_xray_stats_loop():
             
             # Sync connection/disconnection events from native Go sentinel-core SessionTracker to AuditLog
             try:
-                from backend.sentinel_core_bridge import get_recent_session_events
+                from backend.sentinel_core_bridge import get_recent_session_events, get_active_sessions
                 from backend.audit import log_action
                 from backend.client_alerts import get_singbox_user_traffic, get_xray_user_traffic
                 import json
 
                 events = get_recent_session_events(last_session_sync_ts, limit=100)
                 if events and isinstance(events, list):
+                    logging.info(f"[SessionTracker Sync] Polled {len(events)} new events (since={last_session_sync_ts}): {events}")
                     for ev in events:
                         ev_ts = ev.get("timestamp", 0)
                         if ev_ts > last_session_sync_ts:
@@ -112,14 +113,17 @@ async def poll_xray_stats_loop():
                                 details_dict = {"username": email, "tx": tx, "rx": rx}
                                 if action_type == "disconnect":
                                     details_dict["duration"] = ev.get("duration", "несколько секунд")
+                                logging.info(f"[SessionTracker Sync] Recording AuditLog: action={action}, target={ip}, user={email}")
                                 log_action(
                                     username="system",
                                     action=action,
                                     target=ip,
                                     details=json.dumps(details_dict)
                                 )
+                elif events is None:
+                    logging.warning(f"[SessionTracker Sync] get_recent_session_events returned None!")
             except Exception as e:
-                logging.debug(f"Error syncing core session events: {e}")
+                logging.error(f"[SessionTracker Sync] Error syncing core session events: {e}", exc_info=True)
 
             # Update active Telegram cards traffic on the panel
             try:
