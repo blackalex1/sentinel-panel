@@ -64,7 +64,13 @@ async def search_client(request: Request, key: str = Query("")):
                 clients = session.query(ClientStats).filter(
                     (ClientStats.email.ilike(f"%{k}%")) | (ClientStats.client_uuid_or_pwd.ilike(f"%{k}%"))
                 ).all()
-            # 3. Token prefix matching (e.g. 'my_double' when key is 'my_double_v2' or email format)
+            # 3. Match Inbound remark (e.g. if key is inbound remark 'my_double' or 'double_v2')
+            if not clients:
+                matching_ibs = session.query(Inbound).filter(Inbound.remark.ilike(f"%{k}%")).all()
+                if matching_ibs:
+                    ib_ids = [ib.id for ib in matching_ibs]
+                    clients = session.query(ClientStats).filter(ClientStats.inbound_id.in_(ib_ids)).all()
+            # 4. Token prefix matching (e.g. 'my_double' when key is 'my_double_v2' or email format)
             if not clients and any(sep in k for sep in ("_", "-", "@", ".")):
                 import re
                 tokens = [t for t in re.split(r"[_@\-\.]", k) if len(t) >= 3]
@@ -75,6 +81,13 @@ async def search_client(request: Request, key: str = Query("")):
                     if tok_clients:
                         clients = tok_clients
                         break
+                    tok_ibs = session.query(Inbound).filter(Inbound.remark.ilike(f"%{tok}%")).all()
+                    if tok_ibs:
+                        ib_ids = [ib.id for ib in tok_ibs]
+                        tok_ib_clients = session.query(ClientStats).filter(ClientStats.inbound_id.in_(ib_ids)).all()
+                        if tok_ib_clients:
+                            clients = tok_ib_clients
+                            break
         
         for c in clients:
             ib = session.query(Inbound).filter_by(id=c.inbound_id).first()
