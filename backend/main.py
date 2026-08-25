@@ -66,6 +66,7 @@ async def poll_xray_stats_loop():
         logging.error(f"Error in initial stats polling: {e}")
         
     last_releases_refresh = time.time()
+    last_session_sync_ts = int(time.time()) - 300
     while True:
         try:
             await asyncio.sleep(5)
@@ -83,9 +84,12 @@ async def poll_xray_stats_loop():
                 from backend.client_alerts import get_singbox_user_traffic, get_xray_user_traffic
                 import json
 
-                events = get_recent_session_events(int(time.time()) - 15, limit=50)
+                events = get_recent_session_events(last_session_sync_ts, limit=100)
                 if events and isinstance(events, list):
                     for ev in events:
+                        ev_ts = ev.get("timestamp", 0)
+                        if ev_ts > last_session_sync_ts:
+                            last_session_sync_ts = ev_ts
                         action_type = ev.get("action")
                         core_name = str(ev.get("core", "singbox")).replace("-", "")
                         action = f"{core_name}_{action_type}"
