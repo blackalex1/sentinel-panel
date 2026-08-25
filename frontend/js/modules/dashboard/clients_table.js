@@ -73,9 +73,19 @@ export function filterAndRenderClients() {
     const showOnlyOnline = onlineFilter ? onlineFilter.checked : false;
     const showOnlyBlocked = blockedFilter ? blockedFilter.checked : false;
 
+    const onlinesLower = (lastOnlines || []).map(o => String(o).toLowerCase());
+    const checkIsOnline = (c) => {
+        const email = String(c.email || "");
+        const rawId = c.rawClient ? String(c.rawClient.id || "") : "";
+        return lastOnlines.includes(email) ||
+               (rawId && lastOnlines.includes(rawId)) ||
+               onlinesLower.includes(email.toLowerCase()) ||
+               (rawId && onlinesLower.includes(rawId.toLowerCase()));
+    };
+
     // Filter
     const filtered = dashboardClients.filter(c => {
-        const isOnline = lastOnlines.includes(c.email);
+        const isOnline = checkIsOnline(c);
         const matchesSearch = c.email.toLowerCase().includes(searchQuery) || 
                               c.inboundRemark.toLowerCase().includes(searchQuery) ||
                               c.inboundProtocol.toLowerCase().includes(searchQuery);
@@ -94,7 +104,7 @@ export function filterAndRenderClients() {
             case "status": {
                 const getStatusWeight = (item) => {
                     if (!item.enable) return 0;
-                    return lastOnlines.includes(item.email) ? 2 : 1;
+                    return checkIsOnline(item) ? 2 : 1;
                 };
                 res = getStatusWeight(itemA) - getStatusWeight(itemB);
                 break;

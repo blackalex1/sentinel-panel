@@ -197,7 +197,8 @@ export async function openClientsModal(inboundId) {
     
     // Query online clients
     const onlinesRes = await apiFetch("/panel/api/clients/onlines", { method: "POST" });
-    const onlines = onlinesRes ? onlinesRes.obj : [];
+    const onlines = (onlinesRes ? onlinesRes.obj : []) || [];
+    const onlinesLower = onlines.map(o => String(o).toLowerCase());
     
     // Parse settings and clients stats
     const settings = JSON.parse(ib.settings);
@@ -205,7 +206,10 @@ export async function openClientsModal(inboundId) {
     
     currentModalClientsData = clients.map(c => {
         const stats = ib.clientStats.find(s => s.email === c.email) || { up: 0, down: 0, total: 0, enable: true, limitIp: 0, blockReason: "" };
-        const isOnline = onlines.includes(c.email);
+        const isOnline = onlines.includes(c.email) ||
+                         (c.id && onlines.includes(c.id)) ||
+                         onlinesLower.includes(String(c.email).toLowerCase()) ||
+                         (c.id && onlinesLower.includes(String(c.id).toLowerCase()));
         c.allowedIps = c.allowedIps || c.allowed_ips || stats.allowedIps || stats.allowed_ips || "";
         return { c, stats, isOnline };
     });

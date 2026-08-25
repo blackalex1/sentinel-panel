@@ -86,13 +86,32 @@ def update_online_emails():
     except Exception:
         pass
 
-    # Keep only emails of clients that are enabled in the database
+    # Map collected tokens/UUIDs/emails to actual enabled ClientStats.email
     try:
         from backend.database import db_session
         from backend.models import ClientStats
         with db_session() as session:
-            enabled_emails = {c.email for c in session.query(ClientStats).filter_by(enable=1).all()}
-        _online_emails = list(set(emails) & enabled_emails)
+            clients_all = session.query(ClientStats).filter_by(enable=1).all()
+            enabled_emails = {c.email for c in clients_all}
+            uuid_to_email = {c.client_uuid_or_pwd: c.email for c in clients_all if c.client_uuid_or_pwd}
+
+        matched_emails = set()
+        for em in emails:
+            clean_em = str(em).strip("[]():,\"'")
+            if clean_em in enabled_emails:
+                matched_emails.add(clean_em)
+            elif clean_em in uuid_to_email:
+                matched_emails.add(uuid_to_email[clean_em])
+            else:
+                # Case-insensitive / prefix matching
+                for c in clients_all:
+                    if c.email.lower() == clean_em.lower() or (c.client_uuid_or_pwd and c.client_uuid_or_pwd.lower() == clean_em.lower()):
+                        matched_emails.add(c.email)
+                        break
+                    elif c.email.lower().startswith(f"{clean_em.lower()}@") or clean_em.lower().startswith(f"{c.email.lower()}@"):
+                        matched_emails.add(c.email)
+                        break
+        _online_emails = list(matched_emails)
     except Exception as e:
         logging.error(f"Error filtering online emails by enabled status: {e}")
         _online_emails = list(set(emails))
