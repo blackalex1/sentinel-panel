@@ -64,6 +64,17 @@ async def search_client(request: Request, key: str = Query("")):
                 clients = session.query(ClientStats).filter(
                     (ClientStats.email.ilike(f"%{k}%")) | (ClientStats.client_uuid_or_pwd.ilike(f"%{k}%"))
                 ).all()
+            # 3. Token prefix matching (e.g. 'my_double' when key is 'my_double_v2' or email format)
+            if not clients and any(sep in k for sep in ("_", "-", "@", ".")):
+                import re
+                tokens = [t for t in re.split(r"[_@\-\.]", k) if len(t) >= 3]
+                for tok in tokens:
+                    tok_clients = session.query(ClientStats).filter(
+                        (ClientStats.email.ilike(f"%{tok}%")) | (ClientStats.client_uuid_or_pwd.ilike(f"%{tok}%"))
+                    ).all()
+                    if tok_clients:
+                        clients = tok_clients
+                        break
         
         for c in clients:
             ib = session.query(Inbound).filter_by(id=c.inbound_id).first()
