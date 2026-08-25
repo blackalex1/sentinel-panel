@@ -141,18 +141,18 @@ def parse_recent_singbox_ips():
             lines = read_last_lines(SINGBOX_LOG_PATH, 1000)
 
         import re
-        # Pre-compile patterns once (not inside the loop)
-        ip_pattern = re.compile(r"(?:from|client)\s+(?:\[([^\]]+)\]|([0-9]+\.[0-9]+\.[0-9]+\.[0-9]+))")
+        ip_pattern = re.compile(r"(?:from|client)\s+(?:\[([^\]]+)\]|([0-9a-fA-F.:]+?)(?::\d+)?(?:\s|$))")
+        time_pattern = re.compile(r"(\d{4}[-/]\d{2}[-/]\d{2}\s+\d{2}:\d{2}:\d{2})")
             
         for line in lines:
             if not line.strip():
                 continue
 
             log_ts = now_ts
-            parts = line.strip().split()
-            if len(parts) >= 2:
+            time_match = time_pattern.search(line)
+            if time_match:
                 try:
-                    time_str = parts[0].replace("-", "/") + " " + parts[1]
+                    time_str = time_match.group(1).replace("-", "/")
                     log_time = datetime.datetime.strptime(time_str[:19], "%Y/%m/%d %H:%M:%S")
                     log_ts = log_time.timestamp()
                 except Exception:
@@ -161,12 +161,11 @@ def parse_recent_singbox_ips():
             if log_ts < cutoff_ts:
                 continue
 
-            # Find email directly in line — O(1) set lookup per found token
-            # instead of checking every client email against every line (O(n×m))
             found_email = None
             for token in line.split():
-                if token in client_emails:
-                    found_email = token
+                clean_token = token.strip("[]():,\"'")
+                if clean_token in client_emails:
+                    found_email = clean_token
                     break
 
             if found_email is None:
@@ -174,7 +173,12 @@ def parse_recent_singbox_ips():
 
             match = ip_pattern.search(line)
             if match:
-                ip = match.group(1) or match.group(2)
+                ip = match.group(1) or match.group(2) or "127.0.0.1"
+                if ":" in ip and not ip.startswith("["):
+                    # Strip port if present in IPv4
+                    parts_ip = ip.split(":")
+                    if len(parts_ip) == 2:
+                        ip = parts_ip[0]
             else:
                 ip = "127.0.0.1"
 
