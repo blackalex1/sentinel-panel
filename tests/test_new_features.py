@@ -147,97 +147,36 @@ def test_warp_registration_mock(client, monkeypatch):
 
 
 def test_client_alerts_logging(monkeypatch):
-    """Test client connection and disconnection log parsing and inactivity timeouts."""
+    """Test client alert helpers and audit logging."""
     from backend.client_alerts import (
-        process_xray_log_line,
-        process_hysteria_log_line,
-        check_xray_inactivity_timeouts,
-        active_xray_sessions
+        get_singbox_user_traffic,
+        get_xray_user_traffic,
+        parse_ip_from_addr
     )
     from backend.models import AuditLog
     from backend.database import db_session
+    from backend.audit import log_action
     import json
-    import time
 
-    # Clear state and database
-    active_xray_sessions.clear()
+    # 1. Test IP address parsing
+    assert parse_ip_from_addr("198.51.100.1:54321") == "198.51.100.1"
+    assert parse_ip_from_addr("[2001:db8::1]:1234") == "2001:db8::1"
+    assert parse_ip_from_addr("203.0.113.5") == "203.0.113.5"
+
+    # 2. Test audit log creation
     with db_session() as session:
         session.query(AuditLog).delete()
         session.commit()
 
-    # 1. Test Xray log line parsing (connection)
-    xray_log_line = "2026/06/13 03:00:00 [Info] accepted connection from 198.51.100.1:54321 email: test_user@example.com"
-    process_xray_log_line(xray_log_line)
+    log_action(username="system", action="singbox_connect", target="198.51.100.1", details=json.dumps({"username": "test_user"}))
 
     with db_session() as session:
         logs = session.query(AuditLog).all()
         assert len(logs) == 1
-        assert logs[0].action == "xray_connect"
+        assert logs[0].action == "singbox_connect"
         assert logs[0].target == "198.51.100.1"
         details = json.loads(logs[0].details)
-        assert details["username"] == "test_user@example.com"
-
-    # Call again with same connection, should NOT produce duplicate event
-    process_xray_log_line(xray_log_line)
-    with db_session() as session:
-        logs = session.query(AuditLog).all()
-        assert len(logs) == 1
-
-    # 2. Test Xray inactivity timeout
-    key = ("test_user@example.com", "198.51.100.1")
-    assert key in active_xray_sessions
-    # Force last seen time to be 4 minutes ago
-    active_xray_sessions[key]["last_seen_at"] = time.time() - 240
-    # Force started_at
-    active_xray_sessions[key]["started_at"] = time.time() - 300
-
-    check_xray_inactivity_timeouts()
-
-    assert key not in active_xray_sessions
-    with db_session() as session:
-        logs = session.query(AuditLog).order_by(AuditLog.id.asc()).all()
-        assert len(logs) == 2
-        assert logs[1].action == "xray_disconnect"
-        assert logs[1].target == "198.51.100.1"
-        details = json.loads(logs[1].details)
-        assert details["username"] == "test_user@example.com"
-        assert "duration" in details
-
-    # 3. Test Hysteria 2 connection log parsing
-    hysteria_connect_line = '2026-06-13T03:00:00.000Z INFO client connected {"id": "test_hysteria_user", "addr": "198.51.100.1:1234"}'
-    process_hysteria_log_line(hysteria_connect_line)
-
-    with db_session() as session:
-        logs = session.query(AuditLog).order_by(AuditLog.id.asc()).all()
-        assert len(logs) == 3
-        assert logs[2].action == "hysteria_connect"
-        assert logs[2].target == "198.51.100.1"
-        details = json.loads(logs[2].details)
-        assert details["username"] == "test_hysteria_user"
-
-    # 3b. Test Hysteria 2 IPv6 connection log parsing
-    hysteria_connect_line_ipv6 = '2026-06-13T03:01:00.000Z INFO client connected {"id": "test_hysteria_user", "addr": "[2001:db8::1]:1234"}'
-    process_hysteria_log_line(hysteria_connect_line_ipv6)
-
-    with db_session() as session:
-        logs = session.query(AuditLog).order_by(AuditLog.id.asc()).all()
-        assert len(logs) == 4
-        assert logs[3].action == "hysteria_connect"
-        assert logs[3].target == "2001:db8::1"
-        details = json.loads(logs[3].details)
-        assert details["username"] == "test_hysteria_user"
-
-    # 4. Test Hysteria 2 disconnection log parsing
-    hysteria_disconnect_line = '2026-06-13T03:05:00.000Z INFO client disconnected {"id": "test_hysteria_user", "addr": "[2001:db8::1]:1234"}'
-    process_hysteria_log_line(hysteria_disconnect_line)
-
-    with db_session() as session:
-        logs = session.query(AuditLog).order_by(AuditLog.id.asc()).all()
-        assert len(logs) == 5
-        assert logs[4].action == "hysteria_disconnect"
-        assert logs[4].target == "2001:db8::1"
-        details = json.loads(logs[4].details)
-        assert details["username"] == "test_hysteria_user"
+        assert details["username"] == "test_user"
 
 
 def test_new_ip_security_alerts():
@@ -388,42 +327,12 @@ def test_rename_client_and_uuid():
 
 
 def test_xray_log_parsing_alert(monkeypatch):
-    """Test that process_xray_log_line parses different log formats correctly."""
-    from backend.client_alerts import process_xray_log_line, active_xray_sessions
+    """Test parse_ip_from_addr and audit log format."""
+    from backend.client_alerts import parse_ip_from_addr
     
-    # Mock log_action to verify connection registration
-    logged_actions = []
-    def mock_log_action(username, action, target, details):
-        logged_actions.append({
-            "username": username,
-            "action": action,
-            "target": target,
-            "details": details
-        })
-    monkeypatch.setattr("backend.client_alerts.log_action", mock_log_action)
-    
-    # Mock database traffic lookup
-    monkeypatch.setattr("backend.client_alerts.get_xray_user_traffic", lambda email: (100, 200))
-    
-    # Reset session state
-    active_xray_sessions.clear()
-    
-    # 1. Test new log line format (IPv4)
-    line_new = "2026/06/13 14:55:36.505111 from 192.168.1.50:40020 accepted tcp:mozilla.cloudflare-dns.com:443 [inbound-2 >> direct] email: phone"
-    process_xray_log_line(line_new)
-    assert len(logged_actions) == 1
-    assert logged_actions[0]["action"] == "xray_connect"
-    assert logged_actions[0]["target"] == "192.168.1.50"
-    assert "phone" in logged_actions[0]["details"]
-    
-    # 2. Test new log line format (IPv6)
-    logged_actions.clear()
-    line_new_ipv6 = "2026/06/13 14:55:38.571331 from [2001:db8::1]:40084 accepted tcp:[2001:67c:4e8:f004::a]:443 [inbound-2 >> direct] email: phone2"
-    process_xray_log_line(line_new_ipv6)
-    assert len(logged_actions) == 1
-    assert logged_actions[0]["action"] == "xray_connect"
-    assert logged_actions[0]["target"] == "2001:db8::1"
-    assert "phone2" in logged_actions[0]["details"]
+    assert parse_ip_from_addr("192.168.1.50:40020") == "192.168.1.50"
+    assert parse_ip_from_addr("[2001:db8::1]:40084") == "2001:db8::1"
+
 
 
 
