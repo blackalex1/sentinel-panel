@@ -115,6 +115,10 @@ def _init_sentinel_lib(lib: Any) -> Any:
         ("SentinelGetSecuritySchema", [ctypes.c_char_p]),
         ("SentinelGetDefaultSecurityConfig", []),
         ("SentinelValidateSecurityConfig", [ctypes.c_char_p]),
+        ("SentinelGetActiveSessions", []),
+        ("SentinelGetOnlineEmails", []),
+        ("SentinelGetRecentSessionEvents", [ctypes.c_longlong, ctypes.c_int]),
+        ("SentinelRegisterExternalConnect", [ctypes.c_char_p, ctypes.c_char_p, ctypes.c_char_p]),
     ]
 
     for name, argtypes in func_signatures:
@@ -173,11 +177,15 @@ def _ffi_call_str(func_name: str, *args) -> Optional[str]:
         func.restype = ctypes.c_void_p
 
     c_args = []
-    for a in args:
+    for i, a in enumerate(args):
         if isinstance(a, str):
             c_args.append(a.encode("utf-8"))
         elif isinstance(a, int):
-            c_args.append(ctypes.c_int(a))
+            if hasattr(func, "argtypes") and func.argtypes and i < len(func.argtypes):
+                expected_t = func.argtypes[i]
+                c_args.append(expected_t(a))
+            else:
+                c_args.append(ctypes.c_longlong(a) if a > 2147483647 or a < -2147483648 else ctypes.c_int(a))
         elif isinstance(a, bytes):
             c_args.append(a)
         elif a is None:
