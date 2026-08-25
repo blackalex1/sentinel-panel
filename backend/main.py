@@ -82,6 +82,8 @@ async def poll_xray_stats_loop():
                 from backend.sentinel_core_bridge import get_recent_session_events, get_active_sessions
                 from backend.audit import log_action
                 from backend.client_alerts import get_singbox_user_traffic, get_xray_user_traffic
+                from backend.database import db_session
+                from backend.models import AuditLog
                 import json
 
                 events = get_recent_session_events(last_session_sync_ts, limit=100)
@@ -89,8 +91,8 @@ async def poll_xray_stats_loop():
                     logging.info(f"[SessionTracker Sync] Polled {len(events)} new events (since={last_session_sync_ts}): {events}")
                     for ev in events:
                         ev_ts = ev.get("timestamp", 0)
-                        if ev_ts > last_session_sync_ts:
-                            last_session_sync_ts = ev_ts
+                        if ev_ts >= last_session_sync_ts:
+                            last_session_sync_ts = ev_ts + 1
                         action_type = ev.get("action")
                         core_name = str(ev.get("core", "singbox")).replace("-", "")
                         action = f"{core_name}_{action_type}"
@@ -98,14 +100,12 @@ async def poll_xray_stats_loop():
                         ip = ev.get("ip")
                         if email and ip:
                             # Avoid duplicate logging if already recorded recently
-                            from backend.database import db_session
-                            from backend.models import AuditLog
                             is_dup = False
                             with db_session() as a_sess:
                                 dup_count = a_sess.query(AuditLog).filter(
                                     AuditLog.action == action,
                                     AuditLog.target == ip,
-                                    AuditLog.timestamp >= int(time.time()) - 10
+                                    AuditLog.timestamp >= int(time.time()) - 15
                                 ).count()
                                 is_dup = dup_count > 0
                             if not is_dup:
@@ -120,8 +120,32 @@ async def poll_xray_stats_loop():
                                     target=ip,
                                     details=json.dumps(details_dict)
                                 )
-                elif events is None:
-                    logging.warning(f"[SessionTracker Sync] get_recent_session_events returned None!")
+
+                # Active sessions reconciliation: ensure all active core sessions have an AuditLog entry
+                active_list = get_active_sessions()
+                if active_list and isinstance(active_list, list):
+                    for sess_info in active_list:
+                        email = sess_info.get("email")
+                        ip = sess_info.get("ip")
+                        core_name = str(sess_info.get("core", "singbox")).replace("-", "")
+                        action = f"{core_name}_connect"
+                        if email and ip and ip != "127.0.0.1":
+                            with db_session() as a_sess:
+                                has_recent = a_sess.query(AuditLog).filter(
+                                    AuditLog.action == action,
+                                    AuditLog.target == ip,
+                                    AuditLog.timestamp >= int(time.time()) - 600
+                                ).count() > 0
+                            if not has_recent:
+                                tx, rx = get_singbox_user_traffic(email) if "sing" in core_name else get_xray_user_traffic(email)
+                                details_dict = {"username": email, "tx": tx, "rx": rx}
+                                logging.info(f"[SessionTracker Sync] Reconciled active session in AuditLog: action={action}, target={ip}, user={email}")
+                                log_action(
+                                    username="system",
+                                    action=action,
+                                    target=ip,
+                                    details=json.dumps(details_dict)
+                                )
             except Exception as e:
                 logging.error(f"[SessionTracker Sync] Error syncing core session events: {e}", exc_info=True)
 
