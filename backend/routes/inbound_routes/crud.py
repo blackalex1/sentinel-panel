@@ -76,6 +76,24 @@ async def list_inbounds_api(request: Request):
                 client_item["flow"] = flow
             settings_dict["clients"].append(client_item)
         
+        # For single client inbounds, synchronize client traffic with inbound traffic if client was lagging
+        if len(clients) == 1:
+            c_single = clients[0]
+            if (ib["up"] > c_single["up"] or ib["down"] > c_single["down"]):
+                synced_up = max(c_single["up"], ib["up"])
+                synced_down = max(c_single["down"], ib["down"])
+                c_single["up"] = synced_up
+                c_single["down"] = synced_down
+                try:
+                    from backend.database import db_session, ClientStats
+                    with db_session() as s_sess:
+                        cs_row = s_sess.query(ClientStats).filter_by(id=c_single["id"]).first()
+                        if cs_row:
+                            cs_row.up = synced_up
+                            cs_row.down = synced_down
+                except Exception:
+                    pass
+
         # clientStats содержит статистику трафика по клиентам
         client_stats_list = [
             {

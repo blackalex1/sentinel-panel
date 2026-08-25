@@ -48,6 +48,29 @@ def update_online_emails():
                         meta.get("name") or meta.get("email") or meta.get("clientUser") or
                         meta.get("inboundUser") or meta.get("auth_user") or conn.get("user") or ""
                     )
+                    inbound_tag = (
+                        meta.get("inboundName")
+                        or meta.get("inboundTag")
+                        or meta.get("inbound")
+                        or meta.get("type", "")
+                        or ""
+                    )
+                    if user:
+                        user = str(user).strip("[]").strip()
+                    elif "inbound-" in inbound_tag:
+                        try:
+                            ib_part = inbound_tag[inbound_tag.find("inbound-") + 8:].split("/")[0].split("-")[0]
+                            ib_id = int(ib_part)
+                            from backend.database import get_clients_for_inbound
+                            ib_clients = get_clients_for_inbound(ib_id)
+                            active_ib_clients = [c for c in ib_clients if c.get("enable", True)]
+                            if len(active_ib_clients) == 1:
+                                user = active_ib_clients[0]["email"]
+                            elif len(ib_clients) == 1:
+                                user = ib_clients[0]["email"]
+                        except Exception:
+                            pass
+
                     if user:
                         emails.append(user)
                         src_ip = meta.get("sourceIP") or meta.get("source_ip") or "127.0.0.1"

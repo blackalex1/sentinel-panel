@@ -249,6 +249,35 @@ def _process_singbox_connection_data(data: dict):
 
         _last_singbox_conn_stats[conn_id] = (upload, download)
 
+        inbound_tag = (
+            metadata.get("inboundName")
+            or metadata.get("inboundTag")
+            or metadata.get("inbound")
+            or metadata.get("type", "")
+            or ""
+        )
+        ib_id = None
+        if "inbound-" in inbound_tag:
+            try:
+                ib_part = inbound_tag[inbound_tag.find("inbound-") + 8:].split("/")[0].split("-")[0]
+                ib_id = int(ib_part)
+            except (ValueError, IndexError):
+                pass
+
+        if user:
+            user = str(user).strip("[]").strip()
+        elif ib_id is not None:
+            try:
+                from backend.database import get_clients_for_inbound
+                ib_clients = get_clients_for_inbound(ib_id)
+                active_ib_clients = [c for c in ib_clients if c.get("enable", True)]
+                if len(active_ib_clients) == 1:
+                    user = active_ib_clients[0]["email"]
+                elif len(ib_clients) == 1:
+                    user = ib_clients[0]["email"]
+            except Exception:
+                pass
+
         # Обновляем ACTIVE_IP_CACHE для отслеживания онлайна и лимитов IP
         if user:
             src_ip = (
@@ -275,22 +304,15 @@ def _process_singbox_connection_data(data: dict):
 
         if up_delta > 0 or down_delta > 0:
             if user:
-                update_client_traffic_by_email(user, up_delta, down_delta)
+                from backend.database import update_client_traffic
+                updated_client = False
+                if ib_id is not None:
+                    updated_client = update_client_traffic(ib_id, user, up_delta, down_delta)
+                if not updated_client:
+                    update_client_traffic_by_email(user, up_delta, down_delta)
 
-            inbound_tag = (
-                metadata.get("inboundName")
-                or metadata.get("inboundTag")
-                or metadata.get("inbound")
-                or metadata.get("type", "")
-                or ""
-            )
-            if "inbound-" in inbound_tag:
-                try:
-                    ib_part = inbound_tag[inbound_tag.find("inbound-") + 8:].split("/")[0].split("-")[0]
-                    ib_id = int(ib_part)
-                    update_inbound_traffic(ib_id, up_delta, down_delta)
-                except (ValueError, IndexError):
-                    pass
+            if ib_id is not None:
+                update_inbound_traffic(ib_id, up_delta, down_delta)
 
             outbound_tag = (
                 conn.get("outbound")
