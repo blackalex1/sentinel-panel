@@ -83,7 +83,7 @@ def check_new_ip_and_get_history(username, current_ip, current_timestamp, logs, 
             continue
             
         action = log["action"]
-        if action in ("xray_connect", "hysteria_connect"):
+        if action in ("xray_connect", "hysteria_connect", "hysteria2_connect", "singbox_connect"):
             ip = log["target"]
             conn_time = log["timestamp"]
             
@@ -92,7 +92,7 @@ def check_new_ip_and_get_history(username, current_ip, current_timestamp, logs, 
             
             for d_log in user_logs:
                 d_action = d_log["action"]
-                if d_action in ("xray_disconnect", "hysteria_disconnect") and d_log["target"] == ip:
+                if d_action in ("xray_disconnect", "hysteria_disconnect", "hysteria2_disconnect", "singbox_disconnect") and d_log["target"] == ip:
                     if d_log["timestamp"] >= conn_time:
                         if disconnect_time is None or d_log["timestamp"] < disconnect_time:
                             disconnect_time = d_log["timestamp"]
@@ -156,7 +156,7 @@ async def handle_client_event(action: str, client_ip: str, details_str: str):
     timestamp = datetime.datetime.now().strftime("%H:%M:%S")
     host_ip = await get_server_ip()
     
-    protocol = "Xray" if "xray" in action else "Hysteria"
+    protocol = "Xray" if "xray" in action else ("Sing-box" if "sing" in action else "Hysteria")
     if protocol == "Xray":
         tx, rx = rx, tx  # Swap: tx becomes client download, rx becomes client upload
         
@@ -191,7 +191,7 @@ async def handle_client_event(action: str, client_ip: str, details_str: str):
                 except Exception:
                     pass
 
-    if action in ("xray_connect", "hysteria_connect"):
+    if action in ("xray_connect", "hysteria_connect", "hysteria2_connect", "singbox_connect"):
         # Check for new IP connection
         try:
             from backend.models import AuditLog, ClientStats
@@ -262,7 +262,7 @@ async def handle_client_event(action: str, client_ip: str, details_str: str):
                 'admin_messages': msgs
             }
 
-    elif action in ("xray_disconnect", "hysteria_disconnect"):
+    elif action in ("xray_disconnect", "hysteria_disconnect", "hysteria2_disconnect", "singbox_disconnect"):
         if card and is_card_active(card, now_time):
             card['last_activity_at'] = now_time
             
