@@ -8,10 +8,12 @@
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 BIN_DIR="$SCRIPT_DIR/bin"
 AUTO_MODE=0
+FORCE_MODE=0
 
 for arg in "$@"; do
     case "$arg" in
         --auto|-y) AUTO_MODE=1 ;;
+        --force|-f) FORCE_MODE=1 ;;
         -*) ;;
         *) BIN_DIR="$arg" ;;
     esac
@@ -202,7 +204,7 @@ else
         SELECTED_TAG="$LATEST_ANY"
     fi
 
-    if [ "$IS_INSTALLED" -eq 1 ] && [ -n "$SELECTED_TAG" ] && echo "$CURRENT_VER" | grep -q "$SELECTED_TAG"; then
+    if [ "$FORCE_MODE" -eq 0 ] && [ "$IS_INSTALLED" -eq 1 ] && [ -n "$SELECTED_TAG" ] && echo "$CURRENT_VER" | grep -q "$SELECTED_TAG"; then
         echo "[+] Текущая версия ядра ($CURRENT_VER) уже актуальна ($SELECTED_TAG). Обновление не требуется."
         exit 0
     fi
