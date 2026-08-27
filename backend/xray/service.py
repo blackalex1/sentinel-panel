@@ -158,34 +158,10 @@ def is_xray_running():
     return False
 
 def query_traffic_stats():
-    """Считывает статистику трафика Xray и обновляет БД"""
+    """Считывает статистику трафика Xray через sentinel-core и обновляет БД."""
     if not backend.xray.is_xray_running():
         return
 
-    # 1. Primary: Direct query to Xray Stats API via CLI (127.0.0.1:10085)
-    stats_queried = False
-    try:
-        xray_bin = str(backend.xray.XRAY_BIN_PATH)
-        if os.path.exists(xray_bin) or shutil.which(xray_bin):
-            res = subprocess.run(
-                [xray_bin, "api", "statsquery", "--server=127.0.0.1:10085"],
-                capture_output=True,
-                text=True,
-                timeout=1.5
-            )
-            if res.returncode == 0 and res.stdout.strip():
-                try:
-                    data = json.loads(res.stdout.strip())
-                    stat_list = data.get("stat", [])
-                    if stat_list:
-                        process_stats_deltas(stat_list)
-                        stats_queried = True
-                except json.JSONDecodeError:
-                    pass
-    except Exception as e:
-        logging.debug(f"Direct Xray statsquery error: {e}")
-
-    # 2. Secondary / Unified: query sentinel-core bridge
     try:
         from backend.sentinel_core_bridge import get_unified_traffic
         traffic_data = get_unified_traffic()
@@ -210,13 +186,13 @@ def query_traffic_stats():
                 down_delta = tx - prev_down if tx >= prev_down else tx
                 _last_session_stats[down_key] = tx
 
-                if (up_delta > 0 or down_delta > 0) and not stats_queried:
+                if up_delta > 0 or down_delta > 0:
                     update_client_traffic_by_email(email, up_delta, down_delta)
                     for ib in xray_inbounds:
                         update_inbound_traffic(ib["id"], up_delta, down_delta)
                         
     except Exception as e:
-        logging.debug(f"Error querying Xray stats: {e}")
+        logging.debug(f"Error querying Xray stats via sentinel-core: {e}")
 
 def process_stats_deltas(stats_list):
     """Вычисляет дельту трафика с момента предыдущего опроса и прибавляет к БД"""
