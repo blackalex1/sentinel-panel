@@ -334,11 +334,6 @@ def tail_xray_logs():
                     push_log_line("xray", line)
                 except Exception:
                     pass
-                try:
-                    from backend.client_alerts import process_xray_log_line
-                    process_xray_log_line(line)
-                except Exception as ex:
-                    logging.error(f"Error processing Xray log line: {ex}")
     except Exception as e:
         logging.error(f"Error tailing Xray logs: {e}")
 

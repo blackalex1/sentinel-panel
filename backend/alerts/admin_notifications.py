@@ -65,12 +65,17 @@ async def async_send_telegram_alert(username: str, action: str, target: str, det
 
 def trigger_telegram_alert(username: str, action: str, target: str = None, details: str = None):
     """Starts the Telegram alert sending process in a background task."""
-    if action not in ("login_success", "login_telegram_success", "login_rate_limited",
-                      "xray_connect", "xray_disconnect", "hysteria_connect", "hysteria_disconnect"):
+    client_actions = (
+        "xray_connect", "xray_disconnect",
+        "hysteria_connect", "hysteria_disconnect",
+        "hysteria2_connect", "hysteria2_disconnect",
+        "singbox_connect", "singbox_disconnect"
+    )
+    if action not in ("login_success", "login_telegram_success", "login_rate_limited") and action not in client_actions:
         return
     try:
         loop = asyncio.get_running_loop()
-        if action in ("xray_connect", "xray_disconnect", "hysteria_connect", "hysteria_disconnect"):
+        if action in client_actions:
             from backend.alerts.client_connections import handle_client_event
             loop.create_task(handle_client_event(action, target, details))
         else:

@@ -296,12 +296,6 @@ def _process_singbox_connection_data(data: dict):
             except Exception:
                 pass
 
-            try:
-                from backend.client_alerts import process_singbox_connection_event
-                process_singbox_connection_event(user, src_ip)
-            except Exception:
-                pass
-
         if up_delta > 0 or down_delta > 0:
             if user:
                 from backend.database import update_client_traffic
