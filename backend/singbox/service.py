@@ -293,6 +293,10 @@ def _process_singbox_connection_data(data: dict):
                 if user not in ACTIVE_IP_CACHE:
                     ACTIVE_IP_CACHE[user] = {}
                 ACTIVE_IP_CACHE[user][src_ip] = now_ts
+
+                if src_ip and src_ip != "127.0.0.1":
+                    from backend.sentinel_core_bridge import register_external_connect
+                    register_external_connect("sing-box", user, src_ip)
             except Exception:
                 pass
 

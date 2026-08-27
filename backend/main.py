@@ -22,6 +22,117 @@ logging.basicConfig(level=_log_level, format="%(asctime)s - %(levelname)s - %(me
 
 # Фоновые задачи
 polling_task = None
+session_sync_task = None
+
+
+async def sync_session_events_loop():
+    """High-speed background worker (every 2s) syncing core SessionTracker events, active sessions, and ACTIVE_IP_CACHE into AuditLog."""
+    logging.info("Started background session events synchronization task.")
+    last_session_sync_ts = int(time.time()) - 300
+    while True:
+        try:
+            await asyncio.sleep(2)
+            from backend.sentinel_core_bridge import get_recent_session_events, get_active_sessions
+            from backend.audit import log_action
+            from backend.client_alerts import get_singbox_user_traffic, get_xray_user_traffic
+            from backend.database import db_session
+            from backend.models import AuditLog
+            import json
+
+            # 1. Process recent event stream from Go sentinel-core SessionTracker
+            events = get_recent_session_events(last_session_sync_ts, limit=100)
+            if events and isinstance(events, list):
+                for ev in events:
+                    ev_ts = ev.get("timestamp", 0)
+                    if ev_ts >= last_session_sync_ts:
+                        last_session_sync_ts = ev_ts + 1
+                    action_type = ev.get("action")
+                    core_name = str(ev.get("core", "singbox")).replace("-", "")
+                    action = f"{core_name}_{action_type}"
+                    email = ev.get("email")
+                    ip = ev.get("ip")
+                    if email and ip and ip != "127.0.0.1":
+                        is_dup = False
+                        with db_session() as a_sess:
+                            dup_count = a_sess.query(AuditLog).filter(
+                                AuditLog.action == action,
+                                AuditLog.target == ip,
+                                AuditLog.timestamp >= int(time.time()) - 15
+                            ).count()
+                            is_dup = dup_count > 0
+                        if not is_dup:
+                            tx, rx = get_singbox_user_traffic(email) if "sing" in core_name else get_xray_user_traffic(email)
+                            details_dict = {"username": email, "tx": tx, "rx": rx}
+                            if action_type == "disconnect":
+                                details_dict["duration"] = ev.get("duration", "несколько секунд")
+                            logging.info(f"[SessionTracker Sync] Recording AuditLog: action={action}, target={ip}, user={email}")
+                            log_action(
+                                username="system",
+                                action=action,
+                                target=ip,
+                                details=json.dumps(details_dict)
+                            )
+
+            # 2. Active sessions reconciliation: ensure all active core sessions have an AuditLog entry
+            active_list = get_active_sessions()
+            if active_list and isinstance(active_list, list):
+                for sess_info in active_list:
+                    email = sess_info.get("email")
+                    ip = sess_info.get("ip")
+                    core_name = str(sess_info.get("core", "singbox")).replace("-", "")
+                    action = f"{core_name}_connect"
+                    if email and ip and ip != "127.0.0.1":
+                        with db_session() as a_sess:
+                            has_recent = a_sess.query(AuditLog).filter(
+                                AuditLog.action == action,
+                                AuditLog.target == ip,
+                                AuditLog.timestamp >= int(time.time()) - 600
+                            ).count() > 0
+                        if not has_recent:
+                            tx, rx = get_singbox_user_traffic(email) if "sing" in core_name else get_xray_user_traffic(email)
+                            details_dict = {"username": email, "tx": tx, "rx": rx}
+                            logging.info(f"[SessionTracker Sync] Reconciled active session in AuditLog: action={action}, target={ip}, user={email}")
+                            log_action(
+                                username="system",
+                                action=action,
+                                target=ip,
+                                details=json.dumps(details_dict)
+                            )
+
+            # 3. Secondary check: ACTIVE_IP_CACHE from Clash API / Xray API
+            try:
+                from backend.scheduler_jobs.limits import ACTIVE_IP_CACHE
+                if ACTIVE_IP_CACHE:
+                    now_sec = int(time.time())
+                    for c_user, c_ip_map in list(ACTIVE_IP_CACHE.items()):
+                        if isinstance(c_ip_map, dict):
+                            for c_ip, c_last_seen in list(c_ip_map.items()):
+                                if c_ip and c_ip != "127.0.0.1" and (now_sec - int(c_last_seen)) < 60:
+                                    with db_session() as a_sess:
+                                        has_audit = a_sess.query(AuditLog).filter(
+                                            AuditLog.target == c_ip,
+                                            AuditLog.action.in_(("singbox_connect", "xray_connect", "hysteria2_connect", "hysteria_connect")),
+                                            AuditLog.timestamp >= now_sec - 600
+                                        ).count() > 0
+                                    if not has_audit:
+                                        tx, rx = get_singbox_user_traffic(c_user)
+                                        details_dict = {"username": c_user, "tx": tx, "rx": rx}
+                                        logging.info(f"[SessionTracker Sync] Reconciled ACTIVE_IP_CACHE in AuditLog: user={c_user}, ip={c_ip}")
+                                        log_action(
+                                            username="system",
+                                            action="singbox_connect",
+                                            target=c_ip,
+                                            details=json.dumps(details_dict)
+                                        )
+            except Exception as e:
+                logging.debug(f"[SessionTracker Sync] ACTIVE_IP_CACHE check: {e}")
+
+        except asyncio.CancelledError:
+            logging.info("Session events synchronization task cancelled.")
+            break
+        except Exception as e:
+            logging.error(f"[SessionTracker Sync] Error syncing core session events: {e}", exc_info=True)
+
 
 async def poll_xray_stats_loop():
     logging.info("Started background traffic statistics polling task.")
@@ -66,7 +177,6 @@ async def poll_xray_stats_loop():
         logging.error(f"Error in initial stats polling: {e}")
         
     last_releases_refresh = time.time()
-    last_session_sync_ts = int(time.time()) - 300
     while True:
         try:
             await asyncio.sleep(5)
@@ -76,78 +186,6 @@ async def poll_xray_stats_loop():
             
             from backend.routes.clients import update_online_emails
             await asyncio.to_thread(update_online_emails)
-            
-            # Sync connection/disconnection events from native Go sentinel-core SessionTracker to AuditLog
-            try:
-                from backend.sentinel_core_bridge import get_recent_session_events, get_active_sessions
-                from backend.audit import log_action
-                from backend.client_alerts import get_singbox_user_traffic, get_xray_user_traffic
-                from backend.database import db_session
-                from backend.models import AuditLog
-                import json
-
-                events = get_recent_session_events(last_session_sync_ts, limit=100)
-                if events and isinstance(events, list):
-                    logging.info(f"[SessionTracker Sync] Polled {len(events)} new events (since={last_session_sync_ts}): {events}")
-                    for ev in events:
-                        ev_ts = ev.get("timestamp", 0)
-                        if ev_ts >= last_session_sync_ts:
-                            last_session_sync_ts = ev_ts + 1
-                        action_type = ev.get("action")
-                        core_name = str(ev.get("core", "singbox")).replace("-", "")
-                        action = f"{core_name}_{action_type}"
-                        email = ev.get("email")
-                        ip = ev.get("ip")
-                        if email and ip:
-                            # Avoid duplicate logging if already recorded recently
-                            is_dup = False
-                            with db_session() as a_sess:
-                                dup_count = a_sess.query(AuditLog).filter(
-                                    AuditLog.action == action,
-                                    AuditLog.target == ip,
-                                    AuditLog.timestamp >= int(time.time()) - 15
-                                ).count()
-                                is_dup = dup_count > 0
-                            if not is_dup:
-                                tx, rx = get_singbox_user_traffic(email) if "sing" in core_name else get_xray_user_traffic(email)
-                                details_dict = {"username": email, "tx": tx, "rx": rx}
-                                if action_type == "disconnect":
-                                    details_dict["duration"] = ev.get("duration", "несколько секунд")
-                                logging.info(f"[SessionTracker Sync] Recording AuditLog: action={action}, target={ip}, user={email}")
-                                log_action(
-                                    username="system",
-                                    action=action,
-                                    target=ip,
-                                    details=json.dumps(details_dict)
-                                )
-
-                # Active sessions reconciliation: ensure all active core sessions have an AuditLog entry
-                active_list = get_active_sessions()
-                if active_list and isinstance(active_list, list):
-                    for sess_info in active_list:
-                        email = sess_info.get("email")
-                        ip = sess_info.get("ip")
-                        core_name = str(sess_info.get("core", "singbox")).replace("-", "")
-                        action = f"{core_name}_connect"
-                        if email and ip and ip != "127.0.0.1":
-                            with db_session() as a_sess:
-                                has_recent = a_sess.query(AuditLog).filter(
-                                    AuditLog.action == action,
-                                    AuditLog.target == ip,
-                                    AuditLog.timestamp >= int(time.time()) - 600
-                                ).count() > 0
-                            if not has_recent:
-                                tx, rx = get_singbox_user_traffic(email) if "sing" in core_name else get_xray_user_traffic(email)
-                                details_dict = {"username": email, "tx": tx, "rx": rx}
-                                logging.info(f"[SessionTracker Sync] Reconciled active session in AuditLog: action={action}, target={ip}, user={email}")
-                                log_action(
-                                    username="system",
-                                    action=action,
-                                    target=ip,
-                                    details=json.dumps(details_dict)
-                                )
-            except Exception as e:
-                logging.error(f"[SessionTracker Sync] Error syncing core session events: {e}", exc_info=True)
 
             # Update active Telegram cards traffic on the panel
             try:
@@ -216,12 +254,15 @@ async def lifespan(app: FastAPI):
     from backend.log_streamer import ensure_log_tailers
     ensure_log_tailers()
 
-    # Запуск фонового опроса трафика
+    # Запуск фонового опроса трафика и синхронизации сессий
     polling_task = asyncio.create_task(poll_xray_stats_loop())
+    session_sync_task = asyncio.create_task(sync_session_events_loop())
     
     yield
     
-    # Отмена фоновой задачи
+    # Отмена фоновых задач
+    if session_sync_task:
+        session_sync_task.cancel()
     if polling_task:
         polling_task.cancel()
         
