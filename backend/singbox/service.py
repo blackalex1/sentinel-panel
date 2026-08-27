@@ -334,26 +334,12 @@ def _process_singbox_connection_data(data: dict):
 
 def query_singbox_traffic():
     """
-    Считывает активные соединения и трафик Sing-box из Clash API (127.0.0.1:9090/connections)
+    Считывает трафик Sing-box через C-FFI sentinel-core bridge
     и начисляет точные дельты трафика и статус онлайн в реальном времени.
     """
     if not is_singbox_running():
         return
 
-    # 1. Прямой опрос Clash API на 127.0.0.1:9090/connections
-    try:
-        import urllib.request
-        req = urllib.request.Request("http://127.0.0.1:9090/connections", headers={"User-Agent": "SentinelPanel"})
-        with urllib.request.urlopen(req, timeout=1.2) as response:
-            if response.status == 200:
-                raw_data = response.read().decode("utf-8", errors="ignore")
-                data = json.loads(raw_data)
-                _process_singbox_connection_data(data)
-                return
-    except Exception as e:
-        logging.debug(f"Direct Clash API query to 127.0.0.1:9090/connections: {e}")
-
-    # 2. Фолбэк через C-FFI sentinel-core bridge
     try:
         from backend.sentinel_core_bridge import get_unified_traffic
         traffic_data = get_unified_traffic()
