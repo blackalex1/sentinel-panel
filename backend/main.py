@@ -1,5 +1,7 @@
 import asyncio
 import logging
+import time
+import json
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
@@ -37,7 +39,6 @@ async def sync_session_events_loop():
             from backend.client_alerts import get_singbox_user_traffic, get_xray_user_traffic
             from backend.database import db_session
             from backend.models import AuditLog
-            import json
 
             # 1. Process recent event stream from Go sentinel-core SessionTracker
             events = get_recent_session_events(last_session_sync_ts, limit=100)
