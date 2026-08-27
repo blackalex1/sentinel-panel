@@ -119,6 +119,7 @@ def _init_sentinel_lib(lib: Any) -> Any:
         ("SentinelGetOnlineEmails", []),
         ("SentinelGetRecentSessionEvents", [ctypes.c_longlong, ctypes.c_int]),
         ("SentinelRegisterExternalConnect", [ctypes.c_char_p, ctypes.c_char_p, ctypes.c_char_p]),
+        ("SentinelSetLanguage", [ctypes.c_char_p]),
     ]
 
     for name, argtypes in func_signatures:
@@ -994,4 +995,14 @@ def register_external_connect(core: str, email: str, ip: str) -> None:
         _ffi_call_str("SentinelRegisterExternalConnect", core, email, ip)
     except Exception:
         pass
+
+
+def set_core_language(lang: str) -> bool:
+    """Sets language locale in Go sentinel-core ('ru' or 'en')."""
+    try:
+        res = _ffi_call_json("SentinelSetLanguage", lang)
+        return isinstance(res, dict) and res.get("success") is True
+    except Exception:
+        return False
+
 

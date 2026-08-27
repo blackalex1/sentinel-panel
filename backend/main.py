@@ -42,10 +42,12 @@ async def sync_session_events_loop():
             # 1. Process recent event stream from Go sentinel-core SessionTracker
             events = get_recent_session_events(last_session_sync_ts, limit=100)
             if events and isinstance(events, list):
+                # Sort ascending by timestamp so oldest events in the batch are processed first
+                events.sort(key=lambda x: x.get("timestamp", 0))
                 for ev in events:
                     ev_ts = ev.get("timestamp", 0)
-                    if ev_ts >= last_session_sync_ts:
-                        last_session_sync_ts = ev_ts + 1
+                    if ev_ts > last_session_sync_ts:
+                        last_session_sync_ts = ev_ts
                     action_type = ev.get("action")
                     core_name = str(ev.get("core", "singbox")).replace("-", "")
                     action = f"{core_name}_{action_type}"
