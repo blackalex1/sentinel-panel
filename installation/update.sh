@@ -302,22 +302,13 @@ if docker volume inspect sentinel-panel_pgdata &>/dev/null; then
     fi
 fi
 
-if [ -n "$ROTATOR_ACTIVE_PROXY" ] && (echo >/dev/tcp/127.0.0.1/10819) 2>/dev/null; then
-    echo "[+] Использование HTTP VPN-туннеля (127.0.0.1:10819) для быстрой сборки Docker..."
-    if HTTP_PROXY="http://127.0.0.1:10819" HTTPS_PROXY="http://127.0.0.1:10819" docker compose build --build-arg HTTP_PROXY="http://127.0.0.1:10819" --build-arg HTTPS_PROXY="http://127.0.0.1:10819" && docker compose up -d; then
-        echo "[+] Docker containers rebuilt and started successfully!"
-    else
-        echo "[!] Повторная попытка прямого запуска docker compose..."
-        unset http_proxy https_proxy all_proxy HTTP_PROXY HTTPS_PROXY ALL_PROXY
-        docker compose up -d --build || true
-    fi
+# Clean up proxy environment variables before running docker compose to allow direct build and pip install
+unset http_proxy https_proxy all_proxy HTTP_PROXY HTTPS_PROXY ALL_PROXY
+
+if docker compose up -d --build; then
+    echo "[+] Docker containers rebuilt and started successfully!"
 else
-    unset http_proxy https_proxy all_proxy HTTP_PROXY HTTPS_PROXY ALL_PROXY
-    if docker compose up -d --build; then
-        echo "[+] Docker containers rebuilt and started successfully!"
-    else
-        echo "[!] Failed to rebuild or start Docker containers."
-    fi
+    echo "[!] Failed to rebuild or start Docker containers."
 fi
 
 # 4. Update and restart host agent system service (sentinel-agent)
