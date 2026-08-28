@@ -4,19 +4,18 @@ import logging
 import os
 import re
 import shutil
+import socket
 import subprocess
 import sys
 import time
+import urllib.parse
 import urllib.request
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, Tuple
 
 # Ensure panel root directory is always present in sys.path for direct CLI execution
 _panel_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if _panel_root not in sys.path:
     sys.path.insert(0, _panel_root)
-
-import aiohttp
-from aiohttp_socks import ProxyConnector
 
 from backend import sentinel_core_bridge
 
@@ -50,10 +49,11 @@ class SocksProxyRotator:
         self._singbox_proc: Optional[subprocess.Popen] = None
         self._current_engine: str = ""
 
-    def _find_proxy_engine_bin(self) -> tuple[Optional[str], str]:
-        """Находит установленный локально sing-box или xray бинарник."""
+    def _ensure_proxy_engine(self) -> tuple[Optional[str], str]:
+        """Находит установленный локально sing-box или xray бинарник, либо загружает его при отсутствии."""
         base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         bin_dir = os.path.join(base_dir, "bin")
+        os.makedirs(bin_dir, exist_ok=True)
 
         is_win = sys.platform == "win32" or os.name == "nt"
         sb_name = "sing-box.exe" if is_win else "sing-box"
@@ -75,11 +75,21 @@ class SocksProxyRotator:
         if which_xray:
             return which_xray, "xray"
 
+        # Try auto-fetching sing-box via fetch_proxy_core.sh
+        fetch_script = os.path.join(base_dir, "installation", "fetch_proxy_core.sh")
+        if os.path.isfile(fetch_script):
+            try:
+                subprocess.run(["bash", fetch_script, bin_dir, "--auto"], timeout=30, capture_output=True)
+                if os.path.isfile(sb_path) and os.access(sb_path, os.X_OK):
+                    return sb_path, "singbox"
+            except Exception:
+                pass
+
         return None, ""
 
     async def start_or_reload_singbox_tunnel(self, config_json: str, port: int = 10818) -> bool:
         """Запускает или перезапускает локальный процесс Sing-box / Xray с клиентским failover-конфигом."""
-        bin_path, engine_type = self._find_proxy_engine_bin()
+        bin_path, engine_type = self._ensure_proxy_engine()
         if not bin_path:
             logger.warning("Neither sing-box nor xray binary found in PATH or bin/ directory.")
             return False
@@ -100,7 +110,7 @@ class SocksProxyRotator:
         with open(cfg_path, "w", encoding="utf-8") as f:
             f.write(config_json)
 
-        cmd = [bin_path, "run", "-c", cfg_path] if engine_type == "singbox" else [bin_path, "run", "-c", cfg_path]
+        cmd = [bin_path, "run", "-c", cfg_path]
         try:
             self._singbox_proc = subprocess.Popen(
                 cmd,
@@ -279,7 +289,6 @@ class SocksProxyRotator:
         if node_uri.startswith("ss://"):
             try:
                 import pproxy
-                import urllib.parse
                 parsed_url = urllib.parse.urlparse(node_uri)
                 netloc = parsed_url.netloc or parsed_url.path
                 if '@' in netloc:
@@ -346,71 +355,56 @@ class SocksProxyRotator:
         logger.info("Tier 3 SOCKS5: found %d working proxies, best: %s (%.1f ms)", len(working), best_proxy, working[0]["latencyMs"])
         return best_proxy
 
-    async def test_proxy_alive(self, proxy_url: str, timeout: float = 3.5) -> tuple[bool, float]:
-        """Проверяет доступность прокси с замером реального пинга."""
-        start = time.monotonic()
+    async def test_proxy_alive(self, proxy_url: str, timeout: float = 3.5) -> Tuple[bool, float]:
+        """Проверяет доступность прокси с замером реального пинга без обязательных внешних библиотек."""
+        # 1. Try aiohttp + aiohttp_socks if installed
         try:
+            import aiohttp
+            from aiohttp_socks import ProxyConnector
+            start = time.monotonic()
             connector = ProxyConnector.from_url(proxy_url)
             client_timeout = aiohttp.ClientTimeout(total=timeout, connect=2.0)
             async with aiohttp.ClientSession(connector=connector, timeout=client_timeout) as session:
                 async with session.get("https://api.telegram.org", ssl=False) as resp:
                     latency = (time.monotonic() - start) * 1000.0
                     return resp.status in (200, 302, 400, 401, 404), latency
-        except Exception:
-            return False, 999999.0
+        except (ImportError, Exception):
+            pass
 
-    async def refresh_disk_cache(self) -> int:
-        """Фоновый метод: опрашивает GitHub источники, проверяет ноды и обновляет локальный дисковый кэш."""
+        # 2. Pure Python Standard Library socket probe (Zero dependencies fallback)
         loop = asyncio.get_running_loop()
-        all_sources = BLACK_LIST_SOURCES + WHITE_LIST_SOURCES
-        mirror_prefixes = ["", "https://ghproxy.net/", "https://gh-proxy.com/", "https://mirror.ghproxy.com/"]
 
-        def _fetch_url(target_url: str) -> str:
-            req = urllib.request.Request(
-                target_url,
-                headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
-            )
-            with urllib.request.urlopen(req, timeout=8) as response:
-                return response.read().decode("utf-8", errors="ignore")
+        def _socket_probe():
+            start = time.monotonic()
+            try:
+                parsed = urllib.parse.urlparse(proxy_url)
+                host = parsed.hostname or "127.0.0.1"
+                port = parsed.port or 1080
+                s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                s.settimeout(timeout)
+                s.connect((host, port))
+                if proxy_url.startswith("socks5://") or proxy_url.startswith("socks5h://"):
+                    # SOCKS5 greeting
+                    s.sendall(b"\x05\x01\x00")
+                    resp = s.recv(2)
+                    s.close()
+                    lat = (time.monotonic() - start) * 1000.0
+                    return (resp == b"\x05\x00"), lat
+                elif proxy_url.startswith("socks4://"):
+                    s.close()
+                    lat = (time.monotonic() - start) * 1000.0
+                    return True, lat
+                else:
+                    # HTTP proxy probe
+                    s.sendall(b"CONNECT api.telegram.org:443 HTTP/1.1\r\nHost: api.telegram.org:443\r\n\r\n")
+                    resp = s.recv(12)
+                    s.close()
+                    lat = (time.monotonic() - start) * 1000.0
+                    return b"200" in resp or b"HTTP" in resp, lat
+            except Exception:
+                return False, 999999.0
 
-        all_uris = []
-        for base_url in all_sources:
-            for prefix in mirror_prefixes:
-                full_url = f"{prefix}{base_url}" if prefix else base_url
-                try:
-                    content = await loop.run_in_executor(None, _fetch_url, full_url)
-                    if content and len(content) > 10:
-                        lines = [line.strip() for line in content.splitlines() if line.strip() and not line.startswith("#")]
-                        all_uris.extend(lines)
-                        break
-                except Exception:
-                    continue
-
-        unique_uris = list(set(all_uris))
-        if not unique_uris:
-            return 0
-
-        combined_payload = "\n".join(unique_uris[:120])
-        profiles = sentinel_core_bridge.parse_subscription(combined_payload)
-        if not profiles:
-            return 0
-
-        tested = sentinel_core_bridge.test_profiles(profiles, ping_count=2, timeout_ms=3000)
-        if not tested:
-            return 0
-
-        working = [p for p in tested if p.get("alive") or p.get("latencyMs", 0) > 0]
-        if not working:
-            return 0
-
-        working.sort(key=lambda x: x.get("latencyMs") or 999999)
-        alive_uris = [p["proxyUrl"] for p in working if p.get("proxyUrl")]
-        if alive_uris:
-            self._save_working_nodes_to_disk(alive_uris)
-            logger.info("Proxy cache auto-refresh completed: %d / %d alive nodes saved to local disk cache (best: %.1f ms)", len(alive_uris), len(unique_uris), working[0].get("latencyMs", 0))
-            return len(alive_uris)
-
-        return 0
+        return await loop.run_in_executor(None, _socket_probe)
 
     async def get_working_proxy(self) -> Optional[str]:
         """4-Уровневый каскадный поиск рабочего соединения."""
@@ -452,32 +446,32 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Sentinel Panel Proxy Rotator CLI Bridge")
     parser.add_argument("--find-and-start", action="store_true", help="Find best working VPN node and start local Sing-box tunnel")
     parser.add_argument("--node", type=str, default="", help="Specific VPN node URI (ss://, vless://, etc.) to start tunnel for")
-    parser.add_argument("--refresh-cache", action="store_true", help="Refresh local disk cache of VPN nodes")
     parser.add_argument("--port", type=int, default=10818, help="Local SOCKS5 port to bind (default 10818)")
     args = parser.parse_args()
 
-    async def _cli_main():
-        if args.refresh_cache:
-            count = await proxy_rotator.refresh_disk_cache()
-            print(f"CACHE_REFRESHED:{count}")
-            return
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 
+    async def _cli_main():
         if args.node:
+            print(f"[Rotator] Starting local tunnel for node on port {args.port}...", file=sys.stderr, flush=True)
             ok = await proxy_rotator.start_tunnel_for_node(args.node, port=args.port)
             if ok:
                 print(f"PROXY_READY:socks5://127.0.0.1:{args.port}", flush=True)
                 while True:
                     await asyncio.sleep(1)
             else:
+                print(f"[Rotator] Failed to start tunnel for node", file=sys.stderr, flush=True)
                 sys.exit(1)
 
         if args.find_and_start:
+            print(f"[Rotator] Searching for working VPN node on port {args.port}...", file=sys.stderr, flush=True)
             proxy = await proxy_rotator.get_working_proxy()
             if proxy:
                 print(f"PROXY_READY:{proxy}", flush=True)
                 while True:
                     await asyncio.sleep(1)
             else:
+                print(f"[Rotator] No responsive VPN nodes found", file=sys.stderr, flush=True)
                 sys.exit(1)
 
     try:

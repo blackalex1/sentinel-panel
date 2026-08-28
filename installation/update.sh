@@ -26,6 +26,15 @@ cleanup_tunnel() {
 }
 trap cleanup_tunnel EXIT INT TERM
 
+# Detect best python interpreter (.venv -> venv -> system python3)
+PYTHON_BIN="python3"
+for py_cand in "$SCRIPT_DIR/.venv/bin/python3" "$SCRIPT_DIR/venv/bin/python3" "/opt/sentinel-panel/.venv/bin/python3" "$(command -v python3 2>/dev/null)"; do
+    if [ -x "$py_cand" ]; then
+        PYTHON_BIN="$py_cand"
+        break
+    fi
+done
+
 # Parse arguments
 while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -107,11 +116,21 @@ if [ -t 0 ] && [ "$AUTO_MODE" -eq 0 ] && [ "$NO_PROXY" -eq 0 ]; then
     esac
 fi
 
+# Pre-fetch Sing-box / Xray proxy engine if needed for rotator
+if [ "$USE_ROTATOR" -eq 1 ] && [ "$NO_PROXY" -eq 0 ]; then
+    if [ ! -f "$SCRIPT_DIR/bin/sing-box" ] && [ ! -f "$SCRIPT_DIR/bin/xray" ] && ! command -v sing-box &>/dev/null && ! command -v xray &>/dev/null; then
+        if [ -f "$SCRIPT_DIR/installation/fetch_proxy_core.sh" ]; then
+            chmod +x "$SCRIPT_DIR/installation/fetch_proxy_core.sh"
+            bash "$SCRIPT_DIR/installation/fetch_proxy_core.sh" "$SCRIPT_DIR/bin" --auto || true
+        fi
+    fi
+fi
+
 # Launch Rotator tunnel if requested
 ROTATOR_ACTIVE_PROXY=""
-if [ "$USE_ROTATOR" -eq 1 ] && [ "$NO_PROXY" -eq 0 ] && command -v python3 &>/dev/null; then
+if [ "$USE_ROTATOR" -eq 1 ] && [ "$NO_PROXY" -eq 0 ]; then
     echo "[+] Поиск и запуск рабочего VPN-соединения через Sentinel Proxy Rotator..."
-    ROTATOR_CMD=(python3 -m backend.proxy_rotator --port 10818)
+    ROTATOR_CMD=("$PYTHON_BIN" -m backend.proxy_rotator --port 10818)
     if [ -n "$PROXY_URL" ] && [[ "$PROXY_URL" =~ ^(ss|vless|vmess|trojan|hysteria2):// ]]; then
         ROTATOR_CMD+=(--node "$PROXY_URL")
     else
@@ -131,6 +150,8 @@ if [ "$USE_ROTATOR" -eq 1 ] && [ "$NO_PROXY" -eq 0 ] && command -v python3 &>/de
             break
         fi
         if ! kill -0 "$TUNNEL_PID" 2>/dev/null; then
+            echo "[-] Не удалось запустить локальный VPN-ротатор. Лог:"
+            cat "$TEMP_ROTATOR_LOG" 2>/dev/null
             break
         fi
         sleep 0.5
