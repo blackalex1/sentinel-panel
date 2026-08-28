@@ -22,9 +22,14 @@ cleanup_tunnel() {
         wait "$TUNNEL_PID" 2>/dev/null || true
         TUNNEL_PID=""
     fi
-    pkill -9 -f "proxy_rotator.*10818" 2>/dev/null || true
+    fuser -k -9 10818/tcp 10819/tcp 2>/dev/null || true
+    pkill -9 -f "(proxy_rotator|sing-box.*failover|xray.*failover)" 2>/dev/null || true
 }
 trap cleanup_tunnel EXIT INT TERM
+
+# Free ports 10818 and 10819 on startup
+fuser -k -9 10818/tcp 10819/tcp 2>/dev/null || true
+pkill -9 -f "(proxy_rotator|sing-box.*failover|xray.*failover)" 2>/dev/null || true
 
 # Detect best python interpreter (.venv -> venv -> system python3)
 PYTHON_BIN="python3"
