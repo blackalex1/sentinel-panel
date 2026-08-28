@@ -198,32 +198,66 @@ class SocksProxyRotator:
         if not uris:
             return None
 
-        combined_payload = "\n".join(uris[:40])
-        profiles = sentinel_core_bridge.parse_subscription(combined_payload)
+        combined_payload = "\n".join(uris[:35])
+        try:
+            profiles = sentinel_core_bridge.parse_subscription(combined_payload)
+        except Exception as e:
+            logger.debug("Parse subscription error: %s", e)
+            profiles = None
+
         if not profiles:
-            logger.warning("%s: failed to parse any VPN profiles from provided nodes", tier_name)
+            profiles = []
+            for u in uris[:35]:
+                try:
+                    p = sentinel_core_bridge.parse_proxy_uri(u)
+                    if isinstance(p, dict) and "protocol" in p:
+                        profiles.append(p)
+                except Exception:
+                    continue
+
+        if not profiles:
             return None
 
-        tested = sentinel_core_bridge.test_profiles(profiles[:25], ping_count=1, timeout_ms=1500)
-        if not tested:
-            logger.warning("%s: Sentinel core test-profiles returned no result, using raw profiles", tier_name)
-            tested = profiles
+        async def _test_node_tcp(prof: dict) -> dict:
+            host = prof.get("address") or prof.get("server") or ""
+            port = prof.get("port") or 443
+            if not host:
+                return prof
+            start = time.monotonic()
+            try:
+                r, w = await asyncio.wait_for(asyncio.open_connection(host, int(port)), timeout=1.5)
+                w.close()
+                await w.wait_closed()
+                prof["alive"] = True
+                prof["latencyMs"] = (time.monotonic() - start) * 1000.0
+            except Exception:
+                prof["alive"] = False
+                prof["latencyMs"] = 999999.0
+            return prof
 
-        working = [p for p in tested if p.get("alive") or p.get("latencyMs", 0) > 0]
+        tasks = [_test_node_tcp(p) for p in profiles[:25]]
+        tested = await asyncio.gather(*tasks)
+        working = [p for p in tested if p.get("alive") and p.get("latencyMs", 999999) < 2000]
+
         if not working:
-            logger.info("%s: checked %d nodes, none responsive", tier_name, len(uris))
+            logger.info("%s: checked %d nodes, none responsive", tier_name, len(profiles[:25]))
             return None
 
         working.sort(key=lambda x: x.get("latencyMs") or 999999)
         best = working[0]
-        logger.info("%s: %d / %d nodes alive. Best: %s (%.1f ms)", tier_name, len(working), len(uris), best.get("name") or best.get("proxyUrl"), best.get("latencyMs", 0))
+        logger.info("%s: %d / %d nodes alive. Best: %s (%.1f ms)", tier_name, len(working), len(profiles[:25]), best.get("name") or best.get("proxyUrl") or best.get("address"), best.get("latencyMs", 0))
 
-        client_cfg = sentinel_core_bridge.build_failover_client_config(
-            working[:10],
-            socks_port=10818,
-            http_port=10819,
-            health_url="https://api.telegram.org"
-        )
+        try:
+            client_cfg = sentinel_core_bridge.build_failover_client_config(
+                working[:10],
+                socks_port=10818,
+                http_port=10819,
+                health_url="https://api.telegram.org"
+            )
+        except Exception as e:
+            logger.warning("%s: build_failover_client_config exception: %s", tier_name, e)
+            client_cfg = None
+
         if not client_cfg:
             logger.warning("%s: Failed to build client failover config via Go Sentinel-Core", tier_name)
             return None

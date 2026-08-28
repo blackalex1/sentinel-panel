@@ -120,7 +120,8 @@ def _init_sentinel_lib(lib: Any) -> Any:
         ("SentinelRegisterExternalConnect", [ctypes.c_char_p, ctypes.c_char_p, ctypes.c_char_p]),
         ("SentinelSetLanguage", [ctypes.c_char_p]),
         ("SentinelParseSubscription", [ctypes.c_char_p]),
-        ("SentinelTestProfiles", [ctypes.c_char_p, ctypes.c_int, ctypes.c_int]),
+        ("SentinelBatchCheckProxies", [ctypes.c_char_p, ctypes.c_char_p, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int]),
+        ("SentinelFindFastestProxy", [ctypes.c_char_p, ctypes.c_char_p, ctypes.c_int, ctypes.c_int, ctypes.c_int, ctypes.c_int]),
         ("SentinelBuildFailoverClientConfig", [ctypes.c_char_p, ctypes.c_char_p, ctypes.c_int, ctypes.c_int, ctypes.c_char_p]),
     ]
 
@@ -176,8 +177,7 @@ def _ffi_call_str(func_name: str, *args) -> Optional[str]:
         return None
 
     func = getattr(lib, func_name)
-    if hasattr(func, "restype") and func.restype != ctypes.c_void_p and func_name != "SentinelFreeString":
-        func.restype = ctypes.c_void_p
+    func.restype = ctypes.c_void_p
 
     c_args = []
     for i, a in enumerate(args):
@@ -196,7 +196,12 @@ def _ffi_call_str(func_name: str, *args) -> Optional[str]:
         else:
             c_args.append(a)
 
-    ptr = func(*c_args)
+    try:
+        ptr = func(*c_args)
+    except Exception as e:
+        logger.debug("FFI call %s failed: %s", func_name, e)
+        return None
+
     if not ptr:
         return None
     try:
@@ -206,7 +211,10 @@ def _ffi_call_str(func_name: str, *args) -> Optional[str]:
         return raw_bytes.decode("utf-8", errors="replace")
     finally:
         if hasattr(lib, "SentinelFreeString"):
-            lib.SentinelFreeString(ctypes.c_void_p(ptr))
+            try:
+                lib.SentinelFreeString(ctypes.c_void_p(ptr))
+            except Exception:
+                pass
 
 
 def _ffi_call_json(func_name: str, *args) -> Optional[Any]:
