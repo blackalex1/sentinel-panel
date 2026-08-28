@@ -1,4 +1,5 @@
 import asyncio
+import base64
 import json
 import logging
 import os
@@ -12,12 +13,10 @@ import urllib.parse
 import urllib.request
 from typing import Optional, List, Dict, Any, Tuple
 
-# Ensure panel root directory is always present in sys.path for direct CLI execution
+# Ensure panel root directory is in sys.path
 _panel_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if _panel_root not in sys.path:
     sys.path.insert(0, _panel_root)
-
-from backend import sentinel_core_bridge
 
 logger = logging.getLogger(__name__)
 
@@ -42,10 +41,213 @@ SOCKS5_FALLBACK_SOURCES = [
 ]
 
 
+def parse_vpn_uri(uri: str) -> Optional[Dict[str, Any]]:
+    """Парсит любые VPN-ссылки (ss, vless, trojan, hysteria2, hy2, vmess) без внешних C-библиотек."""
+    uri = uri.strip()
+    if not uri or uri.startswith("#") or uri.startswith("//"):
+        return None
+
+    try:
+        # 1. Shadowsocks: ss://base64@host:port#name or ss://base64#name
+        if uri.startswith("ss://"):
+            payload = uri[5:]
+            name = ""
+            if "#" in payload:
+                payload, name = payload.split("#", 1)
+                name = urllib.parse.unquote(name)
+
+            if "@" in payload:
+                user_info, host_port = payload.split("@", 1)
+            else:
+                pad = len(payload) % 4
+                if pad:
+                    payload += "=" * (4 - pad)
+                try:
+                    decoded = base64.b64decode(payload).decode("utf-8", errors="ignore")
+                    if "@" in decoded:
+                        user_info, host_port = decoded.split("@", 1)
+                    else:
+                        return None
+                except Exception:
+                    return None
+
+            if ":" not in user_info:
+                pad = len(user_info) % 4
+                if pad:
+                    user_info += "=" * (4 - pad)
+                try:
+                    user_info = base64.b64decode(user_info).decode("utf-8", errors="ignore")
+                except Exception:
+                    pass
+
+            method, pwd = user_info.split(":", 1) if ":" in user_info else ("chacha20-ietf-poly1305", user_info)
+            
+            # Handle query params if any
+            if "?" in host_port:
+                host_port, _ = host_port.split("?", 1)
+
+            host, port = host_port.split(":", 1) if ":" in host_port else (host_port, "443")
+            return {
+                "protocol": "shadowsocks",
+                "address": host.strip("[]"),
+                "port": int(port),
+                "password": pwd,
+                "cipher": method,
+                "name": name or f"ss-{host}:{port}",
+                "proxyUrl": uri
+            }
+
+        # 2. VLESS / Trojan / Hysteria2: protocol://uuid_or_pwd@host:port?params#name
+        for proto in ("vless", "trojan", "hysteria2", "hy2"):
+            if uri.startswith(f"{proto}://"):
+                parsed = urllib.parse.urlparse(uri)
+                name = urllib.parse.unquote(parsed.fragment) if parsed.fragment else f"{proto}-{parsed.hostname}:{parsed.port}"
+                params = dict(urllib.parse.parse_qsl(parsed.query))
+                
+                res = {
+                    "protocol": "hysteria2" if proto == "hy2" else proto,
+                    "address": parsed.hostname or "",
+                    "port": int(parsed.port or (443 if proto != "shadowsocks" else 8388)),
+                    "name": name,
+                    "proxyUrl": uri
+                }
+
+                if proto == "vless":
+                    res["uuid"] = parsed.username or ""
+                    res["security"] = params.get("security", "none")
+                    res["sni"] = params.get("sni", params.get("serverName", ""))
+                    res["flow"] = params.get("flow", "")
+                    res["fingerprint"] = params.get("fp", "chrome")
+                    res["public_key"] = params.get("pbk", "")
+                    res["short_id"] = params.get("sid", "")
+                elif proto in ("hysteria2", "hy2"):
+                    res["password"] = parsed.username or parsed.password or ""
+                    res["sni"] = params.get("sni", "")
+                elif proto == "trojan":
+                    res["password"] = parsed.username or parsed.password or ""
+                    res["sni"] = params.get("sni", "")
+
+                return res
+
+    except Exception:
+        pass
+
+    return None
+
+
+def generate_singbox_failover_config(profiles: List[Dict[str, Any]], socks_port: int = 10818, http_port: int = 10819) -> str:
+    """Генерирует отказоустойчивый Sing-box JSON конфиг со встроенным urltest балансировщиком."""
+    outbounds = []
+    tags = []
+
+    for i, p in enumerate(profiles):
+        proto = p.get("protocol", "").lower()
+        tag = p.get("name") or f"node-{i+1}"
+        tag = re.sub(r'[^a-zA-Z0-9_\-\.]', '_', tag)
+        if not tag or tag in tags:
+            tag = f"node-{i+1}-{tag}"
+        tags.append(tag)
+
+        if proto == "shadowsocks":
+            outbounds.append({
+                "type": "shadowsocks",
+                "tag": tag,
+                "server": p["address"],
+                "server_port": int(p["port"]),
+                "method": p.get("cipher") or "chacha20-ietf-poly1305",
+                "password": p.get("password", "")
+            })
+        elif proto == "vless":
+            ob = {
+                "type": "vless",
+                "tag": tag,
+                "server": p["address"],
+                "server_port": int(p["port"]),
+                "uuid": p.get("uuid") or p.get("password", "")
+            }
+            sec = p.get("security", "")
+            if sec in ("tls", "reality"):
+                tls_conf = {
+                    "enabled": True,
+                    "server_name": p.get("sni") or p["address"],
+                    "utls": {"enabled": True, "fingerprint": p.get("fingerprint") or "chrome"}
+                }
+                if sec == "reality":
+                    tls_conf["reality"] = {
+                        "enabled": True,
+                        "public_key": p.get("public_key") or "",
+                        "short_id": p.get("short_id") or ""
+                    }
+                ob["tls"] = tls_conf
+            outbounds.append(ob)
+        elif proto in ("hysteria2", "hy2"):
+            outbounds.append({
+                "type": "hysteria2",
+                "tag": tag,
+                "server": p["address"],
+                "server_port": int(p["port"]),
+                "password": p.get("password", ""),
+                "tls": {
+                    "enabled": True,
+                    "server_name": p.get("sni") or p["address"],
+                    "insecure": True
+                }
+            })
+        elif proto == "trojan":
+            outbounds.append({
+                "type": "trojan",
+                "tag": tag,
+                "server": p["address"],
+                "server_port": int(p["port"]),
+                "password": p.get("password", ""),
+                "tls": {
+                    "enabled": True,
+                    "server_name": p.get("sni") or p["address"]
+                }
+            })
+
+    if not outbounds:
+        return ""
+
+    failover_outbound = {
+        "type": "urltest",
+        "tag": "auto-failover",
+        "outbounds": tags,
+        "url": "https://api.telegram.org",
+        "interval": "1m",
+        "tolerance": 50
+    }
+
+    config = {
+        "log": {"level": "warn"},
+        "inbounds": [
+            {
+                "type": "socks",
+                "tag": "socks-in",
+                "listen": "127.0.0.1",
+                "listen_port": socks_port
+            },
+            {
+                "type": "http",
+                "tag": "http-in",
+                "listen": "127.0.0.1",
+                "listen_port": http_port
+            }
+        ],
+        "outbounds": [failover_outbound] + outbounds + [
+            {"type": "direct", "tag": "direct"},
+            {"type": "block", "tag": "block"}
+        ],
+        "route": {
+            "final": "auto-failover",
+            "auto_detect_interface": True
+        }
+    }
+    return json.dumps(config, indent=2)
+
+
 class SocksProxyRotator:
     def __init__(self):
-        self.cached_proxies = []
-        self.last_scrape_time = 0
         self._singbox_proc: Optional[subprocess.Popen] = None
         self._current_engine: str = ""
 
@@ -79,7 +281,7 @@ class SocksProxyRotator:
         fetch_script = os.path.join(base_dir, "installation", "fetch_proxy_core.sh")
         if os.path.isfile(fetch_script):
             try:
-                subprocess.run(["bash", fetch_script, bin_dir, "--auto"], timeout=30, capture_output=True)
+                subprocess.run(["bash", fetch_script, bin_dir, "--auto"], timeout=20, capture_output=True)
                 if os.path.isfile(sb_path) and os.access(sb_path, os.X_OK):
                     return sb_path, "singbox"
             except Exception:
@@ -129,7 +331,7 @@ class SocksProxyRotator:
                     self._singbox_proc = None
                     return False
 
-                ok, lat = await self.test_proxy_alive(f"socks5://127.0.0.1:{port}", timeout=3.0)
+                ok, lat = await self.test_proxy_alive(f"socks5://127.0.0.1:{port}", timeout=2.5)
                 if ok:
                     logger.info("Started local %s failover tunnel on port %d (latency: %.1f ms)", engine_type, port, lat)
                     return True
@@ -154,14 +356,14 @@ class SocksProxyRotator:
             self._singbox_proc = None
 
     def _get_cache_file_path(self) -> str:
-        """Возвращает путь к локальному файлу дискового кэша рабочих VPN-нод."""
+        """Путь к локальному дисковому кэшу рабочих VPN-нод."""
         base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         config_dir = os.path.join(base_dir, "config")
         os.makedirs(config_dir, exist_ok=True)
         return os.path.join(config_dir, "cached_vpn_nodes.json")
 
     def _load_cached_nodes_from_disk(self) -> List[str]:
-        """Загружает список сохраненных VPN-нод из локального дискового файла."""
+        """Загружает список сохраненных VPN-нод из файла."""
         cache_file = self._get_cache_file_path()
         if not os.path.isfile(cache_file):
             return []
@@ -170,12 +372,12 @@ class SocksProxyRotator:
                 data = json.load(f)
                 if isinstance(data, list):
                     return [str(u).strip() for u in data if str(u).strip()]
-        except Exception as e:
-            logger.debug("Failed to read cached VPN nodes from disk: %s", e)
+        except Exception:
+            pass
         return []
 
     def _save_working_nodes_to_disk(self, uris: List[str]):
-        """Сохраняет проверенные рабочие VPN-ноды в локальный дисковый файл для мгновенного старта."""
+        """Сохраняет рабочие VPN-ноды на диск для мгновенного запуска при следующем обновлении."""
         if not uris:
             return
         cache_file = self._get_cache_file_path()
@@ -190,36 +392,35 @@ class SocksProxyRotator:
                     combined.append(u_clean)
             with open(cache_file, "w", encoding="utf-8") as f:
                 json.dump(combined[:50], f, indent=2, ensure_ascii=False)
-        except Exception as e:
-            logger.debug("Failed to save working VPN nodes to disk: %s", e)
+        except Exception:
+            pass
 
     async def _test_and_activate_nodes(self, uris: List[str], tier_name: str = "Tier") -> Optional[str]:
-        """Парсит ссылки через Go sentinel-core, проверяет пинг и активирует лучший Sing-box туннель."""
+        """Парсит ссылки через Go sentinel-core, проверяет пинг и запускает локальный Sing-box failover мост."""
         if not uris:
             return None
 
-        combined_payload = "\n".join(uris[:35])
+        combined_payload = "\n".join(uris[:40])
+        profiles = None
         try:
+            from backend import sentinel_core_bridge
             profiles = sentinel_core_bridge.parse_subscription(combined_payload)
         except Exception as e:
-            logger.debug("Parse subscription error: %s", e)
-            profiles = None
+            logger.debug("Core parse_subscription exception: %s", e)
 
         if not profiles:
             profiles = []
-            for u in uris[:35]:
-                try:
-                    p = sentinel_core_bridge.parse_proxy_uri(u)
-                    if isinstance(p, dict) and "protocol" in p:
-                        profiles.append(p)
-                except Exception:
-                    continue
+            for u in uris[:40]:
+                p = parse_vpn_uri(u)
+                if p:
+                    profiles.append(p)
 
         if not profiles:
             return None
 
-        async def _test_node_tcp(prof: dict) -> dict:
-            host = prof.get("address") or prof.get("server") or ""
+        # Parallel non-blocking TCP ping
+        async def _ping_node(prof: dict) -> dict:
+            host = prof.get("address") or ""
             port = prof.get("port") or 443
             if not host:
                 return prof
@@ -235,7 +436,7 @@ class SocksProxyRotator:
                 prof["latencyMs"] = 999999.0
             return prof
 
-        tasks = [_test_node_tcp(p) for p in profiles[:25]]
+        tasks = [_ping_node(p) for p in profiles[:25]]
         tested = await asyncio.gather(*tasks)
         working = [p for p in tested if p.get("alive") and p.get("latencyMs", 999999) < 2000]
 
@@ -245,9 +446,11 @@ class SocksProxyRotator:
 
         working.sort(key=lambda x: x.get("latencyMs") or 999999)
         best = working[0]
-        logger.info("%s: %d / %d nodes alive. Best: %s (%.1f ms)", tier_name, len(working), len(profiles[:25]), best.get("name") or best.get("proxyUrl") or best.get("address"), best.get("latencyMs", 0))
+        logger.info("%s: %d / %d nodes alive. Best: %s (%.1f ms)", tier_name, len(working), len(profiles[:25]), best.get("name") or best.get("address"), best.get("latencyMs", 0))
 
+        client_cfg = None
         try:
+            from backend import sentinel_core_bridge
             client_cfg = sentinel_core_bridge.build_failover_client_config(
                 working[:10],
                 socks_port=10818,
@@ -255,11 +458,12 @@ class SocksProxyRotator:
                 health_url="https://api.telegram.org"
             )
         except Exception as e:
-            logger.warning("%s: build_failover_client_config exception: %s", tier_name, e)
-            client_cfg = None
+            logger.debug("Core build_failover_client_config exception: %s", e)
 
         if not client_cfg:
-            logger.warning("%s: Failed to build client failover config via Go Sentinel-Core", tier_name)
+            client_cfg = generate_singbox_failover_config(working[:10], socks_port=10818, http_port=10819)
+
+        if not client_cfg:
             return None
 
         ok = await self.start_or_reload_singbox_tunnel(client_cfg, port=10818)
@@ -272,7 +476,7 @@ class SocksProxyRotator:
         return None
 
     async def _fetch_single_source(self, base_url: str) -> List[str]:
-        """Быстро скачивает файл подписки через зеркала с таймаутом 3.5с."""
+        """Скачивает файл подписки через быстрые CDN-зеркала с таймаутом 3.5с."""
         loop = asyncio.get_running_loop()
         mirror_prefixes = [
             "https://ghproxy.net/",
@@ -315,47 +519,15 @@ class SocksProxyRotator:
         return await self._test_and_activate_nodes(uris, tier_name=tier_name)
 
     async def start_tunnel_for_node(self, node_uri: str, port: int = 10818) -> bool:
-        """Запускает локальный Sing-box / Xray / pproxy туннель для конкретной VPN ссылки."""
-        try:
-            parsed = sentinel_core_bridge.parse_subscription(node_uri)
-            if parsed:
-                cfg_json = sentinel_core_bridge.build_failover_client_config(parsed, socks_port=port, http_port=port+1)
-                if cfg_json:
-                    ok = await self.start_or_reload_singbox_tunnel(cfg_json, port=port)
-                    if ok:
-                        self._save_working_nodes_to_disk([node_uri])
-                        return True
-        except Exception as e:
-            logger.debug("Sing-box tunnel start attempt failed: %s", e)
-
-        if node_uri.startswith("ss://"):
-            try:
-                import pproxy
-                parsed_url = urllib.parse.urlparse(node_uri)
-                netloc = parsed_url.netloc or parsed_url.path
-                if '@' in netloc:
-                    creds, host_port = netloc.rsplit('@', 1)
-                else:
-                    creds, host_port = netloc, ''
-
-                if creds and ':' not in creds:
-                    creds = creds.strip()
-                    missing_padding = len(creds) % 4
-                    if missing_padding:
-                        creds += '=' * (4 - missing_padding)
-
-                cleaned_ss_url = f"ss://{creds}@{host_port}"
-                server = pproxy.Server(f'socks5://127.0.0.1:{port}')
-                remote = pproxy.Connection(cleaned_ss_url)
-                await server.start_server({'rserver': [remote]})
-                ok, lat = await self.test_proxy_alive(f"socks5://127.0.0.1:{port}", timeout=4.0)
+        """Запускает туннель для конкретной VPN ссылки."""
+        parsed = parse_vpn_uri(node_uri)
+        if parsed:
+            cfg_json = generate_singbox_failover_config([parsed], socks_port=port, http_port=port+1)
+            if cfg_json:
+                ok = await self.start_or_reload_singbox_tunnel(cfg_json, port=port)
                 if ok:
-                    logger.info("Started pproxy Shadowsocks tunnel on port %d (latency: %.1f ms)", port, lat)
                     self._save_working_nodes_to_disk([node_uri])
                     return True
-            except Exception as e:
-                logger.debug("Failed to start pproxy fallback: %s", e)
-
         return False
 
     async def _check_socks5_sources(self) -> Optional[str]:
@@ -366,7 +538,7 @@ class SocksProxyRotator:
         def _fetch(url):
             try:
                 req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
-                with urllib.request.urlopen(req, timeout=5) as resp:
+                with urllib.request.urlopen(req, timeout=4) as resp:
                     return resp.read().decode('utf-8', errors='ignore')
             except Exception:
                 return ""
@@ -381,11 +553,11 @@ class SocksProxyRotator:
         if not unique_proxies:
             return None
 
-        tasks = [self.test_proxy_alive(p, timeout=2.5) for p in unique_proxies[:60]]
+        tasks = [self.test_proxy_alive(p, timeout=2.0) for p in unique_proxies[:50]]
         results = await asyncio.gather(*tasks)
 
         working = []
-        for p, (ok, lat) in zip(unique_proxies[:60], results):
+        for p, (ok, lat) in zip(unique_proxies[:50], results):
             if ok:
                 working.append({"proxyUrl": p, "latencyMs": lat})
 
@@ -397,23 +569,8 @@ class SocksProxyRotator:
         logger.info("Tier 3 SOCKS5: found %d working proxies, best: %s (%.1f ms)", len(working), best_proxy, working[0]["latencyMs"])
         return best_proxy
 
-    async def test_proxy_alive(self, proxy_url: str, timeout: float = 3.5) -> Tuple[bool, float]:
-        """Проверяет доступность прокси с замером реального пинга без обязательных внешних библиотек."""
-        # 1. Try aiohttp + aiohttp_socks if installed
-        try:
-            import aiohttp
-            from aiohttp_socks import ProxyConnector
-            start = time.monotonic()
-            connector = ProxyConnector.from_url(proxy_url)
-            client_timeout = aiohttp.ClientTimeout(total=timeout, connect=2.0)
-            async with aiohttp.ClientSession(connector=connector, timeout=client_timeout) as session:
-                async with session.get("https://api.telegram.org", ssl=False) as resp:
-                    latency = (time.monotonic() - start) * 1000.0
-                    return resp.status in (200, 302, 400, 401, 404), latency
-        except (ImportError, Exception):
-            pass
-
-        # 2. Pure Python Standard Library socket probe (Zero dependencies fallback)
+    async def test_proxy_alive(self, proxy_url: str, timeout: float = 3.0) -> Tuple[bool, float]:
+        """Проверяет доступность SOCKS5/HTTP прокси сокетным рукопожатием."""
         loop = asyncio.get_running_loop()
 
         def _socket_probe():
@@ -426,7 +583,7 @@ class SocksProxyRotator:
                 s.settimeout(timeout)
                 s.connect((host, port))
                 if proxy_url.startswith("socks5://") or proxy_url.startswith("socks5h://"):
-                    # SOCKS5 greeting
+                    # SOCKS5 greeting: VER=5, NMETHODS=1, NO_AUTH=0
                     s.sendall(b"\x05\x01\x00")
                     resp = s.recv(2)
                     s.close()
