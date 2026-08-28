@@ -93,25 +93,32 @@ def parse_subscription(content_or_url: str) -> Optional[List[Dict[str, Any]]]:
 
     try:
         res = _ffi_call_json("SentinelParseSubscription", content_or_url)
-        if isinstance(res, list):
+        if isinstance(res, list) and len(res) > 0:
             return res
     except Exception as e:
         logger.debug("FFI SentinelParseSubscription error: %s", e)
 
     try:
-        res = run_core_command(["parse"], input_data=content_or_url)
-        if isinstance(res, list):
+        res = run_core_command(["parse-subscription"], input_data=content_or_url)
+        if isinstance(res, list) and len(res) > 0:
             return res
         if isinstance(res, dict) and "profiles" in res:
             return res["profiles"]
     except Exception as e:
-        logger.debug("CLI parse error: %s", e)
+        logger.debug("CLI parse-subscription error: %s", e)
+
+    try:
+        res = run_core_command(["parse"], input_data=content_or_url)
+        if isinstance(res, list) and len(res) > 0:
+            return res
+    except Exception:
+        pass
 
     # Line by line fallback using parse_proxy_uri
     profiles = []
     for line in content_or_url.splitlines():
         line = line.strip()
-        if not line or line.startswith("#"):
+        if not line or line.startswith("#") or line.startswith("//"):
             continue
         p = parse_proxy_uri(line)
         if isinstance(p, dict) and "protocol" in p:
