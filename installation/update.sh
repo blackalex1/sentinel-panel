@@ -337,15 +337,7 @@ if [ -f "$SERVICE_TEMPLATE" ]; then
 fi
 
 echo "===================================================="
-echo "[+] Update process complete! Checking services status & logs..."
+echo -e "\033[0;32m[✓] Обновление успешно завершено!\033[0m"
+echo -e "[ℹ️] Подключение к живому потоку логов панели (Нажмите \033[1mCTRL+C\033[0m для выхода в терминал):"
 echo "===================================================="
-docker compose ps
-echo ""
-echo "[+] Waiting for Sentinel-Panel to complete initialization..."
-sleep 2.5
-echo ""
-echo "--- 📋 Sentinel-Panel Application Logs (tail 30) ---"
-docker compose logs --tail 30 sentinel-panel 2>/dev/null || true
-echo ""
-echo "--- 📋 Sentinel-Agent Host Service Logs (tail 10) ---"
-journalctl -u sentinel-agent -n 10 --no-pager 2>/dev/null || true
+docker compose logs -f --tail 30 sentinel-panel
