@@ -1,25 +1,72 @@
 #!/bin/bash
 
 # ==============================================================================
-# Sentinel-Core Binary & Library Downloader
-# Fetches compiled sentinel-core engine for current OS/Arch with interactive version selector
+# Sentinel-Core Binary & Library Downloader for Sentinel-Panel
+# Fetches compiled sentinel-core engine for current OS/Arch with mirror & proxy support
 # ==============================================================================
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 BIN_DIR="$SCRIPT_DIR/bin"
 AUTO_MODE=0
 FORCE_MODE=0
+PROXY_URL=""
+NO_PROXY=0
 
-for arg in "$@"; do
-    case "$arg" in
-        --auto|-y) AUTO_MODE=1 ;;
-        --force|-f) FORCE_MODE=1 ;;
-        -*) ;;
-        *) BIN_DIR="$arg" ;;
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --auto|-y)
+            AUTO_MODE=1
+            shift
+            ;;
+        --force|-f)
+            FORCE_MODE=1
+            shift
+            ;;
+        --proxy|-p)
+            PROXY_URL="$2"
+            shift 2
+            ;;
+        --no-proxy)
+            NO_PROXY=1
+            shift
+            ;;
+        -*)
+            shift
+            ;;
+        *)
+            BIN_DIR="$1"
+            shift
+            ;;
     esac
 done
 
 mkdir -p "$BIN_DIR"
+
+# 0. Check proxy from .env if not specified via CLI
+if [ -z "$PROXY_URL" ] && [ "$NO_PROXY" -eq 0 ]; then
+    for env_f in "$SCRIPT_DIR/.env" "$SCRIPT_DIR/config/.env"; do
+        if [ -f "$env_f" ]; then
+            P_VAL=$(grep -E '^[[:space:]]*PROXY_URL=' "$env_f" 2>/dev/null | cut -d'=' -f2- | tr -d '"'\'' ')
+            if [ -n "$P_VAL" ]; then
+                PROXY_URL="$P_VAL"
+                break
+            fi
+        fi
+    done
+    if [ -z "$PROXY_URL" ]; then
+        PROXY_URL="${HTTPS_PROXY:-${HTTP_PROXY:-${ALL_PROXY:-${https_proxy:-${http_proxy:-${all_proxy:-}}}}}}"
+    fi
+fi
+
+VALID_PROXY=""
+CURL_OPTS=(-fsSL --connect-timeout 8 --max-time 60)
+if [ -n "$PROXY_URL" ] && [ "$NO_PROXY" -eq 0 ]; then
+    if [[ "$PROXY_URL" =~ ^(http|https|socks4|socks5|socks5h):// ]]; then
+        VALID_PROXY="$PROXY_URL"
+        CURL_OPTS+=("-x" "$VALID_PROXY")
+        echo "[+] Использование прокси для загрузки: $VALID_PROXY"
+    fi
+fi
 
 # 1. Detect OS
 OS_TYPE="$(uname -s | tr '[:upper:]' '[:lower:]')"
@@ -74,20 +121,37 @@ LATEST_ANY=""
 
 echo "[+] Опрос GitHub Releases для $REPO..."
 
-# Use python3 to fetch and categorize releases safely
+# Use python3 to fetch and categorize releases safely with proxy/mirror support
 if command -v python3 &>/dev/null; then
     RELEASE_DATA=$(python3 -c "
-import urllib.request, json, sys
-try:
-    req = urllib.request.Request('https://api.github.com/repos/$REPO/releases', headers={'User-Agent': 'SentinelPanel'})
-    with urllib.request.urlopen(req, timeout=6) as response:
-        releases = json.loads(response.read().decode('utf-8'))
-        stable = next((r['tag_name'] for r in releases if not r.get('prerelease')), '')
-        prerelease = next((r['tag_name'] for r in releases if r.get('prerelease')), '')
-        latest_any = releases[0]['tag_name'] if releases else ''
-        print(f'{stable}|{prerelease}|{latest_any}')
-except Exception:
-    print('||')
+import urllib.request, json, sys, ssl
+ctx = ssl.create_default_context()
+ctx.check_hostname = False
+ctx.verify_mode = ssl.CERT_NONE
+
+urls = [
+    'https://api.github.com/repos/$REPO/releases',
+    'https://ghproxy.net/https://api.github.com/repos/$REPO/releases',
+    'https://gh-proxy.com/https://api.github.com/repos/$REPO/releases'
+]
+proxy = '$VALID_PROXY'
+handlers = [urllib.request.ProxyHandler({'http': proxy, 'https': proxy})] if proxy else []
+opener = urllib.request.build_opener(*handlers)
+
+for u in urls:
+    try:
+        req = urllib.request.Request(u, headers={'User-Agent': 'SentinelPanel'})
+        with opener.open(req, timeout=6) as response:
+            releases = json.loads(response.read().decode('utf-8'))
+            if isinstance(releases, list) and len(releases) > 0:
+                stable = next((r['tag_name'] for r in releases if not r.get('prerelease')), '')
+                prerelease = next((r['tag_name'] for r in releases if r.get('prerelease')), '')
+                latest_any = releases[0]['tag_name'] if releases else ''
+                print(f'{stable}|{prerelease}|{latest_any}')
+                sys.exit(0)
+    except Exception:
+        continue
+print('||')
 " 2>/dev/null || echo "||")
     STABLE_VER=$(echo "$RELEASE_DATA" | cut -d'|' -f1)
     PRERELEASE_VER=$(echo "$RELEASE_DATA" | cut -d'|' -f2)
@@ -96,13 +160,18 @@ fi
 
 # Fallback with curl if python didn't get results
 if [ -z "$LATEST_ANY" ] && command -v curl &>/dev/null; then
-    LATEST_ANY=$(curl -fsSL --connect-timeout 5 "https://api.github.com/repos/$REPO/releases" 2>/dev/null | grep -m1 '"tag_name":' | cut -d'"' -f4 | tr -d '\r\n ')
+    for api_url in "https://api.github.com/repos/$REPO/releases" "https://ghproxy.net/https://api.github.com/repos/$REPO/releases" "https://gh-proxy.com/https://api.github.com/repos/$REPO/releases"; do
+        LATEST_ANY=$(curl "${CURL_OPTS[@]}" "$api_url" 2>/dev/null | grep -m1 '"tag_name":' | cut -d'"' -f4 | tr -d '\r\n ')
+        if [ -n "$LATEST_ANY" ]; then
+            [ -z "$STABLE_VER" ] && STABLE_VER="$LATEST_ANY"
+            break
+        fi
+    done
 fi
 
 # 5. Interactive version selection UI
 SELECTED_TAG=""
 
-# Check if running interactively in a TTY terminal
 if [ -t 0 ] && [ "$AUTO_MODE" -eq 0 ]; then
     echo ""
     echo "===================================================="
@@ -115,8 +184,6 @@ if [ -t 0 ] && [ "$AUTO_MODE" -eq 0 ]; then
 
     CURRENT_VER_TAG=$(echo "$CURRENT_VER" | grep -o -E 'v[0-9]+\.[0-9]+(\.[0-9]+)*(-[a-zA-Z0-9.]+)?' | head -n 1)
 
-    # Smart default: If current version is already the latest stable, default is Skip (3).
-    # If current version is older, a beta, or missing, default is Update to Stable (1).
     if [ "$IS_INSTALLED" -eq 1 ] && [ -n "$STABLE_VER" ] && [ "$CURRENT_VER_TAG" = "$STABLE_VER" ]; then
         DEFAULT_CHOICE="3"
     else
@@ -154,8 +221,9 @@ if [ -t 0 ] && [ "$AUTO_MODE" -eq 0 ]; then
             echo "  2) ⏹️  Пропустить установку ядра"
         fi
         echo "  3) ✏️  Ввести тег/версию вручную"
-        read -t 15 -p "Выберите вариант [1-3] (по умолчанию ${IS_INSTALLED:+2}${IS_INSTALLED:-1}): " USER_CHOICE || USER_CHOICE="${IS_INSTALLED:+2}${IS_INSTALLED:-1}"
-        USER_CHOICE="${USER_CHOICE:-${IS_INSTALLED:+2}${IS_INSTALLED:-1}}"
+        [ "$IS_INSTALLED" -eq 1 ] && DEFAULT_CHOICE="2"
+        read -t 15 -p "Выберите вариант [1-3] (по умолчанию $DEFAULT_CHOICE): " USER_CHOICE || USER_CHOICE="$DEFAULT_CHOICE"
+        USER_CHOICE="${USER_CHOICE:-$DEFAULT_CHOICE}"
         echo ""
         case "$USER_CHOICE" in
             1) SELECTED_TAG="$PRERELEASE_VER" ;;
@@ -166,13 +234,14 @@ if [ -t 0 ] && [ "$AUTO_MODE" -eq 0 ]; then
     elif [ -n "$STABLE_VER" ]; then
         echo "  1) 🟢 Установить стабильную версию ($STABLE_VER)"
         if [ "$IS_INSTALLED" -eq 1 ]; then
-            echo "  2) ⏹️  Оставить текущую версию (пропустить обновление) [По умолчанию]"
+            echo "  2) ⏹️  Оставить текущую версию (пропустить) [По умолчанию]"
         else
             echo "  2) ⏹️  Пропустить установку"
         fi
         echo "  3) ✏️  Ввести тег/версию вручную"
-        read -t 15 -p "Выберите вариант [1-3] (по умолчанию ${IS_INSTALLED:+2}${IS_INSTALLED:-1}): " USER_CHOICE || USER_CHOICE="${IS_INSTALLED:+2}${IS_INSTALLED:-1}"
-        USER_CHOICE="${USER_CHOICE:-${IS_INSTALLED:+2}${IS_INSTALLED:-1}}"
+        [ "$IS_INSTALLED" -eq 1 ] && DEFAULT_CHOICE="2"
+        read -t 15 -p "Выберите вариант [1-3] (по умолчанию $DEFAULT_CHOICE): " USER_CHOICE || USER_CHOICE="$DEFAULT_CHOICE"
+        USER_CHOICE="${USER_CHOICE:-$DEFAULT_CHOICE}"
         echo ""
         case "$USER_CHOICE" in
             1) SELECTED_TAG="$STABLE_VER" ;;
@@ -182,16 +251,18 @@ if [ -t 0 ] && [ "$AUTO_MODE" -eq 0 ]; then
         esac
     else
         echo "[-] Не удалось получить список версий через API."
-        echo "  1) Попробовать скачать последний релиз напрямую"
-        echo "  2) Ввести версию вручную"
-        echo "  3) Пропустить"
-        read -t 15 -p "Выберите вариант [1-3] (по умолчанию 3): " USER_CHOICE || USER_CHOICE="3"
-        USER_CHOICE="${USER_CHOICE:-3}"
+        echo "  1) 🟢 Скачать последний стабильный релиз (через зеркало)"
+        echo "  2) ✏️  Ввести версию вручную (например v0.0.7)"
+        echo "  3) ⏹️  Оставить текущую версию (пропустить) [По умолчанию]"
+        DEFAULT_CHOICE="1"
+        read -t 15 -p "Выберите вариант [1-3] (по умолчанию $DEFAULT_CHOICE): " USER_CHOICE || USER_CHOICE="$DEFAULT_CHOICE"
+        USER_CHOICE="${USER_CHOICE:-$DEFAULT_CHOICE}"
         echo ""
         case "$USER_CHOICE" in
-            1) SELECTED_TAG="" ;;
+            1) SELECTED_TAG="v0.0.7" ;;
             2) read -p "Введите тег релиза вручную: " SELECTED_TAG ;;
-            *) echo "[+] Обновление ядра пропущено."; exit 0 ;;
+            3) echo "[+] Обновление ядра пропущено."; exit 0 ;;
+            *) SELECTED_TAG="v0.0.7" ;;
         esac
     fi
 else
@@ -210,16 +281,21 @@ else
     fi
 fi
 
-echo "[+] Выбранная версия для загрузки: ${SELECTED_TAG:-latest}"
+echo "[+] Выбранная версия для загрузки: ${SELECTED_TAG:-v0.0.7}"
+TARGET_TAG="${SELECTED_TAG:-v0.0.7}"
 
-# 6. Build Candidate Download URLs
-URL_CANDIDATES=()
-if [ -n "$SELECTED_TAG" ]; then
-    URL_CANDIDATES+=("https://github.com/$REPO/releases/download/$SELECTED_TAG")
-fi
-URL_CANDIDATES+=("https://github.com/$REPO/releases/latest/download")
+# 6. Build Candidate Download URLs (Direct + Multiple Fast Mirrors)
+URL_CANDIDATES=(
+    "https://github.com/$REPO/releases/download/$TARGET_TAG"
+    "https://ghproxy.net/https://github.com/$REPO/releases/download/$TARGET_TAG"
+    "https://gh-proxy.com/https://github.com/$REPO/releases/download/$TARGET_TAG"
+    "https://mirror.ghproxy.com/https://github.com/$REPO/releases/download/$TARGET_TAG"
+    "https://github.com/$REPO/releases/latest/download"
+    "https://ghproxy.net/https://github.com/$REPO/releases/latest/download"
+    "https://gh-proxy.com/https://github.com/$REPO/releases/latest/download"
+)
 
-# Helper function to download asset
+# Helper function to download asset with multi-mirror fallback
 download_asset() {
     local ASSET_NAME="$1"
     local DEST_PATH="$2"
@@ -232,16 +308,29 @@ download_asset() {
         rm -f "$TMP_FILE"
 
         if command -v curl &>/dev/null; then
-            curl -fsSL --connect-timeout 10 --retry 2 "$URL" -o "$TMP_FILE" 2>/dev/null
+            curl "${CURL_OPTS[@]}" "$URL" -o "$TMP_FILE" 2>/dev/null
         elif command -v wget &>/dev/null; then
-            wget -q -T 10 -t 2 "$URL" -O "$TMP_FILE" 2>/dev/null
+            local WGET_OPTS=(-q -T 10 -t 2)
+            [ -n "$VALID_PROXY" ] && WGET_OPTS+=("-e" "http_proxy=$VALID_PROXY" "-e" "https_proxy=$VALID_PROXY")
+            wget "${WGET_OPTS[@]}" "$URL" -O "$TMP_FILE" 2>/dev/null
         elif command -v python3 &>/dev/null; then
-            python3 -c "import urllib.request; urllib.request.urlretrieve('$URL', '$TMP_FILE')" 2>/dev/null || true
+            python3 -c "
+import urllib.request, ssl
+ctx = ssl.create_default_context()
+ctx.check_hostname = False
+ctx.verify_mode = ssl.CERT_NONE
+proxy = '$VALID_PROXY'
+handlers = [urllib.request.ProxyHandler({'http': proxy, 'https': proxy})] if proxy else []
+opener = urllib.request.build_opener(*handlers)
+req = urllib.request.Request('$URL', headers={'User-Agent': 'SentinelPanel'})
+with opener.open(req, timeout=15) as r, open('$TMP_FILE', 'wb') as f:
+    f.write(r.read())
+" 2>/dev/null || true
         fi
 
         if [ -s "$TMP_FILE" ]; then
             # Verify it is not an HTML error response
-            if ! head -n 1 "$TMP_FILE" | grep -iq "<!DOCTYPE html>"; then
+            if ! head -n 1 "$TMP_FILE" | grep -iqE "<!DOCTYPE|<html|404: Not Found|\{\"message\":"; then
                 mv "$TMP_FILE" "$DEST_PATH"
                 if [ "$IS_EXEC" = "1" ]; then
                     chmod +x "$DEST_PATH" 2>/dev/null || true
