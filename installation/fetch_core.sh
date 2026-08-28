@@ -284,7 +284,53 @@ fi
 echo "[+] Выбранная версия для загрузки: ${SELECTED_TAG:-v0.0.7}"
 TARGET_TAG="${SELECTED_TAG:-v0.0.7}"
 
-# 6. Build Candidate Download URLs (Direct + Multiple Fast Mirrors)
+# 6. Fetch native release asset digests (SHA256 & Exact Size) from GitHub API
+DIGEST_FILE="/tmp/sentinel_core_digests.$$"
+rm -f "$DIGEST_FILE"
+
+if command -v python3 &>/dev/null; then
+    python3 -c "
+import urllib.request, json
+tag = '$TARGET_TAG'
+repo = '$REPO'
+urls = [
+    f'https://api.github.com/repos/{repo}/releases/tags/{tag}' if tag and tag != 'latest' else f'https://api.github.com/repos/{repo}/releases/latest',
+    f'https://ghproxy.net/https://api.github.com/repos/{repo}/releases/tags/{tag}' if tag and tag != 'latest' else f'https://ghproxy.net/https://api.github.com/repos/{repo}/releases/latest',
+    f'https://gh-proxy.com/https://api.github.com/repos/{repo}/releases/tags/{tag}' if tag and tag != 'latest' else f'https://gh-proxy.com/https://api.github.com/repos/{repo}/releases/latest',
+]
+proxy = '$VALID_PROXY'
+handlers = [urllib.request.ProxyHandler({'http': proxy, 'https': proxy})] if proxy else []
+opener = urllib.request.build_opener(*handlers)
+for url in urls:
+    try:
+        req = urllib.request.Request(url, headers={'User-Agent': 'SentinelPanel'})
+        with opener.open(req, timeout=10) as r:
+            rel = json.loads(r.read().decode('utf-8'))
+            with open('$DIGEST_FILE', 'w') as f:
+                for a in rel.get('assets', []):
+                    name = a.get('name')
+                    digest = a.get('digest', '')
+                    size = a.get('size', 0)
+                    if name:
+                        f.write(f'{name}={digest}={size}\n')
+            exit(0)
+    except Exception:
+        pass
+" 2>/dev/null || true
+fi
+
+calc_sha256() {
+    local file="$1"
+    if command -v sha256sum &>/dev/null; then
+        sha256sum "$file" 2>/dev/null | awk '{print $1}'
+    elif command -v shasum &>/dev/null; then
+        shasum -a 256 "$file" 2>/dev/null | awk '{print $1}'
+    elif command -v python3 &>/dev/null; then
+        python3 -c "import hashlib; print(hashlib.sha256(open('$file', 'rb').read()).hexdigest())" 2>/dev/null || true
+    fi
+}
+
+# 7. Build Candidate Download URLs (Direct + Multiple Fast Mirrors)
 URL_CANDIDATES=(
     "https://github.com/$REPO/releases/download/$TARGET_TAG"
     "https://ghproxy.net/https://github.com/$REPO/releases/download/$TARGET_TAG"
@@ -295,14 +341,14 @@ URL_CANDIDATES=(
     "https://gh-proxy.com/https://github.com/$REPO/releases/latest/download"
 )
 
-# Helper function to download asset with multi-mirror fallback
+# Helper function to download asset with multi-mirror fallback and cryptographic verification
 download_asset() {
     local ASSET_NAME="$1"
     local DEST_PATH="$2"
     local IS_EXEC="$3"
     local SUCCESS=0
 
-    local CURL_BASE_OPTS=("-fsSL" "--connect-timeout" "8" "--max-time" "30" "--speed-limit" "1024" "--speed-time" "6")
+    local CURL_BASE_OPTS=("-fsSL" "--connect-timeout" "10" "--max-time" "60" "--retry" "2" "--speed-limit" "1024" "--speed-time" "6")
 
     for BASE_URL in "${URL_CANDIDATES[@]}"; do
         local URL="$BASE_URL/$ASSET_NAME"
@@ -324,7 +370,7 @@ download_asset() {
                 curl "${CURL_BASE_OPTS[@]}" "$URL" -o "$TMP_FILE" 2>/dev/null || true
             fi
         elif command -v wget &>/dev/null; then
-            local WGET_OPTS=(-q -T 15 -t 1)
+            local WGET_OPTS=(-q -T 30 -t 2)
             if [ "$IS_MIRROR" -eq 0 ] && [ -n "$VALID_PROXY" ]; then
                 WGET_OPTS+=("-e" "http_proxy=$VALID_PROXY" "-e" "https_proxy=$VALID_PROXY")
             fi
@@ -340,7 +386,7 @@ handlers = [urllib.request.ProxyHandler({'http': proxy, 'https': proxy})] if pro
 opener = urllib.request.build_opener(*handlers)
 req = urllib.request.Request('$URL', headers={'User-Agent': 'SentinelPanel'})
 try:
-    with opener.open(req, timeout=15) as r, open('$TMP_FILE', 'wb') as f:
+    with opener.open(req, timeout=30) as r, open('$TMP_FILE', 'wb') as f:
         f.write(r.read())
 except Exception:
     pass
@@ -350,27 +396,65 @@ except Exception:
         if [ -s "$TMP_FILE" ]; then
             local FILE_SIZE=0
             FILE_SIZE=$(wc -c < "$TMP_FILE" 2>/dev/null || stat -c%s "$TMP_FILE" 2>/dev/null || stat -f%z "$TMP_FILE" 2>/dev/null || echo 0)
-            local MIN_SIZE=300000
-            if [[ "$ASSET_NAME" == *.h ]]; then
-                MIN_SIZE=200
+
+            # 1. Проверяем, не вернулась ли HTML-страница ошибки
+            if head -n 1 "$TMP_FILE" | grep -iqE "<!DOCTYPE|<html|404: Not Found|\{\"message\":"; then
+                rm -f "$TMP_FILE"
+                continue
             fi
-            # Verify it is not an HTML error response and passes size check
-            if [ "$FILE_SIZE" -gt "$MIN_SIZE" ] && ! head -n 1 "$TMP_FILE" | grep -iqE "<!DOCTYPE|<html|404: Not Found|\{\"message\":"; then
-                mv -f "$TMP_FILE" "$DEST_PATH"
-                if [ "$IS_EXEC" = "1" ]; then
-                    chmod +x "$DEST_PATH" 2>/dev/null || true
+
+            # 2. Верификация по нативному SHA-256 хешу от GitHub Releases
+            local EXPECTED_ENTRY=""
+            if [ -f "$DIGEST_FILE" ]; then
+                EXPECTED_ENTRY=$(grep -E "^${ASSET_NAME}=" "$DIGEST_FILE" 2>/dev/null | head -n 1)
+            fi
+            local EXPECTED_DIGEST=$(echo "$EXPECTED_ENTRY" | cut -d'=' -f2 | tr -d '\r\n ')
+            local EXPECTED_HASH="${EXPECTED_DIGEST#sha256:}"
+            local EXPECTED_SIZE=$(echo "$EXPECTED_ENTRY" | cut -d'=' -f3 | tr -d '\r\n ')
+
+            if [ -n "$EXPECTED_HASH" ]; then
+                local ACTUAL_HASH
+                ACTUAL_HASH=$(calc_sha256 "$TMP_FILE")
+                if [ "$ACTUAL_HASH" != "$EXPECTED_HASH" ]; then
+                    echo "[-] SHA-256 не совпадает для $ASSET_NAME (ожидался ${EXPECTED_HASH:0:12}..., получен ${ACTUAL_HASH:0:12}...). Пробуем следующий источник..."
+                    rm -f "$TMP_FILE"
+                    continue
                 fi
-                echo "[+] Успешно установлен $ASSET_NAME -> $DEST_PATH"
-                SUCCESS=1
-                break
+                echo "[+] SHA-256 проверен: ${ACTUAL_HASH:0:16}..."
+            elif [ -n "$EXPECTED_SIZE" ] && [ "$EXPECTED_SIZE" -gt 0 ]; then
+                if [ "$FILE_SIZE" -ne "$EXPECTED_SIZE" ]; then
+                    echo "[-] Несовпадение размера $ASSET_NAME (ожидалось: ${EXPECTED_SIZE}B, получено: ${FILE_SIZE}B). Пробуем следующий источник..."
+                    rm -f "$TMP_FILE"
+                    continue
+                fi
+            else
+                local MIN_SIZE=3000000
+                if [[ "$ASSET_NAME" == *.h ]]; then
+                    MIN_SIZE=200
+                fi
+                if [ "$FILE_SIZE" -le "$MIN_SIZE" ]; then
+                    echo "[-] Файл $ASSET_NAME слишком мал (${FILE_SIZE}B). Пробуем следующий источник..."
+                    rm -f "$TMP_FILE"
+                    continue
+                fi
             fi
+
+            # Безопасная замена inode (unlinking старого файла предотвращает Linux SIGBUS)
+            rm -f "$DEST_PATH"
+            mv -f "$TMP_FILE" "$DEST_PATH"
+            if [ "$IS_EXEC" = "1" ]; then
+                chmod +x "$DEST_PATH" 2>/dev/null || true
+            fi
+            echo "[+] Успешно установлен $ASSET_NAME -> $DEST_PATH"
+            SUCCESS=1
+            break
         fi
         rm -f "$TMP_FILE"
     done
 
     if [ "$SUCCESS" -eq 0 ]; then
         if [ -f "$DEST_PATH" ]; then
-            echo "[-] Не удалось загрузить $ASSET_NAME из релиза. Сохранена текущая локальная версия."
+            echo "[-] Не удалось загрузить целый $ASSET_NAME из релиза. Сохранена текущая локальная версия."
         else
             echo "[!] Ошибка: Не удалось скачать $ASSET_NAME."
         fi
