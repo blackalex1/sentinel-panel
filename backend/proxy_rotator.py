@@ -265,6 +265,20 @@ def generate_singbox_failover_config(profiles: List[Dict[str, Any]], socks_port:
     return json.dumps(config, indent=2)
 
 
+def _free_port(port: int):
+    """Принудительно освобождает порт, завершая зависшие процессы."""
+    if sys.platform != "win32":
+        try:
+            subprocess.run(["fuser", "-k", "-9", f"{port}/tcp"], capture_output=True, timeout=1.5)
+        except Exception:
+            pass
+        try:
+            cmd = f"lsof -t -i :{port} 2>/dev/null | xargs -r kill -9 2>/dev/null || true"
+            subprocess.run(["sh", "-c", cmd], capture_output=True, timeout=1.5)
+        except Exception:
+            pass
+
+
 class SocksProxyRotator:
     def __init__(self):
         self._singbox_proc: Optional[subprocess.Popen] = None
@@ -310,21 +324,14 @@ class SocksProxyRotator:
 
     async def start_or_reload_singbox_tunnel(self, config_json: str, port: int = 10818) -> bool:
         """Запускает или перезапускает локальный процесс Sing-box / Xray с клиентским failover-конфигом."""
+        self.stop_tunnel()
+        _free_port(port)
+        _free_port(port + 1)
+
         bin_path, engine_type = self._ensure_proxy_engine()
         if not bin_path:
             logger.warning("Neither sing-box nor xray binary found in PATH or bin/ directory.")
             return False
-
-        if self._singbox_proc:
-            try:
-                self._singbox_proc.terminate()
-                self._singbox_proc.wait(timeout=2)
-            except Exception:
-                try:
-                    self._singbox_proc.kill()
-                except Exception:
-                    pass
-            self._singbox_proc = None
 
         cfg_dir = os.path.dirname(os.path.abspath(__file__))
         cfg_path = os.path.join(cfg_dir, f"{engine_type}_failover.json")
@@ -336,13 +343,18 @@ class SocksProxyRotator:
 
         cmd = [bin_path, "run", "-c", cfg_path]
         try:
+            extra_kwargs = {}
+            if sys.platform != "win32":
+                extra_kwargs["preexec_fn"] = os.setsid
+
             self._singbox_proc = subprocess.Popen(
                 cmd,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 text=True,
                 encoding="utf-8",
-                env=env
+                env=env,
+                **extra_kwargs
             )
             self._current_engine = engine_type
 
@@ -360,23 +372,40 @@ class SocksProxyRotator:
                     return True
 
             logger.warning("%s started on port %d but failed health probe.", engine_type, port)
+            self.stop_tunnel()
             return False
         except Exception as e:
             logger.exception("Failed to launch %s client process: %s", engine_type, e)
+            self.stop_tunnel()
             return False
 
     def stop_tunnel(self):
-        """Останавливает запущенный фоновый процесс прокси."""
+        """Останавливает запущенный фоновый процесс прокси и всю его группу процессов."""
         if self._singbox_proc:
             try:
-                self._singbox_proc.terminate()
-                self._singbox_proc.wait(timeout=2)
+                if sys.platform != "win32":
+                    try:
+                        os.killpg(os.getpgid(self._singbox_proc.pid), signal.SIGTERM)
+                    except Exception:
+                        self._singbox_proc.terminate()
+                else:
+                    self._singbox_proc.terminate()
+                self._singbox_proc.wait(timeout=1.5)
             except Exception:
                 try:
-                    self._singbox_proc.kill()
+                    if sys.platform != "win32":
+                        try:
+                            os.killpg(os.getpgid(self._singbox_proc.pid), signal.SIGKILL)
+                        except Exception:
+                            self._singbox_proc.kill()
+                    else:
+                        self._singbox_proc.kill()
                 except Exception:
                     pass
             self._singbox_proc = None
+
+        _free_port(10818)
+        _free_port(10819)
 
     def _get_cache_file_path(self) -> str:
         """Путь к локальному дисковому кэшу рабочих VPN-нод."""
