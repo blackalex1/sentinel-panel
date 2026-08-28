@@ -220,6 +220,22 @@ def generate_singbox_failover_config(profiles: List[Dict[str, Any]], socks_port:
 
     config = {
         "log": {"level": "warn"},
+        "dns": {
+            "servers": [
+                {
+                    "tag": "dns-direct",
+                    "address": "8.8.8.8",
+                    "detour": "direct"
+                },
+                {
+                    "tag": "dns-remote",
+                    "address": "https://1.1.1.1/dns-query",
+                    "address_resolver": "dns-direct",
+                    "detour": "auto-failover"
+                }
+            ],
+            "strategy": "ipv4_only"
+        },
         "inbounds": [
             {
                 "type": "socks",
@@ -312,6 +328,9 @@ class SocksProxyRotator:
         with open(cfg_path, "w", encoding="utf-8") as f:
             f.write(config_json)
 
+        env = os.environ.copy()
+        env["ENABLE_DEPRECATED_LEGACY_DNS_SERVERS"] = "true"
+
         cmd = [bin_path, "run", "-c", cfg_path]
         try:
             self._singbox_proc = subprocess.Popen(
@@ -319,7 +338,8 @@ class SocksProxyRotator:
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 text=True,
-                encoding="utf-8"
+                encoding="utf-8",
+                env=env
             )
             self._current_engine = engine_type
 
