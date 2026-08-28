@@ -13,16 +13,30 @@ cd "$SCRIPT_DIR"
 PROXY_URL=""
 NO_PROXY=0
 AUTO_MODE=0
+USE_ROTATOR=1
+TUNNEL_PID=""
+
+cleanup_tunnel() {
+    if [ -n "$TUNNEL_PID" ]; then
+        kill -TERM "$TUNNEL_PID" 2>/dev/null || true
+        wait "$TUNNEL_PID" 2>/dev/null || true
+        TUNNEL_PID=""
+    fi
+    pkill -9 -f "proxy_rotator.*10818" 2>/dev/null || true
+}
+trap cleanup_tunnel EXIT INT TERM
 
 # Parse arguments
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --proxy|-p)
             PROXY_URL="$2"
+            USE_ROTATOR=0
             shift 2
             ;;
         --no-proxy)
             NO_PROXY=1
+            USE_ROTATOR=0
             shift
             ;;
         --auto|-y)
@@ -32,8 +46,8 @@ while [[ $# -gt 0 ]]; do
         --help|-h)
             echo "Использование: sudo ./update.sh [опции]"
             echo "Опции:"
-            echo "  --proxy <URL>   Использовать HTTP/HTTPS/SOCKS5 прокси (например, socks5://127.0.0.1:10808 или http://127.0.0.1:7890)"
-            echo "  --no-proxy      Игнорировать прокси из .env и окружения"
+            echo "  --proxy <URL>   Использовать HTTP/HTTPS/SOCKS5 прокси (например, socks5://127.0.0.1:10808)"
+            echo "  --no-proxy      Прямое подключение без прокси и ротатора"
             echo "  --auto, -y      Автоматический режим обновления без интерактива"
             exit 0
             ;;
@@ -54,54 +68,96 @@ if [ -z "$PROXY_URL" ] && [ "$NO_PROXY" -eq 0 ]; then
             fi
         fi
     done
-    if [ -z "$PROXY_URL" ]; then
-        PROXY_URL="${HTTPS_PROXY:-${HTTP_PROXY:-${ALL_PROXY:-${https_proxy:-${http_proxy:-${all_proxy:-}}}}}}"
-    fi
 fi
 
 # Interactive Proxy Choice Menu (if in TTY terminal and not in auto mode)
-if [ -t 0 ] && [ "$AUTO_MODE" -eq 0 ] && [ -z "$PROXY_URL" ] && [ "$NO_PROXY" -eq 0 ]; then
+if [ -t 0 ] && [ "$AUTO_MODE" -eq 0 ] && [ "$NO_PROXY" -eq 0 ]; then
     echo "===================================================="
-    echo "🌐 НАСТРОЙКА СЕТИ И ПРОКСИ ДЛЯ ОБНОВЛЕНИЯ"
+    echo "🌐 НАСТРОЙКА СЕТИ И ПРОКСИ ДЛЯ ОБНОВЛЕНИЯ ПАНЕЛИ"
     echo "===================================================="
-    echo "Выберите режим подключения к GitHub для загрузки релизов и обновлений:"
-    echo "  1) 🟢 Прямое соединение + быстрые CDN-зеркала [Рекомендуется / По умолчанию]"
-    echo "  2) 🔌 Использовать HTTP / SOCKS5 прокси (например, socks5://127.0.0.1:10808)"
-    echo "  3) ⏹️  Только прямое соединение (без зеркал и без прокси)"
-    read -t 15 -p "Выберите вариант [1-3] (по умолчанию 1): " NET_CHOICE || NET_CHOICE="1"
+    echo "Выберите режим подключения к GitHub для загрузки релизов:"
+    echo "  1) 🟢 Автоматический VPN / Прокси ротатор [Рекомендуется / По умолчанию]"
+    echo "  2) 🌐 Прямое соединение + быстрые CDN-зеркала"
+    echo "  3) 🔌 Использовать существующий HTTP / SOCKS5 прокси"
+    echo "  4) ⏹️  Только прямое соединение (без прокси и без ротатора)"
+    read -t 15 -p "Выберите вариант [1-4] (по умолчанию 1): " NET_CHOICE || NET_CHOICE="1"
     NET_CHOICE="${NET_CHOICE:-1}"
     echo ""
     case "$NET_CHOICE" in
+        1)
+            USE_ROTATOR=1
+            ;;
         2)
+            USE_ROTATOR=0
+            ;;
+        3)
+            USE_ROTATOR=0
             read -p "Введите адрес прокси (например socks5://127.0.0.1:10808): " USER_P
             if [ -n "$USER_P" ]; then
                 PROXY_URL="$USER_P"
             fi
             ;;
-        3)
+        4)
+            USE_ROTATOR=0
             NO_PROXY=1
             ;;
         *)
+            USE_ROTATOR=1
             ;;
     esac
 fi
 
+# Launch Rotator tunnel if requested
+ROTATOR_ACTIVE_PROXY=""
+if [ "$USE_ROTATOR" -eq 1 ] && [ "$NO_PROXY" -eq 0 ] && command -v python3 &>/dev/null; then
+    echo "[+] Поиск и запуск рабочего VPN-соединения через Sentinel Proxy Rotator..."
+    ROTATOR_CMD=(python3 -m backend.proxy_rotator --port 10818)
+    if [ -n "$PROXY_URL" ] && [[ "$PROXY_URL" =~ ^(ss|vless|vmess|trojan|hysteria2):// ]]; then
+        ROTATOR_CMD+=(--node "$PROXY_URL")
+    else
+        ROTATOR_CMD+=(--find-and-start)
+    fi
+
+    # Launch in background and wait for PROXY_READY
+    TEMP_ROTATOR_LOG="/tmp/panel_rotator_start.log"
+    rm -f "$TEMP_ROTATOR_LOG"
+    "${ROTATOR_CMD[@]}" > "$TEMP_ROTATOR_LOG" 2>&1 &
+    TUNNEL_PID=$!
+
+    for ((i=0; i<30; i++)); do
+        if grep -q "PROXY_READY:" "$TEMP_ROTATOR_LOG" 2>/dev/null; then
+            ROTATOR_ACTIVE_PROXY=$(grep -m1 "PROXY_READY:" "$TEMP_ROTATOR_LOG" | cut -d':' -f2- | tr -d '\r\n ')
+            echo "[+] VPN-туннель успешно поднят на $ROTATOR_ACTIVE_PROXY!"
+            break
+        fi
+        if ! kill -0 "$TUNNEL_PID" 2>/dev/null; then
+            break
+        fi
+        sleep 0.5
+    done
+    rm -f "$TEMP_ROTATOR_LOG"
+fi
+
 VALID_PROXY=""
 FETCH_ARGS=()
-if [ -n "$PROXY_URL" ] && [ "$NO_PROXY" -eq 0 ]; then
+
+if [ -n "$ROTATOR_ACTIVE_PROXY" ]; then
+    VALID_PROXY="$ROTATOR_ACTIVE_PROXY"
+elif [ -n "$PROXY_URL" ] && [ "$NO_PROXY" -eq 0 ]; then
     if [[ "$PROXY_URL" =~ ^(http|https|socks4|socks5|socks5h):// ]]; then
         VALID_PROXY="$PROXY_URL"
-        echo "[+] Настроено подключение через прокси: $VALID_PROXY"
-        export http_proxy="$VALID_PROXY"
-        export https_proxy="$VALID_PROXY"
-        export all_proxy="$VALID_PROXY"
-        export HTTP_PROXY="$VALID_PROXY"
-        export HTTPS_PROXY="$VALID_PROXY"
-        export ALL_PROXY="$VALID_PROXY"
-        FETCH_ARGS+=("--proxy" "$VALID_PROXY")
-    else
-        echo "[ℹ️] В конфигурации указана VPN-нода (${PROXY_URL%%:*}:...). Будут задействованы быстрые зеркала и прямые соединения."
     fi
+fi
+
+if [ -n "$VALID_PROXY" ]; then
+    echo "[+] Активный прокси для загрузки обновлений: $VALID_PROXY"
+    export http_proxy="$VALID_PROXY"
+    export https_proxy="$VALID_PROXY"
+    export all_proxy="$VALID_PROXY"
+    export HTTP_PROXY="$VALID_PROXY"
+    export HTTPS_PROXY="$VALID_PROXY"
+    export ALL_PROXY="$VALID_PROXY"
+    FETCH_ARGS+=("--proxy" "$VALID_PROXY")
 fi
 
 if [ "$AUTO_MODE" -eq 1 ]; then
