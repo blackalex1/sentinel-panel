@@ -302,29 +302,48 @@ download_asset() {
     local IS_EXEC="$3"
     local SUCCESS=0
 
+    local CURL_BASE_OPTS=("-fsSL" "--connect-timeout" "8" "--max-time" "30" "--speed-limit" "1024" "--speed-time" "6")
+
     for BASE_URL in "${URL_CANDIDATES[@]}"; do
         local URL="$BASE_URL/$ASSET_NAME"
         local TMP_FILE="/tmp/${ASSET_NAME}.$$"
         rm -f "$TMP_FILE"
 
+        local IS_MIRROR=0
+        if [[ "$BASE_URL" =~ (ghproxy|gh-proxy|fastgit) ]]; then
+            IS_MIRROR=1
+        fi
+
         if command -v curl &>/dev/null; then
-            curl "${CURL_OPTS[@]}" "$URL" -o "$TMP_FILE" 2>/dev/null
+            if [ "$IS_MIRROR" -eq 1 ]; then
+                # CDN mirrors should connect directly without proxy
+                curl "${CURL_BASE_OPTS[@]}" -x "" "$URL" -o "$TMP_FILE" 2>/dev/null || true
+            elif [ -n "$VALID_PROXY" ]; then
+                curl "${CURL_BASE_OPTS[@]}" -x "$VALID_PROXY" "$URL" -o "$TMP_FILE" 2>/dev/null || true
+            else
+                curl "${CURL_BASE_OPTS[@]}" "$URL" -o "$TMP_FILE" 2>/dev/null || true
+            fi
         elif command -v wget &>/dev/null; then
-            local WGET_OPTS=(-q -T 10 -t 2)
-            [ -n "$VALID_PROXY" ] && WGET_OPTS+=("-e" "http_proxy=$VALID_PROXY" "-e" "https_proxy=$VALID_PROXY")
-            wget "${WGET_OPTS[@]}" "$URL" -O "$TMP_FILE" 2>/dev/null
+            local WGET_OPTS=(-q -T 15 -t 1)
+            if [ "$IS_MIRROR" -eq 0 ] && [ -n "$VALID_PROXY" ]; then
+                WGET_OPTS+=("-e" "http_proxy=$VALID_PROXY" "-e" "https_proxy=$VALID_PROXY")
+            fi
+            wget "${WGET_OPTS[@]}" "$URL" -O "$TMP_FILE" 2>/dev/null || true
         elif command -v python3 &>/dev/null; then
             python3 -c "
 import urllib.request, ssl
 ctx = ssl.create_default_context()
 ctx.check_hostname = False
 ctx.verify_mode = ssl.CERT_NONE
-proxy = '$VALID_PROXY'
+proxy = '$VALID_PROXY' if $IS_MIRROR == 0 else ''
 handlers = [urllib.request.ProxyHandler({'http': proxy, 'https': proxy})] if proxy else []
 opener = urllib.request.build_opener(*handlers)
 req = urllib.request.Request('$URL', headers={'User-Agent': 'SentinelPanel'})
-with opener.open(req, timeout=15) as r, open('$TMP_FILE', 'wb') as f:
-    f.write(r.read())
+try:
+    with opener.open(req, timeout=15) as r, open('$TMP_FILE', 'wb') as f:
+        f.write(r.read())
+except Exception:
+    pass
 " 2>/dev/null || true
         fi
 
