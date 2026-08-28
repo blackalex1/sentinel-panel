@@ -299,13 +299,8 @@ if docker volume inspect sentinel-panel_pgdata &>/dev/null; then
     fi
 fi
 
-# Verify proxy health before docker build, auto-unset if inactive to avoid proxyconnect connection refused
-if [ -n "$VALID_PROXY" ] && [[ "$VALID_PROXY" == *"127.0.0.1"* ]]; then
-    if ! (echo >/dev/tcp/127.0.0.1/10818) 2>/dev/null; then
-        echo "[!] Прокси на 127.0.0.1:10818 неактивен, переключаем Docker сборку на прямое соединение..."
-        unset http_proxy https_proxy all_proxy HTTP_PROXY HTTPS_PROXY ALL_PROXY
-    fi
-fi
+# Clean up proxy environment variables before running docker compose to prevent Docker BuildKit from failing on localhost SOCKS5 proxy
+unset http_proxy https_proxy all_proxy HTTP_PROXY HTTPS_PROXY ALL_PROXY
 
 if docker compose up -d --build; then
     echo "[+] Docker containers rebuilt and started successfully!"

@@ -1,9 +1,6 @@
 # Stage 1: Build dependencies
 FROM python:3.14-slim AS builder
 
-# Install uv from the official image
-COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
-
 # Set working directory
 WORKDIR /app
 
@@ -12,8 +9,9 @@ ENV VIRTUAL_ENV=/app/.venv
 ENV PATH="$VIRTUAL_ENV/bin:$PATH"
 ENV UV_COMPILE_BYTECODE=1
 
-# Create virtual environment and install requirements
-RUN uv venv $VIRTUAL_ENV
+# Install uv directly and create virtualenv
+RUN pip install --no-cache-dir uv && \
+    uv venv $VIRTUAL_ENV
 COPY requirements.txt /app/
 RUN uv pip install --no-cache -r requirements.txt
 
