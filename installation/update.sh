@@ -129,7 +129,7 @@ fi
 # Launch Rotator tunnel if requested
 ROTATOR_ACTIVE_PROXY=""
 if [ "$USE_ROTATOR" -eq 1 ] && [ "$NO_PROXY" -eq 0 ]; then
-    echo "[+] Поиск и запуск рабочего VPN-соединения через Sentinel Proxy Rotator..."
+    echo -e "\033[0;36m[+] Запуск Sentinel Proxy Rotator для поиска рабочего VPN...\033[0m"
     ROTATOR_CMD=("$PYTHON_BIN" -m backend.proxy_rotator --port 10818)
     if [ -n "$PROXY_URL" ] && [[ "$PROXY_URL" =~ ^(ss|vless|vmess|trojan|hysteria2):// ]]; then
         ROTATOR_CMD+=(--node "$PROXY_URL")
@@ -137,26 +137,43 @@ if [ "$USE_ROTATOR" -eq 1 ] && [ "$NO_PROXY" -eq 0 ]; then
         ROTATOR_CMD+=(--find-and-start)
     fi
 
-    # Launch in background and wait for PROXY_READY
+    # Launch in background and monitor PROXY_READY with real-time logs
     TEMP_ROTATOR_LOG="/tmp/panel_rotator_start.log"
     rm -f "$TEMP_ROTATOR_LOG"
     "${ROTATOR_CMD[@]}" > "$TEMP_ROTATOR_LOG" 2>&1 &
     TUNNEL_PID=$!
 
-    for ((i=0; i<30; i++)); do
+    LAST_LINE_COUNT=0
+    for ((i=0; i<60; i++)); do
+        if [ -f "$TEMP_ROTATOR_LOG" ]; then
+            CURRENT_LINE_COUNT=$(wc -l < "$TEMP_ROTATOR_LOG" 2>/dev/null || echo 0)
+            if [ "$CURRENT_LINE_COUNT" -gt "$LAST_LINE_COUNT" ]; then
+                tail -n +"$((LAST_LINE_COUNT + 1))" "$TEMP_ROTATOR_LOG" 2>/dev/null | grep -v "PROXY_READY:" | while read -r line; do
+                    [ -n "$line" ] && echo "    $line"
+                done
+                LAST_LINE_COUNT="$CURRENT_LINE_COUNT"
+            fi
+        fi
+
         if grep -q "PROXY_READY:" "$TEMP_ROTATOR_LOG" 2>/dev/null; then
             ROTATOR_ACTIVE_PROXY=$(grep -m1 "PROXY_READY:" "$TEMP_ROTATOR_LOG" | cut -d':' -f2- | tr -d '\r\n ')
-            echo "[+] VPN-туннель успешно поднят на $ROTATOR_ACTIVE_PROXY!"
+            echo -e "\033[0;32m[✓] VPN-туннель успешно поднят на $ROTATOR_ACTIVE_PROXY!\033[0m"
             break
         fi
+
         if ! kill -0 "$TUNNEL_PID" 2>/dev/null; then
-            echo "[-] Не удалось запустить локальный VPN-ротатор. Лог:"
+            echo -e "\033[0;31m[-] Процесс ротатора завершился до установления соединения. Лог:\033[0m"
             cat "$TEMP_ROTATOR_LOG" 2>/dev/null
             break
         fi
         sleep 0.5
     done
-    rm -f "$TEMP_ROTATOR_LOG"
+
+    if [ -z "$ROTATOR_ACTIVE_PROXY" ] && kill -0 "$TUNNEL_PID" 2>/dev/null; then
+        echo -e "\033[0;33m[!] Превышено время ожидания ответа от VPN-нод. Продолжаем обновление без ротатора...\033[0m"
+        kill -TERM "$TUNNEL_PID" 2>/dev/null || true
+        TUNNEL_PID=""
+    fi
 fi
 
 VALID_PROXY=""
@@ -171,7 +188,7 @@ elif [ -n "$PROXY_URL" ] && [ "$NO_PROXY" -eq 0 ]; then
 fi
 
 if [ -n "$VALID_PROXY" ]; then
-    echo "[+] Активный прокси для загрузки обновлений: $VALID_PROXY"
+    echo -e "\033[0;32m[✓] Активное прокси-соединение для обновления: $VALID_PROXY\033[0m"
     export http_proxy="$VALID_PROXY"
     export https_proxy="$VALID_PROXY"
     export all_proxy="$VALID_PROXY"
@@ -179,6 +196,8 @@ if [ -n "$VALID_PROXY" ]; then
     export HTTPS_PROXY="$VALID_PROXY"
     export ALL_PROXY="$VALID_PROXY"
     FETCH_ARGS+=("--proxy" "$VALID_PROXY")
+else
+    echo -e "\033[0;33m[ℹ️] Прокси не активен. Будут задействованы быстрые CDN-зеркала и прямые соединения.\033[0m"
 fi
 
 if [ "$AUTO_MODE" -eq 1 ]; then
