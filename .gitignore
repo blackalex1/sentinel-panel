@@ -43,6 +43,8 @@ htmlcov/
 pgdata/
 bin/xray
 bin/xray.exe
+*failover.json
+config/cached_vpn_nodes.json
 bin/sing-box
 bin/sing-box.exe
 bin/hysteria-*
