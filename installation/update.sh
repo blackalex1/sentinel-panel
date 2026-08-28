@@ -257,8 +257,15 @@ fi
 
 # 3. Rebuild and restart Docker containers
 echo "[+] Rebuilding and restarting Docker containers..."
-pkill -9 -f "sing-box" 2>/dev/null || true
-pkill -9 -f "xray" 2>/dev/null || true
+# Kill old background server cores, but preserve active rotator tunnel
+if [ -n "$TUNNEL_PID" ]; then
+    pgrep -f "sing-box.*singbox_server" 2>/dev/null | xargs -r kill -9 2>/dev/null || true
+    pgrep -f "xray.*xray_server" 2>/dev/null | xargs -r kill -9 2>/dev/null || true
+else
+    pkill -9 -f "sing-box" 2>/dev/null || true
+    pkill -9 -f "xray" 2>/dev/null || true
+fi
+
 docker ps -a --filter "name=spectre" -q | xargs -r docker rm -f 2>/dev/null || true
 docker ps -a --filter "name=sentinel" -q | xargs -r docker rm -f 2>/dev/null || true
 docker compose down --remove-orphans 2>/dev/null || true
@@ -289,6 +296,14 @@ if docker volume inspect sentinel-panel_pgdata &>/dev/null; then
         docker volume create --label "com.docker.compose.project=sentinel-panel" --label "com.docker.compose.volume=pgdata" sentinel-panel_pgdata >/dev/null 2>&1
         docker run --rm -v sentinel-panel_pgdata_migrated:/from -v sentinel-panel_pgdata:/to postgres:16-alpine sh -c "cp -a /from/. /to/"
         docker volume rm -f sentinel-panel_pgdata_migrated >/dev/null 2>&1
+    fi
+fi
+
+# Verify proxy health before docker build, auto-unset if inactive to avoid proxyconnect connection refused
+if [ -n "$VALID_PROXY" ] && [[ "$VALID_PROXY" == *"127.0.0.1"* ]]; then
+    if ! (echo >/dev/tcp/127.0.0.1/10818) 2>/dev/null; then
+        echo "[!] Прокси на 127.0.0.1:10818 неактивен, переключаем Docker сборку на прямое соединение..."
+        unset http_proxy https_proxy all_proxy HTTP_PROXY HTTPS_PROXY ALL_PROXY
     fi
 fi
 
