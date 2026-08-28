@@ -323,8 +323,11 @@ echo "[+] Update process complete! Checking services status & logs..."
 echo "===================================================="
 docker compose ps
 echo ""
-echo "--- 📋 Sentinel-Panel Container Logs (tail 20) ---"
-docker compose logs --tail 20 2>/dev/null || true
+echo "[+] Waiting for Sentinel-Panel to complete initialization..."
+sleep 2.5
+echo ""
+echo "--- 📋 Sentinel-Panel Application Logs (tail 30) ---"
+docker compose logs --tail 30 sentinel-panel 2>/dev/null || true
 echo ""
 echo "--- 📋 Sentinel-Agent Host Service Logs (tail 10) ---"
 journalctl -u sentinel-agent -n 10 --no-pager 2>/dev/null || true
