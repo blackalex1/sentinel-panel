@@ -319,7 +319,12 @@ if [ -f "$SERVICE_TEMPLATE" ]; then
 fi
 
 echo "===================================================="
-echo "[+] Update process complete! Checking services status..."
+echo "[+] Update process complete! Checking services status & logs..."
 echo "===================================================="
 docker compose ps
-systemctl status sentinel-agent --no-pager -n 5 2>/dev/null || true
+echo ""
+echo "--- 📋 Sentinel-Panel Container Logs (tail 20) ---"
+docker compose logs --tail 20 2>/dev/null || true
+echo ""
+echo "--- 📋 Sentinel-Agent Host Service Logs (tail 10) ---"
+journalctl -u sentinel-agent -n 10 --no-pager 2>/dev/null || true
