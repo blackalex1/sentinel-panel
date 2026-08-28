@@ -348,9 +348,11 @@ except Exception:
         fi
 
         if [ -s "$TMP_FILE" ]; then
-            # Verify it is not an HTML error response
-            if ! head -n 1 "$TMP_FILE" | grep -iqE "<!DOCTYPE|<html|404: Not Found|\{\"message\":"; then
-                mv "$TMP_FILE" "$DEST_PATH"
+            local FILE_SIZE=0
+            FILE_SIZE=$(wc -c < "$TMP_FILE" 2>/dev/null || stat -c%s "$TMP_FILE" 2>/dev/null || stat -f%z "$TMP_FILE" 2>/dev/null || echo 0)
+            # Verify it is not an HTML error response and is at least 300KB
+            if [ "$FILE_SIZE" -gt 300000 ] && ! head -n 1 "$TMP_FILE" | grep -iqE "<!DOCTYPE|<html|404: Not Found|\{\"message\":"; then
+                mv -f "$TMP_FILE" "$DEST_PATH"
                 if [ "$IS_EXEC" = "1" ]; then
                     chmod +x "$DEST_PATH" 2>/dev/null || true
                 fi
