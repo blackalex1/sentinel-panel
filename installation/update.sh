@@ -226,11 +226,14 @@ if pull_panel_git; then
     PULL_OK=1
 else
     echo "[!] Прямое подключение к GitHub не удалось. Пробуем через быстрое зеркало..."
-    if git fetch "https://ghproxy.net/https://github.com/blackalex1/sentinel-panel.git" main 2>/dev/null && git reset --hard FETCH_HEAD; then
-        echo "[+] Git успешно обновлен через быстрое зеркало!"
+    if git -c "http.proxy=" -c "https.proxy=" fetch "https://ghproxy.net/https://github.com/blackalex1/sentinel-panel.git" main 2>/dev/null && git reset --hard FETCH_HEAD; then
+        echo "[+] Git успешно обновлен через быстрое зеркало ghproxy.net!"
         PULL_OK=1
-    elif git fetch "https://gh-proxy.com/https://github.com/blackalex1/sentinel-panel.git" main 2>/dev/null && git reset --hard FETCH_HEAD; then
+    elif git -c "http.proxy=" -c "https.proxy=" fetch "https://gh-proxy.com/https://github.com/blackalex1/sentinel-panel.git" main 2>/dev/null && git reset --hard FETCH_HEAD; then
         echo "[+] Git успешно обновлен через зеркало gh-proxy.com!"
+        PULL_OK=1
+    elif git -c "http.proxy=" -c "https.proxy=" fetch "https://mirror.ghproxy.com/https://github.com/blackalex1/sentinel-panel.git" main 2>/dev/null && git reset --hard FETCH_HEAD; then
+        echo "[+] Git успешно обновлен через mirror.ghproxy.com!"
         PULL_OK=1
     fi
 fi

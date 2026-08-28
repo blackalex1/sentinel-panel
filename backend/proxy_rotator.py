@@ -223,17 +223,18 @@ def generate_singbox_failover_config(profiles: List[Dict[str, Any]], socks_port:
         "dns": {
             "servers": [
                 {
-                    "tag": "dns-direct",
-                    "address": "8.8.8.8",
-                    "detour": "direct"
+                    "type": "udp",
+                    "tag": "dns-remote",
+                    "server": "1.1.1.1",
+                    "detour": "auto-failover"
                 },
                 {
-                    "tag": "dns-remote",
-                    "address": "https://1.1.1.1/dns-query",
-                    "address_resolver": "dns-direct",
-                    "detour": "auto-failover"
+                    "type": "udp",
+                    "tag": "dns-direct",
+                    "server": "8.8.8.8"
                 }
             ],
+            "final": "dns-remote",
             "strategy": "ipv4_only"
         },
         "inbounds": [
@@ -241,13 +242,15 @@ def generate_singbox_failover_config(profiles: List[Dict[str, Any]], socks_port:
                 "type": "socks",
                 "tag": "socks-in",
                 "listen": "127.0.0.1",
-                "listen_port": socks_port
+                "listen_port": socks_port,
+                "sniff": True
             },
             {
                 "type": "http",
                 "tag": "http-in",
                 "listen": "127.0.0.1",
-                "listen_port": http_port
+                "listen_port": http_port,
+                "sniff": True
             }
         ],
         "outbounds": [failover_outbound] + outbounds + [
@@ -590,7 +593,7 @@ class SocksProxyRotator:
         return best_proxy
 
     async def test_proxy_alive(self, proxy_url: str, timeout: float = 3.0) -> Tuple[bool, float]:
-        """Проверяет доступность SOCKS5/HTTP прокси сокетным рукопожатием."""
+        """Проверяет доступность SOCKS5/HTTP прокси сокетным рукопожатием и сквозным соединением (E2E)."""
         loop = asyncio.get_running_loop()
 
         def _socket_probe():
@@ -603,19 +606,31 @@ class SocksProxyRotator:
                 s.settimeout(timeout)
                 s.connect((host, port))
                 if proxy_url.startswith("socks5://") or proxy_url.startswith("socks5h://"):
-                    # SOCKS5 greeting: VER=5, NMETHODS=1, NO_AUTH=0
+                    # 1. SOCKS5 greeting: VER=5, NMETHODS=1, NO_AUTH=0
                     s.sendall(b"\x05\x01\x00")
                     resp = s.recv(2)
+                    if resp != b"\x05\x00":
+                        s.close()
+                        return False, 999999.0
+
+                    # 2. SOCKS5 CONNECT to 1.1.1.1:80 to verify real internet connectivity through VPN!
+                    ip_bytes = socket.inet_aton("1.1.1.1")
+                    port_bytes = (80).to_bytes(2, byteorder="big")
+                    req = b"\x05\x01\x00\x01" + ip_bytes + port_bytes
+                    s.sendall(req)
+                    connect_resp = s.recv(10)
                     s.close()
-                    lat = (time.monotonic() - start) * 1000.0
-                    return (resp == b"\x05\x00"), lat
+                    if len(connect_resp) >= 2 and connect_resp[1] == 0:
+                        lat = (time.monotonic() - start) * 1000.0
+                        return True, lat
+                    return False, 999999.0
                 elif proxy_url.startswith("socks4://"):
                     s.close()
                     lat = (time.monotonic() - start) * 1000.0
                     return True, lat
                 else:
                     # HTTP proxy probe
-                    s.sendall(b"CONNECT api.telegram.org:443 HTTP/1.1\r\nHost: api.telegram.org:443\r\n\r\n")
+                    s.sendall(b"CONNECT 1.1.1.1:80 HTTP/1.1\r\nHost: 1.1.1.1:80\r\n\r\n")
                     resp = s.recv(12)
                     s.close()
                     lat = (time.monotonic() - start) * 1000.0
