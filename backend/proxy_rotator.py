@@ -225,7 +225,6 @@ def generate_singbox_failover_config(profiles: List[Dict[str, Any]], socks_port:
                 {
                     "tag": "dns-remote",
                     "address": "https://1.1.1.1/dns-query",
-                    "address_resolver": "dns-direct",
                     "detour": "auto-failover"
                 },
                 {
