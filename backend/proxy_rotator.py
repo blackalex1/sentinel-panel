@@ -1,23 +1,27 @@
+import os
+import sys
+
+# Ensure panel root is the first entry and script directory does not shadow stdlib modules (e.g. backend/ssl)
+_current_dir = os.path.dirname(os.path.abspath(__file__))
+_panel_root = os.path.dirname(_current_dir)
+while _current_dir in sys.path:
+    sys.path.remove(_current_dir)
+if _panel_root not in sys.path:
+    sys.path.insert(0, _panel_root)
+
 import asyncio
 import json
 import logging
-import os
 import re
 import shutil
 import signal
 import socket
 import ssl
 import subprocess
-import sys
 import time
 import urllib.parse
 import urllib.request
 from typing import Optional, List, Dict, Any, Tuple
-
-# Ensure panel root directory is always present in sys.path for direct CLI execution
-_panel_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-if _panel_root not in sys.path:
-    sys.path.insert(0, _panel_root)
 
 from backend import sentinel_core_bridge
 
