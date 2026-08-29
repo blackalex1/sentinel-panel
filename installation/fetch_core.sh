@@ -241,14 +241,16 @@ if [ -t 0 ] && [ "$AUTO_MODE" -eq 0 ]; then
             *) echo "[+] Обновление ядра пропущено (оставлена текущая версия)."; exit 0 ;;
         esac
     elif [ -n "$STABLE_VER" ]; then
-        echo "  1) 🟢 Установить стабильную версию ($STABLE_VER)"
-        if [ "$IS_INSTALLED" -eq 1 ]; then
-            echo "  2) ⏹️  Оставить текущую версию (пропустить) [По умолчанию]"
+        if [ "$IS_INSTALLED" -eq 1 ] && [ -n "$CURRENT_VER_TAG" ] && [ "$CURRENT_VER_TAG" = "$STABLE_VER" ]; then
+            DEFAULT_CHOICE="2"
+            echo "  1) 🟢 Переустановить стабильную версию ($STABLE_VER)"
+            echo "  2) ⏹️  Оставить текущую версию ($STABLE_VER) [По умолчанию / Актуально]"
         else
-            echo "  2) ⏹️  Пропустить установку"
+            DEFAULT_CHOICE="1"
+            echo "  1) 🟢 Установить стабильную версию ($STABLE_VER) [Рекомендуется / По умолчанию]"
+            echo "  2) ⏹️  Оставить текущую версию (пропустить)"
         fi
         echo "  3) ✏️  Ввести тег/версию вручную"
-        [ "$IS_INSTALLED" -eq 1 ] && DEFAULT_CHOICE="2"
         read -t 15 -p "Выберите вариант [1-3] (по умолчанию $DEFAULT_CHOICE): " USER_CHOICE || USER_CHOICE="$DEFAULT_CHOICE"
         USER_CHOICE="${USER_CHOICE:-$DEFAULT_CHOICE}"
         echo ""
@@ -256,7 +258,7 @@ if [ -t 0 ] && [ "$AUTO_MODE" -eq 0 ]; then
             1) SELECTED_TAG="$STABLE_VER" ;;
             2) echo "[+] Обновление ядра пропущено (оставлена текущая версия)."; exit 0 ;;
             3) read -p "Введите тег релиза (например $STABLE_VER): " SELECTED_TAG ;;
-            *) echo "[+] Обновление ядра пропущено (оставлена текущая версия)."; exit 0 ;;
+            *) [ "$DEFAULT_CHOICE" = "2" ] && { echo "[+] Обновление ядра пропущено (оставлена текущая версия)."; exit 0; } || SELECTED_TAG="$STABLE_VER" ;;
         esac
     else
         echo "[-] Не удалось получить список версий через API."
@@ -299,21 +301,29 @@ rm -f "$DIGEST_FILE"
 
 if command -v python3 &>/dev/null; then
     python3 -c "
-import urllib.request, json
+import urllib.request, json, ssl
+
+ctx = ssl.create_default_context()
+ctx.check_hostname = False
+ctx.verify_mode = ssl.CERT_NONE
+https_handler = urllib.request.HTTPSHandler(context=ctx)
+
 tag = '$TARGET_TAG'
 repo = '$REPO'
 urls = [
     f'https://api.github.com/repos/{repo}/releases/tags/{tag}' if tag and tag != 'latest' else f'https://api.github.com/repos/{repo}/releases/latest',
-    f'https://ghproxy.net/https://api.github.com/repos/{repo}/releases/tags/{tag}' if tag and tag != 'latest' else f'https://ghproxy.net/https://api.github.com/repos/{repo}/releases/latest',
     f'https://gh-proxy.com/https://api.github.com/repos/{repo}/releases/tags/{tag}' if tag and tag != 'latest' else f'https://gh-proxy.com/https://api.github.com/repos/{repo}/releases/latest',
+    f'https://ghfast.top/https://api.github.com/repos/{repo}/releases/tags/{tag}' if tag and tag != 'latest' else f'https://ghfast.top/https://api.github.com/repos/{repo}/releases/latest',
 ]
 proxy = '$VALID_PROXY'
-handlers = [urllib.request.ProxyHandler({'http': proxy, 'https': proxy})] if proxy else []
+handlers = [https_handler]
+if proxy:
+    handlers.append(urllib.request.ProxyHandler({'http': proxy, 'https': proxy}))
 opener = urllib.request.build_opener(*handlers)
 for url in urls:
     try:
-        req = urllib.request.Request(url, headers={'User-Agent': 'SentinelPanel'})
-        with opener.open(req, timeout=10) as r:
+        req = urllib.request.Request(url, headers={'User-Agent': 'SentinelPanel/1.0'})
+        with opener.open(req, timeout=5) as r:
             rel = json.loads(r.read().decode('utf-8'))
             with open('$DIGEST_FILE', 'w') as f:
                 for a in rel.get('assets', []):
@@ -373,33 +383,38 @@ download_asset() {
         echo "  ➜ Попытка загрузки $ASSET_NAME из $HOST_LABEL..."
 
         if command -v curl &>/dev/null; then
-            # Snappy timeouts for direct connection without proxy to immediately bypass throttled AWS S3
-            local CURL_OPTS=("-fsSL" "--connect-timeout" "4" "--max-time" "20" "--speed-limit" "10240" "--speed-time" "4")
+            local CURL_OPTS=("-fsSL" "-k")
             if [ "$IS_MIRROR" -eq 1 ]; then
-                CURL_OPTS=("-fsSL" "-k" "--connect-timeout" "6" "--max-time" "45" "--retry" "1")
-                curl "${CURL_OPTS[@]}" -x "" "$URL" -o "$TMP_FILE" 2>/dev/null || true
+                CURL_OPTS+=("--connect-timeout" "6" "--max-time" "45")
             elif [ -n "$VALID_PROXY" ]; then
-                CURL_OPTS=("-fsSL" "-k" "--connect-timeout" "10" "--max-time" "60" "--retry" "1")
-                curl "${CURL_OPTS[@]}" -x "$VALID_PROXY" "$URL" -o "$TMP_FILE" 2>/dev/null || true
+                CURL_OPTS+=("--connect-timeout" "10" "--max-time" "60" "-x" "$VALID_PROXY")
             else
-                curl "${CURL_OPTS[@]}" "$URL" -o "$TMP_FILE" 2>/dev/null || true
+                CURL_OPTS+=("--connect-timeout" "4" "--max-time" "20" "--speed-limit" "10240" "--speed-time" "4")
             fi
-        elif command -v wget &>/dev/null; then
-            local WGET_OPTS=(-q -T 15 -t 1)
+            curl "${CURL_OPTS[@]}" "$URL" -o "$TMP_FILE" 2>/dev/null || true
+        fi
+
+        if [ ! -s "$TMP_FILE" ] && command -v wget &>/dev/null; then
+            local WGET_OPTS=(-q --no-check-certificate -T 15 -t 1)
             if [ "$IS_MIRROR" -eq 0 ] && [ -n "$VALID_PROXY" ]; then
                 WGET_OPTS+=("-e" "http_proxy=$VALID_PROXY" "-e" "https_proxy=$VALID_PROXY")
             fi
             wget "${WGET_OPTS[@]}" "$URL" -O "$TMP_FILE" 2>/dev/null || true
-        elif command -v python3 &>/dev/null; then
+        fi
+
+        if [ ! -s "$TMP_FILE" ] && command -v python3 &>/dev/null; then
             python3 -c "
 import urllib.request, ssl
 ctx = ssl.create_default_context()
 ctx.check_hostname = False
 ctx.verify_mode = ssl.CERT_NONE
+https_handler = urllib.request.HTTPSHandler(context=ctx)
 proxy = '$VALID_PROXY' if $IS_MIRROR == 0 else ''
-handlers = [urllib.request.ProxyHandler({'http': proxy, 'https': proxy})] if proxy else []
+handlers = [https_handler]
+if proxy:
+    handlers.append(urllib.request.ProxyHandler({'http': proxy, 'https': proxy}))
 opener = urllib.request.build_opener(*handlers)
-req = urllib.request.Request('$URL', headers={'User-Agent': 'SentinelPanel'})
+req = urllib.request.Request('$URL', headers={'User-Agent': 'SentinelPanel/1.0'})
 try:
     with opener.open(req, timeout=15) as r, open('$TMP_FILE', 'wb') as f:
         f.write(r.read())
