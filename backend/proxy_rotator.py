@@ -42,50 +42,43 @@ SOCKS5_FALLBACK_SOURCES = [
 
 
 def parse_vpn_uri(uri: str) -> Optional[Dict[str, Any]]:
-    """Парсит любые VPN-ссылки (ss, vless, trojan, hysteria2, hy2, vmess) без внешних C-библиотек."""
-    uri = uri.strip()
-    if not uri or uri.startswith("#") or uri.startswith("//"):
-        return None
-
+    """Парсит VPN-ссылку (VLESS, Trojan, Hysteria2, SS) через единое ядро sentinel-core."""
     try:
-        # 1. Shadowsocks: ss://base64@host:port#name or ss://base64#name
+        from backend import sentinel_core_bridge
+        profile = sentinel_core_bridge.parse_proxy_uri(uri)
+        if profile and isinstance(profile, dict) and profile.get("protocol"):
+            profile["proxyUrl"] = uri
+            return profile
+    except Exception:
+        pass
+
+    # Basic fallback with camelCase field mapping for Go ast.ServerProfile
+    try:
+        uri = uri.strip()
         if uri.startswith("ss://"):
-            payload = uri[5:]
+            raw = uri[5:]
             name = ""
-            if "#" in payload:
-                payload, name = payload.split("#", 1)
+            if "#" in raw:
+                raw, name = raw.split("#", 1)
                 name = urllib.parse.unquote(name)
 
-            if "@" in payload:
-                user_info, host_port = payload.split("@", 1)
+            if "@" in raw:
+                user_info, host_port = raw.split("@", 1)
             else:
-                pad = len(payload) % 4
-                if pad:
-                    payload += "=" * (4 - pad)
+                user_info, host_port = raw, ""
+
+            if not host_port and user_info:
+                padded = user_info + "=" * ((4 - len(user_info) % 4) % 4)
                 try:
-                    decoded = base64.b64decode(payload).decode("utf-8", errors="ignore")
+                    decoded = base64.urlsafe_b64decode(padded).decode("utf-8")
                     if "@" in decoded:
                         user_info, host_port = decoded.split("@", 1)
-                    else:
-                        return None
-                except Exception:
-                    return None
-
-            if ":" not in user_info:
-                pad = len(user_info) % 4
-                if pad:
-                    user_info += "=" * (4 - pad)
-                try:
-                    user_info = base64.b64decode(user_info).decode("utf-8", errors="ignore")
                 except Exception:
                     pass
 
             method, pwd = user_info.split(":", 1) if ":" in user_info else ("chacha20-ietf-poly1305", user_info)
-            
-            # Handle query params if any
             if "?" in host_port:
                 host_port, _ = host_port.split("?", 1)
-
             host, port = host_port.split(":", 1) if ":" in host_port else (host_port, "443")
             return {
                 "protocol": "shadowsocks",
@@ -97,7 +90,6 @@ def parse_vpn_uri(uri: str) -> Optional[Dict[str, Any]]:
                 "proxyUrl": uri
             }
 
-        # 2. VLESS / Trojan / Hysteria2: protocol://uuid_or_pwd@host:port?params#name
         for proto in ("vless", "trojan", "hysteria2", "hy2"):
             if uri.startswith(f"{proto}://"):
                 parsed = urllib.parse.urlparse(uri)
@@ -118,8 +110,8 @@ def parse_vpn_uri(uri: str) -> Optional[Dict[str, Any]]:
                     res["sni"] = params.get("sni", params.get("serverName", ""))
                     res["flow"] = params.get("flow", "")
                     res["fingerprint"] = params.get("fp", "chrome")
-                    res["public_key"] = params.get("pbk", "")
-                    res["short_id"] = params.get("sid", "")
+                    res["publicKey"] = params.get("pbk", "")
+                    res["shortId"] = params.get("sid", "")
                 elif proto in ("hysteria2", "hy2"):
                     res["password"] = parsed.username or parsed.password or ""
                     res["sni"] = params.get("sni", "")
@@ -128,151 +120,12 @@ def parse_vpn_uri(uri: str) -> Optional[Dict[str, Any]]:
                     res["sni"] = params.get("sni", "")
 
                 return res
-
     except Exception:
         pass
 
     return None
 
 
-def generate_singbox_failover_config(profiles: List[Dict[str, Any]], socks_port: int = 10818, http_port: int = 10819) -> str:
-    """Генерирует отказоустойчивый Sing-box JSON конфиг со встроенным urltest балансировщиком."""
-    outbounds = []
-    tags = []
-
-    for i, p in enumerate(profiles):
-        proto = p.get("protocol", "").lower()
-        tag = p.get("name") or f"node-{i+1}"
-        tag = re.sub(r'[^a-zA-Z0-9_\-\.]', '_', tag)
-        if not tag or tag in tags:
-            tag = f"node-{i+1}-{tag}"
-        tags.append(tag)
-
-        if proto == "shadowsocks":
-            outbounds.append({
-                "type": "shadowsocks",
-                "tag": tag,
-                "server": p["address"],
-                "server_port": int(p["port"]),
-                "method": p.get("cipher") or "chacha20-ietf-poly1305",
-                "password": p.get("password", "")
-            })
-        elif proto == "vless":
-            ob = {
-                "type": "vless",
-                "tag": tag,
-                "server": p["address"],
-                "server_port": int(p["port"]),
-                "uuid": p.get("uuid") or p.get("password", "")
-            }
-            sec = p.get("security", "")
-            if sec in ("tls", "reality"):
-                tls_conf = {
-                    "enabled": True,
-                    "server_name": p.get("sni") or p["address"],
-                    "utls": {"enabled": True, "fingerprint": p.get("fingerprint") or "chrome"}
-                }
-                if sec == "reality":
-                    tls_conf["reality"] = {
-                        "enabled": True,
-                        "public_key": p.get("public_key") or "",
-                        "short_id": p.get("short_id") or ""
-                    }
-                ob["tls"] = tls_conf
-            outbounds.append(ob)
-        elif proto in ("hysteria2", "hy2"):
-            outbounds.append({
-                "type": "hysteria2",
-                "tag": tag,
-                "server": p["address"],
-                "server_port": int(p["port"]),
-                "password": p.get("password", ""),
-                "tls": {
-                    "enabled": True,
-                    "server_name": p.get("sni") or p["address"],
-                    "insecure": True
-                }
-            })
-        elif proto == "trojan":
-            outbounds.append({
-                "type": "trojan",
-                "tag": tag,
-                "server": p["address"],
-                "server_port": int(p["port"]),
-                "password": p.get("password", ""),
-                "tls": {
-                    "enabled": True,
-                    "server_name": p.get("sni") or p["address"]
-                }
-            })
-
-    if not outbounds:
-        return ""
-
-    failover_outbound = {
-        "type": "urltest",
-        "tag": "auto-failover",
-        "outbounds": tags,
-        "url": "https://api.telegram.org",
-        "interval": "1m",
-        "tolerance": 50
-    }
-
-    config = {
-        "log": {"level": "warn"},
-        "dns": {
-            "servers": [
-                {
-                    "tag": "dns-remote",
-                    "address": "https://1.1.1.1/dns-query",
-                    "detour": "auto-failover"
-                },
-                {
-                    "tag": "dns-direct",
-                    "address": "8.8.8.8",
-                    "detour": "direct"
-                },
-                {
-                    "tag": "dns-direct-alt",
-                    "address": "8.8.4.4",
-                    "detour": "direct"
-                }
-            ],
-            "rules": [
-                {
-                    "outbound": ["direct"],
-                    "server": "dns-direct"
-                }
-            ],
-            "final": "dns-remote",
-            "strategy": "ipv4_only"
-        },
-        "inbounds": [
-            {
-                "type": "socks",
-                "tag": "socks-in",
-                "listen": "127.0.0.1",
-                "listen_port": socks_port,
-                "sniff": True
-            },
-            {
-                "type": "http",
-                "tag": "http-in",
-                "listen": "127.0.0.1",
-                "listen_port": http_port,
-                "sniff": True
-            }
-        ],
-        "outbounds": [failover_outbound] + outbounds + [
-            {"type": "direct", "tag": "direct"},
-            {"type": "block", "tag": "block"}
-        ],
-        "route": {
-            "final": "auto-failover",
-            "auto_detect_interface": True
-        }
-    }
-    return json.dumps(config, indent=2)
 
 
 def _free_port(port: int):
@@ -520,12 +373,10 @@ class SocksProxyRotator:
                 health_url="https://api.telegram.org"
             )
         except Exception as e:
-            logger.debug("Core build_failover_client_config exception: %s", e)
+            logger.error("Core build_failover_client_config exception: %s", e)
 
         if not client_cfg:
-            client_cfg = generate_singbox_failover_config(working[:10], socks_port=10818, http_port=10819)
-
-        if not client_cfg:
+            logger.error("Не удалось скомпилировать Sing-box конфиг через sentinel-core.")
             return None
 
         ok = await self.start_or_reload_singbox_tunnel(client_cfg, port=10818)
@@ -581,15 +432,19 @@ class SocksProxyRotator:
         return await self._test_and_activate_nodes(uris, tier_name=tier_name)
 
     async def start_tunnel_for_node(self, node_uri: str, port: int = 10818) -> bool:
-        """Запускает туннель для конкретной VPN ссылки."""
+        """Запускает туннель для конкретной VPN ссылки через ядро sentinel-core."""
         parsed = parse_vpn_uri(node_uri)
         if parsed:
-            cfg_json = generate_singbox_failover_config([parsed], socks_port=port, http_port=port+1)
-            if cfg_json:
-                ok = await self.start_or_reload_singbox_tunnel(cfg_json, port=port)
-                if ok:
-                    self._save_working_nodes_to_disk([node_uri])
-                    return True
+            try:
+                from backend import sentinel_core_bridge
+                cfg_json = sentinel_core_bridge.build_failover_client_config([parsed], socks_port=port, http_port=port+1)
+                if cfg_json:
+                    ok = await self.start_or_reload_singbox_tunnel(cfg_json, port=port)
+                    if ok:
+                        self._save_working_nodes_to_disk([node_uri])
+                        return True
+            except Exception as e:
+                logger.error("start_tunnel_for_node error: %s", e)
         return False
 
     async def _check_socks5_sources(self) -> Optional[str]:
