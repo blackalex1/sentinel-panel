@@ -126,10 +126,14 @@ def parse_subscription(content_or_url: str) -> Optional[List[Dict[str, Any]]]:
     return profiles if profiles else None
 
 
-def test_profiles(profiles: List[Dict[str, Any]], ping_count: int = 3, timeout_ms: int = 2000) -> Optional[List[Dict[str, Any]]]:
+def test_profiles(profiles: List[Dict[str, Any]], ping_count: int = 1, timeout_ms: int = 3000) -> Optional[List[Dict[str, Any]]]:
     """Tests connectivity and latency of multiple VPN profiles via Go sentinel-core engine."""
     if not profiles:
         return None
+
+    if ping_count > 20:  # If caller passed timeout as 2nd positional arg
+        timeout_ms = ping_count
+        ping_count = 1
 
     profiles_json = json.dumps(profiles)
     try:
@@ -157,6 +161,97 @@ def test_profiles(profiles: List[Dict[str, Any]], ping_count: int = 3, timeout_m
     return None
 
 
+def check_proxies(
+    proxies: List[str],
+    target_host: str = "objects.githubusercontent.com",
+    target_port: int = 443,
+    use_tls: bool = True,
+    timeout_ms: int = 3000,
+    concurrency: int = 64
+) -> List[Dict[str, Any]]:
+    """Checks batch of proxies / VLESS links concurrently with high performance in sentinel-core."""
+    if not proxies:
+        return []
+
+    proxies_json = json.dumps(proxies)
+    try:
+        res = _ffi_call_json(
+            "SentinelBatchCheckProxies",
+            proxies_json,
+            target_host,
+            int(target_port),
+            1 if use_tls else 0,
+            int(timeout_ms),
+            int(concurrency)
+        )
+        if isinstance(res, list) and len(res) > 0:
+            return res
+    except Exception as e:
+        logger.debug("FFI SentinelBatchCheckProxies error: %s", e)
+
+    import tempfile
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False, encoding="utf-8") as f:
+        f.write("\n".join(proxies))
+        tmp_name = f.name
+
+    try:
+        args = [
+            "check-proxies",
+            "--file", tmp_name,
+            "--target", target_host,
+            "--port", str(target_port),
+            "--timeout-ms", str(timeout_ms),
+            "--concurrency", str(concurrency)
+        ]
+        if not use_tls:
+            args.append("--tls=false")
+        res = run_core_command(args)
+        if isinstance(res, list) and len(res) > 0:
+            return res
+    except Exception:
+        pass
+    finally:
+        try:
+            os.remove(tmp_name)
+        except Exception:
+            pass
+
+    # High-performance concurrent TCP probe fallback
+    results = []
+    import concurrent.futures
+    import socket
+    import time
+
+    def _probe_single(uri: str) -> Dict[str, Any]:
+        p = parse_proxy_uri(uri)
+        if not p:
+            return {"proxyUrl": uri, "success": False, "alive": False, "latencyMs": 999999.0}
+        addr = p.get("address", "")
+        port = int(p.get("port", 443))
+        if not addr:
+            return {"proxyUrl": uri, "success": False, "alive": False, "latencyMs": 999999.0}
+        t0 = time.monotonic()
+        try:
+            s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            s.settimeout(timeout_ms / 1000.0)
+            s.connect((addr, port))
+            s.close()
+            lat = (time.monotonic() - t0) * 1000.0
+            return {"proxyUrl": uri, "success": True, "alive": True, "latencyMs": lat, "name": p.get("name", "")}
+        except Exception:
+            return {"proxyUrl": uri, "success": False, "alive": False, "latencyMs": 999999.0}
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=min(concurrency, 64)) as ex:
+        futures = [ex.submit(_probe_single, u) for u in proxies]
+        for f in concurrent.futures.as_completed(futures):
+            try:
+                results.append(f.result())
+            except Exception:
+                pass
+
+    return results
+
+
 def ping_host(host: str, port: int = 443, timeout_ms: int = 3000) -> Dict[str, Any]:
     """Performs TCP handshake latency probe via sentinel-core."""
     try:
@@ -179,3 +274,4 @@ def set_core_language(lang: str) -> bool:
         return isinstance(res, dict) and res.get("success") is True
     except Exception:
         return False
+
