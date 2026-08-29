@@ -121,59 +121,48 @@ LATEST_ANY=""
 
 echo "[+] Опрос GitHub Releases для $REPO..."
 
-# Use python3 to fetch and categorize releases safely with proxy/mirror support
-if command -v python3 &>/dev/null; then
-    RELEASE_DATA=$(python3 -c "
-import urllib.request, json, sys, ssl
+# Query GitHub Releases with curl (supporting socks5h remote DNS) and parse with python
+API_URLS=(
+    "https://api.github.com/repos/$REPO/releases"
+    "https://gh-proxy.com/https://api.github.com/repos/$REPO/releases"
+    "https://ghfast.top/https://api.github.com/repos/$REPO/releases"
+    "https://gh.ddlc.top/https://api.github.com/repos/$REPO/releases"
+)
 
-ctx = ssl.create_default_context()
-ctx.check_hostname = False
-ctx.verify_mode = ssl.CERT_NONE
-https_handler = urllib.request.HTTPSHandler(context=ctx)
+if command -v curl &>/dev/null; then
+    API_CURL_OPTS=("-fsSL" "-k" "--connect-timeout" "5" "--max-time" "10")
+    if [ -n "$VALID_PROXY" ]; then
+        PROXY_ARG="$VALID_PROXY"
+        [[ "$PROXY_ARG" =~ ^socks5:// ]] && PROXY_ARG="socks5h://${PROXY_ARG#socks5://}"
+        API_CURL_OPTS+=("-x" "$PROXY_ARG")
+    fi
 
-proxy = '$VALID_PROXY'
-handlers = [https_handler]
-if proxy:
-    handlers.append(urllib.request.ProxyHandler({'http': proxy, 'https': proxy}))
-
-opener = urllib.request.build_opener(*handlers)
-
-urls = [
-    'https://api.github.com/repos/$REPO/releases',
-    'https://gh-proxy.com/https://api.github.com/repos/$REPO/releases',
-    'https://ghfast.top/https://api.github.com/repos/$REPO/releases',
-    'https://gh.ddlc.top/https://api.github.com/repos/$REPO/releases'
-]
-
-for u in urls:
-    try:
-        req = urllib.request.Request(u, headers={'User-Agent': 'SentinelPanel/1.0'})
-        with opener.open(req, timeout=4) as response:
-            releases = json.loads(response.read().decode('utf-8'))
-            if isinstance(releases, list) and len(releases) > 0:
-                stable = next((r['tag_name'] for r in releases if not r.get('prerelease')), '')
-                prerelease = releases[0]['tag_name'] if releases[0].get('prerelease') else ''
-                latest_any = releases[0]['tag_name'] if releases else ''
-                print(f'{stable}|{prerelease}|{latest_any}')
-                sys.exit(0)
-    except Exception:
-        continue
+    for api_url in "${API_URLS[@]}"; do
+        RAW_JSON=$(curl "${API_CURL_OPTS[@]}" "$api_url" 2>/dev/null || true)
+        if [ -n "$RAW_JSON" ] && [[ "$RAW_JSON" =~ \"tag_name\" ]]; then
+            if command -v python3 &>/dev/null; then
+                RELEASE_DATA=$(echo "$RAW_JSON" | python3 -c "
+import json, sys
+try:
+    releases = json.load(sys.stdin)
+    if isinstance(releases, list) and len(releases) > 0:
+        stable = next((r['tag_name'] for r in releases if not r.get('prerelease')), '')
+        prerelease = releases[0]['tag_name'] if releases[0].get('prerelease') else ''
+        latest_any = releases[0]['tag_name'] if releases else ''
+        print(f'{stable}|{prerelease}|{latest_any}')
+        sys.exit(0)
+except Exception:
+    pass
 print('||')
 " 2>/dev/null || echo "||")
-    STABLE_VER=$(echo "$RELEASE_DATA" | cut -d'|' -f1)
-    PRERELEASE_VER=$(echo "$RELEASE_DATA" | cut -d'|' -f2)
-    LATEST_ANY=$(echo "$RELEASE_DATA" | cut -d'|' -f3)
-fi
-
-# Fallback with curl if python didn't get results
-if [ -z "$LATEST_ANY" ] && command -v curl &>/dev/null; then
-    API_CURL_OPTS=("-fsSL" "-k" "--connect-timeout" "4" "--max-time" "10")
-    [ -n "$VALID_PROXY" ] && API_CURL_OPTS+=("-x" "$VALID_PROXY")
-    for api_url in "https://api.github.com/repos/$REPO/releases" "https://gh-proxy.com/https://api.github.com/repos/$REPO/releases" "https://ghfast.top/https://api.github.com/repos/$REPO/releases"; do
-        LATEST_ANY=$(curl "${API_CURL_OPTS[@]}" "$api_url" 2>/dev/null | grep -m1 '"tag_name":' | cut -d'"' -f4 | tr -d '\r\n ')
-        if [ -n "$LATEST_ANY" ]; then
-            [ -z "$STABLE_VER" ] && STABLE_VER="$LATEST_ANY"
-            break
+            else
+                LATEST_TAG=$(echo "$RAW_JSON" | grep -m1 '"tag_name":' | cut -d'"' -f4 | tr -d '\r\n ')
+                RELEASE_DATA="${LATEST_TAG}||${LATEST_TAG}"
+            fi
+            STABLE_VER=$(echo "$RELEASE_DATA" | cut -d'|' -f1)
+            PRERELEASE_VER=$(echo "$RELEASE_DATA" | cut -d'|' -f2)
+            LATEST_ANY=$(echo "$RELEASE_DATA" | cut -d'|' -f3)
+            [ -n "$LATEST_ANY" ] && break
         fi
     done
 fi
@@ -299,43 +288,47 @@ TARGET_TAG="${SELECTED_TAG:-v0.0.7}"
 DIGEST_FILE="/tmp/sentinel_core_digests.$$"
 rm -f "$DIGEST_FILE"
 
-if command -v python3 &>/dev/null; then
-    python3 -c "
-import urllib.request, json, ssl
+# 6. Fetch native release asset digests (SHA256 & Exact Size) from GitHub API
+DIGEST_FILE="/tmp/sentinel_core_digests.$$"
+rm -f "$DIGEST_FILE"
 
-ctx = ssl.create_default_context()
-ctx.check_hostname = False
-ctx.verify_mode = ssl.CERT_NONE
-https_handler = urllib.request.HTTPSHandler(context=ctx)
+if command -v curl &>/dev/null; then
+    DIG_CURL_OPTS=("-fsSL" "-k" "--connect-timeout" "5" "--max-time" "10")
+    if [ -n "$VALID_PROXY" ]; then
+        PROXY_ARG="$VALID_PROXY"
+        [[ "$PROXY_ARG" =~ ^socks5:// ]] && PROXY_ARG="socks5h://${PROXY_ARG#socks5://}"
+        DIG_CURL_OPTS+=("-x" "$PROXY_ARG")
+    fi
 
-tag = '$TARGET_TAG'
-repo = '$REPO'
-urls = [
-    f'https://api.github.com/repos/{repo}/releases/tags/{tag}' if tag and tag != 'latest' else f'https://api.github.com/repos/{repo}/releases/latest',
-    f'https://gh-proxy.com/https://api.github.com/repos/{repo}/releases/tags/{tag}' if tag and tag != 'latest' else f'https://gh-proxy.com/https://api.github.com/repos/{repo}/releases/latest',
-    f'https://ghfast.top/https://api.github.com/repos/{repo}/releases/tags/{tag}' if tag and tag != 'latest' else f'https://ghfast.top/https://api.github.com/repos/{repo}/releases/latest',
-]
-proxy = '$VALID_PROXY'
-handlers = [https_handler]
-if proxy:
-    handlers.append(urllib.request.ProxyHandler({'http': proxy, 'https': proxy}))
-opener = urllib.request.build_opener(*handlers)
-for url in urls:
-    try:
-        req = urllib.request.Request(url, headers={'User-Agent': 'SentinelPanel/1.0'})
-        with opener.open(req, timeout=5) as r:
-            rel = json.loads(r.read().decode('utf-8'))
-            with open('$DIGEST_FILE', 'w') as f:
-                for a in rel.get('assets', []):
-                    name = a.get('name')
-                    digest = a.get('digest', '')
-                    size = a.get('size', 0)
-                    if name:
-                        f.write(f'{name}={digest}={size}\n')
-            exit(0)
-    except Exception:
-        pass
+    DIGEST_URLS=(
+        "https://api.github.com/repos/$REPO/releases/tags/$TARGET_TAG"
+        "https://gh-proxy.com/https://api.github.com/repos/$REPO/releases/tags/$TARGET_TAG"
+        "https://ghfast.top/https://api.github.com/repos/$REPO/releases/tags/$TARGET_TAG"
+    )
+    [ "$TARGET_TAG" = "latest" ] && DIGEST_URLS=("https://api.github.com/repos/$REPO/releases/latest" "https://gh-proxy.com/https://api.github.com/repos/$REPO/releases/latest")
+
+    for dig_url in "${DIGEST_URLS[@]}"; do
+        RAW_REL=$(curl "${DIG_CURL_OPTS[@]}" "$dig_url" 2>/dev/null || true)
+        if [ -n "$RAW_REL" ] && [[ "$RAW_REL" =~ \"assets\" ]]; then
+            if command -v python3 &>/dev/null; then
+                echo "$RAW_REL" | python3 -c "
+import json, sys
+try:
+    rel = json.load(sys.stdin)
+    with open('$DIGEST_FILE', 'w') as f:
+        for a in rel.get('assets', []):
+            name = a.get('name')
+            digest = a.get('digest', '')
+            size = a.get('size', 0)
+            if name:
+                f.write(f'{name}={digest}={size}\n')
+except Exception:
+    pass
 " 2>/dev/null || true
+            fi
+            [ -s "$DIGEST_FILE" ] && break
+        fi
+    done
 fi
 
 calc_sha256() {
@@ -391,10 +384,12 @@ download_asset() {
 
         if command -v curl &>/dev/null; then
             local CURL_OPTS=("-fsSL" "-k")
-            if [ "$IS_MIRROR" -eq 1 ]; then
+            if [ -n "$VALID_PROXY" ]; then
+                local PROXY_ARG="$VALID_PROXY"
+                [[ "$PROXY_ARG" =~ ^socks5:// ]] && PROXY_ARG="socks5h://${PROXY_ARG#socks5://}"
+                CURL_OPTS+=("--connect-timeout" "10" "--max-time" "60" "-x" "$PROXY_ARG")
+            elif [ "$IS_MIRROR" -eq 1 ]; then
                 CURL_OPTS+=("--connect-timeout" "5" "--max-time" "45")
-            elif [ -n "$VALID_PROXY" ]; then
-                CURL_OPTS+=("--connect-timeout" "10" "--max-time" "60" "-x" "$VALID_PROXY")
             else
                 # Fast 2.5s probe for direct GitHub to immediately detect throttled AWS S3
                 CURL_OPTS+=("--connect-timeout" "2" "--max-time" "3" "--speed-limit" "102400" "--speed-time" "2")
