@@ -28,7 +28,12 @@ if [ -z "${BOOTSTRAPPED:-}" ] && [ -d .git ] && command -v git &>/dev/null; then
     done
     NEW_HEAD=$(git rev-parse HEAD 2>/dev/null || true)
     if [ -n "$OLD_HEAD" ] && [ -n "$NEW_HEAD" ] && [ "$OLD_HEAD" != "$NEW_HEAD" ]; then
-        echo -e "\033[0;32m[✓]\033[0m Скрипт обновления обновлен из Git (${OLD_HEAD:0:7} -> ${NEW_HEAD:0:7}). Перезапуск..."
+        echo -e "\033[0;32m[✓]\033[0m Скрипт обновления обновлен из Git (${OLD_HEAD:0:7} -> ${NEW_HEAD:0:7})."
+        echo -e "\n\033[1;36m============================================================\033[0m"
+        echo -e "\033[1;36m📝 СПИСОК ИЗМЕНЕНИЙ (CHANGELOG: ${OLD_HEAD:0:7}..${NEW_HEAD:0:7}):\033[0m"
+        echo -e "\033[1;36m============================================================\033[0m"
+        git log --pretty=format:"  \033[1;33m•\033[0m \033[0;33m%h\033[0m \033[1;37m%s\033[0m \033[0;36m(%cr)\033[0m" "${OLD_HEAD}..${NEW_HEAD}" 2>/dev/null || true
+        echo -e "\n\033[1;36m============================================================\033[0m\n"
         export BOOTSTRAPPED=1
         exec bash "$0" "$@"
     fi

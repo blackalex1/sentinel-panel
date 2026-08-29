@@ -123,6 +123,14 @@ class GitManager:
         if old_commit and new_commit and old_commit != new_commit:
             log_success(f"Кодовая база успешно обновлена: {BOLD}{old_commit[:7]} -> {new_commit[:7]}{RESET}")
             try:
+                log_commits = run_command(["git", "log", "--pretty=format:  • %h %s (%cr)", f"{old_commit}..{new_commit}"], cwd=self.project_dir, capture=True, check=False).stdout.strip()
+                if log_commits:
+                    print("\n" + "=" * 60)
+                    print(f"{BOLD}📝 СПИСОК ИЗМЕНЕНИЙ (CHANGELOG {old_commit[:7]}..{new_commit[:7]}):{RESET}")
+                    print("=" * 60)
+                    for line in log_commits.splitlines():
+                        print(f"  {CYAN}{line}{RESET}")
+                    print("=" * 60)
                 log_diff = run_command(["git", "diff", "--stat", f"{old_commit}..{new_commit}"], cwd=self.project_dir, capture=True, check=False).stdout.strip()
                 if log_diff:
                     print(f"\n{log_diff}\n")
