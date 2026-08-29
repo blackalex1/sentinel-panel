@@ -32,6 +32,8 @@ class NetworkManager:
     def __init__(self, project_dir: str, proxy_arg: Optional[str] = None, no_proxy: bool = False, auto_mode: bool = False) -> None:
         self.project_dir = project_dir
         self.custom_proxy: Optional[str] = proxy_arg
+        self.configured_proxy: Optional[str] = None
+        self.configured_vpn_node: Optional[str] = None
         self.no_proxy: bool = no_proxy
         self.auto_mode: bool = auto_mode
         self.use_rotator: bool = True if not (no_proxy or proxy_arg) else False
@@ -42,41 +44,51 @@ class NetworkManager:
 
     def _init_proxy_from_env(self) -> None:
         """Reads PROXY_URL from .env file if not explicitly set."""
-        if not self.custom_proxy and not self.no_proxy:
-            env_paths = [
-                os.path.join(self.project_dir, ".env"),
-                os.path.join(self.project_dir, "config", ".env"),
-            ]
-            for p in env_paths:
-                if os.path.isfile(p):
-                    try:
-                        with open(p, "r", encoding="utf-8") as f:
-                            for line in f:
-                                line = line.strip()
-                                if line.startswith("PROXY_URL="):
-                                    val = line.split("=", 1)[1].strip(" '\"")
-                                    if val:
-                                        vpn_prefixes = ("ss://", "vless://", "trojan://", "hysteria2://", "hy2://", "vmess://", "tuic://", "wireguard://", "wg://")
-                                        if any(val.lower().startswith(pref) for pref in vpn_prefixes):
-                                            self.use_rotator = True
-                                        elif re.match(r"^(http|https|socks4|socks5|socks5h)://", val, re.IGNORECASE):
-                                            self.custom_proxy = val
-                                        break
-                    except Exception:
-                        pass
-                if self.custom_proxy:
-                    break
+        env_paths = [
+            os.path.join(self.project_dir, ".env"),
+            os.path.join(self.project_dir, "config", ".env"),
+        ]
+        for p in env_paths:
+            if os.path.isfile(p):
+                try:
+                    with open(p, "r", encoding="utf-8") as f:
+                        for line in f:
+                            line = line.strip()
+                            if line.startswith("PROXY_URL="):
+                                val = line.split("=", 1)[1].strip(" '\"")
+                                if val:
+                                    vpn_prefixes = ("ss://", "vless://", "trojan://", "hysteria2://", "hy2://", "vmess://", "tuic://", "wireguard://", "wg://")
+                                    if any(val.lower().startswith(pref) for pref in vpn_prefixes):
+                                        self.configured_vpn_node = val
+                                    elif re.match(r"^(http|https|socks4|socks5|socks5h)://", val, re.IGNORECASE):
+                                        self.configured_proxy = val
+                                    break
+                except Exception:
+                    pass
+            if self.configured_vpn_node or self.configured_proxy:
+                break
+
+        # In non-interactive or auto mode, fallback to configured proxy if custom_proxy wasn't passed via CLI
+        if (not sys.stdin.isatty() or self.auto_mode) and not self.custom_proxy and not self.no_proxy and self.configured_proxy:
+            self.custom_proxy = self.configured_proxy
 
     def show_menu(self) -> None:
         """Displays interactive network selection menu if interactive TTY."""
-        if not sys.stdin.isatty() or self.auto_mode or self.no_proxy or self.custom_proxy:
+        if not sys.stdin.isatty() or self.auto_mode or self.no_proxy or (self.custom_proxy and not self.configured_proxy):
             return
 
         log_banner("🌐 НАСТРОЙКА СЕТИ И ПРОКСИ ДЛЯ ОБНОВЛЕНИЯ ПАНЕЛИ")
         print("Выберите режим подключения к GitHub для загрузки релизов:")
-        print(f"  1) {GREEN}🟢 Автоматический VPN / Прокси ротатор{RESET} [Рекомендуется / По умолчанию]")
+        if self.configured_vpn_node:
+            node_name = self.configured_vpn_node.split("#")[-1] if "#" in self.configured_vpn_node else self.configured_vpn_node[:30]
+            print(f"  1) {GREEN}🟢 Использовать настроенную VPN-ноду ({node_name}) с авто-ротацией{RESET} [Рекомендуется / По умолчанию]")
+        else:
+            print(f"  1) {GREEN}🟢 Автоматический VPN / Прокси ротатор{RESET} [Рекомендуется / По умолчанию]")
         print(f"  2) 🌐 Прямое соединение к GitHub (с авто-фолбэком на CDN-зеркала при блокировке)")
-        print(f"  3) 🔌 Использовать существующий HTTP / SOCKS5 прокси\n")
+        if self.configured_proxy:
+            print(f"  3) 🔌 Использовать прокси из .env ({self.configured_proxy}) [или ввести другой]\n")
+        else:
+            print(f"  3) 🔌 Использовать существующий HTTP / SOCKS5 прокси\n")
 
         while True:
             try:
@@ -98,9 +110,18 @@ class NetworkManager:
             elif choice == "3":
                 self.use_rotator = False
                 self.no_proxy = False
+                prompt_msg = f"Введите адрес прокси (по умолчанию {self.configured_proxy}): " if self.configured_proxy else "Введите адрес прокси (например socks5://127.0.0.1:10808): "
                 while True:
-                    p_input = input("Введите адрес прокси (например socks5://127.0.0.1:10808): ").strip()
-                    if re.match(r"^(http|https|socks4|socks5|socks5h)://", p_input, re.IGNORECASE):
+                    try:
+                        p_input = input(prompt_msg).strip()
+                    except (EOFError, KeyboardInterrupt):
+                        print("")
+                        p_input = ""
+
+                    if not p_input and self.configured_proxy:
+                        self.custom_proxy = self.configured_proxy
+                        break
+                    elif re.match(r"^(http|https|socks4|socks5|socks5h)://", p_input, re.IGNORECASE):
                         self.custom_proxy = p_input
                         break
                     print(f"{RED}❌ Неверный формат! URL должен начинаться с http://, https://, socks5:// или socks5h://{RESET}")
