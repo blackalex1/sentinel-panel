@@ -221,15 +221,15 @@ class SocksProxyRotator:
             )
             self._current_engine = engine_type
 
-            for _ in range(12):
-                await asyncio.sleep(0.5)
+            for _ in range(4):
+                await asyncio.sleep(0.3)
                 if self._singbox_proc.poll() is not None:
                     _, stderr = self._singbox_proc.communicate()
                     logger.warning("%s process terminated unexpectedly on startup: %s", engine_type, stderr)
                     self._singbox_proc = None
                     return False
 
-                ok, lat = await self.test_proxy_alive(f"socks5://127.0.0.1:{port}", timeout=2.5)
+                ok, lat = await self.test_proxy_alive(f"socks5://127.0.0.1:{port}", timeout=1.5)
                 if ok:
                     logger.info("Started local %s failover tunnel on port %d (latency: %.1f ms)", engine_type, port, lat)
                     return True
