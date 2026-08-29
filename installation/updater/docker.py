@@ -130,6 +130,22 @@ class DockerManager:
         try:
             run_command(compose_cmd + ["up", "-d", "--build"], cwd=self.project_dir, env=docker_env, check=True)
             log_success("Контейнеры Docker успешно собраны и запущены!")
+
+            # Display live initial startup logs of the panel container
+            time.sleep(2.5)
+            try:
+                logs_res = run_command(compose_cmd + ["logs", "--tail=25", "sentinel-panel"], cwd=self.project_dir, capture=True, check=False)
+                logs_out = logs_res.stdout.strip()
+                if logs_out:
+                    print("\n" + "=" * 60)
+                    print(f"{BOLD}📋 ЛОГИ ЗАПУСКА ПАНЕЛИ (sentinel-panel):{RESET}")
+                    print("=" * 60)
+                    for line in logs_out.splitlines():
+                        print(f"  {line}")
+                    print("=" * 60 + "\n")
+            except Exception:
+                pass
+
             return True
         except Exception as e:
             log_error(f"Ошибка запуска Docker Compose: {e}")
