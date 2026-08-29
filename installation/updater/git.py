@@ -49,10 +49,15 @@ class GitManager:
             pass
 
         git_env: Dict[str, str] = {}
+        git_config_args: List[str] = []
         if self.proxy_url:
-            git_env["http_proxy"] = self.proxy_url
-            git_env["https_proxy"] = self.proxy_url
-            git_env["ALL_PROXY"] = self.proxy_url
+            proxy_val = self.proxy_url
+            if proxy_val.startswith("socks5://"):
+                proxy_val = "socks5h://" + proxy_val[len("socks5://") :]
+            git_env["http_proxy"] = proxy_val
+            git_env["https_proxy"] = proxy_val
+            git_env["ALL_PROXY"] = proxy_val
+            git_config_args = ["-c", f"http.proxy={proxy_val}", "-c", "http.sslVerify=false"]
 
         candidate_remotes = [
             "origin",
@@ -60,7 +65,6 @@ class GitManager:
             "https://gh-proxy.com/https://github.com/blackalex1/sentinel-panel.git",
             "https://ghfast.top/https://github.com/blackalex1/sentinel-panel.git",
             "https://gh.ddlc.top/https://github.com/blackalex1/sentinel-panel.git",
-            "https://ghproxy.net/https://github.com/blackalex1/sentinel-panel.git",
         ]
 
         # Determine current branch
@@ -81,16 +85,12 @@ class GitManager:
         pull_success = False
         for remote in candidate_remotes:
             try:
-                run_command(
-                    ["git", "fetch", remote, branch],
-                    cwd=self.project_dir,
-                    env=git_env,
-                    check=True,
-                    timeout=15,
-                )
-                run_command(["git", "reset", "--hard", "FETCH_HEAD"], cwd=self.project_dir, check=True)
-                pull_success = True
-                break
+                fetch_cmd = ["git"] + git_config_args + ["fetch", remote, branch]
+                res = run_command(fetch_cmd, cwd=self.project_dir, env=git_env, capture=True, check=False, timeout=12)
+                if res.returncode == 0:
+                    run_command(["git", "reset", "--hard", "FETCH_HEAD"], cwd=self.project_dir, capture=True, check=True)
+                    pull_success = True
+                    break
             except Exception:
                 continue
 
