@@ -116,9 +116,7 @@ def main() -> int:
 
         # 8. Success Banner
         log_banner("✅ ОБНОВЛЕНИЕ ПАНЕЛИ SENTINEL УСПЕШНО ЗАВЕРШЕНО!")
-        print(f"{GREEN}Панель доступна по адресу:{RESET} {BOLD}http://<IP_СЕРВЕРА>:8000{RESET}")
-        print(f"{CYAN}База данных PostgreSQL:{RESET}  {BOLD}порт 5432 (том: sentinel-panel_pgdata){RESET}")
-        print(f"{MAGENTA}Логи панели:{RESET}             {BOLD}docker compose logs -f{RESET}\n")
+        print(f"{GREEN}Все компоненты, ядро и контейнеры панели успешно обновлены и перезапущены.{RESET}\n")
 
         return 0
 
