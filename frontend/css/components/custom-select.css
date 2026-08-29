@@ -114,6 +114,7 @@ select[data-custom-select-init="true"] {
 
 /* Custom Select Dropdown Popup */
 .custom-select-dropdown {
+    display: none !important;
     position: absolute;
     top: calc(100% + 6px);
     left: 0;
@@ -123,7 +124,7 @@ select[data-custom-select-init="true"] {
     border: 1px solid rgba(139, 92, 246, 0.5) !important;
     border-radius: 12px;
     padding: 6px;
-    box-shadow: 0 25px 60px rgba(0, 0, 0, 0.98), 0 0 35px rgba(139, 92, 246, 0.35) !important;
+    box-shadow: none !important;
     opacity: 0;
     visibility: hidden;
     transform: translateY(-8px);
@@ -132,12 +133,16 @@ select[data-custom-select-init="true"] {
     overflow-y: auto;
     backdrop-filter: none !important;
     -webkit-backdrop-filter: none !important;
+    pointer-events: none;
 }
 
 .custom-select-container.open .custom-select-dropdown {
+    display: block !important;
     opacity: 1;
     visibility: visible;
     transform: translateY(0);
+    box-shadow: 0 25px 60px rgba(0, 0, 0, 0.98), 0 0 35px rgba(139, 92, 246, 0.35) !important;
+    pointer-events: auto;
 }
 
 /* Dropup mode (when near bottom of screen or modal) */
@@ -148,7 +153,9 @@ select[data-custom-select-init="true"] {
 }
 
 .custom-select-container.dropup.open .custom-select-dropdown {
+    display: block !important;
     transform: translateY(0);
+    box-shadow: 0 -25px 60px rgba(0, 0, 0, 0.98), 0 0 35px rgba(139, 92, 246, 0.35) !important;
 }
 
 /* Scrollbar for Custom Dropdown */
