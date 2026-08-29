@@ -301,38 +301,53 @@ class SocksProxyRotator:
         if not uris:
             return None
 
+        valid_uris = []
+        for u in uris:
+            u_clean = u.strip()
+            # Filter out corrupt entries and restrict to stable modern protocols supported by Sing-box failover
+            if (
+                u_clean
+                and u_clean.startswith(("vless://", "ss://", "shadowsocks://", "trojan://", "hy2://", "hysteria2://"))
+                and u_clean not in valid_uris
+            ):
+                valid_uris.append(u_clean)
+            if len(valid_uris) >= 60:
+                break
+
+        if not valid_uris:
+            return None
+
+        logger.info("[%s] Checking %d nodes via sentinel-core...", tier_name, len(valid_uris))
+
         loop = asyncio.get_running_loop()
+        results = await loop.run_in_executor(
+            None,
+            lambda: sentinel_core_bridge.check_proxies(valid_uris, target_host=target_host, timeout_ms=3000, concurrency=32)
+        )
+
+        working = [r for r in results if r.get("success") or r.get("alive") or r.get("isAlive")]
+        if not working:
+            logger.warning("[%s] 0 / %d nodes alive", tier_name, len(valid_uris))
+            return None
+
+        working.sort(key=lambda x: x.get("latencyMs", 999999))
+        best = working[0]
+        best_label = best.get("name") or (best.get("proxyUrl", "")[:35] if best.get("proxyUrl") else "Node")
+        logger.info("%s: %d / %d nodes alive. Best: %s (%.1f ms)", tier_name, len(working), len(valid_uris), best_label, best.get("latencyMs", 0))
+
+        # Парсим живые ноды в профили для генерации sing-box конфига
+        top_alive_uris = [w.get("proxyUrl") for w in working[:10] if w.get("proxyUrl")]
         parsed_profiles = []
-
-        def _parse_all():
-            for u in uris:
-                p = parse_vpn_uri(u)
-                if p:
-                    parsed_profiles.append(p)
-
-        await loop.run_in_executor(None, _parse_all)
+        for u in top_alive_uris:
+            p = parse_vpn_uri(u)
+            if p:
+                parsed_profiles.append(p)
 
         if not parsed_profiles:
-            logger.warning("[%s] No valid proxy profiles parsed from %d URIs", tier_name, len(uris))
             return None
 
-        logger.info("[%s] Checking %d nodes via sentinel-core...", tier_name, len(parsed_profiles))
-        test_res = await loop.run_in_executor(None, sentinel_core_bridge.test_profiles, parsed_profiles, 3500)
-        alive_profiles = [p for p in test_res if p.get("alive")]
-        alive_profiles.sort(key=lambda x: x.get("latencyMs", 999999))
-
-        if not alive_profiles:
-            logger.warning("[%s] 0 / %d nodes alive", tier_name, len(parsed_profiles))
-            return None
-
-        best = alive_profiles[0]
-        best_name = best.get("name") or best.get("address")
-        logger.info("%s: %d / %d nodes alive. Best: %s (%.1f ms)", tier_name, len(alive_profiles), len(parsed_profiles), best_name, best.get("latencyMs", 0))
-
-        top_alive = alive_profiles[:10]
-        logger.info("[Failover] Compiling Sing-box multi-node client config for %d alive nodes...", len(top_alive))
-
-        cfg_json = sentinel_core_bridge.build_failover_client_config(top_alive, socks_port=10818, http_port=10819)
+        logger.info("[Failover] Compiling Sing-box multi-node client config for %d alive nodes...", len(parsed_profiles))
+        cfg_json = sentinel_core_bridge.build_failover_client_config(parsed_profiles, socks_port=10818, http_port=10819)
         if not cfg_json:
             logger.error("[Failover] Failed to compile Sing-box client config from alive profiles")
             return None
@@ -340,7 +355,7 @@ class SocksProxyRotator:
         logger.info("[Tunnel] Launching Sing-box client process and activating fastest route...")
         ok = await self.start_or_reload_singbox_tunnel(cfg_json, port=10818, target_host=target_host)
         if ok:
-            working_uris = [p.get("proxyUrl") for p in top_alive if p.get("proxyUrl")]
+            working_uris = [p.get("proxyUrl") for p in parsed_profiles if p.get("proxyUrl")]
             self._save_working_nodes_to_disk(working_uris)
             self._last_working_source_tier = tier_name
             return "socks5://127.0.0.1:10818"

@@ -240,10 +240,6 @@ class NetworkManager:
         timeout = 90.0
 
         while time.time() - start_time < timeout:
-            if self.rotator_proc.poll() is not None:
-                log_error("Процесс ротатора завершился до установления соединения.")
-                break
-
             line = self.rotator_proc.stdout.readline() if self.rotator_proc.stdout else ""
             if line:
                 line_str = line.strip()
@@ -251,8 +247,17 @@ class NetworkManager:
                     self.active_proxy_url = line_str.split("PROXY_READY:", 1)[1].strip()
                     log_success(f"VPN-туннель успешно поднят на {self.active_proxy_url}!")
                     return self.active_proxy_url
-                elif any(k in line_str for k in ("[INFO]", "[Failover]", "[singbox]", "[Rotator]", "[Tunnel]", "Tier", "nodes alive", "Best:", "singbox")):
+                elif line_str:
                     print(f"    {line_str}", flush=True)
+            elif self.rotator_proc.poll() is not None:
+                # Read all remaining output
+                if self.rotator_proc.stdout:
+                    for remaining in self.rotator_proc.stdout:
+                        r_str = remaining.strip()
+                        if r_str:
+                            print(f"    {r_str}", flush=True)
+                log_error("Процесс ротатора завершился до установления соединения.")
+                break
 
             time.sleep(0.05)
 
