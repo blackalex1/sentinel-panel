@@ -88,8 +88,8 @@ def main() -> int:
         # 2. DNS Verification (Unencrypted UDP:53)
         ensure_unencrypted_dns()
 
-        # 3. Start VPN Rotator if selected
-        active_proxy = network_mgr.start_vpn_rotator()
+        # 3. Start VPN Rotator / Proxy if selected
+        active_proxy = network_mgr.setup_network()
 
         log_banner("🔄 UPDATING SENTINEL PANEL")
 
