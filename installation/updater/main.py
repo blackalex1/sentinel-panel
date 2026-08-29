@@ -93,11 +93,7 @@ def main() -> int:
 
         log_banner("🔄 UPDATING SENTINEL PANEL")
 
-        # 4. Update Git Codebase
-        git_mgr = GitManager(project_dir=project_root, proxy_url=active_proxy)
-        git_mgr.update_codebase()
-
-        # 5. Update Sentinel-Core Engine (v0.0.8+)
+        # 4. Update Sentinel-Core Engine (v0.0.8+)
         core_mgr = CoreManager(
             project_dir=project_root,
             proxy_url=active_proxy,

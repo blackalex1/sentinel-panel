@@ -17,6 +17,23 @@ if [ "$EUID" -ne 0 ]; then
     exit 1
 fi
 
+# 1. Fast bootstrap: auto-update git repository before launching updater
+if [ -z "${BOOTSTRAPPED:-}" ] && [ -d .git ] && command -v git &>/dev/null; then
+    OLD_HEAD=$(git rev-parse HEAD 2>/dev/null || true)
+    for remote in origin "https://github.com/blackalex1/sentinel-panel.git" "https://gh-proxy.com/https://github.com/blackalex1/sentinel-panel.git" "https://ghfast.top/https://github.com/blackalex1/sentinel-panel.git"; do
+        if git fetch "$remote" main 2>/dev/null; then
+            git reset --hard FETCH_HEAD 2>/dev/null || true
+            break
+        fi
+    done
+    NEW_HEAD=$(git rev-parse HEAD 2>/dev/null || true)
+    if [ -n "$OLD_HEAD" ] && [ -n "$NEW_HEAD" ] && [ "$OLD_HEAD" != "$NEW_HEAD" ]; then
+        echo -e "\033[0;32m[✓]\033[0m Скрипт обновления обновлен из Git (${OLD_HEAD:0:7} -> ${NEW_HEAD:0:7}). Перезапуск..."
+        export BOOTSTRAPPED=1
+        exec bash "$0" "$@"
+    fi
+fi
+
 # Detect Python 3 interpreter
 PYTHON_BIN=""
 for candidate in python3 python /usr/bin/python3 /usr/local/bin/python3; do
