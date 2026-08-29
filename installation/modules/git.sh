@@ -24,9 +24,10 @@ update_git_codebase() {
     else
         log_warn "Прямое подключение к GitHub не удалось. Пробуем через быстрое зеркало..."
         local MIRRORS=(
-            "https://ghproxy.net/https://github.com/blackalex1/sentinel-panel.git"
             "https://gh-proxy.com/https://github.com/blackalex1/sentinel-panel.git"
-            "https://mirror.ghproxy.com/https://github.com/blackalex1/sentinel-panel.git"
+            "https://ghfast.top/https://github.com/blackalex1/sentinel-panel.git"
+            "https://gh.ddlc.top/https://github.com/blackalex1/sentinel-panel.git"
+            "https://ghproxy.net/https://github.com/blackalex1/sentinel-panel.git"
         )
         for mirror_url in "${MIRRORS[@]}"; do
             if git -c "http.proxy=" -c "https.proxy=" fetch "$mirror_url" main 2>/dev/null && git reset --hard FETCH_HEAD; then
