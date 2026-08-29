@@ -197,28 +197,10 @@ class SocksProxyRotator:
             return False
 
         cfg_dir = os.path.dirname(os.path.abspath(__file__))
-        cfg_path = os.path.join(cfg_dir, f"{engine_type}_failover.json")
-
-        final_cfg = config_json
-        if engine_type == "singbox":
-            try:
-                c_dict = json.loads(config_json)
-                if "dns" in c_dict and "servers" in c_dict["dns"]:
-                    for s in c_dict["dns"]["servers"]:
-                        if isinstance(s, dict):
-                            if "server" in s and "address" not in s and "type" not in s:
-                                s["address"] = s.pop("server")
-                final_cfg = json.dumps(c_dict, indent=2, ensure_ascii=False)
-            except Exception:
-                pass
-
         with open(cfg_path, "w", encoding="utf-8") as f:
-            f.write(final_cfg)
+            f.write(config_json)
 
         env = os.environ.copy()
-        env["ENABLE_DEPRECATED_LEGACY_DNS_SERVERS"] = "true"
-        env["ENABLE_DEPRECATED_MISSING_DOMAIN_RESOLVER"] = "true"
-        env["ENABLE_DEPRECATED_SPECIAL_OUTBOUNDS"] = "true"
 
         cmd = [bin_path, "run", "-c", cfg_path]
         try:
