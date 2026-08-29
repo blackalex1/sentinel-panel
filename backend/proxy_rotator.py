@@ -223,15 +223,26 @@ def generate_singbox_failover_config(profiles: List[Dict[str, Any]], socks_port:
         "dns": {
             "servers": [
                 {
-                    "type": "udp",
                     "tag": "dns-remote",
-                    "server": "1.1.1.1",
+                    "address": "https://1.1.1.1/dns-query",
+                    "address_resolver": "dns-direct",
                     "detour": "auto-failover"
                 },
                 {
-                    "type": "udp",
                     "tag": "dns-direct",
-                    "server": "8.8.8.8"
+                    "address": "8.8.8.8",
+                    "detour": "direct"
+                },
+                {
+                    "tag": "dns-direct-alt",
+                    "address": "8.8.4.4",
+                    "detour": "direct"
+                }
+            ],
+            "rules": [
+                {
+                    "outbound": ["direct"],
+                    "server": "dns-direct"
                 }
             ],
             "final": "dns-remote",
