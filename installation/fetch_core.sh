@@ -125,23 +125,30 @@ echo "[+] Опрос GitHub Releases для $REPO..."
 if command -v python3 &>/dev/null; then
     RELEASE_DATA=$(python3 -c "
 import urllib.request, json, sys, ssl
+
 ctx = ssl.create_default_context()
 ctx.check_hostname = False
 ctx.verify_mode = ssl.CERT_NONE
+https_handler = urllib.request.HTTPSHandler(context=ctx)
+
+proxy = '$VALID_PROXY'
+handlers = [https_handler]
+if proxy:
+    handlers.append(urllib.request.ProxyHandler({'http': proxy, 'https': proxy}))
+
+opener = urllib.request.build_opener(*handlers)
 
 urls = [
     'https://api.github.com/repos/$REPO/releases',
-    'https://ghproxy.net/https://api.github.com/repos/$REPO/releases',
-    'https://gh-proxy.com/https://api.github.com/repos/$REPO/releases'
+    'https://gh-proxy.com/https://api.github.com/repos/$REPO/releases',
+    'https://ghfast.top/https://api.github.com/repos/$REPO/releases',
+    'https://gh.ddlc.top/https://api.github.com/repos/$REPO/releases'
 ]
-proxy = '$VALID_PROXY'
-handlers = [urllib.request.ProxyHandler({'http': proxy, 'https': proxy})] if proxy else []
-opener = urllib.request.build_opener(*handlers)
 
 for u in urls:
     try:
-        req = urllib.request.Request(u, headers={'User-Agent': 'SentinelPanel'})
-        with opener.open(req, timeout=6) as response:
+        req = urllib.request.Request(u, headers={'User-Agent': 'SentinelPanel/1.0'})
+        with opener.open(req, timeout=4) as response:
             releases = json.loads(response.read().decode('utf-8'))
             if isinstance(releases, list) and len(releases) > 0:
                 stable = next((r['tag_name'] for r in releases if not r.get('prerelease')), '')
@@ -160,8 +167,10 @@ fi
 
 # Fallback with curl if python didn't get results
 if [ -z "$LATEST_ANY" ] && command -v curl &>/dev/null; then
-    for api_url in "https://api.github.com/repos/$REPO/releases" "https://ghproxy.net/https://api.github.com/repos/$REPO/releases" "https://gh-proxy.com/https://api.github.com/repos/$REPO/releases"; do
-        LATEST_ANY=$(curl "${CURL_OPTS[@]}" "$api_url" 2>/dev/null | grep -m1 '"tag_name":' | cut -d'"' -f4 | tr -d '\r\n ')
+    API_CURL_OPTS=("-fsSL" "-k" "--connect-timeout" "4" "--max-time" "10")
+    [ -n "$VALID_PROXY" ] && API_CURL_OPTS+=("-x" "$VALID_PROXY")
+    for api_url in "https://api.github.com/repos/$REPO/releases" "https://gh-proxy.com/https://api.github.com/repos/$REPO/releases" "https://ghfast.top/https://api.github.com/repos/$REPO/releases"; do
+        LATEST_ANY=$(curl "${API_CURL_OPTS[@]}" "$api_url" 2>/dev/null | grep -m1 '"tag_name":' | cut -d'"' -f4 | tr -d '\r\n ')
         if [ -n "$LATEST_ANY" ]; then
             [ -z "$STABLE_VER" ] && STABLE_VER="$LATEST_ANY"
             break
