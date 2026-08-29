@@ -221,8 +221,8 @@ class SocksProxyRotator:
             )
             self._current_engine = engine_type
 
-            for _ in range(6):
-                await asyncio.sleep(0.5)
+            for _ in range(16):
+                await asyncio.sleep(0.6)
                 if self._singbox_proc.poll() is not None:
                     _, stderr = self._singbox_proc.communicate()
                     logger.warning("%s process terminated unexpectedly on startup: %s", engine_type, stderr)
