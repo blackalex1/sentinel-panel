@@ -118,6 +118,13 @@ def main() -> int:
         log_banner("✅ ОБНОВЛЕНИЕ ПАНЕЛИ SENTINEL УСПЕШНО ЗАВЕРШЕНО!")
         print(f"{GREEN}Все компоненты, ядро и контейнеры панели успешно обновлены и перезапущены.{RESET}\n")
 
+        # 9. Live Follow Logs Stream (-f)
+        if sys.stdin.isatty() and not args.auto:
+            print(f"{CYAN}📡 Подключение к живому потоку логов панели ({BOLD}docker compose logs -f{RESET}{CYAN})...{RESET}")
+            print(f"{YELLOW}(Нажмите Ctrl+C для выхода из режима просмотра логов){RESET}\n")
+            docker_mgr.stream_live_logs()
+            print(f"\n{GREEN}[✓] Просмотр логов завершен. Панель продолжает работать в фоне.{RESET}\n")
+
         return 0
 
     except Exception as e:
