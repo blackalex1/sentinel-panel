@@ -33,7 +33,11 @@ if [ -z "${BOOTSTRAPPED:-}" ] && [ -d .git ] && command -v git &>/dev/null; then
         echo -e "\033[1;36m📝 СПИСОК ИЗМЕНЕНИЙ (CHANGELOG: ${OLD_HEAD:0:7}..${NEW_HEAD:0:7}):\033[0m"
         echo -e "\033[1;36m============================================================\033[0m"
         git log --color=always --pretty=format:"  %C(yellow)•%C(reset) %C(bold yellow)%h%C(reset) %C(bold white)%s%C(reset) %C(cyan)(%cr)%C(reset)" "${OLD_HEAD}..${NEW_HEAD}" 2>/dev/null || true
-        echo -e "\n\033[1;36m============================================================\033[0m\n"
+        echo -e "\n\033[1;36m------------------------------------------------------------\033[0m"
+        echo -e "\033[1;33m📊 ИЗМЕНЕННЫЕ ФАЙЛЫ:\033[0m"
+        echo -e "\033[1;36m------------------------------------------------------------\033[0m"
+        git diff --stat --color=always "${OLD_HEAD}..${NEW_HEAD}" 2>/dev/null || true
+        echo -e "\033[1;36m============================================================\033[0m\n"
         export BOOTSTRAPPED=1
         exec bash "$0" "$@"
     fi
