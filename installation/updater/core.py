@@ -47,22 +47,48 @@ class CoreManager:
         os.makedirs(self.bin_dir, exist_ok=True)
 
     def _get_installed_version(self) -> Tuple[bool, str]:
-        """Detects currently installed core version."""
+        """Detects currently installed core version via binary CLI or C-shared library FFI."""
         exe_path = os.path.join(self.bin_dir, "sentinel-core")
         if platform.system() == "Windows":
             exe_path += ".exe"
 
         if os.path.isfile(exe_path):
-            try:
-                out = subprocess.check_output([exe_path, "--version"], stderr=subprocess.STDOUT, timeout=3).decode().strip()
-                match = re.search(r"v\d+\.\d+(\.\d+)?(-[a-zA-Z0-9.]+)?", out)
-                ver_tag = match.group(0) if match else out
-                return True, ver_tag
-            except Exception:
-                return True, "Установлена (версия не определена)"
+            if platform.system() != "Windows":
+                try:
+                    os.chmod(exe_path, 0o755)
+                except Exception:
+                    pass
+            for arg in ["version", "--version", "-v"]:
+                try:
+                    out = subprocess.check_output([exe_path, arg], stderr=subprocess.STDOUT, timeout=3).decode().strip()
+                    match = re.search(r"v\d+\.\d+(\.\d+)?(-[a-zA-Z0-9.]+)?", out)
+                    if match:
+                        return True, match.group(0)
+                    if out:
+                        return True, out
+                except Exception:
+                    continue
 
-        so_path = os.path.join(self.bin_dir, "libsentinel-core.so")
+        # Try shared library FFI
+        _, _, ext = self._get_platform_info()
+        so_path = os.path.join(self.bin_dir, f"libsentinel-core{ext}")
+        if not os.path.isfile(so_path):
+            so_path = os.path.join(self.bin_dir, "libsentinel-core.so")
+
         if os.path.isfile(so_path):
+            try:
+                import ctypes
+                lib = ctypes.CDLL(so_path)
+                if hasattr(lib, "SentinelGetEngineVersion"):
+                    lib.SentinelGetEngineVersion.restype = ctypes.c_char_p
+                    ver_raw = lib.SentinelGetEngineVersion()
+                    if ver_raw:
+                        v_str = ver_raw.decode("utf-8").strip()
+                        if not v_str.startswith("v") and re.match(r"^\d+\.\d+", v_str):
+                            v_str = "v" + v_str
+                        return True, v_str
+            except Exception:
+                pass
             return True, "Установлена (.so найдена)"
 
         return False, "Не установлена"
