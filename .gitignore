@@ -47,6 +47,7 @@ bin/xray.exe
 config/cached_vpn_nodes.json
 bin/sing-box
 bin/sing-box.exe
+bin/hysteria.exe
 bin/hysteria-*
 bin/hysteria-*.exe
 bin/sentinel-core
@@ -56,9 +57,7 @@ bin/sentinel-core.h
 bin/libsentinel-core.*
 bin/config.json
 bin/singbox.json
-bin/xray.log
-bin/singbox.log
-bin/hysteria.log
+bin/*.log
 bin/hysteria.crt
 bin/hysteria.key
 bin/hysteria_*.json

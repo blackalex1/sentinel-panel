@@ -157,16 +157,14 @@ def download_singbox_core(download_url: str = None):
         download_url = info["download_url"]
         version = info["version"]
     else:
-        from urllib.parse import urlparse
+        from urllib.parse import urlparse, unquote
         try:
             parsed = urlparse(download_url)
+            path_lower = unquote(parsed.path).lower()
             is_safe = (
                 parsed.scheme == "https"
                 and parsed.netloc.lower() == "github.com"
-                and (
-                    parsed.path.startswith("/SagerNet/sing-box/releases/download/")
-                    or parsed.path.startswith("/sagernet/sing-box/releases/download/")
-                )
+                and path_lower.startswith("/sagernet/sing-box/releases/download/")
             )
         except Exception:
             is_safe = False
