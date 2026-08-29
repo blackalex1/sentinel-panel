@@ -212,9 +212,9 @@ class NetworkManager:
         rotator_py = os.path.join(self.project_dir, "backend", "proxy_rotator.py")
         cmd = [py_bin, "-u", rotator_py]
         if self.configured_vpn_node:
-            cmd.extend(["--node", self.configured_vpn_node, "--port", "10818"])
+            cmd.extend(["--node", self.configured_vpn_node, "--port", "10818", "--target-host", "objects.githubusercontent.com"])
         else:
-            cmd.extend(["--find-and-start", "--port", "10818"])
+            cmd.extend(["--find-and-start", "--port", "10818", "--target-host", "objects.githubusercontent.com"])
 
         try:
             extra_kwargs = {}
@@ -259,6 +259,10 @@ class NetworkManager:
         log_warn("Превышено время ожидания ответа от VPN-нод. Продолжаем обновление без ротатора...")
         self.cleanup()
         return None
+
+    def start_vpn_rotator(self) -> Optional[str]:
+        """Alias for setup_network for backward compatibility."""
+        return self.setup_network()
 
     def get_env_dict(self) -> Dict[str, str]:
         """Returns environment dictionary configured with the active proxy."""
