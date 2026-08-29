@@ -43,6 +43,7 @@ def main() -> int:
     parser.add_argument("--no-proxy", action="store_true", help="Direct connection without proxy or rotator")
     parser.add_argument("--auto", "-y", action="store_true", help="Non-interactive automated mode")
     parser.add_argument("--force", "-f", action="store_true", help="Force re-download even if already up to date")
+    parser.add_argument("--bootstrapped", action="store_true", help=argparse.SUPPRESS)
 
     args = parser.parse_args()
 
@@ -51,6 +52,18 @@ def main() -> int:
 
     # 0. Initial System Checks
     check_root()
+
+    # 1. Bootstrap Phase: Auto-update codebase first before displaying any menu
+    if not args.bootstrapped:
+        git_mgr = GitManager(project_dir=project_root)
+        updated = git_mgr.update_codebase(silent_if_uptodate=True)
+        if updated:
+            log_info("Скрипт обновления получил новые изменения из Git. Перезапуск...")
+            new_argv = [sys.executable, "-m", "installation.updater.main", "--bootstrapped"]
+            for a in sys.argv[1:]:
+                if a not in ("--bootstrapped",):
+                    new_argv.append(a)
+            os.execv(sys.executable, new_argv)
 
     network_mgr = NetworkManager(
         project_dir=project_root,
@@ -69,7 +82,7 @@ def main() -> int:
     signal.signal(signal.SIGTERM, handle_signal)
 
     try:
-        # 1. Interactive Network & Proxy Configuration
+        # 2. Interactive Network & Proxy Configuration
         network_mgr.show_menu()
 
         # 2. DNS Verification (Unencrypted UDP:53)

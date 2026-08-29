@@ -29,20 +29,23 @@ class GitManager:
         self.project_dir = project_dir
         self.proxy_url = proxy_url
 
-    def update_codebase(self) -> bool:
-        """Pulls latest updates from Git origin or fallback CDN mirrors."""
+    def update_codebase(self, silent_if_uptodate: bool = False) -> bool:
+        """Pulls latest updates from Git origin or fallback CDN mirrors. Returns True if new commits were pulled."""
         if not shutil.which("git") or not os.path.isdir(os.path.join(self.project_dir, ".git")):
-            log_warn("Директория .git не найдена. Пропуск этапа обновления через Git.")
-            return True
+            if not silent_if_uptodate:
+                log_warn("Директория .git не найдена. Пропуск этапа обновления через Git.")
+            return False
 
-        log_info("Получение последних обновлений из Git...")
+        if not silent_if_uptodate:
+            log_info("Получение последних обновлений из Git...")
 
         # Stash any local uncommitted changes to prevent conflicts
         stashed = False
         try:
             status = run_command(["git", "status", "--porcelain"], cwd=self.project_dir, capture=True, check=False).stdout.strip()
             if status:
-                log_warn("Обнаружены локальные изменения. Сохранение во временный stash...")
+                if not silent_if_uptodate:
+                    log_warn("Обнаружены локальные изменения. Сохранение во временный stash...")
                 run_command(["git", "stash", "push", "-m", "sentinel-updater-autostash"], cwd=self.project_dir, check=False)
                 stashed = True
         except Exception:
@@ -86,7 +89,7 @@ class GitManager:
         for remote in candidate_remotes:
             try:
                 fetch_cmd = ["git"] + git_config_args + ["fetch", remote, branch]
-                res = run_command(fetch_cmd, cwd=self.project_dir, env=git_env, capture=True, check=False, timeout=12)
+                res = run_command(fetch_cmd, cwd=self.project_dir, env=git_env, capture=True, check=False, timeout=10)
                 if res.returncode == 0:
                     run_command(["git", "reset", "--hard", "FETCH_HEAD"], cwd=self.project_dir, capture=True, check=True)
                     pull_success = True
@@ -95,7 +98,8 @@ class GitManager:
                 continue
 
         if not pull_success:
-            log_error("Не удалось получить обновления из Git ни с одного источника.")
+            if not silent_if_uptodate:
+                log_error("Не удалось получить обновления из Git ни с одного источника.")
             if stashed:
                 try:
                     run_command(["git", "stash", "pop"], cwd=self.project_dir, check=False)
@@ -124,7 +128,8 @@ class GitManager:
                     print(f"\n{log_diff}\n")
             except Exception:
                 pass
+            return True
         else:
-            log_success("Кодовая база уже актуальна (Already up to date).")
-
-        return True
+            if not silent_if_uptodate:
+                log_success("Кодовая база уже актуальна (Already up to date).")
+            return False
