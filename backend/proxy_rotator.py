@@ -542,9 +542,9 @@ class SocksProxyRotator:
         """Скачивает файл подписки через быстрые CDN-зеркала с таймаутом 3.5с."""
         loop = asyncio.get_running_loop()
         mirror_prefixes = [
-            "https://ghproxy.net/",
+            "https://ghfast.top/",
             "https://gh-proxy.com/",
-            "https://mirror.ghproxy.com/",
+            "https://gh.ddlc.top/",
             "",
         ]
 
@@ -555,9 +555,9 @@ class SocksProxyRotator:
             ctx.verify_mode = ssl.CERT_NONE
             req = urllib.request.Request(
                 target_url,
-                headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
+                headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Sentinel/1.0"}
             )
-            with urllib.request.urlopen(req, timeout=3.5, context=ctx) as response:
+            with urllib.request.urlopen(req, timeout=2.0, context=ctx) as response:
                 return response.read().decode("utf-8", errors="ignore")
 
         for prefix in mirror_prefixes:
