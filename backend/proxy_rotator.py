@@ -210,22 +210,48 @@ class SocksProxyRotator:
             if sys.platform != "win32":
                 extra_kwargs["preexec_fn"] = os.setsid
 
+            log_path = os.path.join(_panel_root, "bin", f"{engine_type}_rotator.log")
+            os.makedirs(os.path.dirname(log_path), exist_ok=True)
+            log_file = open(log_path, "w", encoding="utf-8", errors="ignore")
+
             self._singbox_proc = subprocess.Popen(
                 cmd,
                 stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
                 text=True,
                 encoding="utf-8",
+                errors="ignore",
+                bufsize=1,
                 env=env,
                 **extra_kwargs
             )
             self._current_engine = engine_type
 
+            # Background thread to stream and log Sing-box engine lines live in real time
+            import threading
+            def _stream_logs():
+                try:
+                    for line in iter(self._singbox_proc.stdout.readline, ''):
+                        clean_line = line.strip()
+                        if clean_line:
+                            log_file.write(clean_line + "\n")
+                            log_file.flush()
+                            logger.info("    [%s] %s", engine_type, clean_line)
+                except Exception:
+                    pass
+                finally:
+                    try:
+                        log_file.close()
+                    except Exception:
+                        pass
+
+            log_thread = threading.Thread(target=_stream_logs, daemon=True)
+            log_thread.start()
+
             for _ in range(16):
                 await asyncio.sleep(0.6)
                 if self._singbox_proc.poll() is not None:
-                    _, stderr = self._singbox_proc.communicate()
-                    logger.warning("%s process terminated unexpectedly on startup: %s", engine_type, stderr)
+                    logger.warning("%s process terminated with exit code %d (see %s)", engine_type, self._singbox_proc.returncode, log_path)
                     self._singbox_proc = None
                     return False
 
@@ -363,6 +389,7 @@ class SocksProxyRotator:
         best = working[0]
         logger.info("%s: %d / %d nodes alive. Best: %s (%.1f ms)", tier_name, len(working), len(profiles[:25]), best.get("name") or best.get("address"), best.get("latencyMs", 0))
 
+        logger.info("[Failover] Compiling Sing-box multi-node client config for %d alive nodes...", len(working[:10]))
         client_cfg = None
         try:
             from backend import sentinel_core_bridge
@@ -370,7 +397,7 @@ class SocksProxyRotator:
                 working[:10],
                 socks_port=10818,
                 http_port=10819,
-                health_url="https://api.telegram.org"
+                health_url="https://www.gstatic.com/generate_204"
             )
         except Exception as e:
             logger.error("Core build_failover_client_config exception: %s", e)
@@ -379,6 +406,7 @@ class SocksProxyRotator:
             logger.error("Не удалось скомпилировать Sing-box конфиг через sentinel-core.")
             return None
 
+        logger.info("[Tunnel] Launching Sing-box client process and activating fastest route...")
         ok = await self.start_or_reload_singbox_tunnel(client_cfg, port=10818)
         if ok:
             working_uris = [p["proxyUrl"] for p in working if p.get("proxyUrl")]
