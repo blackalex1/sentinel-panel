@@ -40,8 +40,11 @@ def _fetch_hysteria_releases_atom(include_prerelease: bool = False, limit: int =
             tag = title_text.split()[-1] if title_text else ""
             if not tag:
                 continue
-            if not tag.startswith("v") and not tag.startswith("app/v"):
-                tag = "app/v" + tag
+            if not tag.startswith("app/"):
+                if tag.startswith("v"):
+                    tag = "app/" + tag
+                else:
+                    tag = "app/v" + tag
             is_pre = any(k in tag.lower() for k in ("beta", "alpha", "rc", "pre"))
             if not include_prerelease and is_pre:
                 continue
@@ -180,13 +183,14 @@ def download_hysteria_core(download_url: str = None):
         download_url = info["download_url"]
         version = info["version"]
     else:
-        from urllib.parse import urlparse
+        from urllib.parse import urlparse, unquote
         try:
             parsed = urlparse(download_url)
+            path_lower = unquote(parsed.path).lower()
             is_safe = (
                 parsed.scheme == "https"
                 and parsed.netloc.lower() == "github.com"
-                and parsed.path.startswith("/apernet/hysteria/releases/download/")
+                and path_lower.startswith("/apernet/hysteria/releases/download/")
             )
         except Exception:
             is_safe = False
