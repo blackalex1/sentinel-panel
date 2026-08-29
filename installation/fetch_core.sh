@@ -145,7 +145,7 @@ for u in urls:
             releases = json.loads(response.read().decode('utf-8'))
             if isinstance(releases, list) and len(releases) > 0:
                 stable = next((r['tag_name'] for r in releases if not r.get('prerelease')), '')
-                prerelease = next((r['tag_name'] for r in releases if r.get('prerelease')), '')
+                prerelease = releases[0]['tag_name'] if releases[0].get('prerelease') else ''
                 latest_any = releases[0]['tag_name'] if releases else ''
                 print(f'{stable}|{prerelease}|{latest_any}')
                 sys.exit(0)
@@ -348,29 +348,34 @@ download_asset() {
     local IS_EXEC="$3"
     local SUCCESS=0
 
-    local CURL_BASE_OPTS=("-fsSL" "--connect-timeout" "10" "--max-time" "60" "--retry" "2" "--speed-limit" "1024" "--speed-time" "6")
-
     for BASE_URL in "${URL_CANDIDATES[@]}"; do
         local URL="$BASE_URL/$ASSET_NAME"
         local TMP_FILE="/tmp/${ASSET_NAME}.$$"
         rm -f "$TMP_FILE"
 
         local IS_MIRROR=0
-        if [[ "$BASE_URL" =~ (ghproxy|gh-proxy|fastgit) ]]; then
+        local HOST_LABEL="Официальный GitHub"
+        if [[ "$BASE_URL" =~ (ghproxy|gh-proxy|mirror\.ghproxy|fastgit) ]]; then
             IS_MIRROR=1
+            HOST_LABEL="CDN-зеркало ($(echo "$BASE_URL" | awk -F'/' '{print $3}'))"
         fi
 
+        echo "  ➜ Попытка загрузки $ASSET_NAME из $HOST_LABEL..."
+
         if command -v curl &>/dev/null; then
+            # Snappy timeouts for direct connection without proxy to immediately bypass throttled AWS S3
+            local CURL_OPTS=("-fsSL" "--connect-timeout" "4" "--max-time" "20" "--speed-limit" "10240" "--speed-time" "4")
             if [ "$IS_MIRROR" -eq 1 ]; then
-                # CDN mirrors should connect directly without proxy
-                curl "${CURL_BASE_OPTS[@]}" -x "" "$URL" -o "$TMP_FILE" 2>/dev/null || true
+                CURL_OPTS=("-fsSL" "--connect-timeout" "8" "--max-time" "60" "--retry" "1")
+                curl "${CURL_OPTS[@]}" -x "" "$URL" -o "$TMP_FILE" 2>/dev/null || true
             elif [ -n "$VALID_PROXY" ]; then
-                curl "${CURL_BASE_OPTS[@]}" -x "$VALID_PROXY" "$URL" -o "$TMP_FILE" 2>/dev/null || true
+                CURL_OPTS=("-fsSL" "--connect-timeout" "10" "--max-time" "60" "--retry" "1")
+                curl "${CURL_OPTS[@]}" -x "$VALID_PROXY" "$URL" -o "$TMP_FILE" 2>/dev/null || true
             else
-                curl "${CURL_BASE_OPTS[@]}" "$URL" -o "$TMP_FILE" 2>/dev/null || true
+                curl "${CURL_OPTS[@]}" "$URL" -o "$TMP_FILE" 2>/dev/null || true
             fi
         elif command -v wget &>/dev/null; then
-            local WGET_OPTS=(-q -T 30 -t 2)
+            local WGET_OPTS=(-q -T 15 -t 1)
             if [ "$IS_MIRROR" -eq 0 ] && [ -n "$VALID_PROXY" ]; then
                 WGET_OPTS+=("-e" "http_proxy=$VALID_PROXY" "-e" "https_proxy=$VALID_PROXY")
             fi
@@ -386,7 +391,7 @@ handlers = [urllib.request.ProxyHandler({'http': proxy, 'https': proxy})] if pro
 opener = urllib.request.build_opener(*handlers)
 req = urllib.request.Request('$URL', headers={'User-Agent': 'SentinelPanel'})
 try:
-    with opener.open(req, timeout=30) as r, open('$TMP_FILE', 'wb') as f:
+    with opener.open(req, timeout=15) as r, open('$TMP_FILE', 'wb') as f:
         f.write(r.read())
 except Exception:
     pass
