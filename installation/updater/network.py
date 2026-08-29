@@ -189,5 +189,12 @@ class NetworkManager:
                     pass
             self.rotator_proc = None
 
+        try:
+            if sys.platform != "win32":
+                subprocess.run(["pkill", "-9", "-f", "singbox_failover.json"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                subprocess.run(["pkill", "-9", "-f", "xray_failover.json"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        except Exception:
+            pass
+
         free_port(10818)
         free_port(10819)
