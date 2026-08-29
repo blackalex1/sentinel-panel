@@ -275,18 +275,19 @@ class SocksProxyRotator:
             # Brief settle time for Sing-box engine inbounds to bind
             await asyncio.sleep(1.0)
 
-            for _ in range(12):
+            for attempt in range(1, 6):
                 if self._singbox_proc.poll() is not None:
                     logger.warning("%s process terminated with exit code %d (see %s)", engine_type, self._singbox_proc.returncode, log_path)
                     self._singbox_proc = None
                     return False
 
-                ok, lat = await self.test_proxy_alive(f"socks5://127.0.0.1:{port}", target_host=target_host, timeout=4.0)
+                logger.debug("[Tunnel] Probing %s via local tunnel (attempt %d/5)...", target_host, attempt)
+                ok, lat = await self.test_proxy_alive(f"socks5://127.0.0.1:{port}", target_host=target_host, timeout=2.5)
                 if ok:
                     logger.info("Started local %s failover tunnel on port %d (latency: %.1f ms)", engine_type, port, lat)
                     return True
 
-                await asyncio.sleep(0.8)
+                await asyncio.sleep(0.5)
 
             logger.warning("%s started on port %d but failed health probe to %s.", engine_type, port, target_host)
             self.stop_tunnel()
@@ -347,7 +348,13 @@ class SocksProxyRotator:
             return None
 
         logger.info("[Failover] Compiling Sing-box multi-node client config for %d alive nodes...", len(parsed_profiles))
-        cfg_json = sentinel_core_bridge.build_failover_client_config(parsed_profiles, socks_port=10818, http_port=10819)
+        health_check_endpoint = f"https://{target_host}" if target_host else "https://objects.githubusercontent.com"
+        cfg_json = sentinel_core_bridge.build_failover_client_config(
+            parsed_profiles,
+            socks_port=10818,
+            http_port=10819,
+            health_url=health_check_endpoint
+        )
         if not cfg_json:
             logger.error("[Failover] Failed to compile Sing-box client config from alive profiles")
             return None
@@ -432,7 +439,12 @@ class SocksProxyRotator:
         parsed = parse_vpn_uri(node_uri)
         if parsed:
             try:
-                cfg_json = sentinel_core_bridge.build_failover_client_config([parsed], socks_port=port, http_port=port+1)
+                cfg_json = sentinel_core_bridge.build_failover_client_config(
+                    [parsed],
+                    socks_port=port,
+                    http_port=port+1,
+                    health_url=f"https://{target_host}" if target_host else "https://objects.githubusercontent.com"
+                )
                 if cfg_json:
                     ok = await self.start_or_reload_singbox_tunnel(cfg_json, port=port, target_host=target_host)
                     if ok:
