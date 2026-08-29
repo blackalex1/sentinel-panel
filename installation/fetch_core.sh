@@ -361,6 +361,8 @@ URL_CANDIDATES=(
     "https://ghfast.top/https://github.com/$REPO/releases/latest/download"
 )
 
+DIRECT_GITHUB_BLOCKED=0
+
 # Helper function to download asset with multi-mirror fallback and cryptographic verification
 download_asset() {
     local ASSET_NAME="$1"
@@ -369,10 +371,6 @@ download_asset() {
     local SUCCESS=0
 
     for BASE_URL in "${URL_CANDIDATES[@]}"; do
-        local URL="$BASE_URL/$ASSET_NAME"
-        local TMP_FILE="/tmp/${ASSET_NAME}.$$"
-        rm -f "$TMP_FILE"
-
         local IS_MIRROR=0
         local HOST_LABEL="Официальный GitHub"
         if [[ "$BASE_URL" =~ (ghproxy|gh-proxy|ghfast|ddlc|mirror\.ghproxy|fastgit) ]]; then
@@ -380,22 +378,32 @@ download_asset() {
             HOST_LABEL="CDN-зеркало ($(echo "$BASE_URL" | awk -F'/' '{print $3}'))"
         fi
 
+        # If direct GitHub is blocked/throttled, skip straight to fast CDN mirrors
+        if [ "$IS_MIRROR" -eq 0 ] && [ "$DIRECT_GITHUB_BLOCKED" -eq 1 ] && [ -z "$VALID_PROXY" ]; then
+            continue
+        fi
+
+        local URL="$BASE_URL/$ASSET_NAME"
+        local TMP_FILE="/tmp/${ASSET_NAME}.$$"
+        rm -f "$TMP_FILE"
+
         echo "  ➜ Попытка загрузки $ASSET_NAME из $HOST_LABEL..."
 
         if command -v curl &>/dev/null; then
             local CURL_OPTS=("-fsSL" "-k")
             if [ "$IS_MIRROR" -eq 1 ]; then
-                CURL_OPTS+=("--connect-timeout" "6" "--max-time" "45")
+                CURL_OPTS+=("--connect-timeout" "5" "--max-time" "45")
             elif [ -n "$VALID_PROXY" ]; then
                 CURL_OPTS+=("--connect-timeout" "10" "--max-time" "60" "-x" "$VALID_PROXY")
             else
-                CURL_OPTS+=("--connect-timeout" "4" "--max-time" "20" "--speed-limit" "10240" "--speed-time" "4")
+                # Fast 2.5s probe for direct GitHub to immediately detect throttled AWS S3
+                CURL_OPTS+=("--connect-timeout" "2" "--max-time" "3" "--speed-limit" "102400" "--speed-time" "2")
             fi
             curl "${CURL_OPTS[@]}" "$URL" -o "$TMP_FILE" 2>/dev/null || true
         fi
 
         if [ ! -s "$TMP_FILE" ] && command -v wget &>/dev/null; then
-            local WGET_OPTS=(-q --no-check-certificate -T 15 -t 1)
+            local WGET_OPTS=(-q --no-check-certificate -T 10 -t 1)
             if [ "$IS_MIRROR" -eq 0 ] && [ -n "$VALID_PROXY" ]; then
                 WGET_OPTS+=("-e" "http_proxy=$VALID_PROXY" "-e" "https_proxy=$VALID_PROXY")
             fi
@@ -479,6 +487,7 @@ except Exception:
             SUCCESS=1
             break
         fi
+        [ "$IS_MIRROR" -eq 0 ] && [ -z "$VALID_PROXY" ] && DIRECT_GITHUB_BLOCKED=1
         rm -f "$TMP_FILE"
     done
 

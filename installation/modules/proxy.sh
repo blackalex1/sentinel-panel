@@ -80,7 +80,7 @@ start_vpn_rotator() {
         TUNNEL_PID=$!
 
         local LAST_LINE_COUNT=0
-        for ((i=0; i<60; i++)); do
+        for ((i=0; i<180; i++)); do
             if [ -f "$TEMP_ROTATOR_LOG" ]; then
                 local CURRENT_LINE_COUNT
                 CURRENT_LINE_COUNT=$(wc -l < "$TEMP_ROTATOR_LOG" 2>/dev/null || echo 0)
