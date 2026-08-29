@@ -56,7 +56,11 @@ class NetworkManager:
                                 if line.startswith("PROXY_URL="):
                                     val = line.split("=", 1)[1].strip(" '\"")
                                     if val:
-                                        self.custom_proxy = val
+                                        vpn_prefixes = ("ss://", "vless://", "trojan://", "hysteria2://", "hy2://", "vmess://", "tuic://", "wireguard://", "wg://")
+                                        if any(val.lower().startswith(pref) for pref in vpn_prefixes):
+                                            self.use_rotator = True
+                                        elif re.match(r"^(http|https|socks4|socks5|socks5h)://", val, re.IGNORECASE):
+                                            self.custom_proxy = val
                                         break
                     except Exception:
                         pass
