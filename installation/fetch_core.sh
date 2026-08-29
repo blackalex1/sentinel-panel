@@ -130,7 +130,7 @@ API_URLS=(
 )
 
 if command -v curl &>/dev/null; then
-    API_CURL_OPTS=("-fsSL" "-k" "--connect-timeout" "5" "--max-time" "10")
+    API_CURL_OPTS=("-fsSL" "-k" "-H" "User-Agent: SentinelPanel/1.0" "--connect-timeout" "6" "--max-time" "12")
     if [ -n "$VALID_PROXY" ]; then
         PROXY_ARG="$VALID_PROXY"
         [[ "$PROXY_ARG" =~ ^socks5:// ]] && PROXY_ARG="socks5h://${PROXY_ARG#socks5://}"
@@ -200,35 +200,58 @@ if [ -t 0 ] && [ "$AUTO_MODE" -eq 0 ]; then
             echo "  3) ⏹️  Оставить текущую версию (пропустить обновление ядра) [По умолчанию]"
         fi
         echo "  4) ✏️  Ввести тег/версию вручную"
-        read -t 15 -p "Выберите вариант [1-4] (по умолчанию $DEFAULT_CHOICE): " USER_CHOICE || USER_CHOICE="$DEFAULT_CHOICE"
-        USER_CHOICE="${USER_CHOICE:-$DEFAULT_CHOICE}"
+
+        while true; do
+            read -r -t 15 -p "Выберите вариант [1-4] (по умолчанию $DEFAULT_CHOICE): " USER_CHOICE || USER_CHOICE="$DEFAULT_CHOICE"
+            USER_CHOICE="${USER_CHOICE:-$DEFAULT_CHOICE}"
+            USER_CHOICE=$(echo "$USER_CHOICE" | tr -d '[:space:]\\/')
+            case "$USER_CHOICE" in
+                1) SELECTED_TAG="$STABLE_VER"; break ;;
+                2) SELECTED_TAG="$PRERELEASE_VER"; break ;;
+                3) echo "[+] Обновление ядра пропущено (оставлена текущая версия)."; exit 0 ;;
+                4)
+                    while true; do
+                        read -r -p "Введите тег релиза (например $PRERELEASE_VER): " SELECTED_TAG
+                        SELECTED_TAG=$(echo "$SELECTED_TAG" | tr -d '[:space:]')
+                        [ -n "$SELECTED_TAG" ] && break
+                    done
+                    break
+                    ;;
+                *) echo "❌ Неверный ввод '$USER_CHOICE'. Пожалуйста, введите цифру от 1 до 4." ;;
+            esac
+        done
         echo ""
-        case "$USER_CHOICE" in
-            1) SELECTED_TAG="$STABLE_VER" ;;
-            2) SELECTED_TAG="$PRERELEASE_VER" ;;
-            3) echo "[+] Обновление ядра пропущено (оставлена текущая версия)."; exit 0 ;;
-            4) read -p "Введите тег релиза (например $PRERELEASE_VER): " SELECTED_TAG ;;
-            *) [ "$DEFAULT_CHOICE" = "3" ] && { echo "[+] Обновление ядра пропущено (оставлена текущая версия)."; exit 0; } || SELECTED_TAG="$STABLE_VER" ;;
-        esac
     elif [ -n "$PRERELEASE_VER" ]; then
         echo "⚠️  Внимание: Стабильный релиз пока отсутствует (проект на стадии беты/пре-релиза)."
         echo "  1) 🟡 Установить бета-версию ($PRERELEASE_VER) [Экспериментальная]"
         if [ "$IS_INSTALLED" -eq 1 ]; then
             echo "  2) ⏹️  Оставить текущую версию (пропустить обновление) [По умолчанию]"
+            DEFAULT_CHOICE="2"
         else
             echo "  2) ⏹️  Пропустить установку ядра"
+            DEFAULT_CHOICE="1"
         fi
         echo "  3) ✏️  Ввести тег/версию вручную"
-        [ "$IS_INSTALLED" -eq 1 ] && DEFAULT_CHOICE="2"
-        read -t 15 -p "Выберите вариант [1-3] (по умолчанию $DEFAULT_CHOICE): " USER_CHOICE || USER_CHOICE="$DEFAULT_CHOICE"
-        USER_CHOICE="${USER_CHOICE:-$DEFAULT_CHOICE}"
+
+        while true; do
+            read -r -t 15 -p "Выберите вариант [1-3] (по умолчанию $DEFAULT_CHOICE): " USER_CHOICE || USER_CHOICE="$DEFAULT_CHOICE"
+            USER_CHOICE="${USER_CHOICE:-$DEFAULT_CHOICE}"
+            USER_CHOICE=$(echo "$USER_CHOICE" | tr -d '[:space:]\\/')
+            case "$USER_CHOICE" in
+                1) SELECTED_TAG="$PRERELEASE_VER"; break ;;
+                2) echo "[+] Обновление ядра пропущено (оставлена текущая версия)."; exit 0 ;;
+                3)
+                    while true; do
+                        read -r -p "Введите тег релиза (например $PRERELEASE_VER): " SELECTED_TAG
+                        SELECTED_TAG=$(echo "$SELECTED_TAG" | tr -d '[:space:]')
+                        [ -n "$SELECTED_TAG" ] && break
+                    done
+                    break
+                    ;;
+                *) echo "❌ Неверный ввод '$USER_CHOICE'. Пожалуйста, введите цифру от 1 до 3." ;;
+            esac
+        done
         echo ""
-        case "$USER_CHOICE" in
-            1) SELECTED_TAG="$PRERELEASE_VER" ;;
-            2) echo "[+] Обновление ядра пропущено (оставлена текущая версия)."; exit 0 ;;
-            3) read -p "Введите тег релиза (например $PRERELEASE_VER): " SELECTED_TAG ;;
-            *) echo "[+] Обновление ядра пропущено (оставлена текущая версия)."; exit 0 ;;
-        esac
     elif [ -n "$STABLE_VER" ]; then
         if [ "$IS_INSTALLED" -eq 1 ] && [ -n "$CURRENT_VER_TAG" ] && [ "$CURRENT_VER_TAG" = "$STABLE_VER" ]; then
             DEFAULT_CHOICE="2"
@@ -240,30 +263,52 @@ if [ -t 0 ] && [ "$AUTO_MODE" -eq 0 ]; then
             echo "  2) ⏹️  Оставить текущую версию (пропустить)"
         fi
         echo "  3) ✏️  Ввести тег/версию вручную"
-        read -t 15 -p "Выберите вариант [1-3] (по умолчанию $DEFAULT_CHOICE): " USER_CHOICE || USER_CHOICE="$DEFAULT_CHOICE"
-        USER_CHOICE="${USER_CHOICE:-$DEFAULT_CHOICE}"
+
+        while true; do
+            read -r -t 15 -p "Выберите вариант [1-3] (по умолчанию $DEFAULT_CHOICE): " USER_CHOICE || USER_CHOICE="$DEFAULT_CHOICE"
+            USER_CHOICE="${USER_CHOICE:-$DEFAULT_CHOICE}"
+            USER_CHOICE=$(echo "$USER_CHOICE" | tr -d '[:space:]\\/')
+            case "$USER_CHOICE" in
+                1) SELECTED_TAG="$STABLE_VER"; break ;;
+                2) echo "[+] Обновление ядра пропущено (оставлена текущая версия)."; exit 0 ;;
+                3)
+                    while true; do
+                        read -r -p "Введите тег релиза (например $STABLE_VER): " SELECTED_TAG
+                        SELECTED_TAG=$(echo "$SELECTED_TAG" | tr -d '[:space:]')
+                        [ -n "$SELECTED_TAG" ] && break
+                    done
+                    break
+                    ;;
+                *) echo "❌ Неверный ввод '$USER_CHOICE'. Пожалуйста, введите цифру от 1 до 3." ;;
+            esac
+        done
         echo ""
-        case "$USER_CHOICE" in
-            1) SELECTED_TAG="$STABLE_VER" ;;
-            2) echo "[+] Обновление ядра пропущено (оставлена текущая версия)."; exit 0 ;;
-            3) read -p "Введите тег релиза (например $STABLE_VER): " SELECTED_TAG ;;
-            *) [ "$DEFAULT_CHOICE" = "2" ] && { echo "[+] Обновление ядра пропущено (оставлена текущая версия)."; exit 0; } || SELECTED_TAG="$STABLE_VER" ;;
-        esac
     else
         echo "[-] Не удалось получить список версий через API."
         echo "  1) 🟢 Скачать последний стабильный релиз (через зеркало)"
         echo "  2) ✏️  Ввести версию вручную (например v0.0.7)"
         echo "  3) ⏹️  Оставить текущую версию (пропустить) [По умолчанию]"
         DEFAULT_CHOICE="1"
-        read -t 15 -p "Выберите вариант [1-3] (по умолчанию $DEFAULT_CHOICE): " USER_CHOICE || USER_CHOICE="$DEFAULT_CHOICE"
-        USER_CHOICE="${USER_CHOICE:-$DEFAULT_CHOICE}"
+
+        while true; do
+            read -r -t 15 -p "Выберите вариант [1-3] (по умолчанию $DEFAULT_CHOICE): " USER_CHOICE || USER_CHOICE="$DEFAULT_CHOICE"
+            USER_CHOICE="${USER_CHOICE:-$DEFAULT_CHOICE}"
+            USER_CHOICE=$(echo "$USER_CHOICE" | tr -d '[:space:]\\/')
+            case "$USER_CHOICE" in
+                1) SELECTED_TAG="v0.0.8"; break ;;
+                2)
+                    while true; do
+                        read -r -p "Введите тег релиза вручную: " SELECTED_TAG
+                        SELECTED_TAG=$(echo "$SELECTED_TAG" | tr -d '[:space:]')
+                        [ -n "$SELECTED_TAG" ] && break
+                    done
+                    break
+                    ;;
+                3) echo "[+] Обновление ядра пропущено."; exit 0 ;;
+                *) echo "❌ Неверный ввод '$USER_CHOICE'. Пожалуйста, введите цифру от 1 до 3." ;;
+            esac
+        done
         echo ""
-        case "$USER_CHOICE" in
-            1) SELECTED_TAG="v0.0.7" ;;
-            2) read -p "Введите тег релиза вручную: " SELECTED_TAG ;;
-            3) echo "[+] Обновление ядра пропущено."; exit 0 ;;
-            *) SELECTED_TAG="v0.0.7" ;;
-        esac
     fi
 else
     # Non-interactive / unattended automated mode: skip re-download if installed version matches
@@ -288,12 +333,8 @@ TARGET_TAG="${SELECTED_TAG:-v0.0.7}"
 DIGEST_FILE="/tmp/sentinel_core_digests.$$"
 rm -f "$DIGEST_FILE"
 
-# 6. Fetch native release asset digests (SHA256 & Exact Size) from GitHub API
-DIGEST_FILE="/tmp/sentinel_core_digests.$$"
-rm -f "$DIGEST_FILE"
-
 if command -v curl &>/dev/null; then
-    DIG_CURL_OPTS=("-fsSL" "-k" "--connect-timeout" "5" "--max-time" "10")
+    DIG_CURL_OPTS=("-fsSL" "-k" "-H" "User-Agent: SentinelPanel/1.0" "--connect-timeout" "6" "--max-time" "12")
     if [ -n "$VALID_PROXY" ]; then
         PROXY_ARG="$VALID_PROXY"
         [[ "$PROXY_ARG" =~ ^socks5:// ]] && PROXY_ARG="socks5h://${PROXY_ARG#socks5://}"
