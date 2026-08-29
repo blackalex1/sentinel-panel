@@ -77,16 +77,13 @@ class CoreManager:
 
         if os.path.isfile(so_path):
             try:
-                import ctypes
-                lib = ctypes.CDLL(so_path)
-                if hasattr(lib, "SentinelGetEngineVersion"):
-                    lib.SentinelGetEngineVersion.restype = ctypes.c_char_p
-                    ver_raw = lib.SentinelGetEngineVersion()
-                    if ver_raw:
-                        v_str = ver_raw.decode("utf-8").strip()
-                        if not v_str.startswith("v") and re.match(r"^\d+\.\d+", v_str):
-                            v_str = "v" + v_str
-                        return True, v_str
+                ffi_cmd = [
+                    sys.executable, "-c",
+                    f'import ctypes, re; lib = ctypes.CDLL("{so_path}"); lib.SentinelGetEngineVersion.restype = ctypes.c_char_p; v = lib.SentinelGetEngineVersion().decode("utf-8").strip(); print("v" + v if re.match(r"^\\d+\\.\\d+", v) else v)'
+                ]
+                v_out = subprocess.check_output(ffi_cmd, stderr=subprocess.DEVNULL, timeout=2).decode().strip()
+                if v_out:
+                    return True, v_out
             except Exception:
                 pass
             return True, "Установлена (.so найдена)"
