@@ -221,15 +221,15 @@ class SocksProxyRotator:
             )
             self._current_engine = engine_type
 
-            for _ in range(4):
-                await asyncio.sleep(0.3)
+            for _ in range(6):
+                await asyncio.sleep(0.5)
                 if self._singbox_proc.poll() is not None:
                     _, stderr = self._singbox_proc.communicate()
                     logger.warning("%s process terminated unexpectedly on startup: %s", engine_type, stderr)
                     self._singbox_proc = None
                     return False
 
-                ok, lat = await self.test_proxy_alive(f"socks5://127.0.0.1:{port}", timeout=1.5)
+                ok, lat = await self.test_proxy_alive(f"socks5://127.0.0.1:{port}", timeout=2.5)
                 if ok:
                     logger.info("Started local %s failover tunnel on port %d (latency: %.1f ms)", engine_type, port, lat)
                     return True
@@ -507,9 +507,9 @@ class SocksProxyRotator:
                         s.close()
                         return False, 999999.0
 
-                    # 2. SOCKS5 CONNECT to 1.1.1.1:80 to verify real internet connectivity through VPN!
+                    # 2. SOCKS5 CONNECT to 1.1.1.1:443 (HTTPS) to verify real internet connectivity through VPN!
                     ip_bytes = socket.inet_aton("1.1.1.1")
-                    port_bytes = (80).to_bytes(2, byteorder="big")
+                    port_bytes = (443).to_bytes(2, byteorder="big")
                     req = b"\x05\x01\x00\x01" + ip_bytes + port_bytes
                     s.sendall(req)
                     connect_resp = s.recv(10)
@@ -524,7 +524,7 @@ class SocksProxyRotator:
                     return True, lat
                 else:
                     # HTTP proxy probe
-                    s.sendall(b"CONNECT 1.1.1.1:80 HTTP/1.1\r\nHost: 1.1.1.1:80\r\n\r\n")
+                    s.sendall(b"CONNECT 1.1.1.1:443 HTTP/1.1\r\nHost: 1.1.1.1:443\r\n\r\n")
                     resp = s.recv(12)
                     s.close()
                     lat = (time.monotonic() - start) * 1000.0
