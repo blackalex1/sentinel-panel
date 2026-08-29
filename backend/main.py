@@ -73,7 +73,7 @@ async def sync_session_events_loop():
                                 username="system",
                                 action=action,
                                 target=ip,
-                                details=json.dumps(details_dict)
+                                details=json.dumps(details_dict, ensure_ascii=False)
                             )
 
             # 2. Active sessions reconciliation: ensure all active core sessions have an AuditLog entry
@@ -99,7 +99,7 @@ async def sync_session_events_loop():
                                 username="system",
                                 action=action,
                                 target=ip,
-                                details=json.dumps(details_dict)
+                                details=json.dumps(details_dict, ensure_ascii=False)
                             )
 
             # 3. Secondary check: ACTIVE_IP_CACHE from Clash API / Xray API
@@ -125,7 +125,7 @@ async def sync_session_events_loop():
                                             username="system",
                                             action="singbox_connect",
                                             target=c_ip,
-                                            details=json.dumps(details_dict)
+                                            details=json.dumps(details_dict, ensure_ascii=False)
                                         )
             except Exception as e:
                 logging.debug(f"[SessionTracker Sync] ACTIVE_IP_CACHE check: {e}")
