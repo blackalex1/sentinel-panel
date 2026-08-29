@@ -27,27 +27,41 @@ show_proxy_menu() {
         echo "  1) 🟢 Автоматический VPN / Прокси ротатор [Рекомендуется / По умолчанию]"
         echo "  2) 🌐 Прямое соединение к GitHub (с авто-фолбэком на CDN-зеркала при блокировке)"
         echo "  3) 🔌 Использовать существующий HTTP / SOCKS5 прокси"
-        read -t 15 -p "Выберите вариант [1-3] (по умолчанию 1): " NET_CHOICE || NET_CHOICE="1"
-        NET_CHOICE="${NET_CHOICE:-1}"
+
+        while true; do
+            read -r -t 15 -p "Выберите вариант [1-3] (по умолчанию 1): " NET_CHOICE || NET_CHOICE="1"
+            NET_CHOICE="${NET_CHOICE:-1}"
+            NET_CHOICE=$(echo "$NET_CHOICE" | tr -d '[:space:]\\/')
+            case "$NET_CHOICE" in
+                1)
+                    USE_ROTATOR=1
+                    break
+                    ;;
+                2)
+                    USE_ROTATOR=0
+                    NO_PROXY=1
+                    break
+                    ;;
+                3)
+                    USE_ROTATOR=0
+                    while true; do
+                        read -r -p "Введите адрес прокси (например socks5://127.0.0.1:10808): " USER_P
+                        USER_P=$(echo "$USER_P" | tr -d '[:space:]')
+                        if [[ "$USER_P" =~ ^(http|https|socks4|socks5|socks5h):// ]]; then
+                            PROXY_URL="$USER_P"
+                            break
+                        else
+                            echo "❌ Неверный формат прокси! URL должен начинаться с http://, https://, socks5:// или socks5h://"
+                        fi
+                    done
+                    break
+                    ;;
+                *)
+                    echo "❌ Неверный ввод '$NET_CHOICE'. Пожалуйста, введите цифру 1, 2 или 3."
+                    ;;
+            esac
+        done
         echo ""
-        case "$NET_CHOICE" in
-            1)
-                USE_ROTATOR=1
-                ;;
-            2)
-                USE_ROTATOR=0
-                ;;
-            3)
-                USE_ROTATOR=0
-                read -p "Введите адрес прокси (например socks5://127.0.0.1:10808): " USER_P
-                if [ -n "$USER_P" ]; then
-                    PROXY_URL="$USER_P"
-                fi
-                ;;
-            *)
-                USE_ROTATOR=1
-                ;;
-        esac
     fi
 }
 
