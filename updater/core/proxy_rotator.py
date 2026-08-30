@@ -59,11 +59,25 @@ HEALTH_CHECK_URL = "http://cp.cloudflare.com/generate_204"
 
 
 def _free_port(port: int) -> None:
-    """Освобождает указанный локальный порт."""
+    """Освобождает указанный локальный порт, принудительно завершая зависшие процессы."""
     if sys.platform == "win32":
         return
     try:
-        subprocess.run(["fuser", "-k", f"{port}/tcp"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        subprocess.run(["fuser", "-k", "-9", f"{port}/tcp"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    except Exception:
+        pass
+    try:
+        res = subprocess.run(["lsof", "-ti", f":{port}"], capture_output=True, text=True)
+        for pid_str in res.stdout.strip().split():
+            if pid_str.isdigit():
+                try:
+                    os.kill(int(pid_str), signal.SIGKILL)
+                except Exception:
+                    pass
+    except Exception:
+        pass
+    try:
+        subprocess.run(["pkill", "-9", "-f", "_failover_"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     except Exception:
         pass
 
@@ -105,32 +119,15 @@ class SocksProxyRotator:
             try:
                 if sys.platform != "win32":
                     try:
-                        os.killpg(os.getpgid(self._singbox_proc.pid), signal.SIGTERM)
+                        os.killpg(os.getpgid(self._singbox_proc.pid), signal.SIGKILL)
                     except Exception:
-                        self._singbox_proc.terminate()
-                else:
-                    self._singbox_proc.terminate()
-                self._singbox_proc.wait(timeout=1.5)
-            except Exception:
-                try:
-                    if sys.platform != "win32":
-                        try:
-                            os.killpg(os.getpgid(self._singbox_proc.pid), signal.SIGKILL)
-                        except Exception:
-                            self._singbox_proc.kill()
-                    else:
                         self._singbox_proc.kill()
-                except Exception:
-                    pass
+                else:
+                    self._singbox_proc.kill()
+                self._singbox_proc.wait(timeout=1.0)
+            except Exception:
+                pass
             self._singbox_proc = None
-
-        try:
-            if sys.platform != "win32":
-                subprocess.run(["pkill", "-9", "-f", "_failover_"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-                subprocess.run(["pkill", "-9", "-f", "singbox_failover"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-                subprocess.run(["pkill", "-9", "-f", "xray_failover"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        except Exception:
-            pass
 
         _free_port(10818)
         _free_port(10819)
@@ -145,6 +142,7 @@ class SocksProxyRotator:
         self.stop_tunnel()
         _free_port(port)
         _free_port(port + 1)
+        await asyncio.sleep(0.2)
 
         engine_bin, engine_type = self._find_proxy_engine_bin()
         if not engine_bin:
