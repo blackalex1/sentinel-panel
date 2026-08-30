@@ -96,7 +96,7 @@ def get_history(core: CoreName) -> list[str]:
 _tail_threads_started = False
 
 def _core_log_worker(core: CoreName):
-    """High-speed worker that drains in-memory pipes from sentinel-core."""
+    """High-speed worker that drains in-memory pipes from sentinel-core and streams to panel logs."""
     import time
     from backend.sentinel_core_bridge import pop_core_log_line
 
@@ -109,6 +109,7 @@ def _core_log_worker(core: CoreName):
                 if not line:
                     break
                 had_activity = True
+                logging.info(f"[{core}] {line}")
                 push_log_line(core, line)
 
             if had_activity:
@@ -117,6 +118,7 @@ def _core_log_worker(core: CoreName):
                 time.sleep(0.03)
         except Exception:
             time.sleep(0.2)
+
 
 
 def ensure_log_tailers():
