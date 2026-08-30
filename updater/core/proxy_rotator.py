@@ -200,7 +200,9 @@ class SocksProxyRotator:
         self,
         proxy_url: str,
         health_check_url: str = HEALTH_CHECK_URL,
-        timeout: float = 3.0
+        timeout: float = 3.0,
+        verbose: bool = False,
+        **kwargs
     ) -> Tuple[bool, float]:
         """Проверяет доступность прокси через curl к health-check эндпоинту."""
         loop = asyncio.get_running_loop()
