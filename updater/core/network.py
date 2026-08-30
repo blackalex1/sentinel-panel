@@ -30,6 +30,21 @@ from .common import (
 )
 
 
+def _set_pdeathsig():
+    """Configures child process to terminate immediately if parent process exits or dies."""
+    if sys.platform != "win32":
+        try:
+            import ctypes
+            libc = ctypes.CDLL("libc.so.6")
+            libc.prctl(1, signal.SIGKILL)
+        except Exception:
+            pass
+        try:
+            os.setsid()
+        except Exception:
+            pass
+
+
 class NetworkManager:
     """Manages VPN rotator tunnels and HTTP/SOCKS5 proxy settings for Sentinel components."""
 
@@ -50,8 +65,10 @@ class NetworkManager:
         self.allow_env: bool = allow_env
         self.use_rotator: bool = True if not (no_proxy or proxy_arg) else False
         self.use_env_proxy: bool = False
-        self.rotator_proc: Optional[subprocess.Popen] = None
         self.active_proxy_url: Optional[str] = None
+
+        import atexit
+        atexit.register(self.cleanup)
 
         if self.allow_env:
             self._init_proxy_from_env()
@@ -314,7 +331,7 @@ class NetworkManager:
         try:
             extra_kwargs = {}
             if sys.platform != "win32":
-                extra_kwargs["preexec_fn"] = os.setsid
+                extra_kwargs["preexec_fn"] = _set_pdeathsig
 
             self.rotator_proc = subprocess.Popen(
                 cmd,
@@ -383,29 +400,21 @@ class NetworkManager:
             try:
                 if sys.platform != "win32":
                     try:
-                        os.killpg(os.getpgid(self.rotator_proc.pid), signal.SIGTERM)
+                        os.killpg(os.getpgid(self.rotator_proc.pid), signal.SIGKILL)
                     except Exception:
-                        self.rotator_proc.terminate()
-                else:
-                    self.rotator_proc.terminate()
-                self.rotator_proc.wait(timeout=1.5)
-            except Exception:
-                try:
-                    if sys.platform != "win32":
-                        try:
-                            os.killpg(os.getpgid(self.rotator_proc.pid), signal.SIGKILL)
-                        except Exception:
-                            self.rotator_proc.kill()
-                    else:
                         self.rotator_proc.kill()
-                except Exception:
-                    pass
+                else:
+                    self.rotator_proc.kill()
+                self.rotator_proc.wait(timeout=1.0)
+            except Exception:
+                pass
             self.rotator_proc = None
 
         try:
             if sys.platform != "win32":
-                subprocess.run(["pkill", "-9", "-f", "singbox_failover.json"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-                subprocess.run(["pkill", "-9", "-f", "xray_failover.json"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                subprocess.run(["pkill", "-9", "-f", "_failover_"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                subprocess.run(["pkill", "-9", "-f", "singbox_failover"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                subprocess.run(["pkill", "-9", "-f", "xray_failover"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
                 subprocess.run(["pkill", "-9", "-f", "proxy_rotator.py"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         except Exception:
             pass

@@ -235,8 +235,12 @@ def free_port(port: int) -> None:
 
     try:
         if shutil.which("fuser"):
-            subprocess.run(["fuser", "-k", f"{port}/tcp"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        elif shutil.which("lsof"):
+            subprocess.run(["fuser", "-k", "-9", f"{port}/tcp"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    except Exception:
+        pass
+
+    try:
+        if shutil.which("lsof"):
             out = subprocess.check_output(["lsof", "-t", f"-i:{port}"], stderr=subprocess.DEVNULL).decode().strip()
             for pid_str in out.split():
                 if pid_str.isdigit():
@@ -244,6 +248,13 @@ def free_port(port: int) -> None:
                         os.kill(int(pid_str), signal.SIGKILL)
                     except Exception:
                         pass
+    except Exception:
+        pass
+
+    try:
+        subprocess.run(["pkill", "-9", "-f", "_failover_"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        subprocess.run(["pkill", "-9", "-f", "singbox_failover"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        subprocess.run(["pkill", "-9", "-f", "xray_failover"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     except Exception:
         pass
 

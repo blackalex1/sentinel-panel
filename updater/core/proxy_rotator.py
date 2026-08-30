@@ -58,6 +58,24 @@ WHITE_LIST_SOURCES = [
 HEALTH_CHECK_URL = "http://cp.cloudflare.com/generate_204"
 
 
+import atexit
+
+
+def _set_pdeathsig():
+    """Configures child process to terminate immediately if parent process exits or dies."""
+    if sys.platform != "win32":
+        try:
+            import ctypes
+            libc = ctypes.CDLL("libc.so.6")
+            libc.prctl(1, signal.SIGKILL)
+        except Exception:
+            pass
+        try:
+            os.setsid()
+        except Exception:
+            pass
+
+
 def _free_port(port: int) -> None:
     """Освобождает указанный локальный порт, принудительно завершая зависшие процессы."""
     if sys.platform == "win32":
@@ -88,6 +106,7 @@ class SocksProxyRotator:
     def __init__(self) -> None:
         self._singbox_proc: Optional[subprocess.Popen] = None
         self._current_engine: str = "singbox"
+        atexit.register(self.stop_tunnel)
 
     def _find_proxy_engine_bin(self) -> Tuple[Optional[str], str]:
         """Ищет бинарник sing-box или xray на сервере."""
@@ -165,7 +184,7 @@ class SocksProxyRotator:
 
             extra_kwargs = {}
             if sys.platform != "win32":
-                extra_kwargs["preexec_fn"] = os.setsid
+                extra_kwargs["preexec_fn"] = _set_pdeathsig
 
             self._singbox_proc = subprocess.Popen(
                 cmd,
