@@ -157,7 +157,7 @@ class GitManager:
                 print(f"\n  {CYAN}📝 Список изменений ({BOLD}{from_commit[:7]} → {to_commit[:7]}{RESET}{CYAN}):{RESET}")
                 log_cmd = [
                     "git", "-c", "safe.directory=*", "log",
-                    "--pretty=format:    • \033[1;33m%h\033[0m %s \033[2m(%cr)\033[0m",
+                    "--pretty=format:%h %s (%cr)",
                     f"{from_commit}..{to_commit}"
                 ]
                 diff_cmd = [
@@ -170,7 +170,7 @@ class GitManager:
                 log_cmd = [
                     "git", "-c", "safe.directory=*", "log",
                     f"-n", str(max_commits),
-                    "--pretty=format:    • \033[1;33m%h\033[0m %s \033[2m(%cr)\033[0m"
+                    "--pretty=format:%h %s (%cr)"
                 ]
                 diff_cmd = [
                     "git", "-c", "safe.directory=*", "show",
@@ -180,13 +180,18 @@ class GitManager:
 
             commits_out = run_command(log_cmd, cwd=self.project_dir, capture=True, check=False).stdout.strip()
             if commits_out:
-                print(commits_out)
+                for line in commits_out.splitlines():
+                    if line.strip():
+                        parts = line.strip().split(" ", 1)
+                        h = parts[0]
+                        rest = parts[1] if len(parts) > 1 else ""
+                        print(f"    • {YELLOW}{BOLD}{h}{RESET} {rest}")
 
             diff_out = run_command(diff_cmd, cwd=self.project_dir, capture=True, check=False).stdout.strip()
             if diff_out:
                 print(f"\n  {WHITE}{BOLD}📊 Статистика изменений файлов ({GREEN}+{RESET}/{RED}-{RESET}):{RESET}")
                 for line in diff_out.splitlines():
-                    print(f"  {line}")
+                    print(f"    {line}")
             print("")
         except Exception:
             pass
