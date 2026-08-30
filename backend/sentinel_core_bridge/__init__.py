@@ -52,6 +52,7 @@ from backend.sentinel_core_bridge.traffic_sessions import (
 from backend.sentinel_core_bridge.logs import (
     get_core_logs,
     pop_core_log_line,
+    push_core_log_line,
     get_in_memory_core_logs,
     clear_in_memory_core_logs,
 )
@@ -108,6 +109,7 @@ __all__ = [
     # Logs
     "get_core_logs",
     "pop_core_log_line",
+    "push_core_log_line",
     "get_in_memory_core_logs",
     "clear_in_memory_core_logs",
     # Routing

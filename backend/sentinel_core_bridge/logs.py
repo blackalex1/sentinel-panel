@@ -56,3 +56,15 @@ def clear_in_memory_core_logs(core_name: str) -> bool:
     except Exception as e:
         logger.debug("FFI clear_in_memory_core_logs error: %s", e)
     return True
+
+
+def push_core_log_line(core_name: str, line: str) -> bool:
+    """Pushes a raw log line into sentinel-core Go memory broadcaster and session tracker."""
+    try:
+        res = _ffi_call_json("SentinelPushLogLine", str(core_name), str(line))
+        if isinstance(res, dict) and res.get("success") is True:
+            return True
+    except Exception as e:
+        logger.debug("FFI push_core_log_line error: %s", e)
+    return True
+

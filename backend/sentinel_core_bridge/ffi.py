@@ -111,6 +111,7 @@ def _init_sentinel_lib(lib: Any) -> Any:
         ("SentinelPopLogLine", [ctypes.c_char_p, ctypes.c_int]),
         ("SentinelGetInMemoryLogs", [ctypes.c_char_p, ctypes.c_int]),
         ("SentinelClearInMemoryLogs", [ctypes.c_char_p]),
+        ("SentinelPushLogLine", [ctypes.c_char_p, ctypes.c_char_p]),
         ("SentinelGetSecuritySchema", [ctypes.c_char_p]),
         ("SentinelGetDefaultSecurityConfig", []),
         ("SentinelValidateSecurityConfig", [ctypes.c_char_p]),
@@ -177,7 +178,10 @@ def _ffi_call_str(func_name: str, *args) -> Optional[str]:
         return None
 
     func = getattr(lib, func_name)
-    func.restype = ctypes.c_void_p
+    try:
+        func.restype = ctypes.c_void_p
+    except (AttributeError, TypeError):
+        pass
 
     c_args = []
     for i, a in enumerate(args):
@@ -205,7 +209,7 @@ def _ffi_call_str(func_name: str, *args) -> Optional[str]:
     if not ptr:
         return None
     try:
-        raw_bytes = ctypes.cast(ptr, ctypes.c_char_p).value
+        raw_bytes = ctypes.cast(ctypes.c_void_p(ptr) if isinstance(ptr, int) else ptr, ctypes.c_char_p).value
         if raw_bytes is None:
             return None
         return raw_bytes.decode("utf-8", errors="replace")

@@ -60,12 +60,25 @@ def parse_proxy_uri(raw_uri: str) -> Dict[str, Any]:
     """Parses any proxy URI (vless, hy2, trojan, ss, etc.) via sentinel-core."""
     try:
         res = _ffi_call_json("SentinelParseURI", raw_uri)
-        if isinstance(res, dict) and ("protocol" in res or "error" in res):
+        if isinstance(res, dict) and ("protocol" in res or "error" in res or "name" in res):
             return res
+        if isinstance(res, str):
+            try:
+                parsed = json.loads(res)
+                if isinstance(parsed, dict):
+                    return parsed
+            except Exception:
+                pass
     except Exception as e:
         logger.debug("FFI parse_proxy_uri error: %s", e)
 
-    return run_core_command(["parse", "--uri", raw_uri])
+    res = run_core_command(["parse", "--uri", raw_uri])
+    if isinstance(res, str):
+        try:
+            return json.loads(res)
+        except Exception:
+            return {}
+    return res if isinstance(res, dict) else {}
 
 
 def generate_proxy_uri(profile: Dict[str, Any]) -> str:
