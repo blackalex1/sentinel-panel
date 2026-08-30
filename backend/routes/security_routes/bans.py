@@ -73,7 +73,7 @@ async def get_audit_logs(request: Request, limit: int = 10, search: str = ""):
                     (AuditLog.target.ilike(f"%{search}%")) |
                     (AuditLog.details.ilike(f"%{search}%"))
                 )
-            logs = query.order_by(AuditLog.timestamp.desc()).limit(limit).all()
+            logs = query.order_by(AuditLog.id.desc(), AuditLog.timestamp.desc()).limit(limit).all()
             
             result = []
             for log in logs:
