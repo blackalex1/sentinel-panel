@@ -371,7 +371,10 @@ class SocksProxyRotator:
         if not alive_profiles:
             return None
 
-        logger.info("[%s] Sentinel-Core генерирует Failover конфигурацию (активно нод: %d)...", tier_name, len(alive_profiles))
+        logger.info(
+            "[%s] Sentinel-Core формирует Failover-пул из топ-%d самых быстрых нод (из %d найденных)...",
+            tier_name, len(alive_profiles), len(alive_results)
+        )
 
         config_obj = build_failover_client_config(
             profiles=alive_profiles,
