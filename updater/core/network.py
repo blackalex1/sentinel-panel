@@ -65,6 +65,7 @@ class NetworkManager:
         self.allow_env: bool = allow_env
         self.use_rotator: bool = True if not (no_proxy or proxy_arg) else False
         self.use_env_proxy: bool = False
+        self.rotator_proc: Optional[subprocess.Popen] = None
         self.active_proxy_url: Optional[str] = None
 
         import atexit
@@ -396,19 +397,20 @@ class NetworkManager:
 
     def cleanup(self) -> None:
         """Terminates background rotator processes and frees proxy ports."""
-        if self.rotator_proc:
+        proc = getattr(self, "rotator_proc", None)
+        if proc:
             try:
+                self.rotator_proc = None
                 if sys.platform != "win32":
                     try:
-                        os.killpg(os.getpgid(self.rotator_proc.pid), signal.SIGKILL)
+                        os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
                     except Exception:
-                        self.rotator_proc.kill()
+                        proc.kill()
                 else:
-                    self.rotator_proc.kill()
-                self.rotator_proc.wait(timeout=1.0)
+                    proc.kill()
+                proc.wait(timeout=1.0)
             except Exception:
                 pass
-            self.rotator_proc = None
 
         try:
             if sys.platform != "win32":
