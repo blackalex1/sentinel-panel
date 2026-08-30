@@ -293,17 +293,21 @@ class Downloader:
 
     def fetch_github_api(self, endpoint_url: str, timeout: float = 5.0) -> Optional[Any]:
         """Queries GitHub REST API with mirror fallback and strict timeout."""
+        clean_url = endpoint_url
+        for mirror in FAST_MIRRORS:
+            if clean_url.startswith(mirror):
+                clean_url = clean_url[len(mirror):]
+                break
+
         api_candidates = []
         if self.proxy_url:
-            api_candidates.append((endpoint_url, True))
+            api_candidates.append((clean_url, True))
 
-        api_candidates.extend([
-            (f"https://gh-proxy.com/{endpoint_url}", False),
-            (f"https://ghfast.top/{endpoint_url}", False),
-        ])
+        for m in FAST_MIRRORS:
+            api_candidates.append((f"{m}{clean_url}", False))
 
         if not self.proxy_url:
-            api_candidates.append((endpoint_url, False))
+            api_candidates.append((clean_url, False))
 
         for api_url, use_proxy in api_candidates:
             if shutil.which("curl"):

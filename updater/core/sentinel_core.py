@@ -125,20 +125,12 @@ class SentinelCoreManager:
         """Queries GitHub API (via proxy or mirrors) and returns (stable_ver, prerelease_ver, latest_any)."""
         log_info(f"Опрос GitHub Releases для {BOLD}{self.REPO}{RESET}...")
 
-        api_urls = [
-            f"https://api.github.com/repos/{self.REPO}/releases",
-            f"https://gh-proxy.com/https://api.github.com/repos/{self.REPO}/releases",
-            f"https://ghfast.top/https://api.github.com/repos/{self.REPO}/releases",
-            f"https://gh.ddlc.top/https://api.github.com/repos/{self.REPO}/releases",
-        ]
-
-        for url in api_urls:
-            data = self.downloader.fetch_github_api(url, timeout=6.0)
-            if isinstance(data, list) and len(data) > 0:
-                stable = next((r["tag_name"] for r in data if not r.get("prerelease")), "")
-                prerelease = data[0]["tag_name"] if data[0].get("prerelease") else ""
-                latest_any = data[0]["tag_name"]
-                return stable, prerelease, latest_any
+        data = self.downloader.fetch_github_api(f"https://api.github.com/repos/{self.REPO}/releases", timeout=5.0)
+        if isinstance(data, list) and len(data) > 0:
+            stable = next((r["tag_name"] for r in data if not r.get("prerelease")), "")
+            prerelease = data[0]["tag_name"] if data[0].get("prerelease") else ""
+            latest_any = data[0]["tag_name"]
+            return stable, prerelease, latest_any
 
         # Fallback to git ls-remote
         if shutil.which("git"):

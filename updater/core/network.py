@@ -219,8 +219,11 @@ class NetworkManager:
     def _ensure_rotator_prerequisites(self) -> bool:
         """Verifies that libsentinel-core and sing-box/xray binaries exist.
         If missing, automatically downloads them via CDN mirrors."""
-        bot_bin = os.path.join(self.project_dir, "bot", "bin")
-        bin_dir = bot_bin if os.path.isdir(os.path.join(self.project_dir, "bot")) else os.path.join(self.project_dir, "bin")
+        bot_dir = os.path.join(self.project_dir, "bot")
+        if os.path.isdir(bot_dir) and os.path.isfile(os.path.join(bot_dir, "main.py")):
+            bin_dir = os.path.join(bot_dir, "bin")
+        else:
+            bin_dir = os.path.join(self.project_dir, "bin")
         os.makedirs(bin_dir, exist_ok=True)
 
         is_win = sys.platform == "win32"
