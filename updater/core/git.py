@@ -1,4 +1,4 @@
-"""Git Codebase Updater Module for Sentinel Panel."""
+"""Git Codebase Updater Module with multi-mirror fallback and changelog formatter."""
 
 from __future__ import annotations
 
@@ -9,8 +9,13 @@ from typing import Dict, List, Optional
 
 from .common import (
     BOLD,
+    CYAN,
+    DARK_GRAY,
+    DIM,
     GREEN,
+    RED,
     RESET,
+    WHITE,
     YELLOW,
     log_error,
     log_info,
@@ -21,25 +26,34 @@ from .common import (
 
 
 class GitManager:
-    """Manages Git updates with automatic multi-mirror fallback."""
+    """Manages Git updates with automatic multi-mirror fallback and changelog visualization."""
 
-    REPO_URL = "https://github.com/blackalex1/sentinel-panel.git"
-
-    def __init__(self, project_dir: str, proxy_url: Optional[str] = None) -> None:
+    def __init__(self, project_dir: str, repo_url: Optional[str] = None, proxy_url: Optional[str] = None) -> None:
         self.project_dir = project_dir
+        self.repo_url = repo_url
         self.proxy_url = proxy_url
 
+    def _get_candidate_remotes(self) -> List[str]:
+        """Builds a list of fetch sources including official URL and CDN mirrors."""
+        remotes = ["origin"]
+        if self.repo_url:
+            remotes.append(self.repo_url)
+            remotes.append(f"https://gh-proxy.com/{self.repo_url}")
+            remotes.append(f"https://ghfast.top/{self.repo_url}")
+            remotes.append(f"https://gh.ddlc.top/{self.repo_url}")
+        return remotes
+
     def update_codebase(self, silent_if_uptodate: bool = False) -> bool:
-        """Pulls latest updates from Git origin or fallback CDN mirrors. Returns True if new commits were pulled."""
+        """Pulls latest updates from Git origin or fallback mirrors. Returns True if new commits were pulled."""
         if not shutil.which("git") or not os.path.isdir(os.path.join(self.project_dir, ".git")):
             if not silent_if_uptodate:
-                log_warn("Директория .git не найдена. Пропуск этапа обновления через Git.")
+                log_warn("Директория .git не найдена. Пропуск обновления через Git.")
             return False
 
         if not silent_if_uptodate:
-            log_info("Получение последних обновлений из Git...")
+            log_info("Проверка и получение обновлений Git...")
 
-        # Stash any local uncommitted changes to prevent conflicts
+        # Stash local changes if any
         stashed = False
         try:
             status = run_command(["git", "status", "--porcelain"], cwd=self.project_dir, capture=True, check=False).stdout.strip()
@@ -52,23 +66,15 @@ class GitManager:
             pass
 
         git_env: Dict[str, str] = {}
-        git_config_args: List[str] = []
+        git_config_args: List[str] = ["-c", "safe.directory=*"]
         if self.proxy_url:
             proxy_val = self.proxy_url
             if proxy_val.startswith("socks5://"):
-                proxy_val = "socks5h://" + proxy_val[len("socks5://") :]
+                proxy_val = "socks5h://" + proxy_val[len("socks5://"):]
             git_env["http_proxy"] = proxy_val
             git_env["https_proxy"] = proxy_val
             git_env["ALL_PROXY"] = proxy_val
-            git_config_args = ["-c", f"http.proxy={proxy_val}", "-c", "http.sslVerify=false"]
-
-        candidate_remotes = [
-            "origin",
-            self.REPO_URL,
-            "https://gh-proxy.com/https://github.com/blackalex1/sentinel-panel.git",
-            "https://ghfast.top/https://github.com/blackalex1/sentinel-panel.git",
-            "https://gh.ddlc.top/https://github.com/blackalex1/sentinel-panel.git",
-        ]
+            git_config_args.extend(["-c", f"http.proxy={proxy_val}", "-c", "http.sslVerify=false"])
 
         # Determine current branch
         branch = "main"
@@ -86,12 +92,12 @@ class GitManager:
             pass
 
         pull_success = False
-        for remote in candidate_remotes:
+        for remote in self._get_candidate_remotes():
             try:
                 fetch_cmd = ["git"] + git_config_args + ["fetch", remote, branch]
-                res = run_command(fetch_cmd, cwd=self.project_dir, env=git_env, capture=True, check=False, timeout=10)
+                res = run_command(fetch_cmd, cwd=self.project_dir, env=git_env, capture=True, check=False, timeout=12.0)
                 if res.returncode == 0:
-                    run_command(["git", "reset", "--hard", "FETCH_HEAD"], cwd=self.project_dir, capture=True, check=True)
+                    run_command(["git", "reset", "--hard", "FETCH_HEAD"], cwd=self.project_dir, check=True)
                     pull_success = True
                     break
             except Exception:
@@ -99,7 +105,7 @@ class GitManager:
 
         if not pull_success:
             if not silent_if_uptodate:
-                log_error("Не удалось получить обновления из Git ни с одного источника.")
+                log_warn("Не удалось загрузить новые коммиты из Git (используется текущая локальная версия).")
             if stashed:
                 try:
                     run_command(["git", "stash", "pop"], cwd=self.project_dir, check=False)
@@ -107,7 +113,6 @@ class GitManager:
                     pass
             return False
 
-        # Pop stash if it was created
         if stashed:
             try:
                 run_command(["git", "stash", "pop"], cwd=self.project_dir, check=False)
@@ -121,23 +126,24 @@ class GitManager:
             pass
 
         if old_commit and new_commit and old_commit != new_commit:
-            log_success(f"Кодовая база успешно обновлена: {BOLD}{old_commit[:7]} -> {new_commit[:7]}{RESET}")
+            log_success(f"Кодовая база обновлена: {BOLD}{old_commit[:7]} → {new_commit[:7]}{RESET}")
             try:
-                log_commits = run_command(["git", "log", "--pretty=format:  • %h %s (%cr)", f"{old_commit}..{new_commit}"], cwd=self.project_dir, capture=True, check=False).stdout.strip()
+                log_commits = run_command(
+                    ["git", "log", "--pretty=format:  • \033[1;33m%h\033[0m %s \033[2m(%cr)\033[0m", f"{old_commit}..{new_commit}"],
+                    cwd=self.project_dir,
+                    capture=True,
+                    check=False,
+                ).stdout.strip()
                 if log_commits:
-                    print("\n" + "=" * 60)
-                    print(f"{BOLD}📝 СПИСОК ИЗМЕНЕНИЙ (CHANGELOG {old_commit[:7]}..{new_commit[:7]}):{RESET}")
-                    print("=" * 60)
-                    for line in log_commits.splitlines():
-                        print(f"  {CYAN}{line}{RESET}")
-                    print("=" * 60)
+                    print(f"\n  {CYAN}📝 Список изменений ({old_commit[:7]}..{new_commit[:7]}):{RESET}")
+                    print(log_commits)
                 log_diff = run_command(["git", "diff", "--stat", f"{old_commit}..{new_commit}"], cwd=self.project_dir, capture=True, check=False).stdout.strip()
                 if log_diff:
-                    print(f"\n{log_diff}\n")
+                    print(f"\n  {DARK_GRAY}{log_diff}{RESET}\n")
             except Exception:
                 pass
             return True
         else:
             if not silent_if_uptodate:
-                log_success("Кодовая база уже актуальна (Already up to date).")
+                log_success("Кодовая база уже актуальна (Up to date).")
             return False

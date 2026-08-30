@@ -6,13 +6,15 @@ import os
 import shutil
 import subprocess
 import time
-from typing import Dict, Optional
+from typing import Dict, List, Optional
 
-from .common import (
+from ..core.common import (
     BOLD,
+    CYAN,
     GREEN,
     RED,
     RESET,
+    WHITE,
     YELLOW,
     free_port,
     log_error,
@@ -30,7 +32,7 @@ class DockerManager:
         self.project_dir = project_dir
         self.proxy_url = proxy_url
 
-    def _get_compose_cmd(self) -> list[str]:
+    def _get_compose_cmd(self) -> List[str]:
         """Detects whether 'docker compose' or 'docker-compose' is available."""
         try:
             res = subprocess.run(["docker", "compose", "version"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
@@ -46,11 +48,10 @@ class DockerManager:
 
     def cleanup_conflicting_processes(self) -> None:
         """Kills any stale Python/Agent/Postgres processes holding panel ports."""
-        log_info("Очистка конфликтующих локальных процессов...")
+        log_info("Очистка конфликтующих локальных портов (8000, 8080, 5432)...")
         for port in (8000, 8080, 5432):
             free_port(port)
 
-        # Kill any lingering sentinel agent or python processes
         try:
             subprocess.run(["pkill", "-f", "backend.main"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             subprocess.run(["pkill", "-f", "sentinel-agent"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
@@ -68,32 +69,20 @@ class DockerManager:
                 log_warn("Обнаружен том базы данных старой версии (spectre-panel_pgdata). Миграция в sentinel-panel_pgdata...")
                 run_command(
                     [
-                        "docker",
-                        "volume",
-                        "create",
-                        "--label",
-                        "com.docker.compose.project=sentinel-panel",
-                        "--label",
-                        "com.docker.compose.volume=pgdata",
+                        "docker", "volume", "create",
+                        "--label", "com.docker.compose.project=sentinel-panel",
+                        "--label", "com.docker.compose.volume=pgdata",
                         "sentinel-panel_pgdata",
                     ],
                     check=True,
                 )
 
-                # Clone data from old to new volume
                 run_command(
                     [
-                        "docker",
-                        "run",
-                        "--rm",
-                        "-v",
-                        "spectre-panel_pgdata:/from",
-                        "-v",
-                        "sentinel-panel_pgdata:/to",
-                        "alpine",
-                        "ash",
-                        "-c",
-                        "cp -a /from/. /to/",
+                        "docker", "run", "--rm",
+                        "-v", "spectre-panel_pgdata:/from",
+                        "-v", "sentinel-panel_pgdata:/to",
+                        "alpine", "ash", "-c", "cp -a /from/. /to/",
                     ],
                     check=True,
                 )
@@ -138,7 +127,7 @@ class DockerManager:
             return True
         except Exception as e:
             if docker_env:
-                log_warn(f"Сборка Docker через прокси завершилась с ошибкой ({e}). Повторная попытка напрямую без прокси...")
+                log_warn(f"Сборка Docker через прокси завершилась с ошибкой ({e}). Повтор напрямую...")
                 try:
                     run_command(compose_cmd + ["up", "-d", "--build"], cwd=self.project_dir, env=None, check=True)
                     log_success("Контейнеры Docker успешно собраны и запущены (напрямую)!")
@@ -150,7 +139,7 @@ class DockerManager:
             return False
 
     def stream_live_logs(self) -> None:
-        """Attaches to live container log stream (-f) until interrupted by user (Ctrl+C)."""
+        """Attaches to live container log stream until interrupted by user (Ctrl+C)."""
         compose_cmd = self._get_compose_cmd()
         try:
             subprocess.run(compose_cmd + ["logs", "-f", "--tail=30", "sentinel-panel"], cwd=self.project_dir)
