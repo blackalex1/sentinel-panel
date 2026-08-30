@@ -275,12 +275,10 @@ class NetworkManager:
             return None
 
         rotator_candidates = [
-            os.path.join(self.project_dir, "backend", "proxy_rotator.py"),
-            os.path.join(self.project_dir, "bot", "core", "proxy_rotator.py"),
-            os.path.join(self.project_dir, "bot", "proxy_rotator.py"),
-            os.path.join(self.project_dir, "core", "proxy_rotator.py"),
-            os.path.join(self.project_dir, "proxy_rotator.py"),
             os.path.join(os.path.dirname(__file__), "proxy_rotator.py"),
+            os.path.join(self.project_dir, "updater", "core", "proxy_rotator.py"),
+            os.path.join(self.project_dir, "bot", "core", "proxy_rotator.py"),
+            os.path.join(self.project_dir, "backend", "proxy_rotator.py"),
         ]
         rotator_py = next((p for p in rotator_candidates if os.path.isfile(p)), None)
 
