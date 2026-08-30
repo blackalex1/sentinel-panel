@@ -327,11 +327,13 @@ class CoreManager:
         _clean_tmp()
 
         candidate_urls = [
-            (f"https://github.com/{self.REPO}/releases/download/{tag}/{asset_name}", True),
-            (f"https://github.com/{self.REPO}/releases/download/{tag}/{asset_name}", False),
+            (f"https://ghproxy.net/https://github.com/{self.REPO}/releases/download/{tag}/{asset_name}", False),
             (f"https://gh-proxy.com/https://github.com/{self.REPO}/releases/download/{tag}/{asset_name}", False),
             (f"https://ghfast.top/https://github.com/{self.REPO}/releases/download/{tag}/{asset_name}", False),
-            (f"https://mirror.ghproxy.com/https://github.com/{self.REPO}/releases/download/{tag}/{asset_name}", False),
+            (f"https://gh.ddlc.top/https://github.com/{self.REPO}/releases/download/{tag}/{asset_name}", False),
+            (f"https://gh.con.sh/https://github.com/{self.REPO}/releases/download/{tag}/{asset_name}", False),
+            (f"https://github.com/{self.REPO}/releases/download/{tag}/{asset_name}", True),
+            (f"https://github.com/{self.REPO}/releases/download/{tag}/{asset_name}", False),
         ]
 
         min_size = 1000
@@ -347,11 +349,10 @@ class CoreManager:
                 progress_flag = "-#" if is_interactive else "-s"
                 curl_cmd = [
                     "curl", progress_flag, "-L", "-k",
-                    "--connect-timeout", "10",
+                    "--connect-timeout", "6",
                     "--max-time", "180",
-                    "--speed-time", "15",
-                    "--speed-limit", "500",
-                    "--retry", "1",
+                    "--speed-time", "12",
+                    "--speed-limit", "30720",  # 30 KB/s threshold
                     "-H", "User-Agent: SentinelPanel/1.0",
                     "-o", tmp_file,
                 ]
@@ -360,6 +361,8 @@ class CoreManager:
                     if p_arg.startswith("socks5://"):
                         p_arg = "socks5h://" + p_arg[len("socks5://") :]
                     curl_cmd.extend(["-x", p_arg])
+                else:
+                    curl_cmd.extend(["--noproxy", "*"])
 
                 curl_cmd.append(url)
                 try:
