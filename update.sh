@@ -51,6 +51,8 @@ if [ -z "${BOOTSTRAPPED:-}" ] && [ -d .git ] && command -v git &>/dev/null; then
     NEW_HEAD=$(git rev-parse HEAD 2>/dev/null || true)
     if [ -n "$OLD_HEAD" ] && [ -n "$NEW_HEAD" ] && [ "$OLD_HEAD" != "$NEW_HEAD" ]; then
         echo -e "\033[0;32m[✔]\033[0m Скрипт обновления обновлен из Git (${OLD_HEAD:0:7} -> ${NEW_HEAD:0:7})."
+        export SENTINEL_OLD_HEAD="$OLD_HEAD"
+        export SENTINEL_NEW_HEAD="$NEW_HEAD"
         export BOOTSTRAPPED=1
         exec bash "$0" "$@"
     fi
