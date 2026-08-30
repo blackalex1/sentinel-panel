@@ -122,16 +122,30 @@ class DockerManager:
 
         docker_env: Dict[str, str] = {}
         if self.proxy_url:
-            docker_env["http_proxy"] = self.proxy_url
-            docker_env["https_proxy"] = self.proxy_url
-            docker_env["HTTP_PROXY"] = self.proxy_url
-            docker_env["HTTPS_PROXY"] = self.proxy_url
+            p_url = self.proxy_url
+            if ":10818" in p_url:
+                p_url = p_url.replace(":10818", ":10819")
+            if p_url.startswith("socks5://") or p_url.startswith("socks4://"):
+                p_url = "http://" + p_url.split("://", 1)[1]
+            docker_env["http_proxy"] = p_url
+            docker_env["https_proxy"] = p_url
+            docker_env["HTTP_PROXY"] = p_url
+            docker_env["HTTPS_PROXY"] = p_url
 
         try:
-            run_command(compose_cmd + ["up", "-d", "--build"], cwd=self.project_dir, env=docker_env, check=True)
+            run_command(compose_cmd + ["up", "-d", "--build"], cwd=self.project_dir, env=docker_env if docker_env else None, check=True)
             log_success("Контейнеры Docker успешно собраны и запущены!")
             return True
         except Exception as e:
+            if docker_env:
+                log_warn(f"Сборка Docker через прокси завершилась с ошибкой ({e}). Повторная попытка напрямую без прокси...")
+                try:
+                    run_command(compose_cmd + ["up", "-d", "--build"], cwd=self.project_dir, env=None, check=True)
+                    log_success("Контейнеры Docker успешно собраны и запущены (напрямую)!")
+                    return True
+                except Exception as e_direct:
+                    log_error(f"Ошибка запуска Docker Compose: {e_direct}")
+                    return False
             log_error(f"Ошибка запуска Docker Compose: {e}")
             return False
 

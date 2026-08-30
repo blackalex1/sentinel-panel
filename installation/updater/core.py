@@ -257,27 +257,54 @@ class CoreManager:
     def _fetch_asset_digests(self, tag: str) -> Dict[str, Tuple[str, int]]:
         """Fetches SHA-256 digests and exact file sizes directly from GitHub release metadata."""
         digests: Dict[str, Tuple[str, int]] = {}
-        api_url = f"https://api.github.com/repos/{self.REPO}/releases/tags/{tag}"
+        api_urls = [
+            f"https://api.github.com/repos/{self.REPO}/releases/tags/{tag}",
+            f"https://gh-proxy.com/https://api.github.com/repos/{self.REPO}/releases/tags/{tag}",
+        ]
 
-        if shutil.which("curl"):
-            curl_cmd = ["curl", "-fsSL", "-k", "-H", "User-Agent: SentinelPanel/1.0", "--connect-timeout", "6", "--max-time", "12"]
-            if self.proxy_url:
-                proxy_arg = self.proxy_url
-                if proxy_arg.startswith("socks5://"):
-                    proxy_arg = "socks5h://" + proxy_arg[len("socks5://") :]
-                curl_cmd.extend(["-x", proxy_arg])
-
+        def _parse_assets_json(raw_text: str) -> bool:
             try:
-                res = subprocess.run(curl_cmd + [api_url], stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True, timeout=14)
-                if res.returncode == 0 and '"assets"' in res.stdout:
-                    rel = json.loads(res.stdout)
+                rel = json.loads(raw_text)
+                if isinstance(rel, dict) and "assets" in rel:
                     for a in rel.get("assets", []):
                         name = a.get("name")
                         digest = a.get("digest", "")
                         size = a.get("size", 0)
                         if name:
                             digests[name] = (digest.replace("sha256:", ""), size)
-                    if digests:
+                    return bool(digests)
+            except Exception:
+                pass
+            return False
+
+        for api_url in api_urls:
+            # 1. Try curl
+            if shutil.which("curl"):
+                curl_cmd = ["curl", "-fsSL", "-k", "-H", "User-Agent: SentinelPanel/1.0", "--connect-timeout", "6", "--max-time", "12"]
+                if self.proxy_url:
+                    proxy_arg = self.proxy_url
+                    if proxy_arg.startswith("socks5://"):
+                        proxy_arg = "socks5h://" + proxy_arg[len("socks5://") :]
+                    curl_cmd.extend(["-x", proxy_arg])
+                try:
+                    res = subprocess.run(curl_cmd + [api_url], stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True, timeout=14)
+                    if res.returncode == 0 and _parse_assets_json(res.stdout):
+                        return digests
+                except Exception:
+                    pass
+
+            # 2. Try urllib
+            try:
+                ctx = ssl.create_default_context()
+                ctx.check_hostname = False
+                ctx.verify_mode = ssl.CERT_NONE
+                handlers = [urllib.request.HTTPSHandler(context=ctx)]
+                if self.proxy_url and not self.proxy_url.startswith("socks"):
+                    handlers.append(urllib.request.ProxyHandler({"http": self.proxy_url, "https": self.proxy_url}))
+                opener = urllib.request.build_opener(*handlers)
+                req = urllib.request.Request(api_url, headers={"User-Agent": "SentinelPanel/1.0"})
+                with opener.open(req, timeout=10) as resp:
+                    if _parse_assets_json(resp.read().decode("utf-8", errors="ignore")):
                         return digests
             except Exception:
                 pass
@@ -285,133 +312,140 @@ class CoreManager:
         return digests
 
     def _download_file(self, asset_name: str, dest_path: str, tag: str, expected_hash: str = "", expected_size: int = 0) -> bool:
-        """Downloads a release file directly from GitHub with live progress bar and SHA-256 verification."""
-        url = f"https://github.com/{self.REPO}/releases/download/{tag}/{asset_name}"
+        """Downloads a release file directly from GitHub or CDN mirrors with live progress and verification."""
         log_info(f"  ➜ Загрузка {asset_name} с GitHub...")
 
         tmp_file = f"/tmp/{asset_name}.{os.getpid()}"
-        if os.path.exists(tmp_file):
-            try:
-                os.remove(tmp_file)
-            except Exception:
-                pass
 
-        # 1. Try curl download with interactive progress bar
-        if shutil.which("curl"):
-            is_interactive = sys.stdout.isatty()
-            progress_flag = "-#" if is_interactive else "-s"
-            curl_cmd = [
-                "curl", progress_flag, "-L", "-k",
-                "--connect-timeout", "10",
-                "--max-time", "180",
-                "--speed-time", "20",
-                "--speed-limit", "500",
-                "--retry", "2",
-                "--retry-delay", "1",
-                "-H", "User-Agent: SentinelPanel/1.0",
-                "-o", tmp_file,
-            ]
-            if self.proxy_url:
-                p_arg = self.proxy_url
-                if p_arg.startswith("socks5://"):
-                    p_arg = "socks5h://" + p_arg[len("socks5://") :]
-                curl_cmd.extend(["-x", p_arg])
+        def _clean_tmp():
+            if os.path.exists(tmp_file):
+                try:
+                    os.remove(tmp_file)
+                except Exception:
+                    pass
 
-            curl_cmd.append(url)
+        _clean_tmp()
 
-            try:
-                if is_interactive:
-                    subprocess.run(curl_cmd, timeout=190)
-                else:
-                    subprocess.run(curl_cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=190)
-            except Exception:
-                pass
+        candidate_urls = [
+            (f"https://github.com/{self.REPO}/releases/download/{tag}/{asset_name}", True),
+            (f"https://github.com/{self.REPO}/releases/download/{tag}/{asset_name}", False),
+            (f"https://gh-proxy.com/https://github.com/{self.REPO}/releases/download/{tag}/{asset_name}", False),
+            (f"https://ghfast.top/https://github.com/{self.REPO}/releases/download/{tag}/{asset_name}", False),
+            (f"https://mirror.ghproxy.com/https://github.com/{self.REPO}/releases/download/{tag}/{asset_name}", False),
+        ]
 
-        # 2. Fallback to Python urllib streaming if curl didn't produce file
-        if not os.path.isfile(tmp_file) or os.path.getsize(tmp_file) < 100:
-            ctx = ssl.create_default_context()
-            ctx.check_hostname = False
-            ctx.verify_mode = ssl.CERT_NONE
-            handlers: list = [urllib.request.HTTPSHandler(context=ctx)]
-            if self.proxy_url and not self.proxy_url.startswith("socks"):
-                handlers.append(urllib.request.ProxyHandler({"http": self.proxy_url, "https": self.proxy_url}))
-            opener = urllib.request.build_opener(*handlers)
+        min_size = 1000
+        if asset_name.endswith(".so") or asset_name == "sentinel-core" or asset_name == "sentinel-core.exe":
+            min_size = 3 * 1024 * 1024
 
-            try:
-                req = urllib.request.Request(url, headers={"User-Agent": "SentinelPanel/1.0"})
-                start_time = time.time()
-                with opener.open(req, timeout=60) as resp, open(tmp_file, "wb") as f_out:
-                    total_len = int(resp.headers.get("Content-Length", expected_size or 0))
-                    downloaded = 0
-                    while True:
-                        chunk = resp.read(65536)
-                        if not chunk:
-                            break
-                        f_out.write(chunk)
-                        downloaded += len(chunk)
+        for url, use_proxy in candidate_urls:
+            _clean_tmp()
 
-                        elapsed = max(time.time() - start_time, 0.001)
-                        speed_kb = (downloaded / 1024) / elapsed
-                        pct = min(100.0, (downloaded / total_len) * 100) if total_len > 0 else 50.0
-                        bar_len = int(pct // 5)
-                        bar = "█" * bar_len + "░" * (20 - bar_len)
-                        sys.stdout.write(f"\r   [{bar}] {pct:.1f}% ({downloaded / (1024*1024):.2f}/{total_len / (1024*1024):.2f} MB) {speed_kb:.1f} KB/s")
-                        sys.stdout.flush()
-                    print("")
-            except Exception as e:
-                log_warn(f"Ошибка скачивания через urllib: {e}")
-                if os.path.exists(tmp_file):
+            # 1. Try curl
+            if shutil.which("curl"):
+                is_interactive = sys.stdout.isatty()
+                progress_flag = "-#" if is_interactive else "-s"
+                curl_cmd = [
+                    "curl", progress_flag, "-L", "-k",
+                    "--connect-timeout", "10",
+                    "--max-time", "180",
+                    "--speed-time", "15",
+                    "--speed-limit", "500",
+                    "--retry", "1",
+                    "-H", "User-Agent: SentinelPanel/1.0",
+                    "-o", tmp_file,
+                ]
+                if use_proxy and self.proxy_url:
+                    p_arg = self.proxy_url
+                    if p_arg.startswith("socks5://"):
+                        p_arg = "socks5h://" + p_arg[len("socks5://") :]
+                    curl_cmd.extend(["-x", p_arg])
+
+                curl_cmd.append(url)
+                try:
+                    res = subprocess.run(curl_cmd, timeout=190)
+                    if res.returncode != 0:
+                        _clean_tmp()
+                except Exception:
+                    _clean_tmp()
+
+            # 2. Try urllib fallback
+            if not os.path.isfile(tmp_file) or os.path.getsize(tmp_file) < min_size:
+                _clean_tmp()
+                ctx = ssl.create_default_context()
+                ctx.check_hostname = False
+                ctx.verify_mode = ssl.CERT_NONE
+                handlers = [urllib.request.HTTPSHandler(context=ctx)]
+                if use_proxy and self.proxy_url and not self.proxy_url.startswith("socks"):
+                    handlers.append(urllib.request.ProxyHandler({"http": self.proxy_url, "https": self.proxy_url}))
+                opener = urllib.request.build_opener(*handlers)
+
+                try:
+                    req = urllib.request.Request(url, headers={"User-Agent": "SentinelPanel/1.0"})
+                    start_time = time.time()
+                    with opener.open(req, timeout=60) as resp, open(tmp_file, "wb") as f_out:
+                        total_len = int(resp.headers.get("Content-Length", expected_size or 0))
+                        downloaded = 0
+                        while True:
+                            chunk = resp.read(65536)
+                            if not chunk:
+                                break
+                            f_out.write(chunk)
+                            downloaded += len(chunk)
+
+                            elapsed = max(time.time() - start_time, 0.001)
+                            speed_kb = (downloaded / 1024) / elapsed
+                            pct = min(100.0, (downloaded / total_len) * 100) if total_len > 0 else 50.0
+                            bar_len = int(pct // 5)
+                            bar = "█" * bar_len + "░" * (20 - bar_len)
+                            sys.stdout.write(f"\r   [{bar}] {pct:.1f}% ({downloaded / (1024*1024):.2f}/{total_len / (1024*1024):.2f} MB) {speed_kb:.1f} KB/s")
+                            sys.stdout.flush()
+                        print("")
+                except Exception:
+                    _clean_tmp()
+
+            # Verification
+            if os.path.isfile(tmp_file) and os.path.getsize(tmp_file) >= min_size:
+                file_size = os.path.getsize(tmp_file)
+
+                # Check HTML error
+                with open(tmp_file, "rb") as f_check:
+                    head = f_check.read(256)
+                    if b"<!DOCTYPE" in head or b"<html" in head or b"404: Not Found" in head or b'{"message":' in head:
+                        _clean_tmp()
+                        continue
+
+                # SHA-256 verification
+                if expected_hash:
+                    with open(tmp_file, "rb") as f_hash:
+                        actual_hash = hashlib.sha256(f_hash.read()).hexdigest()
+                    if actual_hash != expected_hash:
+                        log_warn(f"SHA-256 не совпадает для {asset_name} ({actual_hash} != {expected_hash})")
+                        _clean_tmp()
+                        continue
+                    log_success(f"SHA-256 проверен ({actual_hash[:16]}...)")
+                elif expected_size > 0 and file_size != expected_size:
+                    log_warn(f"Размер {asset_name} не совпадает ({file_size} != {expected_size})")
+                    _clean_tmp()
+                    continue
+
+                # Safe replace
+                if os.path.exists(dest_path):
                     try:
-                        os.remove(tmp_file)
+                        os.remove(dest_path)
                     except Exception:
                         pass
+                shutil.move(tmp_file, dest_path)
+                if not asset_name.endswith(".h"):
+                    try:
+                        os.chmod(dest_path, 0o755)
+                    except Exception:
+                        pass
+                size_mb = file_size / (1024 * 1024)
+                log_success(f"Успешно установлен {asset_name} ({size_mb:.1f} MB) -> {dest_path}")
+                return True
 
-        # Verify downloaded file
-        if os.path.isfile(tmp_file) and os.path.getsize(tmp_file) > 100:
-            file_size = os.path.getsize(tmp_file)
-
-            # Check if file is HTML error page
-            with open(tmp_file, "rb") as f_check:
-                head = f_check.read(256)
-                if b"<!DOCTYPE" in head or b"<html" in head or b"404: Not Found" in head or b'{"message":' in head:
-                    os.remove(tmp_file)
-                    return False
-
-            # SHA-256 Verification
-            if expected_hash:
-                with open(tmp_file, "rb") as f_hash:
-                    actual_hash = hashlib.sha256(f_hash.read()).hexdigest()
-                if actual_hash != expected_hash:
-                    log_warn(f"SHA-256 не совпадает для {asset_name} ({actual_hash} != {expected_hash})")
-                    os.remove(tmp_file)
-                    return False
-                log_success(f"SHA-256 проверен ({actual_hash[:16]}...)")
-            elif expected_size > 0 and file_size != expected_size:
-                log_warn(f"Размер {asset_name} не совпадает ({file_size} != {expected_size})")
-                os.remove(tmp_file)
-                return False
-
-            # Safe atomic replace and permissions
-            if os.path.exists(dest_path):
-                try:
-                    os.remove(dest_path)
-                except Exception:
-                    pass
-            shutil.move(tmp_file, dest_path)
-            if not asset_name.endswith(".h"):
-                try:
-                    os.chmod(dest_path, 0o755)
-                except Exception:
-                    pass
-            size_mb = file_size / (1024 * 1024)
-            log_success(f"Успешно установлен {asset_name} ({size_mb:.1f} MB) -> {dest_path}")
-            return True
-
-        if os.path.exists(tmp_file):
-            try:
-                os.remove(tmp_file)
-            except Exception:
-                pass
+        _clean_tmp()
         return False
 
     def update_core(self) -> bool:

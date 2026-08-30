@@ -246,6 +246,18 @@ class NetworkManager:
                 if "PROXY_READY:" in line_str:
                     self.active_proxy_url = line_str.split("PROXY_READY:", 1)[1].strip()
                     log_success(f"VPN-туннель успешно поднят на {self.active_proxy_url}!")
+
+                    import threading
+                    def _drain_rotator_output():
+                        try:
+                            if self.rotator_proc and self.rotator_proc.stdout:
+                                for _ in iter(self.rotator_proc.stdout.readline, ''):
+                                    pass
+                        except Exception:
+                            pass
+
+                    drain_thread = threading.Thread(target=_drain_rotator_output, daemon=True)
+                    drain_thread.start()
                     return self.active_proxy_url
                 elif line_str:
                     print(f"    {line_str}", flush=True)
