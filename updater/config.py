@@ -25,7 +25,7 @@ class TargetType(str, enum.Enum):
 # 🎯 ЗАХАРДКОЖЕННАЯ ПЕРЕМЕННАЯ ВЫБОРА ЦЕЛИ ОБНОВЛЕНИЯ:
 # Варианты: TargetType.AUTO | TargetType.BOT | TargetType.PANEL | TargetType.ALL
 # ==============================================================================
-TARGET: TargetType = TargetType.AUTO
+TARGET: TargetType = TargetType.PANEL
 
 
 @dataclass

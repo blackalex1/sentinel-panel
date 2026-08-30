@@ -198,6 +198,61 @@ class NetworkManager:
                         log_warn("Неверный формат URL прокси. Повторите ввод.")
                     break
 
+    def _ensure_rotator_prerequisites(self) -> bool:
+        """Verifies that libsentinel-core and sing-box/xray binaries exist.
+        If missing, automatically downloads them via CDN mirrors."""
+        bot_bin = os.path.join(self.project_dir, "bot", "bin")
+        bin_dir = bot_bin if os.path.isdir(os.path.join(self.project_dir, "bot")) else os.path.join(self.project_dir, "bin")
+        os.makedirs(bin_dir, exist_ok=True)
+
+        is_win = sys.platform == "win32"
+        is_mac = sys.platform == "darwin"
+        lib_ext = ".dll" if is_win else (".dylib" if is_mac else ".so")
+        exe_ext = ".exe" if is_win else ""
+
+        lib_names = [f"libsentinel-core{lib_ext}", f"sentinel-core{lib_ext}"]
+        lib_exists = any(os.path.isfile(os.path.join(bin_dir, n)) for n in lib_names)
+
+        engine_names = [f"sing-box{exe_ext}", f"singbox{exe_ext}", f"xray{exe_ext}"]
+        engine_exists = any(os.path.isfile(os.path.join(bin_dir, n)) for n in engine_names)
+
+        if lib_exists and engine_exists:
+            return True
+
+        log_info("Для работы VPN-ротатора выполняется быстрая подготовка компонентов...")
+
+        # 1. Download libsentinel-core if missing
+        if not lib_exists:
+            try:
+                from .sentinel_core import SentinelCoreManager
+                core_mgr = SentinelCoreManager(bin_dir=bin_dir, proxy_url=None, auto_mode=True)
+                _, _, latest_tag = core_mgr.fetch_releases()
+                tag_to_use = latest_tag or "latest"
+                log_info(f"Загрузка ядра Sentinel-Core ({tag_to_use}) для VPN-ротатора...")
+                core_mgr.download_core(tag_to_use)
+            except Exception as e:
+                log_warn(f"Не удалось автоматически загрузить ядро Sentinel-Core: {e}")
+
+        # 2. Download sing-box if missing
+        if not engine_exists:
+            try:
+                from ..controller.engines import ProxyEngineManager
+                engine_mgr = ProxyEngineManager(bin_dir=bin_dir, proxy_url=None, auto_mode=True)
+                log_info("Загрузка движка Sing-box для VPN-ротатора...")
+                engine_mgr.download_singbox()
+            except Exception as e:
+                log_warn(f"Не удалось автоматически загрузить Sing-box: {e}")
+
+        # Re-check presence
+        lib_ok = any(os.path.isfile(os.path.join(bin_dir, n)) for n in lib_names)
+        engine_ok = any(os.path.isfile(os.path.join(bin_dir, n)) for n in engine_names)
+
+        if not (lib_ok and engine_ok):
+            log_warn("Ядра Sing-box / Sentinel-Core отсутствуют. Переключение на прямое подключение (CDN-зеркала)...")
+            return False
+
+        return True
+
     def setup_network(self) -> Optional[str]:
         """Activates chosen proxy mode or starts automated rotator."""
         if self.no_proxy:
@@ -210,6 +265,13 @@ class NetworkManager:
             return self.active_proxy_url
 
         if not self.use_rotator:
+            return None
+
+        # Check and ensure prerequisites (Sentinel-Core and Sing-box)
+        if not self._ensure_rotator_prerequisites():
+            self.use_rotator = False
+            self.no_proxy = True
+            log_info("Используется прямое сетевое подключение к GitHub (с CDN-зеркалами при блокировке).")
             return None
 
         rotator_candidates = [
