@@ -22,15 +22,7 @@ from .core.common import (
 
 def detect_target(project_dir: str) -> TargetType:
     """Detects whether the target directory corresponds to Panel, Controller, or Both."""
-    # Check for Proxmox Controller indicators
-    is_controller = any([
-        os.path.isfile(os.path.join(project_dir, "bot", "proxmox-lxc-bot.service")),
-        os.path.isfile(os.path.join(project_dir, "bot", "main.py")),
-        os.path.isfile(os.path.join(project_dir, "proxmox-lxc-bot.service")),
-        os.path.isdir(os.path.join(project_dir, "bot")),
-    ])
-
-    # Check for Panel indicators
+    # Check for Panel indicators (Docker Compose, backend/frontend directories)
     is_panel = any([
         os.path.isfile(os.path.join(project_dir, "docker-compose.yml")),
         os.path.isfile(os.path.join(project_dir, "docker-compose.yaml")),
@@ -38,18 +30,29 @@ def detect_target(project_dir: str) -> TargetType:
         os.path.isfile(os.path.join(project_dir, "installation", "sentinel-panel.service")),
     ])
 
-    # Check if this is a parent directory containing both subprojects
+    # Check for Proxmox Controller indicators (proxmox-lxc-bot.service, proxmox monitor modules)
+    is_controller = any([
+        os.path.isfile(os.path.join(project_dir, "bot", "proxmox-lxc-bot.service")),
+        os.path.isfile(os.path.join(project_dir, "proxmox-lxc-bot.service")),
+        os.path.isdir(os.path.join(project_dir, "bot", "modules", "proxmox")),
+        os.path.isfile(os.path.join(project_dir, "bot", "config", "bot.ini")),
+    ])
+
+    # Check if this is a parent directory containing both distinct subproject folders
     has_sub_controller = os.path.isdir(os.path.join(project_dir, "controller")) or os.path.isdir(os.path.join(project_dir, "proxmox_Sentinel"))
     has_sub_panel = os.path.isdir(os.path.join(project_dir, "panel")) or os.path.isdir(os.path.join(project_dir, "sentinel-panel"))
 
-    if is_controller and not is_panel:
-        return TargetType.CONTROLLER
-    elif is_panel and not is_controller:
+    if is_panel and not is_controller:
         return TargetType.PANEL
-    elif is_controller and is_panel:
-        return TargetType.ALL
+    elif is_controller and not is_panel:
+        return TargetType.CONTROLLER
     elif has_sub_controller and has_sub_panel:
         return TargetType.ALL
+
+    if is_panel:
+        return TargetType.PANEL
+    if is_controller:
+        return TargetType.CONTROLLER
 
     return TargetType.AUTO
 
