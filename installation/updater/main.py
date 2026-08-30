@@ -108,7 +108,8 @@ def main() -> int:
         docker_mgr = DockerManager(project_dir=project_root, proxy_url=active_proxy)
         docker_ok = docker_mgr.rebuild_and_restart()
         if not docker_ok:
-            log_error("Ошибка при сборке контейнеров Docker.")
+            log_error("Сборка контейнеров Docker не удалась. Прерывание процесса обновления.")
+            return 1
 
         # 7. Register / Restart Systemd Service
         service_mgr = ServiceManager(project_dir=project_root)
