@@ -1,4 +1,4 @@
-"""Network, Proxy & VPN Rotator Manager for Sentinel Panel Updater."""
+"""Network, Proxy & VPN Rotator Manager for Sentinel Updater."""
 
 from __future__ import annotations
 
@@ -7,15 +7,19 @@ import re
 import signal
 import subprocess
 import sys
+import threading
 import time
 from typing import Dict, Optional
 
 from .common import (
     BOLD,
     CYAN,
+    DARK_GRAY,
+    DIM,
     GREEN,
     RED,
     RESET,
+    WHITE,
     YELLOW,
     free_port,
     log_banner,
@@ -27,27 +31,37 @@ from .common import (
 
 
 class NetworkManager:
-    """Manages VPN rotator tunnel and external HTTP/SOCKS5 proxy settings for Panel."""
+    """Manages VPN rotator tunnels and HTTP/SOCKS5 proxy settings for Sentinel components."""
 
-    def __init__(self, project_dir: str, proxy_arg: Optional[str] = None, no_proxy: bool = False, auto_mode: bool = False) -> None:
+    def __init__(
+        self,
+        project_dir: str,
+        proxy_arg: Optional[str] = None,
+        no_proxy: bool = False,
+        auto_mode: bool = False,
+        allow_env: bool = False,
+    ) -> None:
         self.project_dir = project_dir
         self.custom_proxy: Optional[str] = proxy_arg
         self.configured_proxy: Optional[str] = None
         self.configured_vpn_node: Optional[str] = None
         self.no_proxy: bool = no_proxy
         self.auto_mode: bool = auto_mode
+        self.allow_env: bool = allow_env
         self.use_rotator: bool = True if not (no_proxy or proxy_arg) else False
         self.use_env_proxy: bool = False
         self.rotator_proc: Optional[subprocess.Popen] = None
         self.active_proxy_url: Optional[str] = None
 
-        self._init_proxy_from_env()
+        if self.allow_env:
+            self._init_proxy_from_env()
 
     def _init_proxy_from_env(self) -> None:
-        """Reads PROXY_URL from .env file if not explicitly set."""
+        """Reads PROXY_URL from bot/config/.env or bot/.env (Controller only)."""
         env_paths = [
-            os.path.join(self.project_dir, ".env"),
+            os.path.join(self.project_dir, "bot", "config", ".env"),
             os.path.join(self.project_dir, "config", ".env"),
+            os.path.join(self.project_dir, ".env"),
         ]
         for p in env_paths:
             if os.path.isfile(p):
@@ -58,7 +72,10 @@ class NetworkManager:
                             if line.startswith("PROXY_URL="):
                                 val = line.split("=", 1)[1].strip(" '\"")
                                 if val:
-                                    vpn_prefixes = ("ss://", "vless://", "trojan://", "hysteria2://", "hy2://", "vmess://", "tuic://", "wireguard://", "wg://")
+                                    vpn_prefixes = (
+                                        "ss://", "vless://", "trojan://", "hysteria2://",
+                                        "hy2://", "vmess://", "tuic://", "wireguard://", "wg://"
+                                    )
                                     if any(val.lower().startswith(pref) for pref in vpn_prefixes):
                                         self.configured_vpn_node = val
                                         self.use_env_proxy = True
@@ -71,7 +88,6 @@ class NetworkManager:
             if self.configured_vpn_node or self.configured_proxy:
                 break
 
-        # In non-interactive or auto mode, fallback to configured proxy if custom_proxy wasn't passed via CLI
         if (not sys.stdin.isatty() or self.auto_mode) and not self.custom_proxy and not self.no_proxy:
             if self.configured_proxy:
                 self.custom_proxy = self.configured_proxy
@@ -79,35 +95,34 @@ class NetworkManager:
                 self.use_rotator = True
 
     def show_menu(self) -> None:
-        """Displays interactive network selection menu if interactive TTY."""
+        """Displays interactive network selection menu if running in interactive TTY."""
         if not sys.stdin.isatty() or self.auto_mode or self.no_proxy or (self.custom_proxy and not self.use_env_proxy):
             return
 
-        has_env = bool(self.configured_vpn_node or self.configured_proxy)
+        has_env = bool(self.allow_env and (self.configured_vpn_node or self.configured_proxy))
 
-        log_banner("🌐 НАСТРОЙКА СЕТИ И ПРОКСИ ДЛЯ ОБНОВЛЕНИЯ ПАНЕЛИ")
-        print("Выберите режим подключения к GitHub для загрузки релизов:")
+        log_banner("🌐 НАСТРОЙКА СЕТИ И ПРОКСИ", "Выбор режима подключения к GitHub для загрузки")
 
         if has_env:
             if self.configured_vpn_node:
-                node_name = self.configured_vpn_node.split("#")[-1] if "#" in self.configured_vpn_node else self.configured_vpn_node[:28]
+                node_name = self.configured_vpn_node.split("#")[-1] if "#" in self.configured_vpn_node else self.configured_vpn_node[:30]
                 proto = self.configured_vpn_node.split("://")[0]
-                print(f"  1) {GREEN}🟢 Прокси из .env: {BOLD}{node_name}{RESET} ({proto}){RESET} [Рекомендуется / По умолчанию]")
+                print(f"  {CYAN}1){RESET} {GREEN}🟢 Прокси из .env:{RESET} {BOLD}{node_name}{RESET} ({proto}) [Рекомендуется / По умолчанию]")
             else:
-                print(f"  1) {GREEN}🟢 Прокси из .env: {BOLD}{self.configured_proxy}{RESET} [Рекомендуется / По умолчанию]")
+                print(f"  {CYAN}1){RESET} {GREEN}🟢 Прокси из .env:{RESET} {BOLD}{self.configured_proxy}{RESET} [Рекомендуется / По умолчанию]")
 
-            print(f"  2) 🔄 Автоматический поиск рабочего VPN / Прокси (ротатор)")
-            print(f"  3) 🌐 Прямое соединение к GitHub (с авто-фолбэком на CDN-зеркала)")
-            print(f"  4) 🔌 Ввести другой адрес прокси вручную\n")
+            print(f"  {CYAN}2){RESET} 🔄 Автоматический поиск рабочего VPN / Прокси (ротатор из списков)")
+            print(f"  {CYAN}3){RESET} 🌐 Прямое соединение к GitHub (с CDN-зеркалами)")
+            print(f"  {CYAN}4){RESET} 🔌 Ввести другой адрес прокси вручную\n")
 
             while True:
                 try:
-                    raw_choice = input("Выберите вариант [1-4] (по умолчанию 1): ")
+                    raw_choice = input(f"  {BOLD}Выберите вариант [1-4]{RESET} (по умолчанию 1): ").strip()
                 except (EOFError, KeyboardInterrupt):
                     print("")
                     raw_choice = "1"
 
-                choice = re.sub(r"[^1-4]", "", raw_choice.strip()) or "1" if raw_choice.strip() == "" else re.sub(r"[^1-4]", "", raw_choice.strip())
+                choice = re.sub(r"[^1-4]", "", raw_choice) or "1"
 
                 if choice == "1":
                     if self.configured_vpn_node:
@@ -120,6 +135,9 @@ class NetworkManager:
                     break
                 elif choice == "2":
                     self.configured_vpn_node = None
+                    self.configured_proxy = None
+                    self.custom_proxy = None
+                    self.use_env_proxy = False
                     self.use_rotator = True
                     self.no_proxy = False
                     break
@@ -132,7 +150,7 @@ class NetworkManager:
                     self.no_proxy = False
                     while True:
                         try:
-                            p_input = input("Введите адрес прокси (например socks5://127.0.0.1:10808): ").strip()
+                            p_input = input("  Введите URL прокси (например socks5://127.0.0.1:10808): ").strip()
                         except (EOFError, KeyboardInterrupt):
                             print("")
                             p_input = ""
@@ -140,21 +158,21 @@ class NetworkManager:
                         if re.match(r"^(http|https|socks4|socks5|socks5h)://", p_input, re.IGNORECASE):
                             self.custom_proxy = p_input
                             break
-                        print(f"{RED}Неверный формат URL прокси. Повторите ввод.{RESET}")
+                        log_warn("Неверный формат URL прокси. Повторите ввод.")
                     break
         else:
-            print(f"  1) {GREEN}🟢 Автоматический VPN / Прокси ротатор{RESET} [Рекомендуется / По умолчанию]")
-            print(f"  2) 🌐 Прямое соединение к GitHub (с авто-фолбэком на CDN-зеркала)")
-            print(f"  3) 🔌 Ввести адрес HTTP / SOCKS5 прокси вручную\n")
+            print(f"  {CYAN}1){RESET} {GREEN}🟢 Автоматический VPN / Прокси ротатор{RESET} [Рекомендуется / По умолчанию]")
+            print(f"  {CYAN}2){RESET} 🌐 Прямое соединение к GitHub (с авто-фолбэком на CDN)")
+            print(f"  {CYAN}3){RESET} 🔌 Ввести адрес HTTP / SOCKS5 прокси вручную\n")
 
             while True:
                 try:
-                    raw_choice = input("Выберите вариант [1-3] (по умолчанию 1): ")
+                    raw_choice = input(f"  {BOLD}Выберите вариант [1-3]{RESET} (по умолчанию 1): ").strip()
                 except (EOFError, KeyboardInterrupt):
                     print("")
                     raw_choice = "1"
 
-                choice = re.sub(r"[^1-3]", "", raw_choice.strip()) or "1" if raw_choice.strip() == "" else re.sub(r"[^1-3]", "", raw_choice.strip())
+                choice = re.sub(r"[^1-3]", "", raw_choice) or "1"
 
                 if choice == "1":
                     self.use_rotator = True
@@ -169,7 +187,7 @@ class NetworkManager:
                     self.no_proxy = False
                     while True:
                         try:
-                            p_input = input("Введите адрес прокси (например socks5://127.0.0.1:10808): ").strip()
+                            p_input = input("  Введите URL прокси (например socks5://127.0.0.1:10808): ").strip()
                         except (EOFError, KeyboardInterrupt):
                             print("")
                             p_input = ""
@@ -177,41 +195,58 @@ class NetworkManager:
                         if re.match(r"^(http|https|socks4|socks5|socks5h)://", p_input, re.IGNORECASE):
                             self.custom_proxy = p_input
                             break
-                        print(f"{RED}Неверный формат URL прокси. Повторите ввод.{RESET}")
+                        log_warn("Неверный формат URL прокси. Повторите ввод.")
                     break
 
     def setup_network(self) -> Optional[str]:
-        """Activates chosen proxy mode or starts automated failover rotator."""
+        """Activates chosen proxy mode or starts automated rotator."""
         if self.no_proxy:
             log_info("Используется прямое сетевое подключение к GitHub (с CDN-зеркалами при блокировке).")
             return None
 
         if self.custom_proxy:
             self.active_proxy_url = self.custom_proxy
-            log_info(f"Используется указанный прокси: {self.active_proxy_url}")
+            log_info(f"Используется указанный прокси: {BOLD}{self.active_proxy_url}{RESET}")
             return self.active_proxy_url
 
         if not self.use_rotator:
             return None
 
-        # Start automated VPN Rotator / Node tunnel
-        if self.configured_vpn_node:
+        rotator_candidates = [
+            os.path.join(self.project_dir, "backend", "proxy_rotator.py"),
+            os.path.join(self.project_dir, "bot", "core", "proxy_rotator.py"),
+            os.path.join(self.project_dir, "bot", "proxy_rotator.py"),
+            os.path.join(self.project_dir, "core", "proxy_rotator.py"),
+            os.path.join(self.project_dir, "proxy_rotator.py"),
+            os.path.join(os.path.dirname(__file__), "proxy_rotator.py"),
+        ]
+        rotator_py = next((p for p in rotator_candidates if os.path.isfile(p)), None)
+
+        if not rotator_py:
+            log_info("Скрипт proxy_rotator.py не найден. Используются CDN-зеркала GitHub.")
+            return None
+
+        if self.allow_env and self.configured_vpn_node:
             node_label = self.configured_vpn_node.split("#")[-1] if "#" in self.configured_vpn_node else self.configured_vpn_node[:30]
             log_info(f"Запуск локального Sing-box туннеля для ноды {BOLD}{node_label}{RESET}...")
         else:
-            log_info("Запуск Sentinel Proxy Rotator для поиска рабочего VPN...")
+            log_info("Запуск Sentinel Proxy Rotator для поиска рабочего VPN из списков...")
 
         self.cleanup()
 
-        # Find python executable inside backend venv or host
+        # Find python binary
         py_bin = sys.executable
-        venv_py = os.path.join(self.project_dir, "backend", "venv", "bin", "python")
-        if os.path.isfile(venv_py):
-            py_bin = venv_py
+        for venv_cand in [
+            os.path.join(self.project_dir, "backend", "venv", "bin", "python"),
+            os.path.join(self.project_dir, "bot", "venv", "bin", "python"),
+            os.path.join(self.project_dir, ".venv", "bin", "python"),
+        ]:
+            if os.path.isfile(venv_cand):
+                py_bin = venv_cand
+                break
 
-        rotator_py = os.path.join(self.project_dir, "backend", "proxy_rotator.py")
         cmd = [py_bin, "-u", rotator_py]
-        if self.configured_vpn_node:
+        if self.allow_env and self.configured_vpn_node:
             cmd.extend(["--node", self.configured_vpn_node, "--port", "10818", "--target-host", "objects.githubusercontent.com"])
         else:
             cmd.extend(["--find-and-start", "--port", "10818", "--target-host", "objects.githubusercontent.com"])
@@ -237,7 +272,7 @@ class NetworkManager:
             return None
 
         start_time = time.time()
-        timeout = 90.0
+        timeout = 75.0
 
         while time.time() - start_time < timeout:
             line = self.rotator_proc.stdout.readline() if self.rotator_proc.stdout else ""
@@ -245,10 +280,9 @@ class NetworkManager:
                 line_str = line.strip()
                 if "PROXY_READY:" in line_str:
                     self.active_proxy_url = line_str.split("PROXY_READY:", 1)[1].strip()
-                    log_success(f"VPN-туннель успешно поднят на {self.active_proxy_url}!")
+                    log_success(f"VPN-туннель успешно поднят на {BOLD}{self.active_proxy_url}{RESET}!")
 
-                    import threading
-                    def _drain_rotator_output():
+                    def _drain_rotator():
                         try:
                             if self.rotator_proc and self.rotator_proc.stdout:
                                 for _ in iter(self.rotator_proc.stdout.readline, ''):
@@ -256,30 +290,20 @@ class NetworkManager:
                         except Exception:
                             pass
 
-                    drain_thread = threading.Thread(target=_drain_rotator_output, daemon=True)
+                    drain_thread = threading.Thread(target=_drain_rotator, daemon=True)
                     drain_thread.start()
                     return self.active_proxy_url
                 elif line_str:
-                    print(f"    {line_str}", flush=True)
+                    print(f"    {DARK_GRAY}{line_str}{RESET}", flush=True)
             elif self.rotator_proc.poll() is not None:
-                # Read all remaining output
-                if self.rotator_proc.stdout:
-                    for remaining in self.rotator_proc.stdout:
-                        r_str = remaining.strip()
-                        if r_str:
-                            print(f"    {r_str}", flush=True)
-                log_error("Процесс ротатора завершился до установления соединения.")
+                log_warn("Процесс ротатора завершился до установления соединения. Продолжение через зеркала...")
                 break
 
             time.sleep(0.05)
 
-        log_warn("Превышено время ожидания ответа от VPN-нод. Продолжаем обновление без ротатора...")
+        log_warn("Превышено время ожидания ответа от VPN-нод. Продолжение через зеркала...")
         self.cleanup()
         return None
-
-    def start_vpn_rotator(self) -> Optional[str]:
-        """Alias for setup_network for backward compatibility."""
-        return self.setup_network()
 
     def get_env_dict(self) -> Dict[str, str]:
         """Returns environment dictionary configured with the active proxy."""
@@ -294,7 +318,7 @@ class NetworkManager:
         return env
 
     def cleanup(self) -> None:
-        """Terminates any background rotator process and frees proxy ports."""
+        """Terminates background rotator processes and frees proxy ports."""
         if self.rotator_proc:
             try:
                 if sys.platform != "win32":
@@ -322,6 +346,7 @@ class NetworkManager:
             if sys.platform != "win32":
                 subprocess.run(["pkill", "-9", "-f", "singbox_failover.json"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
                 subprocess.run(["pkill", "-9", "-f", "xray_failover.json"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                subprocess.run(["pkill", "-9", "-f", "proxy_rotator.py"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         except Exception:
             pass
 
