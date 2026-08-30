@@ -18,6 +18,15 @@ fi
 
 export PYTHONUNBUFFERED=1
 
+# Clean up any lingering updater proxy processes on exit / interrupt
+cleanup_updater_processes() {
+    pkill -9 -f "_failover_" 2>/dev/null || true
+    pkill -9 -f "proxy_rotator.py" 2>/dev/null || true
+    pkill -9 -f "singbox_failover" 2>/dev/null || true
+    pkill -9 -f "xray_failover" 2>/dev/null || true
+}
+trap cleanup_updater_processes EXIT INT TERM HUP
+
 # 2. Configure Git safe directory
 git config --global --add safe.directory "$SCRIPT_DIR" 2>/dev/null || true
 git config --global --add safe.directory "*" 2>/dev/null || true
