@@ -201,11 +201,11 @@ class SocksProxyRotator:
                 if self._singbox_proc.poll() is not None:
                     return False
 
-                ok, lat = await self.test_proxy_alive(f"socks5://127.0.0.1:{port}", health_check_url=health_url, timeout=3.5)
+                ok, lat = await self.test_proxy_alive(f"socks5://127.0.0.1:{port}", health_check_url=health_url, timeout=5.0)
                 if ok:
                     return True
 
-                await asyncio.sleep(0.4)
+                await asyncio.sleep(0.5)
 
             self.stop_tunnel()
             return False
@@ -218,7 +218,7 @@ class SocksProxyRotator:
         self,
         proxy_url: str,
         health_check_url: str = HEALTH_CHECK_URL,
-        timeout: float = 3.0,
+        timeout: float = 5.0,
         verbose: bool = False,
         **kwargs
     ) -> Tuple[bool, float]:
@@ -232,14 +232,16 @@ class SocksProxyRotator:
                     p = proxy_url
                     if p.startswith("socks5://"):
                         p = "socks5h://" + p[len("socks5://"):]
+                    conn_timeout = max(4, int(timeout))
+                    max_time = conn_timeout + 3
                     cmd = [
                         "curl", "-sI", "-k",
-                        "--connect-timeout", "2",
-                        "--max-time", str(int(timeout)),
+                        "--connect-timeout", str(conn_timeout),
+                        "--max-time", str(max_time),
                         "-x", p,
                         health_check_url,
                     ]
-                    res = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout + 1.0)
+                    res = subprocess.run(cmd, capture_output=True, text=True, timeout=max_time + 1.0)
                     if res.returncode == 0 and ("HTTP/" in res.stdout or "204" in res.stdout or "200" in res.stdout or "30" in res.stdout):
                         lat = (time.monotonic() - start) * 1000.0
                         return True, lat
@@ -321,7 +323,7 @@ class SocksProxyRotator:
         self,
         raw_subscriptions: List[str],
         tier_name: str = "Tier",
-        target_host: str = "cp.cloudflare.com"
+        target_host: str = "objects.githubusercontent.com"
     ) -> Optional[str]:
         """Парсит подписки, проверяет ссылки и строит failover-конфиг полностью через Go Sentinel-Core."""
         candidate_uris: List[str] = []
@@ -393,7 +395,7 @@ class SocksProxyRotator:
 
         return None
 
-    async def get_working_proxy(self, target_host: str = "cp.cloudflare.com") -> Optional[str]:
+    async def get_working_proxy(self, target_host: str = "objects.githubusercontent.com") -> Optional[str]:
         """Многопоточный поиск рабочего VPN-соединения через Sentinel-Core."""
         logger.info("[Failover] Проверка Tier 1: Черные списки (Hysteria 2 / Trojan / VLESS Reality)...")
         tasks = [self._fetch_single_source(url) for url in BLACK_LIST_SOURCES]
