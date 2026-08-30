@@ -60,7 +60,7 @@ async def sync_session_events_loop():
                             dup_count = a_sess.query(AuditLog).filter(
                                 AuditLog.action == action,
                                 AuditLog.target == ip,
-                                AuditLog.timestamp >= int(time.time()) - 15
+                                AuditLog.timestamp >= int(time.time()) - 3
                             ).count()
                             is_dup = dup_count > 0
                         if not is_dup:
