@@ -21,7 +21,7 @@ async def get_audit_logs_api(request: Request, page: int = 1, limit: int = 50, s
                 (AuditLog.details.ilike(f"%{search}%"))
             )
         total = query.count()
-        logs = query.order_by(AuditLog.timestamp.desc()).offset((page - 1) * limit).limit(limit).all()
+        logs = query.order_by(AuditLog.id.desc(), AuditLog.timestamp.desc()).offset((page - 1) * limit).limit(limit).all()
         
         logs_list = [{
             "id": log.id,
