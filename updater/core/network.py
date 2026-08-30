@@ -307,9 +307,9 @@ class NetworkManager:
 
         cmd = [py_bin, "-u", rotator_py]
         if self.allow_env and self.configured_vpn_node:
-            cmd.extend(["--node", self.configured_vpn_node, "--port", "10818", "--target-host", "objects.githubusercontent.com"])
+            cmd.extend(["--node", self.configured_vpn_node, "--port", "10818", "--target-host", "cp.cloudflare.com"])
         else:
-            cmd.extend(["--find-and-start", "--port", "10818", "--target-host", "objects.githubusercontent.com"])
+            cmd.extend(["--find-and-start", "--port", "10818", "--target-host", "cp.cloudflare.com"])
 
         try:
             extra_kwargs = {}

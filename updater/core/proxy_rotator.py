@@ -177,17 +177,18 @@ class SocksProxyRotator:
             )
             self._current_engine = engine_type
 
-            await asyncio.sleep(0.8)
+            await asyncio.sleep(1.0)
+            health_url = health_check_url or HEALTH_CHECK_URL
 
-            for attempt in range(1, 4):
+            for attempt in range(1, 5):
                 if self._singbox_proc.poll() is not None:
                     return False
 
-                ok, lat = await self.test_proxy_alive(f"socks5://127.0.0.1:{port}", health_check_url=health_check_url, timeout=2.5)
+                ok, lat = await self.test_proxy_alive(f"socks5://127.0.0.1:{port}", health_check_url=health_url, timeout=3.5)
                 if ok:
                     return True
 
-                await asyncio.sleep(0.3)
+                await asyncio.sleep(0.4)
 
             self.stop_tunnel()
             return False
