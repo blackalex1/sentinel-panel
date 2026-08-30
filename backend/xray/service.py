@@ -248,21 +248,24 @@ def remove_client_api(inbound_id: int, email: str) -> bool:
 
 
 def get_xray_logs(lines_count: int = 150) -> list:
-    """Возвращает последние строки лог-файла Xray через sentinel-core supervisor"""
-    if not backend.xray.XRAY_LOG_PATH.exists():
-        return ["Лог-файл пуст или еще не создан."]
-        
+    """Возвращает последние строки логов Xray из оперативной памяти через sentinel-core ring buffer (zero disk IO)."""
     try:
-        from backend.sentinel_core_bridge import get_core_logs
-        lines = get_core_logs(str(backend.xray.XRAY_LOG_PATH), lines_count)
-        if lines:
+        from backend.sentinel_core_bridge import get_in_memory_core_logs
+        mem_lines = get_in_memory_core_logs("xray", lines_count)
+        if mem_lines:
+            return [line.strip() for line in mem_lines]
+    except Exception:
+        pass
+
+    if backend.xray.XRAY_LOG_PATH.exists():
+        try:
+            from backend.utils import read_last_lines
+            lines = read_last_lines(backend.xray.XRAY_LOG_PATH, lines_count)
             return [line.strip() for line in lines]
-            
-        from backend.utils import read_last_lines
-        lines = read_last_lines(backend.xray.XRAY_LOG_PATH, lines_count)
-        return [line.strip() for line in lines]
-    except Exception as e:
-        return [f"Ошибка чтения логов: {e}"]
+        except Exception as e:
+            return [f"Ошибка чтения логов: {e}"]
+
+    return ["Лог-буфер пуст."]
 
 def log_xray_errors():
     """Prints last 20 lines of Xray logs to output for easy container debugging."""

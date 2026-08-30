@@ -337,8 +337,8 @@ def compile_node_server_config(target_core: str) -> Dict[str, Any]:
         
         setting_key = "xray_loglevel" if target_core == "xray" else ("singbox_loglevel" if target_core in ("singbox", "sing-box") else "hysteria_loglevel")
         db_lvl = (get_setting(setting_key) or "").lower()
-        if db_lvl not in ("trace", "debug", "info", "warn", "warning", "error", "none"):
-            db_lvl = "warning"
+        if db_lvl not in ("trace", "debug", "info", "warn", "warning", "error"):
+            db_lvl = "info"
         log_level = db_lvl
         
         access_log = get_setting("xray_access_log") or ""

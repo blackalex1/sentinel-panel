@@ -8,7 +8,7 @@ from backend.sentinel_core_bridge import push_core_log_line, get_recent_session_
 from backend.main import sync_session_events_loop
 
 
-@pytest.mark.asyncio
+@pytest.mark.anyio
 async def test_singbox_core_session_tracking_and_audit(client, monkeypatch):
     """Verifies that Go sentinel-core exclusively parses Singbox logs and Python worker syncs structured events."""
     import backend.routes.security_routes.bans
@@ -89,7 +89,7 @@ async def test_singbox_core_session_tracking_and_audit(client, monkeypatch):
     assert "203.0.113.88" in targets
 
 
-@pytest.mark.asyncio
+@pytest.mark.anyio
 async def test_singbox_concurrent_google_traffic_simulation(client, monkeypatch):
     """Simulates multiple clients concurrently generating traffic to Google (8.8.8.8 / google.com) and verifies end-to-end event and alert generation."""
     import backend.routes.security_routes.bans
@@ -99,26 +99,26 @@ async def test_singbox_concurrent_google_traffic_simulation(client, monkeypatch)
         session.query(AuditLog).delete()
 
     concurrent_google_logs = [
-        # Client 1: phone (188.170.74.53) connects to 8.8.8.8:853
-        "+0000 2026-08-31 12:10:01 INFO [90000001 0ms] inbound/vless[inbound-8]: inbound connection from 188.170.74.53:32402",
-        # Client 2: desktop (198.51.100.99) connects to 8.8.8.8:53
+        # Client 1: client_one (198.51.100.10) connects to 8.8.8.8:853
+        "+0000 2026-08-31 12:10:01 INFO [90000001 0ms] inbound/vless[inbound-8]: inbound connection from 198.51.100.10:32402",
+        # Client 2: client_two (198.51.100.99) connects to 8.8.8.8:53
         "+0000 2026-08-31 12:10:01 INFO [90000002 0ms] inbound/vless[inbound-8]: inbound connection from 198.51.100.99:41150",
-        # Client 3: guest (203.0.113.123) connects to www.google.com:443
+        # Client 3: client_three (203.0.113.123) connects to www.google.com:443
         "+0000 2026-08-31 12:10:01 INFO [90000003 0ms] inbound/vless[inbound-8]: inbound connection from 203.0.113.123:52110",
 
         # Interleaved user routings
-        "+0000 2026-08-31 12:10:01 INFO [90000001 78ms] inbound/vless[inbound-8]: [phone] inbound connection to 8.8.8.8:853",
+        "+0000 2026-08-31 12:10:01 INFO [90000001 78ms] inbound/vless[inbound-8]: [client_one] inbound connection to 8.8.8.8:853",
         "+0000 2026-08-31 12:10:01 INFO [90000001 79ms] outbound/direct[direct]: outbound connection to 8.8.8.8:853",
-        "+0000 2026-08-31 12:10:01 INFO [90000002 85ms] inbound/vless[inbound-8]: [desktop] inbound connection to 8.8.8.8:53",
+        "+0000 2026-08-31 12:10:01 INFO [90000002 85ms] inbound/vless[inbound-8]: [client_two] inbound connection to 8.8.8.8:53",
         "+0000 2026-08-31 12:10:01 INFO [90000002 85ms] outbound/hysteria2[primary]: outbound connection to 8.8.8.8:53",
-        "+0000 2026-08-31 12:10:01 INFO [90000003 92ms] inbound/vless[inbound-8]: [guest] inbound connection to www.google.com:443",
+        "+0000 2026-08-31 12:10:01 INFO [90000003 92ms] inbound/vless[inbound-8]: [client_three] inbound connection to www.google.com:443",
         "+0000 2026-08-31 12:10:01 INFO [90000003 92ms] outbound/hysteria2[primary]: outbound connection to www.google.com:443",
     ]
 
     mock_events = [
-        {"timestamp": int(time.time()), "action": "connect", "core": "sing-box", "email": "phone", "ip": "188.170.74.53"},
-        {"timestamp": int(time.time()), "action": "connect", "core": "sing-box", "email": "desktop", "ip": "198.51.100.99"},
-        {"timestamp": int(time.time()), "action": "connect", "core": "sing-box", "email": "guest", "ip": "203.0.113.123"},
+        {"timestamp": int(time.time()), "action": "connect", "core": "sing-box", "email": "client_one", "ip": "198.51.100.10"},
+        {"timestamp": int(time.time()), "action": "connect", "core": "sing-box", "email": "client_two", "ip": "198.51.100.99"},
+        {"timestamp": int(time.time()), "action": "connect", "core": "sing-box", "email": "client_three", "ip": "203.0.113.123"},
     ]
 
     monkeypatch.setattr("backend.sentinel_core_bridge.get_recent_session_events", lambda since, limit: mock_events)
@@ -148,7 +148,7 @@ async def test_singbox_concurrent_google_traffic_simulation(client, monkeypatch)
     logs = res.json()["logs"]
     assert len(logs) >= 3
     targets = {l["target"] for l in logs}
-    assert "188.170.74.53" in targets
+    assert "198.51.100.10" in targets
     assert "198.51.100.99" in targets
     assert "203.0.113.123" in targets
 
