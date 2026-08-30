@@ -79,7 +79,24 @@ class SentinelCoreManager:
         return os_name, arch, ext
 
     def get_installed_version(self) -> Tuple[bool, str]:
-        """Detects currently installed core version via binary CLI or C-shared library ctypes FFI."""
+        """Detects currently installed core version via C-shared library ctypes FFI or binary CLI."""
+        _, _, ext = self._get_platform_info()
+        so_path = os.path.join(self.bin_dir, f"libsentinel-core{ext}")
+        if not os.path.isfile(so_path):
+            so_path = os.path.join(self.bin_dir, "libsentinel-core.so")
+
+        if os.path.isfile(so_path):
+            try:
+                ffi_cmd = [
+                    sys.executable, "-c",
+                    f'import ctypes, re; lib = ctypes.CDLL("{so_path}"); lib.SentinelGetEngineVersion.restype = ctypes.c_char_p; v = lib.SentinelGetEngineVersion().decode("utf-8").strip(); print("v" + v if re.match(r"^\\d+\\.\\d+", v) else v)'
+                ]
+                v_out = subprocess.check_output(ffi_cmd, stderr=subprocess.DEVNULL, timeout=2).decode().strip()
+                if v_out and v_out != "dev":
+                    return True, v_out
+            except Exception:
+                pass
+
         exe_path = os.path.join(self.bin_dir, "sentinel-core")
         if platform.system() == "Windows":
             exe_path += ".exe"
@@ -101,25 +118,11 @@ class SentinelCoreManager:
                 except Exception:
                     continue
 
-        _, _, ext = self._get_platform_info()
-        so_path = os.path.join(self.bin_dir, f"libsentinel-core{ext}")
-        if not os.path.isfile(so_path):
-            so_path = os.path.join(self.bin_dir, "libsentinel-core.so")
-
         if os.path.isfile(so_path):
-            try:
-                ffi_cmd = [
-                    sys.executable, "-c",
-                    f'import ctypes, re; lib = ctypes.CDLL("{so_path}"); lib.SentinelGetEngineVersion.restype = ctypes.c_char_p; v = lib.SentinelGetEngineVersion().decode("utf-8").strip(); print("v" + v if re.match(r"^\\d+\\.\\d+", v) else v)'
-                ]
-                v_out = subprocess.check_output(ffi_cmd, stderr=subprocess.DEVNULL, timeout=2).decode().strip()
-                if v_out:
-                    return True, v_out
-            except Exception:
-                pass
             return True, "Установлена (.so найдена)"
 
         return False, "Не установлена"
+
 
     def fetch_releases(self) -> Tuple[str, str, str]:
         """Queries GitHub API (via proxy or mirrors) and returns (stable_ver, prerelease_ver, latest_any)."""
@@ -329,6 +332,23 @@ class SentinelCoreManager:
             else:
                 log_warn(f"Несовпадение SHA-256 для {lib_asset}!")
 
+        # Download CLI Binary if present in release assets
+        exe_ext = ".exe" if os_name == "windows" else ""
+        cli_asset = f"sentinel-core-{os_name}-{arch}{exe_ext}"
+        target_cli = os.path.join(self.bin_dir, f"sentinel-core{exe_ext}")
+        if cli_asset in size_map or cli_asset in checksum_map:
+            cli_ok = self.downloader.download_file_with_mirrors(
+                f"{base_release_url}/{cli_asset}",
+                target_cli,
+                filename_for_log=cli_asset,
+                expected_size=size_map.get(cli_asset, 0),
+            )
+            if cli_ok and os_name != "windows" and os.path.exists(target_cli):
+                try:
+                    os.chmod(target_cli, 0o755)
+                except Exception:
+                    pass
+
         # Create alias symlink sentinel-core.so in project bin if needed
         alt_lib = os.path.join(self.bin_dir, f"sentinel-core{lib_ext}")
         try:
@@ -338,3 +358,4 @@ class SentinelCoreManager:
             pass
 
         return True
+
