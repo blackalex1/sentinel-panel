@@ -127,23 +127,66 @@ class GitManager:
 
         if old_commit and new_commit and old_commit != new_commit:
             log_success(f"Кодовая база обновлена: {BOLD}{old_commit[:7]} → {new_commit[:7]}{RESET}")
-            try:
-                log_commits = run_command(
-                    ["git", "log", "--pretty=format:  • \033[1;33m%h\033[0m %s \033[2m(%cr)\033[0m", f"{old_commit}..{new_commit}"],
-                    cwd=self.project_dir,
-                    capture=True,
-                    check=False,
-                ).stdout.strip()
-                if log_commits:
-                    print(f"\n  {CYAN}📝 Список изменений ({old_commit[:7]}..{new_commit[:7]}):{RESET}")
-                    print(log_commits)
-                log_diff = run_command(["git", "diff", "--stat", f"{old_commit}..{new_commit}"], cwd=self.project_dir, capture=True, check=False).stdout.strip()
-                if log_diff:
-                    print(f"\n  {DARK_GRAY}{log_diff}{RESET}\n")
-            except Exception:
-                pass
+            self.display_changelog(from_commit=old_commit, to_commit=new_commit)
             return True
         else:
             if not silent_if_uptodate:
                 log_success("Кодовая база уже актуальна (Up to date).")
+                self.display_changelog(max_commits=3)
             return False
+
+    def display_changelog(
+        self,
+        from_commit: Optional[str] = None,
+        to_commit: Optional[str] = None,
+        max_commits: int = 5,
+    ) -> None:
+        """Visualizes commit log and colorized git diff statistics with added/deleted line counts."""
+        if not shutil.which("git") or not os.path.isdir(os.path.join(self.project_dir, ".git")):
+            return
+
+        try:
+            current_head = run_command(
+                ["git", "-c", "safe.directory=*", "rev-parse", "--short", "HEAD"],
+                cwd=self.project_dir,
+                capture=True,
+                check=False,
+            ).stdout.strip()
+
+            if from_commit and to_commit and from_commit != to_commit:
+                print(f"\n  {CYAN}📝 Список изменений ({BOLD}{from_commit[:7]} → {to_commit[:7]}{RESET}{CYAN}):{RESET}")
+                log_cmd = [
+                    "git", "-c", "safe.directory=*", "log",
+                    "--pretty=format:    • \033[1;33m%h\033[0m %s \033[2m(%cr)\033[0m",
+                    f"{from_commit}..{to_commit}"
+                ]
+                diff_cmd = [
+                    "git", "-c", "safe.directory=*", "diff",
+                    "--stat", "--color=always",
+                    f"{from_commit}..{to_commit}"
+                ]
+            else:
+                print(f"\n  {CYAN}📝 Недавние изменения в кодовой базе (текущая: {BOLD}{current_head}{RESET}{CYAN}):{RESET}")
+                log_cmd = [
+                    "git", "-c", "safe.directory=*", "log",
+                    f"-n", str(max_commits),
+                    "--pretty=format:    • \033[1;33m%h\033[0m %s \033[2m(%cr)\033[0m"
+                ]
+                diff_cmd = [
+                    "git", "-c", "safe.directory=*", "show",
+                    "--stat", "--color=always", "--format=",
+                    "HEAD"
+                ]
+
+            commits_out = run_command(log_cmd, cwd=self.project_dir, capture=True, check=False).stdout.strip()
+            if commits_out:
+                print(commits_out)
+
+            diff_out = run_command(diff_cmd, cwd=self.project_dir, capture=True, check=False).stdout.strip()
+            if diff_out:
+                print(f"\n  {WHITE}{BOLD}📊 Статистика изменений файлов ({GREEN}+{RESET}/{RED}-{RESET}):{RESET}")
+                for line in diff_out.splitlines():
+                    print(f"  {line}")
+            print("")
+        except Exception:
+            pass

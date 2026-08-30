@@ -85,14 +85,21 @@ class ControllerRunner:
         total_steps = 6
 
         # Step 1: Git Codebase Sync
-        if not self.skip_git and not self.bootstrapped:
-            log_step(1, total_steps, "Синхронизация кодовой базы Git")
-            git_mgr = GitManager(
-                project_dir=self.project_dir,
-                repo_url="https://github.com/blackalex1/proxmox_Sentinel.git",
-                proxy_url=self.proxy_arg,
-            )
-            updated = git_mgr.update_codebase(silent_if_uptodate=True)
+        log_step(1, total_steps, "Синхронизация кодовой базы Git")
+        git_mgr = GitManager(
+            project_dir=self.project_dir,
+            repo_url="https://github.com/blackalex1/proxmox_Sentinel.git",
+            proxy_url=self.proxy_arg,
+        )
+
+        old_head_env = os.getenv("SENTINEL_OLD_HEAD")
+        new_head_env = os.getenv("SENTINEL_NEW_HEAD")
+
+        if old_head_env and new_head_env and old_head_env != new_head_env:
+            log_success(f"Кодовая база обновлена: {BOLD}{old_head_env[:7]} → {new_head_env[:7]}{RESET}")
+            git_mgr.display_changelog(from_commit=old_head_env, to_commit=new_head_env)
+        elif not self.skip_git and not self.bootstrapped:
+            updated = git_mgr.update_codebase(silent_if_uptodate=False)
             if updated:
                 log_info("Кодовая база обновлена. Перезапуск обновленного скрипта...")
                 new_argv = [sys.executable, "-m", "updater.main", "--bootstrapped"]
@@ -101,7 +108,8 @@ class ControllerRunner:
                         new_argv.append(a)
                 os.execv(sys.executable, new_argv)
         else:
-            log_step(1, total_steps, "Синхронизация Git (пропущена)")
+            log_success("Кодовая база актуальна (Up to date).")
+            git_mgr.display_changelog(max_commits=3)
 
         # Step 2: Network & Proxy Setup
         log_step(2, total_steps, "Настройка сетевого подключения и прокси")

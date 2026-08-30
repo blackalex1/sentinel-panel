@@ -27,6 +27,7 @@ if __package__ is None or __package__ == "":
         log_success,
         log_warn,
     )
+    from updater.core.git import GitManager
     from updater.detector import detect_target, prompt_target_selection
     from updater.panel.runner import PanelRunner
 else:
@@ -46,6 +47,7 @@ else:
         log_success,
         log_warn,
     )
+    from .core.git import GitManager
     from .detector import detect_target, prompt_target_selection
     from .panel.runner import PanelRunner
 
@@ -120,6 +122,11 @@ def parse_args() -> argparse.Namespace:
         help="Custom project directory path (default: current working directory)",
     )
     parser.add_argument(
+        "--changelog", "-c",
+        action="store_true",
+        help="Display detailed Git changelog and file diff statistics (+/-) and exit",
+    )
+    parser.add_argument(
         "--bootstrapped",
         action="store_true",
         help=argparse.SUPPRESS,
@@ -152,6 +159,12 @@ def main() -> int:
     args = parse_args()
 
     project_dir = os.path.abspath(args.dir) if args.dir else os.getcwd()
+
+    # Changelog standalone viewer
+    if args.changelog:
+        git_mgr = GitManager(project_dir=project_dir)
+        git_mgr.display_changelog(max_commits=10)
+        return 0
 
     # Determine what to update
     target = determine_target(args.target, project_dir)
