@@ -30,7 +30,6 @@ session_sync_task = None
 async def sync_session_events_loop():
     """High-speed background worker (every 2s) syncing core SessionTracker events, active sessions, and ACTIVE_IP_CACHE into AuditLog."""
     logging.info("Started background session events synchronization task.")
-    last_session_sync_ts = int(time.time()) - 300
     seen_events: set[tuple] = set()
     reconciled_active: set[tuple] = set()
 
@@ -44,14 +43,10 @@ async def sync_session_events_loop():
             from backend.models import AuditLog
 
             # 1. Process recent event stream from Go sentinel-core SessionTracker
-            events = get_recent_session_events(last_session_sync_ts, limit=100)
+            events = get_recent_session_events(0, limit=100)
             if events and isinstance(events, list):
-                # Sort ascending by timestamp so oldest events in the batch are processed first
-                events.sort(key=lambda x: x.get("timestamp", 0))
                 for ev in events:
                     ev_ts = ev.get("timestamp", 0)
-                    if ev_ts > last_session_sync_ts:
-                        last_session_sync_ts = ev_ts
                     action_type = ev.get("action")
                     core_name = str(ev.get("core", "singbox")).replace("-", "")
                     action = f"{core_name}_{action_type}"
@@ -106,7 +101,7 @@ async def sync_session_events_loop():
                                 has_recent = a_sess.query(AuditLog).filter(
                                     AuditLog.action == action,
                                     AuditLog.target == ip,
-                                    AuditLog.timestamp >= int(time.time()) - 3600
+                                    AuditLog.timestamp >= int(time.time()) - 30
                                 ).count() > 0
                             if not has_recent:
                                 tx, rx = get_singbox_user_traffic(email) if "sing" in core_name else get_xray_user_traffic(email)
@@ -140,7 +135,7 @@ async def sync_session_events_loop():
                                             has_audit = a_sess.query(AuditLog).filter(
                                                 AuditLog.target == c_ip,
                                                 AuditLog.action.in_(("singbox_connect", "xray_connect", "hysteria2_connect", "hysteria_connect")),
-                                                AuditLog.timestamp >= now_sec - 3600
+                                                AuditLog.timestamp >= now_sec - 30
                                             ).count() > 0
                                         if not has_audit:
                                             tx, rx = get_singbox_user_traffic(c_user)
