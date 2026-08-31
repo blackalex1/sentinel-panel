@@ -31,6 +31,9 @@ async def sync_session_events_loop():
     """High-speed background worker (every 2s) syncing core SessionTracker events, active sessions, and ACTIVE_IP_CACHE into AuditLog."""
     logging.info("Started background session events synchronization task.")
     last_session_sync_ts = int(time.time()) - 300
+    seen_events: set[tuple] = set()
+    reconciled_active: set[tuple] = set()
+
     while True:
         try:
             await asyncio.sleep(2)
@@ -55,12 +58,22 @@ async def sync_session_events_loop():
                     email = ev.get("email")
                     ip = ev.get("ip")
                     if email and ip and ip != "127.0.0.1":
+                        ev_key = (core_name, action_type, email, ip, ev_ts)
+                        if ev_key in seen_events:
+                            continue
+                        seen_events.add(ev_key)
+                        if len(seen_events) > 5000:
+                            seen_events.clear()
+
+                        if action_type == "disconnect":
+                            reconciled_active.discard((core_name, email, ip))
+
                         is_dup = False
                         with db_session() as a_sess:
                             dup_count = a_sess.query(AuditLog).filter(
                                 AuditLog.action == action,
                                 AuditLog.target == ip,
-                                AuditLog.timestamp >= int(time.time()) - 3
+                                AuditLog.timestamp >= int(time.time()) - 10
                             ).count()
                             is_dup = dup_count > 0
                         if not is_dup:
@@ -78,6 +91,7 @@ async def sync_session_events_loop():
 
             # 2. Active sessions reconciliation: ensure all active core sessions have an AuditLog entry
             active_list = get_active_sessions()
+            current_active_keys = set()
             if active_list and isinstance(active_list, list):
                 for sess_info in active_list:
                     email = sess_info.get("email")
@@ -85,22 +99,31 @@ async def sync_session_events_loop():
                     core_name = str(sess_info.get("core", "singbox")).replace("-", "")
                     action = f"{core_name}_connect"
                     if email and ip and ip != "127.0.0.1":
-                        with db_session() as a_sess:
-                            has_recent = a_sess.query(AuditLog).filter(
-                                AuditLog.action == action,
-                                AuditLog.target == ip,
-                                AuditLog.timestamp >= int(time.time()) - 600
-                            ).count() > 0
-                        if not has_recent:
-                            tx, rx = get_singbox_user_traffic(email) if "sing" in core_name else get_xray_user_traffic(email)
-                            details_dict = {"username": email, "tx": tx, "rx": rx}
-                            logging.info(f"[SessionTracker Sync] Reconciled active session in AuditLog: action={action}, target={ip}, user={email}")
-                            log_action(
-                                username="system",
-                                action=action,
-                                target=ip,
-                                details=json.dumps(details_dict, ensure_ascii=False)
-                            )
+                        s_key = (core_name, email, ip)
+                        current_active_keys.add(s_key)
+                        if s_key not in reconciled_active:
+                            with db_session() as a_sess:
+                                has_recent = a_sess.query(AuditLog).filter(
+                                    AuditLog.action == action,
+                                    AuditLog.target == ip,
+                                    AuditLog.timestamp >= int(time.time()) - 3600
+                                ).count() > 0
+                            if not has_recent:
+                                tx, rx = get_singbox_user_traffic(email) if "sing" in core_name else get_xray_user_traffic(email)
+                                details_dict = {"username": email, "tx": tx, "rx": rx}
+                                logging.info(f"[SessionTracker Sync] Reconciled active session in AuditLog: action={action}, target={ip}, user={email}")
+                                log_action(
+                                    username="system",
+                                    action=action,
+                                    target=ip,
+                                    details=json.dumps(details_dict, ensure_ascii=False)
+                                )
+                            reconciled_active.add(s_key)
+
+            # Clean reconciled sessions that are no longer active
+            for stale_key in list(reconciled_active):
+                if stale_key not in current_active_keys:
+                    reconciled_active.discard(stale_key)
 
             # 3. Secondary check: ACTIVE_IP_CACHE from Clash API / Xray API
             try:
@@ -111,22 +134,25 @@ async def sync_session_events_loop():
                         if isinstance(c_ip_map, dict):
                             for c_ip, c_last_seen in list(c_ip_map.items()):
                                 if c_ip and c_ip != "127.0.0.1" and (now_sec - int(c_last_seen)) < 60:
-                                    with db_session() as a_sess:
-                                        has_audit = a_sess.query(AuditLog).filter(
-                                            AuditLog.target == c_ip,
-                                            AuditLog.action.in_(("singbox_connect", "xray_connect", "hysteria2_connect", "hysteria_connect")),
-                                            AuditLog.timestamp >= now_sec - 600
-                                        ).count() > 0
-                                    if not has_audit:
-                                        tx, rx = get_singbox_user_traffic(c_user)
-                                        details_dict = {"username": c_user, "tx": tx, "rx": rx}
-                                        logging.info(f"[SessionTracker Sync] Reconciled ACTIVE_IP_CACHE in AuditLog: user={c_user}, ip={c_ip}")
-                                        log_action(
-                                            username="system",
-                                            action="singbox_connect",
-                                            target=c_ip,
-                                            details=json.dumps(details_dict, ensure_ascii=False)
-                                        )
+                                    s_key = ("singbox", c_user, c_ip)
+                                    if s_key not in reconciled_active:
+                                        with db_session() as a_sess:
+                                            has_audit = a_sess.query(AuditLog).filter(
+                                                AuditLog.target == c_ip,
+                                                AuditLog.action.in_(("singbox_connect", "xray_connect", "hysteria2_connect", "hysteria_connect")),
+                                                AuditLog.timestamp >= now_sec - 3600
+                                            ).count() > 0
+                                        if not has_audit:
+                                            tx, rx = get_singbox_user_traffic(c_user)
+                                            details_dict = {"username": c_user, "tx": tx, "rx": rx}
+                                            logging.info(f"[SessionTracker Sync] Reconciled ACTIVE_IP_CACHE in AuditLog: user={c_user}, ip={c_ip}")
+                                            log_action(
+                                                username="system",
+                                                action="singbox_connect",
+                                                target=c_ip,
+                                                details=json.dumps(details_dict, ensure_ascii=False)
+                                            )
+                                        reconciled_active.add(s_key)
             except Exception as e:
                 logging.debug(f"[SessionTracker Sync] ACTIVE_IP_CACHE check: {e}")
 
