@@ -192,7 +192,7 @@ async def handle_client_event(action: str, client_ip: str, details_str: str):
                 except Exception:
                     pass
 
-    if action in ("xray_connect", "hysteria_connect", "hysteria2_connect", "singbox_connect"):
+    if action in ("xray_connect", "hysteria_connect", "hysteria2_connect", "singbox_connect", "sing-box_connect"):
         # Check for new IP connection
         try:
             from backend.models import AuditLog, ClientStats
