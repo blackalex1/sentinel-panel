@@ -259,20 +259,13 @@ async def lifespan(app: FastAPI):
     from backend.i18n import load_translations
     load_translations()
     
-    # Запуск Xray, Hysteria 2 и sing-box (если есть активные подключения)
+    # Запуск Xray, Hysteria 2 и sing-box
     start_xray()
     start_hysteria()
     try:
-        from backend.database import db_session, Inbound
-        with db_session() as session:
-            has_singbox_inbounds = session.query(Inbound).filter(
-                Inbound.enable == 1,
-                ((Inbound.core == "singbox") | (Inbound.protocol == "singbox"))
-            ).count() > 0
-        if has_singbox_inbounds:
-            start_singbox()
+        start_singbox()
     except Exception as e:
-        logging.error(f"Failed to check sing-box inbounds status at startup: {e}")
+        logging.error(f"Failed to start sing-box at startup: {e}")
     
     # Запуск фоновых сборщиков и стримеров логов ядер
     from backend.log_streamer import ensure_log_tailers

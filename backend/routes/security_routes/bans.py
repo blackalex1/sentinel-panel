@@ -105,7 +105,10 @@ async def clear_connection_logs(request: Request):
             session.query(AuditLog).filter(
                 AuditLog.action.in_([
                     "xray_connect", "xray_disconnect", 
-                    "hysteria_connect", "hysteria_disconnect"
+                    "hysteria_connect", "hysteria_disconnect",
+                    "hysteria2_connect", "hysteria2_disconnect",
+                    "singbox_connect", "singbox_disconnect",
+                    "sing-box_connect", "sing-box_disconnect"
                 ])
             ).delete(synchronize_session=False)
             session.commit()
