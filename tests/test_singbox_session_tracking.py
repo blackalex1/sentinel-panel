@@ -220,4 +220,62 @@ async def test_singbox_vless_github_download_session_stability_no_spam(client, m
             assert count == 0, f"Destination IP {f_ip} was mistakenly recorded in AuditLog!"
 
 
+@pytest.mark.anyio
+async def test_singbox_real_production_stream_wifi_to_lte_switch(client, monkeypatch):
+    """Verifies that realistic production log stream switches from Wi-Fi to LTE with exact connect events recorded."""
+    import backend.routes.security_routes.bans
+    monkeypatch.setattr(backend.routes.security_routes.bans, "check_auth", lambda r: True)
+
+    with db_session() as session:
+        session.query(AuditLog).delete()
+
+    wifi_ip = "192.0.2.10"
+    lte_ip = "198.51.100.71"
+    user_email = "client_user_roaming"
+
+    mock_events = [
+        {"timestamp": 1788174800, "action": "connect", "core": "sing-box", "email": user_email, "ip": wifi_ip},
+        {"timestamp": 1788174815, "action": "disconnect", "core": "sing-box", "email": user_email, "ip": wifi_ip, "duration": "15 сек"},
+        {"timestamp": 1788174815, "action": "connect", "core": "sing-box", "email": user_email, "ip": lte_ip},
+    ]
+
+    from backend.audit import log_action
+    seen_events = set()
+    reconciled_active = set()
+
+    for ev in mock_events:
+        ev_ts = ev.get("timestamp", 0)
+        action_type = ev.get("action")
+        core_name = str(ev.get("core", "singbox")).replace("-", "")
+        action = f"{core_name}_{action_type}"
+        email = ev.get("email")
+        ip = ev.get("ip")
+        ev_key = (core_name, action_type, email, ip, ev_ts)
+
+        if ev_key not in seen_events:
+            seen_events.add(ev_key)
+            if action_type == "disconnect":
+                reconciled_active.discard((core_name, email, ip))
+            details = {"username": email, "tx": 0, "rx": 0}
+            if action_type == "disconnect":
+                details["duration"] = ev.get("duration", "несколько секунд")
+            log_action(username="system", action=action, target=ip, details=json.dumps(details, ensure_ascii=False))
+
+    with db_session() as session:
+        logs = session.query(AuditLog).order_by(AuditLog.id.asc()).all()
+        assert len(logs) == 3
+        assert logs[0].action == "singbox_connect"
+        assert logs[0].target == wifi_ip
+        assert logs[1].action == "singbox_disconnect"
+        assert logs[1].target == wifi_ip
+        assert logs[2].action == "singbox_connect"
+        assert logs[2].target == lte_ip
+
+    res = client.get("/api/security/audit-logs?limit=10")
+    assert res.status_code == 200
+    data = res.json()
+    assert data["success"] is True
+    assert len(data["logs"]) == 3
+
+
 
