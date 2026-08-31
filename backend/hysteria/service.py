@@ -16,21 +16,15 @@ _last_hysteria_stats = {}
 
 
 def get_hysteria_logs(lines_count: int = 150) -> list:
-    """Возвращает последние строки лог-файла Hysteria 2 через sentinel-core supervisor"""
-    if not backend.hysteria.HYSTERIA_LOG_PATH.exists():
-        return ["Лог-файл пуст или еще не создан."]
-        
+    """Возвращает последние строки логов Hysteria 2 исключительно из оперативной памяти через sentinel-core ring buffer (zero disk IO)."""
     try:
-        from backend.sentinel_core_bridge import get_core_logs
-        lines = get_core_logs(str(backend.hysteria.HYSTERIA_LOG_PATH), lines_count)
-        if lines:
-            return [line.strip() for line in lines]
-
-        from backend.utils import read_last_lines
-        lines = read_last_lines(backend.hysteria.HYSTERIA_LOG_PATH, lines_count)
-        return [line.strip() for line in lines]
-    except Exception as e:
-        return [f"Ошибка чтения логов: {e}"]
+        from backend.sentinel_core_bridge import get_in_memory_core_logs
+        mem_lines = get_in_memory_core_logs("hysteria", lines_count)
+        if mem_lines:
+            return [line.strip() for line in mem_lines]
+    except Exception:
+        pass
+    return ["Лог-буфер пуст."]
 
 def is_hysteria_running() -> bool:
     """Проверяет, запущен ли хотя бы один процесс Hysteria 2"""

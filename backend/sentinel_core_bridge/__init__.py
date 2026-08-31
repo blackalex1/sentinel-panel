@@ -55,6 +55,9 @@ from backend.sentinel_core_bridge.logs import (
     push_core_log_line,
     get_in_memory_core_logs,
     clear_in_memory_core_logs,
+    find_xray_client_email,
+    find_hysteria_client_email,
+    find_client_ip_for_email_in_hysteria_log,
 )
 
 from backend.sentinel_core_bridge.routing import (

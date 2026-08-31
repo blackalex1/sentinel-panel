@@ -68,3 +68,93 @@ def push_core_log_line(core_name: str, line: str) -> bool:
         logger.debug("FFI push_core_log_line error: %s", e)
     return True
 
+
+def find_xray_client_email(
+    lines: List[str],
+    dst_ip: Optional[str],
+    dst_port: int,
+    client_ip: Optional[str] = None,
+    max_age_sec: int = 300
+) -> tuple[Optional[str], Optional[str], Optional[str]]:
+    """Searches Xray/Sing-box log lines for client email, IP, and inbound tag via sentinel-core."""
+    import json
+    lines_json = json.dumps(lines)
+    try:
+        res = _ffi_call_json("SentinelFindXrayClientEmail", lines_json, client_ip or "", dst_ip or "", int(dst_port), int(max_age_sec))
+        if isinstance(res, dict) and res.get("email"):
+            return res.get("email"), res.get("ip") or client_ip, res.get("inbound_tag")
+    except Exception as e:
+        logger.debug("FFI find_xray_client_email error: %s", e)
+
+    args = [
+        "security", "find-proxy-client",
+        "--core", "xray",
+        "--lines", lines_json,
+        "--client-ip", client_ip or "",
+        "--dst-ip", dst_ip or "",
+        "--dpt", str(dst_port),
+        "--max-age", str(max_age_sec)
+    ]
+    res = run_core_command(args)
+    if isinstance(res, dict) and res.get("email"):
+        return res.get("email"), res.get("ip") or client_ip, res.get("inbound_tag")
+    return None, None, None
+
+
+def find_hysteria_client_email(
+    lines: List[str],
+    dst_ip: Optional[str],
+    dst_port: int,
+    max_age_sec: int = 300
+) -> Optional[str]:
+    """Searches Hysteria 2 log lines for client user/email via sentinel-core."""
+    import json
+    lines_json = json.dumps(lines)
+    try:
+        email = _ffi_call_str("SentinelFindHysteriaClientEmail", lines_json, dst_ip or "", int(dst_port), int(max_age_sec))
+        if email:
+            return email.strip()
+    except Exception as e:
+        logger.debug("FFI find_hysteria_client_email error: %s", e)
+
+    args = [
+        "security", "find-proxy-client",
+        "--core", "hysteria",
+        "--lines", lines_json,
+        "--dst-ip", dst_ip or "",
+        "--dpt", str(dst_port),
+        "--max-age", str(max_age_sec)
+    ]
+    res = run_core_command(args)
+    if isinstance(res, dict) and res.get("email"):
+        return res["email"].strip()
+    return None
+
+
+def find_client_ip_for_email_in_hysteria_log(
+    lines: List[str],
+    email: str,
+    max_age_sec: int = 300
+) -> Optional[str]:
+    """Searches Hysteria 2 log lines for latest client IP by email via sentinel-core."""
+    import json
+    lines_json = json.dumps(lines)
+    try:
+        ip = _ffi_call_str("SentinelFindClientIPForEmail", lines_json, email, int(max_age_sec))
+        if ip:
+            return ip.strip()
+    except Exception as e:
+        logger.debug("FFI find_client_ip_for_email_in_hysteria_log error: %s", e)
+
+    args = [
+        "security", "find-proxy-client",
+        "--core", "hysteria-ip",
+        "--lines", lines_json,
+        "--email", email,
+        "--max-age", str(max_age_sec)
+    ]
+    res = run_core_command(args)
+    if isinstance(res, dict) and res.get("ip"):
+        return res["ip"].strip()
+    return None
+

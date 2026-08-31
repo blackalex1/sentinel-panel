@@ -160,7 +160,7 @@ def restart_singbox(force_generate: bool = True) -> bool:
     return start_singbox(force_generate=force_generate)
 
 def get_singbox_logs(lines_count: int = 100) -> list[str]:
-    """Считывает последние строки логов sing-box из оперативной памяти через sentinel-core ring buffer (zero disk IO)."""
+    """Считывает последние строки логов sing-box исключительно из оперативной памяти через sentinel-core ring buffer (zero disk IO)."""
     try:
         from backend.sentinel_core_bridge import get_in_memory_core_logs
         mem_lines = get_in_memory_core_logs("sing-box", lines_count)
@@ -168,14 +168,6 @@ def get_singbox_logs(lines_count: int = 100) -> list[str]:
             return [line.strip() for line in mem_lines]
     except Exception as e:
         logging.debug(f"Failed to read in-memory sing-box logs: {e}")
-
-    if SINGBOX_LOG_PATH.exists():
-        try:
-            with open(SINGBOX_LOG_PATH, "r", encoding="utf-8", errors="ignore") as f:
-                lines = f.readlines()
-                return [line.strip() for line in lines[-lines_count:]]
-        except Exception:
-            pass
     return []
 
 def get_singbox_client_traffic_stats() -> dict:

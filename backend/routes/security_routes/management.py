@@ -8,10 +8,11 @@ from sqlalchemy import func
 from backend.auth_utils import check_auth, decoy_response
 from backend.database import db_session
 from backend.models import ClientStats, Inbound, ClientTrafficDaily
-from backend.routes.security_routes.log_parsers import (
-    find_email_in_hysteria_log,
+from backend.sentinel_core_bridge import (
+    get_in_memory_core_logs,
+    find_hysteria_client_email,
     find_client_ip_for_email_in_hysteria_log,
-    find_email_and_ip_in_xray_log
+    find_xray_client_email,
 )
 
 router = APIRouter()
@@ -26,17 +27,22 @@ async def client_by_connection(
     if not check_auth(request):
         return decoy_response()
         
-    email = find_email_in_hysteria_log(dst_ip, port)
-    if email:
-        real_client_ip = find_client_ip_for_email_in_hysteria_log(email)
-        return {"success": True, "email": email, "source": "hysteria", "client_ip": real_client_ip}
-        
-    res = find_email_and_ip_in_xray_log(client_ip, dst_ip, port)
-    if res:
-        found_email, found_ip = res
-        return {"success": True, "email": found_email, "source": "xray", "client_ip": found_ip}
-        
-    return {"success": False, "msg": "Client not found in logs"}
+    # 1. Hysteria 2: query in-memory core logs
+    hys_lines = get_in_memory_core_logs("hysteria", 500)
+    if hys_lines:
+        email = find_hysteria_client_email(hys_lines, dst_ip, port)
+        if email:
+            real_client_ip = find_client_ip_for_email_in_hysteria_log(hys_lines, email)
+            return {"success": True, "email": email, "source": "hysteria", "client_ip": real_client_ip}
+
+    # 2. Xray & Sing-box: query in-memory core logs
+    xray_lines = get_in_memory_core_logs("xray", 500) + get_in_memory_core_logs("sing-box", 500)
+    if xray_lines:
+        found_email, found_ip, _ = find_xray_client_email(xray_lines, dst_ip, port, client_ip)
+        if found_email:
+            return {"success": True, "email": found_email, "source": "xray", "client_ip": found_ip}
+
+    return {"success": False, "msg": "Client not found in in-memory logs"}
 
 @router.get("/api/security/search-client")
 async def search_client(request: Request, key: str = Query("")):
