@@ -17,7 +17,7 @@ from pathlib import Path
 import pytest
 from httpx import AsyncClient, ASGITransport
 
-from backend.config import settings, SINGBOX_BIN_PATH, XRAY_BIN_PATH
+from backend.config import settings, SINGBOX_BIN_PATH, XRAY_BIN_PATH, HYSTERIA_BIN_PATH
 from backend.main import app, sync_session_events_loop
 from backend.database import db_session, Base, engine, Inbound, ClientStats
 from backend.models import AuditLog
@@ -433,3 +433,178 @@ async def test_e2e_real_xray_binary_traffic_and_untrusted_ip_audit_log(tmp_path)
             client_proc.terminate()
             client_proc.wait()
         stop_core("xray")
+
+
+@pytest.mark.asyncio
+async def test_e2e_real_hysteria_binary_traffic_and_untrusted_ip_audit_log(tmp_path):
+    """
+    1. Configures a real Hysteria 2 server with userpass auth and user 'charlie_hy_user'.
+    2. Whitelist in DB is set to '198.51.100.77' (RFC 5737 TEST-NET-2), so '127.0.0.1' is UNTRUSTED.
+    3. Starts real hysteria.exe server via sentinel-core ProcessManager.
+    4. Starts real sing-box.exe client configured with hysteria2 outbound and triggers real authenticated connection.
+    5. Verifies Sentinel-Core captures the real connection from stdout and registers the session.
+    6. Verifies Panel AuditLog records the event and flags the IP as untrusted.
+    """
+    if not HYSTERIA_BIN_PATH.exists() or not SINGBOX_BIN_PATH.exists():
+        pytest.skip("hysteria or sing-box binary not found, skipping real Hysteria e2e test")
+
+    user_email = "charlie_hy_user"
+    user_password = "hy_password_secure_456"
+    allowed_whitelist = "198.51.100.77"
+    server_port = get_free_port()
+
+    # 1. Setup client in Panel DB with whitelist
+    with db_session() as session:
+        inbound = Inbound(
+            remark="Real-Hysteria-Inbound",
+            port=server_port,
+            protocol="hysteria2",
+            core="hysteria",
+            enable=1
+        )
+        session.add(inbound)
+        session.commit()
+        session.refresh(inbound)
+
+        client = ClientStats(
+            inbound_id=inbound.id,
+            email=user_email,
+            client_uuid_or_pwd=user_password,
+            enable=1,
+            allowed_ips=allowed_whitelist
+        )
+        session.add(client)
+        session.commit()
+
+    # 2. Write real Hysteria 2 server config
+    cert_path = str(Path(HYSTERIA_BIN_PATH.parent / "hysteria.crt").resolve())
+    key_path = str(Path(HYSTERIA_BIN_PATH.parent / "hysteria.key").resolve())
+
+    server_config = {
+        "listen": f"127.0.0.1:{server_port}",
+        "tls": {
+            "cert": cert_path,
+            "key": key_path
+        },
+        "auth": {
+            "type": "userpass",
+            "userpass": {
+                user_email: user_password
+            }
+        }
+    }
+    server_cfg_file = tmp_path / "hy2_server.json"
+    server_cfg_file.write_text(json.dumps(server_config, indent=2), encoding="utf-8")
+
+    # 3. Start real Hysteria 2 server via sentinel-core
+    assert start_core("hysteria", str(HYSTERIA_BIN_PATH), str(server_cfg_file)) is True
+    await asyncio.sleep(0.4)
+
+    client_proc = None
+    try:
+        # 4. Write client config (using sing-box as client to Hysteria 2 server)
+        client_port = get_free_port()
+        client_config = {
+            "log": {
+                "level": "warn",
+                "timestamp": True
+            },
+            "inbounds": [
+                {
+                    "type": "mixed",
+                    "tag": "mixed-in",
+                    "listen": "127.0.0.1",
+                    "listen_port": client_port
+                }
+            ],
+            "outbounds": [
+                {
+                    "type": "hysteria2",
+                    "tag": "hy2-out",
+                    "server": "127.0.0.1",
+                    "server_port": server_port,
+                    "password": f"{user_email}:{user_password}",
+                    "tls": {
+                        "enabled": True,
+                        "insecure": True
+                    }
+                }
+            ]
+        }
+        client_cfg_file = tmp_path / "hy2_client.json"
+        client_cfg_file.write_text(json.dumps(client_config, indent=2), encoding="utf-8")
+
+        client_proc = subprocess.Popen(
+            [str(SINGBOX_BIN_PATH), "run", "-c", str(client_cfg_file)],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.PIPE
+        )
+        await asyncio.sleep(0.4)
+
+        # 5. Trigger real proxy connection through the client
+        async with AsyncClient(proxy=f"http://127.0.0.1:{client_port}", timeout=2.0) as tunnel_client:
+            try:
+                await tunnel_client.get("http://example.com:80")
+            except Exception:
+                pass
+
+        # 6. Verify Sentinel Core captured the real Hysteria session
+        matched = False
+        for _ in range(30):
+            sessions = get_active_sessions()
+            for s in sessions:
+                if s.get("email") == user_email and s.get("core") in ("hysteria", "hysteria2"):
+                    matched = True
+                    assert s.get("ip") == "127.0.0.1"
+                    break
+            if matched:
+                break
+            await asyncio.sleep(0.1)
+
+        assert matched is True, f"Sentinel Core did not track Hysteria session. Logs: {get_in_memory_core_logs('hysteria', 20)}"
+
+        # 7. Record connection to Panel AuditLog
+        from backend.audit import log_action
+        log_action(
+            username="system",
+            action="hysteria2_connect",
+            target="127.0.0.1",
+            details=json.dumps({"username": user_email, "tx": 0, "rx": 0})
+        )
+
+        # 8. Verify Security Alert untrusted IP evaluation
+        with db_session() as session:
+            db_client = session.query(ClientStats).filter_by(email=user_email).first()
+            assert db_client is not None
+            assert db_client.allowed_ips == allowed_whitelist
+
+            db_logs = session.query(AuditLog).order_by(AuditLog.timestamp.desc()).all()
+            logs_list = [{
+                "timestamp": l.timestamp,
+                "username": l.username,
+                "action": l.action,
+                "target": l.target,
+                "details": l.details
+            } for l in db_logs]
+
+            is_untrusted, history = check_new_ip_and_get_history(
+                user_email, "127.0.0.1", int(time.time()), logs_list, allowed_ips=db_client.allowed_ips
+            )
+            assert is_untrusted is True, "Expected 127.0.0.1 to be flagged as UNTRUSTED against whitelist"
+
+        # 9. Verify via Panel API /api/security/audit-logs
+        headers = {"Authorization": f"Bearer {settings.API_TOKEN}"}
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="https://testserver") as client_api:
+            res = await client_api.get("/api/security/audit-logs?limit=50", headers=headers)
+            assert res.status_code == 200
+            data = res.json()
+            assert data["success"] is True
+            audit_actions = [l["action"] for l in data["logs"]]
+            assert "hysteria2_connect" in audit_actions
+
+    finally:
+        if client_proc:
+            client_proc.terminate()
+            client_proc.wait()
+        stop_core("hysteria")
