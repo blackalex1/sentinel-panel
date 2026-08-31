@@ -176,21 +176,29 @@ async def auto_investigate_and_resolve(dst_ip: Optional[str], dst_port: int) -> 
     """
     logging.info(f"[Node Agent] Running auto-investigation for connection {dst_ip}:{dst_port}...")
     
-    # Import log parsers from panel's security router
-    from backend.routes.security import find_email_in_hysteria_log, find_email_in_xray_log
+    from backend.sentinel_core_bridge import (
+        get_in_memory_core_logs,
+        find_hysteria_client_email,
+        find_xray_client_email,
+    )
     
     email = None
     
     # Try finding in Hysteria 2 log first
     try:
-        email = find_email_in_hysteria_log(dst_ip, dst_port)
+        hys_lines = get_in_memory_core_logs("hysteria", 500)
+        if hys_lines:
+            email = find_hysteria_client_email(hys_lines, dst_ip, dst_port)
     except Exception as e:
         logging.error(f"[Node Agent] Error reading Hysteria log: {e}")
         
     # If not found, try Xray log
     if not email:
         try:
-            email = find_email_in_xray_log(None, dst_ip, dst_port)
+            xray_lines = get_in_memory_core_logs("xray", 500) + get_in_memory_core_logs("sing-box", 500)
+            if xray_lines:
+                found_email, _, _ = find_xray_client_email(xray_lines, dst_ip, dst_port)
+                email = found_email
         except Exception as e:
             logging.error(f"[Node Agent] Error reading Xray log: {e}")
             

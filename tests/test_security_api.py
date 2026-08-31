@@ -119,23 +119,19 @@ def test_security_search_client_and_disable(client):
         assert c_db.enable == 1
         assert c_db.block_reason is None
 
-def test_security_client_by_connection_hysteria(client, tmp_path, monkeypatch):
+def test_security_client_by_connection_hysteria(client, monkeypatch):
     """
-    Проверка поиска клиента по соединению в логах Hysteria.
+    Проверка поиска клиента по соединению в логах Hysteria через sentinel-core bridge.
     """
+    import datetime
     headers = {"Authorization": "Bearer test_bearer_token"}
+    now_iso = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     
-    # 1. Записываем тестовые логи Hysteria
-    log_file = tmp_path / "hysteria.log"
-    log_content = (
-        '2026-06-07T00:30:00Z\tinfo\t[socks5] tcp request\t{"client": "1.2.3.4:5678", "auth": "tunnel_user@example.com", "req": "185.112.14.3:22"}\n'
-    )
-    log_file.write_text(log_content)
+    log_content = [
+        f'{now_iso}\tinfo\t[socks5] tcp request\t{{"client": "1.2.3.4:5678", "auth": "tunnel_user@example.com", "req": "185.112.14.3:22"}}\n'
+    ]
+    monkeypatch.setattr("backend.routes.security_routes.management.get_in_memory_core_logs", lambda core, limit: log_content if core == "hysteria" else [])
     
-    # Мокаем путь к логам Hysteria в конфигурации
-    monkeypatch.setattr("backend.routes.security.HYSTERIA_LOG_PATH", log_file)
-    
-    # 2. Вызываем эндпоинт поиска
     response = client.get("/api/security/client-by-connection?dst_ip=185.112.14.3&port=22", headers=headers)
     assert response.status_code == 200
     data = response.json()
@@ -144,24 +140,20 @@ def test_security_client_by_connection_hysteria(client, tmp_path, monkeypatch):
     assert data["source"] == "hysteria"
 
 
-def test_security_client_by_connection_hysteria_v2(client, tmp_path, monkeypatch):
+def test_security_client_by_connection_hysteria_v2(client, monkeypatch):
     """
-    Проверка поиска клиента по соединению в логах Hysteria 2 (новый формат с id и reqAddr, а также без года).
+    Проверка поиска клиента по соединению в логах Hysteria 2 (новый формат с id и reqAddr).
     """
+    import datetime
     headers = {"Authorization": "Bearer test_bearer_token"}
+    now_iso = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     
-    # 1. Записываем тестовые логи Hysteria в новом формате
-    log_file = tmp_path / "hysteria.log"
-    log_content = (
-        '06-16T15:17:38Z DEBUG\tTCP request\t{"addr": "198.51.100.42:47534", "id": "test_hysteria_v2_user@vpn.net", "reqAddr": "mtalk.google.com:5228"}\n'
-        '[Hysteria] 2026-06-16T15:17:45Z DEBUG\tTCP request\t{"addr": "198.51.100.42:47534", "id": "test_hysteria_v2_user@vpn.net", "reqAddr": "203.0.113.84:22"}\n'
-    )
-    log_file.write_text(log_content)
+    log_content = [
+        f'{now_iso} DEBUG\tTCP request\t{{"addr": "198.51.100.42:47534", "id": "test_hysteria_v2_user@vpn.net", "reqAddr": "mtalk.google.com:5228"}}\n',
+        f'[Hysteria] {now_iso} DEBUG\tTCP request\t{{"addr": "198.51.100.42:47534", "id": "test_hysteria_v2_user@vpn.net", "reqAddr": "203.0.113.84:22"}}\n'
+    ]
+    monkeypatch.setattr("backend.routes.security_routes.management.get_in_memory_core_logs", lambda core, limit: log_content if core == "hysteria" else [])
     
-    # Мокаем путь к логам Hysteria в конфигурации
-    monkeypatch.setattr("backend.routes.security.HYSTERIA_LOG_PATH", log_file)
-    
-    # 2. Вызываем эндпоинт поиска
     response = client.get("/api/security/client-by-connection?dst_ip=203.0.113.84&port=22", headers=headers)
     assert response.status_code == 200
     data = response.json()

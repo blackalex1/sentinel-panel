@@ -225,8 +225,8 @@ def test_node_agent_bootstrap_and_autoban(client, monkeypatch):
     
     # 4. Test Auto-Investigation Mock Flow
     # Add a mock connection in log parsers
-    monkeypatch.setattr("backend.routes.security.find_email_in_hysteria_log", lambda ip, port: "malicious_user@vpn.net")
-    monkeypatch.setattr("backend.routes.security.find_email_in_xray_log", lambda client_ip, ip, port: "malicious_user@vpn.net")
+    monkeypatch.setattr("backend.sentinel_core_bridge.find_hysteria_client_email", lambda lines, ip, port, max_age_sec=300: "malicious_user@vpn.net")
+    monkeypatch.setattr("backend.sentinel_core_bridge.find_xray_client_email", lambda lines, dst_ip, port, client_ip=None, max_age_sec=300: ("malicious_user@vpn.net", "198.51.100.22", "inbound-0"))
     
     # Setup client in local DB to verify local block
     with db_session() as session:
