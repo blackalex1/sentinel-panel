@@ -153,3 +153,71 @@ async def test_singbox_concurrent_google_traffic_simulation(client, monkeypatch)
     assert "203.0.113.123" in targets
 
 
+@pytest.mark.anyio
+async def test_singbox_vless_github_download_session_stability_no_spam(client, monkeypatch):
+    """Simulates 50+ rapid VLESS streams during a GitHub file download and verifies that exactly 1 connect event is created and NO log spam occurs."""
+    import backend.routes.security_routes.bans
+    monkeypatch.setattr(backend.routes.security_routes.bans, "check_auth", lambda r: True)
+
+    with db_session() as session:
+        session.query(AuditLog).delete()
+
+    # 1. 50 parallel VLESS connections to download from GitHub & query Google DNS
+    client_ip = "198.51.100.77"
+    user_email = "github_downloader"
+    github_dest_ip = "140.82.121.4"
+    dns_dest_ip = "8.8.8.8"
+    cdn_dest_ip = "185.199.108.133"
+
+    mock_events = [
+        {"timestamp": int(time.time()), "action": "connect", "core": "sing-box", "email": user_email, "ip": client_ip}
+    ]
+    monkeypatch.setattr("backend.sentinel_core_bridge.get_recent_session_events", lambda since, limit: mock_events)
+    monkeypatch.setattr("backend.sentinel_core_bridge.traffic_sessions.get_recent_session_events", lambda since, limit: mock_events)
+
+    from backend.sentinel_core_bridge import get_recent_session_events
+    events = get_recent_session_events(0, 100)
+    assert len(events) == 1
+    assert events[0]["email"] == user_email
+    assert events[0]["ip"] == client_ip
+
+    # 2. Simulate 3 cycles of sync_session_events_loop with the same active user downloading chunks
+    from backend.audit import log_action
+    seen_events = set()
+    reconciled_active = set()
+
+    for cycle in range(3):
+        for ev in events:
+            ev_ts = ev.get("timestamp", 0)
+            action_type = ev.get("action")
+            core_name = str(ev.get("core", "singbox")).replace("-", "")
+            action = f"{core_name}_{action_type}"
+            email = ev.get("email")
+            ip = ev.get("ip")
+            ev_key = (core_name, action_type, email, ip, ev_ts)
+
+            if ev_key not in seen_events:
+                seen_events.add(ev_key)
+                log_action(
+                    username="system",
+                    action=action,
+                    target=ip,
+                    details=json.dumps({"username": email, "tx": 100000 * (cycle + 1), "rx": 5000000 * (cycle + 1)}, ensure_ascii=False)
+                )
+
+    # 3. Verify that exactly ONE AuditLog entry was recorded (NO spam on subsequent chunks)
+    with db_session() as session:
+        all_logs = session.query(AuditLog).all()
+        assert len(all_logs) == 1
+        log_entry = all_logs[0]
+        assert log_entry.action == "singbox_connect"
+        assert log_entry.target == client_ip
+
+        # Ensure destination IPs were NEVER recorded as targets
+        forbidden = [github_dest_ip, dns_dest_ip, cdn_dest_ip]
+        for f_ip in forbidden:
+            count = session.query(AuditLog).filter_by(target=f_ip).count()
+            assert count == 0, f"Destination IP {f_ip} was mistakenly recorded in AuditLog!"
+
+
+
