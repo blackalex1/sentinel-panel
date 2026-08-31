@@ -154,7 +154,9 @@ def find_client_ip_for_email_in_hysteria_log(
         "--max-age", str(max_age_sec)
     ]
     res = run_core_command(args)
-    if isinstance(res, dict) and res.get("ip"):
-        return res["ip"].strip()
+    if isinstance(res, dict):
+        found_ip = (res.get("ip") or res.get("client_ip") or "").strip()
+        if found_ip:
+            return found_ip
     return None
 
