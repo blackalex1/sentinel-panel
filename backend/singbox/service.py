@@ -191,183 +191,73 @@ def get_singbox_client_traffic_stats() -> dict:
         logging.debug(f"Failed to query Sing-box traffic stats: {e}")
         return {}
 
-def _process_singbox_connection_data(data: dict):
-    """
-    Обрабатывает JSON структуру соединений Sing-box
-    и начисляет дельты трафика в ClientStats и Inbound.
-    """
-    global _last_singbox_conn_stats
-    if not isinstance(data, dict):
-        return
-
-    from backend.database import update_client_traffic_by_email, update_inbound_traffic
-
-    connections = data.get("connections", [])
-    active_conn_ids = set()
-    now_ts = time.time()
-
-    for conn in connections:
-        conn_id = str(conn.get("id") or "")
-        if not conn_id:
-            continue
-
-        active_conn_ids.add(conn_id)
-        metadata = conn.get("metadata", {})
-        user = (
-            metadata.get("user")
-            or metadata.get("username")
-            or metadata.get("client")
-            or metadata.get("name")
-            or metadata.get("email")
-            or metadata.get("clientUser")
-            or metadata.get("inboundUser")
-            or metadata.get("auth_user")
-            or conn.get("user")
-            or conn.get("username")
-            or conn.get("client")
-            or conn.get("name")
-            or conn.get("email")
-            or conn.get("clientUser")
-            or conn.get("inboundUser")
-            or conn.get("auth_user")
-            or ""
-        )
-
-        download = int(conn.get("download", 0))
-        upload = int(conn.get("upload", 0))
-
-        prev_up, prev_down = _last_singbox_conn_stats.get(conn_id, (0, 0))
-
-        up_delta = upload - prev_up if upload >= prev_up else upload
-        down_delta = download - prev_down if download >= prev_down else download
-
-        _last_singbox_conn_stats[conn_id] = (upload, download)
-
-        inbound_tag = (
-            metadata.get("inboundName")
-            or metadata.get("inboundTag")
-            or metadata.get("inbound")
-            or metadata.get("type", "")
-            or ""
-        )
-        ib_id = None
-        if "inbound-" in inbound_tag:
-            try:
-                ib_part = inbound_tag[inbound_tag.find("inbound-") + 8:].split("/")[0].split("-")[0]
-                ib_id = int(ib_part)
-            except (ValueError, IndexError):
-                pass
-
-        if user:
-            user = str(user).strip("[]").strip()
-        elif ib_id is not None:
-            try:
-                from backend.database import get_clients_for_inbound
-                ib_clients = get_clients_for_inbound(ib_id)
-                active_ib_clients = [c for c in ib_clients if c.get("enable", True)]
-                if len(active_ib_clients) == 1:
-                    user = active_ib_clients[0]["email"]
-                elif len(ib_clients) == 1:
-                    user = ib_clients[0]["email"]
-            except Exception:
-                pass
-
-        # Обновляем ACTIVE_IP_CACHE для отслеживания онлайна и лимитов IP
-        if user:
-            src_ip = (
-                metadata.get("sourceIP")
-                or metadata.get("source_ip")
-                or metadata.get("clientIP")
-                or conn.get("sourceIP")
-                or conn.get("source_ip")
-                or "127.0.0.1"
-            )
-            try:
-                from backend.scheduler_jobs.limits import ACTIVE_IP_CACHE
-                if user not in ACTIVE_IP_CACHE:
-                    ACTIVE_IP_CACHE[user] = {}
-                ACTIVE_IP_CACHE[user][src_ip] = now_ts
-
-                if src_ip and src_ip != "127.0.0.1":
-                    from backend.sentinel_core_bridge import register_external_connect
-                    register_external_connect("sing-box", user, src_ip)
-            except Exception:
-                pass
-
-        if up_delta > 0 or down_delta > 0:
-            if user:
-                from backend.database import update_client_traffic
-                updated_client = False
-                if ib_id is not None:
-                    updated_client = update_client_traffic(ib_id, user, up_delta, down_delta)
-                if not updated_client:
-                    update_client_traffic_by_email(user, up_delta, down_delta)
-
-            if ib_id is not None:
-                update_inbound_traffic(ib_id, up_delta, down_delta)
-
-            outbound_tag = (
-                conn.get("outbound")
-                or conn.get("outboundName")
-                or metadata.get("outbound")
-                or metadata.get("outboundName")
-                or (isinstance(conn.get("chains"), list) and conn.get("chains") and conn.get("chains")[0])
-                or ""
-            )
-            if outbound_tag:
-                try:
-                    from backend.database import update_outbound_traffic
-                    update_outbound_traffic(outbound_tag, up_delta, down_delta)
-                except Exception:
-                    pass
-
-    # Удаляем завершенные соединения из кэша
-    stale_ids = set(_last_singbox_conn_stats.keys()) - active_conn_ids
-    for s_id in stale_ids:
-        del _last_singbox_conn_stats[s_id]
-
 def query_singbox_traffic():
     """
-    Считывает трафик Sing-box через C-FFI sentinel-core bridge
-    и начисляет точные дельты трафика и статус онлайн в реальном времени.
+    Считывает трафик и сессии Sing-box исключительно через sentinel-core bridge (Go FFI).
+    Обновляет статистику трафика в БД и кэш активных IP.
+    Вся логика парсинга делегирована ядру sentinel-core.
     """
     if not is_singbox_running():
         return
 
     try:
-        from backend.sentinel_core_bridge import get_unified_traffic
-        traffic_data = get_unified_traffic()
-        if not traffic_data or not isinstance(traffic_data, dict):
-            return
-
+        from backend.sentinel_core_bridge.traffic_sessions import (
+            get_unified_traffic,
+            get_active_sessions,
+            register_external_connect,
+        )
         from backend.database import update_client_traffic_by_email, get_all_inbounds, update_inbound_traffic
-        inbounds = get_all_inbounds()
-        singbox_inbounds = [ib for ib in inbounds if ib.get("core") == "singbox" and ib.get("enable")]
+
         now_ts = time.time()
 
-        for email, stats in traffic_data.items():
+        # ── 1. Трафик per-email из sentinel-core ──────────────────────────────
+        traffic_data = get_unified_traffic()
+        inbounds = get_all_inbounds()
+        singbox_inbounds = [ib for ib in inbounds if ib.get("core") == "singbox" and ib.get("enable")]
+
+        for email, stats in (traffic_data or {}).items():
             if not isinstance(stats, dict):
                 continue
-            up = int(stats.get("upBytes", 0))
-            down = int(stats.get("downBytes", 0))
+            up = int(stats.get("upBytes", 0) or stats.get("up", 0) or 0)
+            down = int(stats.get("downBytes", 0) or stats.get("down", 0) or 0)
 
             prev_up, prev_down = _last_singbox_conn_stats.get(email, (0, 0))
             up_delta = up - prev_up if up >= prev_up else up
             down_delta = down - prev_down if down >= prev_down else down
             _last_singbox_conn_stats[email] = (up, down)
 
-            if stats.get("online") or stats.get("connections", 0) > 0:
-                try:
-                    from backend.scheduler_jobs.limits import ACTIVE_IP_CACHE
-                    if email not in ACTIVE_IP_CACHE:
-                        ACTIVE_IP_CACHE[email] = {}
-                    ACTIVE_IP_CACHE[email]["127.0.0.1"] = now_ts
-                except Exception:
-                    pass
-
             if up_delta > 0 or down_delta > 0:
                 update_client_traffic_by_email(email, up_delta, down_delta)
                 for ib in singbox_inbounds:
                     update_inbound_traffic(ib["id"], up_delta, down_delta)
+
+        # ── 2. Активные сессии — реальные IP из session tracker ───────────────
+        # sentinel-core заполняет сессионный трекер из лог-строк sing-box через
+        # двухстадийный парсер (Stage1 = from IP, Stage2 = [user] in "to" строке).
+        sessions = get_active_sessions()
+        for session in sessions:
+            if not isinstance(session, dict):
+                continue
+            core = session.get("core", "")
+            if "sing" not in core.lower():
+                continue
+            email = session.get("email", "")
+            ip = session.get("ip", "")
+            if not email or not ip or ip in ("127.0.0.1", "::1", ""):
+                continue
+
+            # Обновляем кэш активных IP для проверки лимитов
+            try:
+                from backend.scheduler_jobs.limits import ACTIVE_IP_CACHE
+                if email not in ACTIVE_IP_CACHE:
+                    ACTIVE_IP_CACHE[email] = {}
+                ACTIVE_IP_CACHE[email][ip] = now_ts
+            except Exception:
+                pass
+
+            # Регистрируем соединение в session tracker ядра (идемпотентно)
+            register_external_connect("sing-box", email, ip)
+
     except Exception as e:
-        logging.debug(f"Failed to query Sing-box traffic via sentinel-core: {e}")
+        logging.debug("Failed to query Sing-box traffic via sentinel-core: %s", e)
+

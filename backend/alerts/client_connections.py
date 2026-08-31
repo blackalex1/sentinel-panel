@@ -124,7 +124,8 @@ def check_new_ip_and_get_history(username, current_ip, current_timestamp, logs, 
                 break
                 
     if not conns:
-        return False, []
+        # No prior connection history — this IP is definitely new.
+        return True, []
         
     prev_ips = {c["ip"] for c in conns}
     is_new_ip = current_ip not in prev_ips

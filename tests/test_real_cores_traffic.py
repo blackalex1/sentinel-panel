@@ -102,39 +102,32 @@ def test_real_cores_traffic_accounting_and_dashboard_aggregation(client, monkeyp
 
     # -------------------------------------------------------------
     # 3. SIMULATE TRAFFIC FOR SING-BOX (WITH CLOSED CONNECTIONS)
+    # _process_singbox_connection_data removed; sentinel-core (Go) handles
+    # all Clash API parsing. query_singbox_traffic() reads cumulative totals
+    # from SentinelGetUnifiedTraffic and calculates deltas in Python.
     # -------------------------------------------------------------
     monkeypatch.setattr("backend.singbox.service.is_singbox_running", lambda: True)
+    from backend.singbox.service import _last_singbox_conn_stats
+    _last_singbox_conn_stats.clear()
 
-    # Phase 1: Connection 1 open (200 MB down, 20 MB up)
-    from backend.singbox.service import _process_singbox_connection_data
-    sb_data_1 = {
-        "connections": [
-            {
-                "id": "sb-conn-1",
-                "metadata": {"user": email_singbox, "inboundName": f"inbound-{ib_singbox_id}"},
-                "download": 200 * 1024 * 1024,
-                "upload": 20 * 1024 * 1024
-            }
-        ]
-    }
-    _process_singbox_connection_data(sb_data_1)
+    # Phase 1: sentinel-core reports cumulative 200 MB down, 20 MB up
+    with patch("backend.sentinel_core_bridge.traffic_sessions.get_unified_traffic",
+               return_value={email_singbox: {"downBytes": 200 * 1024 * 1024, "upBytes": 20 * 1024 * 1024}}), \
+         patch("backend.sentinel_core_bridge.traffic_sessions.get_active_sessions", return_value=[]), \
+         patch("backend.sentinel_core_bridge.traffic_sessions.register_external_connect"):
+        query_singbox_traffic()
 
-    # Phase 2: Connection 1 CLOSED, Connection 2 open (100 MB down, 10 MB up)
-    sb_data_2 = {
-        "connections": [
-            {
-                "id": "sb-conn-2",
-                "metadata": {"user": email_singbox, "inboundName": f"inbound-{ib_singbox_id}"},
-                "download": 100 * 1024 * 1024,
-                "upload": 10 * 1024 * 1024
-            }
-        ]
-    }
-    _process_singbox_connection_data(sb_data_2)
+    # Phase 2: old connection closed, new one opens — cumulative resets to 100 MB
+    # (sentinel-core resets counters when connections drop, Python treats as new delta)
+    with patch("backend.sentinel_core_bridge.traffic_sessions.get_unified_traffic",
+               return_value={email_singbox: {"downBytes": 100 * 1024 * 1024, "upBytes": 10 * 1024 * 1024}}), \
+         patch("backend.sentinel_core_bridge.traffic_sessions.get_active_sessions", return_value=[]), \
+         patch("backend.sentinel_core_bridge.traffic_sessions.register_external_connect"):
+        query_singbox_traffic()
 
     with db_session() as session:
         s_rec = session.query(ClientStats).filter_by(email=email_singbox).first()
-        # Sing-box total should be 200MB (conn 1) + 100MB (conn 2) = 300MB down, 30MB up!
+        # Total: 200 MB (phase 1) + 100 MB (phase 2, counter wrap = new delta) = 300 MB
         assert s_rec.down == 300 * 1024 * 1024, f"Singbox down expected 300MB, got {s_rec.down}"
         assert s_rec.up == 30 * 1024 * 1024, f"Singbox up expected 30MB, got {s_rec.up}"
 
