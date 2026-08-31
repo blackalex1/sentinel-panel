@@ -162,12 +162,12 @@ async def test_singbox_vless_github_download_session_stability_no_spam(client, m
     with db_session() as session:
         session.query(AuditLog).delete()
 
-    # 1. 50 parallel VLESS connections to download from GitHub & query Google DNS
+    # 1. 50 parallel VLESS connections to download from simulated remote endpoints & query DNS
     client_ip = "198.51.100.77"
-    user_email = "github_downloader"
-    github_dest_ip = "140.82.121.4"
-    dns_dest_ip = "8.8.8.8"
-    cdn_dest_ip = "185.199.108.133"
+    user_email = "test_downloader"
+    service_dest_ip = "192.0.2.100"
+    dns_dest_ip = "192.0.2.53"
+    cdn_dest_ip = "192.0.2.101"
 
     mock_events = [
         {"timestamp": int(time.time()), "action": "connect", "core": "sing-box", "email": user_email, "ip": client_ip}
@@ -214,7 +214,7 @@ async def test_singbox_vless_github_download_session_stability_no_spam(client, m
         assert log_entry.target == client_ip
 
         # Ensure destination IPs were NEVER recorded as targets
-        forbidden = [github_dest_ip, dns_dest_ip, cdn_dest_ip]
+        forbidden = [service_dest_ip, dns_dest_ip, cdn_dest_ip]
         for f_ip in forbidden:
             count = session.query(AuditLog).filter_by(target=f_ip).count()
             assert count == 0, f"Destination IP {f_ip} was mistakenly recorded in AuditLog!"
