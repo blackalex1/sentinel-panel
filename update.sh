@@ -27,16 +27,18 @@ cleanup_updater_processes() {
 }
 trap cleanup_updater_processes EXIT INT TERM HUP
 
-# 2. Configure Git safe directory
+# 2. Configure Git safe directory and non-interactive authentication
 git config --global --add safe.directory "$SCRIPT_DIR" 2>/dev/null || true
 git config --global --add safe.directory "*" 2>/dev/null || true
+export GIT_TERMINAL_PROMPT=0
+export GIT_ASKPASS=""
 
 # 3. Fast bootstrap: auto-update git repository if .git exists
 if [ -z "${BOOTSTRAPPED:-}" ] && [ -d .git ] && command -v git &>/dev/null; then
     OLD_HEAD=$(git rev-parse HEAD 2>/dev/null || true)
     
     # Check for proxy configuration in .env
-    FETCH_ARGS=(-c "safe.directory=*" -c "http.connectTimeout=4" -c "http.timeout=8")
+    FETCH_ARGS=(-c "safe.directory=*" -c "core.askPass=true" -c "credential.helper=" -c "http.connectTimeout=4" -c "http.timeout=8")
     for env_f in "bot/config/.env" "config/.env" ".env"; do
         if [ -f "$env_f" ]; then
             P_URL=$(grep -E '^[[:space:]]*PROXY_URL=' "$env_f" 2>/dev/null | cut -d'=' -f2- | tr -d '"'\'' ')
@@ -50,7 +52,7 @@ if [ -z "${BOOTSTRAPPED:-}" ] && [ -d .git ] && command -v git &>/dev/null; then
     FETCH_OK=0
     if timeout 10 git "${FETCH_ARGS[@]}" fetch origin main 2>/dev/null; then
         FETCH_OK=1
-    elif timeout 10 git -c "safe.directory=*" -c "http.proxy=" -c "https.proxy=" fetch origin main 2>/dev/null; then
+    elif timeout 10 git -c "safe.directory=*" -c "core.askPass=true" -c "credential.helper=" -c "http.proxy=" -c "https.proxy=" fetch origin main 2>/dev/null; then
         FETCH_OK=1
     fi
 

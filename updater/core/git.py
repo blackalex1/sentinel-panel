@@ -65,8 +65,17 @@ class GitManager:
         except Exception:
             pass
 
-        git_env: Dict[str, str] = {}
-        git_config_args: List[str] = ["-c", "safe.directory=*"]
+        git_env: Dict[str, str] = {
+            "GIT_TERMINAL_PROMPT": "0",
+            "GIT_ASKPASS": "",
+        }
+        git_config_args: List[str] = [
+            "-c", "safe.directory=*",
+            "-c", "core.askPass=true",
+            "-c", "credential.helper=",
+            "-c", "http.connectTimeout=4",
+            "-c", "http.timeout=8",
+        ]
         if self.proxy_url:
             proxy_val = self.proxy_url
             if proxy_val.startswith("socks5://"):
