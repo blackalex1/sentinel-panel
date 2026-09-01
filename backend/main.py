@@ -312,6 +312,19 @@ async def decoy_exception_handler(request: Request, exc: DecoyException):
     path = request.url.path.lstrip("/")
     return await handle_decoy_route(request, path)
 
+from fastapi.exceptions import RequestValidationError
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    from backend.auth_utils import check_auth
+    if not check_auth(request):
+        path = request.url.path.lstrip("/")
+        return await handle_decoy_route(request, path)
+    return JSONResponse(
+        status_code=422,
+        content={"detail": exc.errors()}
+    )
+
+
 
 
 # Настройка CORS

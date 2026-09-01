@@ -3,8 +3,7 @@ import logging
 from fastapi import APIRouter, Request
 from backend.database import get_all_inbounds, get_clients_for_inbound, get_setting, set_setting
 import backend.hysteria
-import backend.routes.hysteria
-from backend.auth_utils import decoy_response
+import backend.routes.hysteria as hysteria_facade
 from backend.hysteria import restart_hysteria
 from backend.i18n import t, get_lang
 
@@ -12,8 +11,9 @@ router = APIRouter()
 
 @router.get("/api/hysteria/config")
 async def hysteria_config(request: Request):
-    if not backend.routes.hysteria.check_auth(request):
-        return decoy_response()
+    if not hysteria_facade.check_auth(request):
+        return hysteria_facade.decoy_response()
+
     
     lang = get_lang(request)
     try:
@@ -100,6 +100,7 @@ async def save_hysteria_config(request: Request, payload: dict):
 async def reset_hysteria_config(request: Request, payload: dict = None):
     if not hysteria_facade.check_auth(request):
         return hysteria_facade.decoy_response()
+
         
     payload = payload or {}
     inbound_id = payload.get("inbound_id")
@@ -115,3 +116,4 @@ async def reset_hysteria_config(request: Request, payload: dict = None):
         return {"success": success}
     except Exception as e:
         return {"success": False, "msg": str(e)}
+
