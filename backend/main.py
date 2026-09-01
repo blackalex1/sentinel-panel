@@ -99,9 +99,9 @@ async def sync_session_events_loop():
                         if s_key not in reconciled_active:
                             with db_session() as a_sess:
                                 has_recent = a_sess.query(AuditLog).filter(
-                                    AuditLog.action == action,
+                                    AuditLog.action.in_((f"{core_name}_connect", "singbox_connect", "xray_connect", "hysteria2_connect", "hysteria_connect")),
                                     AuditLog.target == ip,
-                                    AuditLog.timestamp >= int(time.time()) - 30
+                                    AuditLog.timestamp >= int(time.time()) - 60
                                 ).count() > 0
                             if not has_recent:
                                 tx, rx = get_singbox_user_traffic(email) if "sing" in core_name else get_xray_user_traffic(email)
@@ -119,37 +119,6 @@ async def sync_session_events_loop():
             for stale_key in list(reconciled_active):
                 if stale_key not in current_active_keys:
                     reconciled_active.discard(stale_key)
-
-            # 3. Secondary check: ACTIVE_IP_CACHE from Clash API / Xray API
-            try:
-                from backend.scheduler_jobs.limits import ACTIVE_IP_CACHE
-                if ACTIVE_IP_CACHE:
-                    now_sec = int(time.time())
-                    for c_user, c_ip_map in list(ACTIVE_IP_CACHE.items()):
-                        if isinstance(c_ip_map, dict):
-                            for c_ip, c_last_seen in list(c_ip_map.items()):
-                                if c_ip and c_ip != "127.0.0.1" and (now_sec - int(c_last_seen)) < 60:
-                                    s_key = ("singbox", c_user, c_ip)
-                                    if s_key not in reconciled_active:
-                                        with db_session() as a_sess:
-                                            has_audit = a_sess.query(AuditLog).filter(
-                                                AuditLog.target == c_ip,
-                                                AuditLog.action.in_(("singbox_connect", "xray_connect", "hysteria2_connect", "hysteria_connect")),
-                                                AuditLog.timestamp >= now_sec - 30
-                                            ).count() > 0
-                                        if not has_audit:
-                                            tx, rx = get_singbox_user_traffic(c_user)
-                                            details_dict = {"username": c_user, "tx": tx, "rx": rx}
-                                            logging.info(f"[SessionTracker Sync] Reconciled ACTIVE_IP_CACHE in AuditLog: user={c_user}, ip={c_ip}")
-                                            log_action(
-                                                username="system",
-                                                action="singbox_connect",
-                                                target=c_ip,
-                                                details=json.dumps(details_dict, ensure_ascii=False)
-                                            )
-                                        reconciled_active.add(s_key)
-            except Exception as e:
-                logging.debug(f"[SessionTracker Sync] ACTIVE_IP_CACHE check: {e}")
 
         except asyncio.CancelledError:
             logging.info("Session events synchronization task cancelled.")
