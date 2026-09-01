@@ -32,27 +32,37 @@ async def sync_whitelist(payload: WhitelistSyncBody, request: Request):
 
 
 @router.post("/api/security/unban-ip")
-async def unban_ip(request: Request, ip: str = Form(...)):
+async def unban_ip(request: Request, ip: str = Form(None)):
     if not check_auth(request):
         return decoy_response()
         
     lang = get_lang(request)
+    target_ip = ip
+    if not target_ip:
+        try:
+            payload = await request.json()
+            target_ip = payload.get("ip")
+        except Exception:
+            pass
+    if not target_ip:
+        return {"success": False, "msg": t("security_ip_required", lang=lang, category="backend")}
+
     from backend.database import get_setting, set_setting
     
     banned_ips = get_setting("banned_login_ips", "")
     banned_list = [i.strip() for i in banned_ips.split(",") if i.strip()]
-    if ip in banned_list:
-        banned_list.remove(ip)
+    if target_ip in banned_list:
+        banned_list.remove(target_ip)
         set_setting("banned_login_ips", ",".join(banned_list))
         
         # Также пробуем удалить из iptables
         try:
-            subprocess.run(["iptables", "-D", "INPUT", "-s", ip, "-j", "DROP"], capture_output=True)
+            subprocess.run(["iptables", "-D", "INPUT", "-s", target_ip, "-j", "DROP"], capture_output=True)
         except Exception as ex:
             logging.warning(f"Failed to remove IP from iptables: {ex}")
             
-        return {"success": True, "msg": t("security_ip_unbanned", lang=lang, category="backend", ip=ip)}
-    return {"success": False, "msg": t("security_ip_not_in_banned_list", lang=lang, category="backend", ip=ip)}
+        return {"success": True, "msg": t("security_ip_unbanned", lang=lang, category="backend", ip=target_ip)}
+    return {"success": False, "msg": t("security_ip_not_in_banned_list", lang=lang, category="backend", ip=target_ip)}
 
 
 @router.get("/api/security/audit-logs")
@@ -226,10 +236,9 @@ async def unban_client(body: UnbanClientBody, request: Request):
         
     lang = get_lang(request)
     from backend.database import db_session
-    from backend.models import ClientStats
+    from backend.models import ClientStats, Inbound
     from backend.audit import log_action, get_actor_username
-    from backend.xray import restart_xray
-    from backend.hysteria import restart_hysteria
+    from backend.utils.service_restart import restart_services_background
     
     with db_session() as session:
         query = session.query(ClientStats).filter(ClientStats.email == body.email)
@@ -243,15 +252,23 @@ async def unban_client(body: UnbanClientBody, request: Request):
         for cs in clients:
             cs.enable = 1
             cs.block_reason = ""
+            inbound = session.query(Inbound).filter_by(id=cs.inbound_id).first()
+            if inbound:
+                try:
+                    ib_settings = json.loads(inbound.settings or "{}")
+                    ib_clients = ib_settings.get("clients", [])
+                    for sc in ib_clients:
+                        if sc.get("email") == body.email or sc.get("id") == body.email or sc.get("password") == body.email or sc.get("name") == body.email:
+                            sc["enable"] = True
+                            break
+                    inbound.settings = json.dumps(ib_settings)
+                except Exception as e:
+                    logging.error(f"Error updating inbound settings JSON: {e}")
         session.commit()
         
     log_action(get_actor_username(request), "unban_client", target=body.email, details=f"Unbanned via API (inbound_id={body.inbound_id})")
     
-    try:
-        restart_xray()
-        restart_hysteria()
-    except Exception as e:
-        logging.error(f"Error restarting cores after client unban: {e}")
+    restart_services_background(delay=0.5)
         
     return {"success": True, "msg": t("security_client_unbanned_success", lang=lang, category="backend", email=body.email)}
 
