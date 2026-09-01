@@ -76,8 +76,9 @@ def test_investigation_on_real_hysteria_logs():
     """
     Проверяет расследование и атрибуцию нарушителя в логах ядра Hysteria 2 через Go-ядро.
     """
-    now_str = time.strftime("%Y-%m-%dT%H:%M:%SZ")
+    now_str = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
     json_logs = [
+
         json.dumps({
             "time": now_str,
             "level": "debug",

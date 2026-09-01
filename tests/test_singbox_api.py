@@ -174,17 +174,19 @@ def test_singbox_config_generation_with_hysteria_and_rules(monkeypatch):
     rules = config["route"]["rules"]
     assert len(rules) >= 2  # User rule + system API rule
 
-    user_rule = next((r for r in rules if r.get("outbound") == "hysteria2-out"), None)
-    assert user_rule is not None
-    assert user_rule["inbound"] == ["inbound-1"]
-    assert user_rule["user"] == ["test@example.com"]
-    assert "geosite-openai" in user_rule["rule_set"]
-    assert "chatgpt.com" in user_rule["domain"]
-    assert ".*\\.ai" in user_rule["domain_regex"]
-    assert "geoip-us" in user_rule["rule_set"]
-    assert "1.1.1.1/32" in user_rule["ip_cidr"]
-    assert "tcp" in user_rule["network"]
-    assert "bittorrent" in user_rule["protocol"]
+    domain_rule = next((r for r in rules if r.get("outbound") == "hysteria2-out" and "geosite-openai" in r.get("rule_set", [])), None)
+    assert domain_rule is not None
+    assert domain_rule["inbound"] == ["inbound-1"]
+    assert domain_rule["user"] == ["test@example.com"]
+    assert "chatgpt.com" in domain_rule["domain"]
+    assert ".*\\.ai" in domain_rule["domain_regex"]
+    assert "tcp" in domain_rule["network"]
+    assert "bittorrent" in domain_rule["protocol"]
+
+    ip_rule = next((r for r in rules if r.get("outbound") == "hysteria2-out" and "geoip-us" in r.get("rule_set", [])), None)
+    assert ip_rule is not None
+    assert "1.1.1.1/32" in ip_rule["ip_cidr"]
+
 
 
 def test_update_online_emails_singbox(monkeypatch):
