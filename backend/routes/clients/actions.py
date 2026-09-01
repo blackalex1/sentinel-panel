@@ -68,9 +68,10 @@ def update_online_emails():
         from backend.database import db_session
         from backend.models import ClientStats
         with db_session() as session:
-            clients_all = session.query(ClientStats).filter_by(enable=1).all()
-            enabled_emails = {c.email for c in clients_all}
-            uuid_to_email = {c.client_uuid_or_pwd: c.email for c in clients_all if c.client_uuid_or_pwd}
+            clients_all = session.query(ClientStats.email, ClientStats.client_uuid_or_pwd).filter_by(enable=1).all()
+            enabled_emails = {c[0] for c in clients_all if c[0]}
+            uuid_to_email = {c[1]: c[0] for c in clients_all if c[1] and c[0]}
+            clients_pairs = [(c[0], c[1] or "") for c in clients_all if c[0]]
 
         matched_emails = set()
         for em in emails:
@@ -81,12 +82,15 @@ def update_online_emails():
                 matched_emails.add(uuid_to_email[clean_em])
             else:
                 # Case-insensitive / prefix matching
-                for c in clients_all:
-                    if c.email.lower() == clean_em.lower() or (c.client_uuid_or_pwd and c.client_uuid_or_pwd.lower() == clean_em.lower()):
-                        matched_emails.add(c.email)
+                clean_lower = clean_em.lower()
+                for c_email, c_uuid in clients_pairs:
+                    c_email_lower = c_email.lower()
+                    c_uuid_lower = c_uuid.lower()
+                    if c_email_lower == clean_lower or (c_uuid_lower and c_uuid_lower == clean_lower):
+                        matched_emails.add(c_email)
                         break
-                    elif c.email.lower().startswith(f"{clean_em.lower()}@") or clean_em.lower().startswith(f"{c.email.lower()}@"):
-                        matched_emails.add(c.email)
+                    elif c_email_lower.startswith(f"{clean_lower}@") or clean_lower.startswith(f"{c_email_lower}@"):
+                        matched_emails.add(c_email)
                         break
         _online_emails = list(matched_emails)
     except Exception as e:
