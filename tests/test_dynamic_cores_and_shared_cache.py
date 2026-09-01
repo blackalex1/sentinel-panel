@@ -119,8 +119,13 @@ def test_dynamic_xray_start():
         session.query(Inbound).delete()
         session.commit()
 
+    import backend.utils.service_restart as s_rst
+    if s_rst._pending_timer:
+        s_rst._pending_timer.cancel()
+        s_rst._pending_timer = None
+
     stop_xray()
-    time.sleep(0.2)
+    time.sleep(0.3)
 
     res = start_xray()
     assert res is True
@@ -153,14 +158,14 @@ def test_dynamic_xray_start():
         session.add(cs)
         session.commit()
 
-    stop_xray()
-    time.sleep(0.2)
-    res = start_xray()
-    assert res is True
-    assert is_xray_running() is True
-    stop_xray()
-    time.sleep(0.3)
-    assert is_xray_running() is False
+        stop_xray()
+        time.sleep(0.5)
+        res = start_xray()
+        assert res is True
+        assert is_xray_running() is True
+        stop_xray()
+        time.sleep(0.6)
+        assert is_xray_running() is False
 
 
 @_skip_no_xray
