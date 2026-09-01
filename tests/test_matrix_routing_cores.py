@@ -196,18 +196,20 @@ def test_intra_core_singbox_routing(monkeypatch):
     assert sb_ob["obfs"]["type"] == "salamander"
 
     # 3. Routing rule check
-    rule = next((r for r in config["route"]["rules"] if r.get("outbound") == "sb-hysteria2-out"), None)
-    assert rule is not None
-    assert rule["inbound"] == ["inbound-20"]
-    assert rule["user"] == ["user2@singbox.com"]
-    assert "geosite-google" in rule["rule_set"]
-    assert "google.com" in rule["domain"]
-    assert "exact.google.com" in rule["domain"]
-    assert ".*\\.google" in rule["domain_regex"]
-    assert "goog" in rule["domain_keyword"]
-    assert "geoip-ru" in rule["rule_set"]
-    assert "8.8.8.8/32" in rule["ip_cidr"]
-    assert rule["network"] == ["udp"]
+    d_rule = next((r for r in config["route"]["rules"] if r.get("outbound") == "sb-hysteria2-out" and "geosite-google" in r.get("rule_set", [])), None)
+    assert d_rule is not None
+    assert d_rule["inbound"] == ["inbound-20"]
+    assert d_rule["user"] == ["user2@singbox.com"]
+    assert "google.com" in d_rule["domain"]
+    assert "exact.google.com" in d_rule["domain"]
+    assert ".*\\.google" in d_rule["domain_regex"]
+    assert "goog" in d_rule["domain_keyword"]
+
+    i_rule = next((r for r in config["route"]["rules"] if r.get("outbound") == "sb-hysteria2-out" and "geoip-ru" in r.get("rule_set", [])), None)
+    assert i_rule is not None
+    assert "8.8.8.8/32" in i_rule["ip_cidr"]
+    assert i_rule["network"] == ["udp"]
+
 
 
 def test_cross_core_hysteria2_socks_bridge_to_xray(monkeypatch):

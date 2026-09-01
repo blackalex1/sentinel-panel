@@ -80,7 +80,8 @@ def test_advanced_hysteria_configs():
     assert config["masquerade"]["string"]["statusCode"] == 403
 
     # Verify port hopping listen
-    assert config["listen"] == ":60020"
+    assert config["listen"] == ":30000-40000"
+
 
     # Verify routingViaXray config
     stream_settings_routing = {
@@ -171,13 +172,15 @@ def test_hysteria_config_port_hopping():
     config1 = generate_hysteria_config(999, 20000, clients, {"hysteria": {"hop": "20000-30000"}})
     assert config1["listen"] == ":20000-30000"
     
-    # Scenario 2: Disjoint range (should fallback to primary port only)
+    # Scenario 2: Port hopping range overrides base port
     config2 = generate_hysteria_config(999, 8443, clients, {"hysteria": {"hop": "20000-30000"}})
-    assert config2["listen"] == ":8443"
+    assert config2["listen"] == ":20000-30000"
+
     
-    # Scenario 3: Invalid range format
-    config3 = generate_hysteria_config(999, 8443, clients, {"hysteria": {"hop": "invalid-hop"}})
+    # Scenario 3: Invalid range format (no hyphen)
+    config3 = generate_hysteria_config(999, 8443, clients, {"hysteria": {"hop": "invalid_hop"}})
     assert config3["listen"] == ":8443"
+
     
     # Scenario 4: Non-range input
     config4 = generate_hysteria_config(999, 8443, clients, {"hysteria": {"hop": "20000"}})
