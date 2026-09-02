@@ -82,13 +82,13 @@ async def search_client(request: Request, key: str = Query("")):
                 clients = session.query(ClientStats).filter(
                     (ClientStats.email.ilike(f"%{k}%")) | (ClientStats.client_uuid_or_pwd.ilike(f"%{k}%"))
                 ).all()
-            # 3. Match Inbound remark (e.g. if key is inbound remark 'my_double' or 'double_v2')
+            # 3. Match Inbound remark (e.g. if key is inbound remark 'profile_1' or 'inbound_v2')
             if not clients:
                 matching_ibs = session.query(Inbound).filter(Inbound.remark.ilike(f"%{k}%")).all()
                 if matching_ibs:
                     ib_ids = [ib.id for ib in matching_ibs]
                     clients = session.query(ClientStats).filter(ClientStats.inbound_id.in_(ib_ids)).all()
-            # 4. Token prefix matching (e.g. 'my_double' when key is 'my_double_v2' or email format)
+            # 4. Token prefix matching (e.g. 'client_1' when key is 'client_1_v2' or email format)
             if not clients and any(sep in k for sep in ("_", "-", "@", ".")):
                 import re
                 tokens = [t for t in re.split(r"[_@\-\.]", k) if len(t) >= 3]
