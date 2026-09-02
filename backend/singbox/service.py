@@ -193,71 +193,13 @@ def get_singbox_client_traffic_stats() -> dict:
 
 def query_singbox_traffic():
     """
-    Считывает трафик и сессии Sing-box исключительно через sentinel-core bridge (Go FFI).
+    Считывает трафик и сессии Sing-box через sentinel-core bridge.
     Обновляет статистику трафика в БД и кэш активных IP.
-    Вся логика парсинга делегирована ядру sentinel-core.
     """
-    if not is_singbox_running():
-        return
-
     try:
-        from backend.sentinel_core_bridge.traffic_sessions import (
-            get_unified_traffic,
-            get_active_sessions,
-            register_external_connect,
-        )
-        from backend.database import update_client_traffic_by_email, get_all_inbounds, update_inbound_traffic
-
-        now_ts = time.time()
-
-        # ── 1. Трафик per-email из sentinel-core ──────────────────────────────
-        traffic_data = get_unified_traffic()
-        inbounds = get_all_inbounds()
-        singbox_inbounds = [ib for ib in inbounds if ib.get("core") == "singbox" and ib.get("enable")]
-
-        for email, stats in (traffic_data or {}).items():
-            if not isinstance(stats, dict):
-                continue
-            up = int(stats.get("upBytes", 0) or stats.get("up", 0) or 0)
-            down = int(stats.get("downBytes", 0) or stats.get("down", 0) or 0)
-
-            prev_up, prev_down = _last_singbox_conn_stats.get(email, (0, 0))
-            up_delta = up - prev_up if up >= prev_up else up
-            down_delta = down - prev_down if down >= prev_down else down
-            _last_singbox_conn_stats[email] = (up, down)
-
-            if up_delta > 0 or down_delta > 0:
-                update_client_traffic_by_email(email, up_delta, down_delta)
-                for ib in singbox_inbounds:
-                    update_inbound_traffic(ib["id"], up_delta, down_delta)
-
-        # ── 2. Активные сессии — реальные IP из session tracker ───────────────
-        # sentinel-core заполняет сессионный трекер из лог-строк sing-box через
-        # двухстадийный парсер (Stage1 = from IP, Stage2 = [user] in "to" строке).
-        sessions = get_active_sessions()
-        for session in sessions:
-            if not isinstance(session, dict):
-                continue
-            core = session.get("core", "")
-            if "sing" not in core.lower():
-                continue
-            email = session.get("email", "")
-            ip = session.get("ip", "")
-            if not email or not ip or ip in ("127.0.0.1", "::1", ""):
-                continue
-
-            # Обновляем кэш активных IP для проверки лимитов
-            try:
-                from backend.scheduler_jobs.limits import ACTIVE_IP_CACHE
-                if email not in ACTIVE_IP_CACHE:
-                    ACTIVE_IP_CACHE[email] = {}
-                ACTIVE_IP_CACHE[email][ip] = now_ts
-            except Exception:
-                pass
-
-            # Регистрируем соединение в session tracker ядра (идемпотентно)
-            register_external_connect("sing-box", email, ip)
-
+        from backend.sentinel_core_bridge import query_all_cores_traffic
+        query_all_cores_traffic()
     except Exception as e:
         logging.debug("Failed to query Sing-box traffic via sentinel-core: %s", e)
+
 

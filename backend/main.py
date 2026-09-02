@@ -38,7 +38,7 @@ async def sync_session_events_loop():
             await asyncio.sleep(2)
             from backend.sentinel_core_bridge import get_recent_session_events, get_active_sessions
             from backend.audit import log_action
-            from backend.client_alerts import get_singbox_user_traffic, get_xray_user_traffic
+            from backend.client_alerts import get_user_traffic_from_db
             from backend.database import db_session
             from backend.models import AuditLog
 
@@ -72,7 +72,7 @@ async def sync_session_events_loop():
                             ).count()
                             is_dup = dup_count > 0
                         if not is_dup:
-                            tx, rx = get_singbox_user_traffic(email) if "sing" in core_name else get_xray_user_traffic(email)
+                            tx, rx = get_user_traffic_from_db(email)
                             details_dict = {"username": email, "tx": tx, "rx": rx}
                             if action_type == "disconnect":
                                 details_dict["duration"] = ev.get("duration", "несколько секунд")
@@ -104,7 +104,7 @@ async def sync_session_events_loop():
                                     AuditLog.timestamp >= int(time.time()) - 60
                                 ).count() > 0
                             if not has_recent:
-                                tx, rx = get_singbox_user_traffic(email) if "sing" in core_name else get_xray_user_traffic(email)
+                                tx, rx = get_user_traffic_from_db(email)
                                 details_dict = {"username": email, "tx": tx, "rx": rx}
                                 logging.info(f"[SessionTracker Sync] Reconciled active session in AuditLog: action={action}, target={ip}, user={email}")
                                 log_action(
@@ -129,23 +129,20 @@ async def sync_session_events_loop():
 
 async def poll_xray_stats_loop():
     logging.info("Started background traffic statistics polling task.")
+    from backend.sentinel_core_bridge import query_all_cores_traffic
     
     # Fast-probe cores API ready status with 300ms intervals instead of static 5s sleep
     for attempt in range(15):
         await asyncio.sleep(0.3)
         try:
-            await asyncio.to_thread(query_traffic_stats)
-            await asyncio.to_thread(query_hysteria_traffic)
-            await asyncio.to_thread(query_singbox_traffic)
+            await asyncio.to_thread(query_all_cores_traffic)
             break
         except Exception:
             pass
 
     # Run the initial statistics and online check immediately at startup to populate caches
     try:
-        await asyncio.to_thread(query_traffic_stats)
-        await asyncio.to_thread(query_hysteria_traffic)
-        await asyncio.to_thread(query_singbox_traffic)
+        await asyncio.to_thread(query_all_cores_traffic)
         
         from backend.routes.clients import update_online_emails
         await asyncio.to_thread(update_online_emails)
@@ -173,9 +170,7 @@ async def poll_xray_stats_loop():
     while True:
         try:
             await asyncio.sleep(5)
-            await asyncio.to_thread(query_traffic_stats)
-            await asyncio.to_thread(query_hysteria_traffic)
-            await asyncio.to_thread(query_singbox_traffic)
+            await asyncio.to_thread(query_all_cores_traffic)
             
             from backend.routes.clients import update_online_emails
             await asyncio.to_thread(update_online_emails)

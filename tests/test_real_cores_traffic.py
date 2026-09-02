@@ -13,13 +13,16 @@ from backend.singbox.service import query_singbox_traffic, stop_singbox
 from backend.scheduler_jobs.limits import enforce_client_limits_and_rules
 from backend.routes.system.status import global_traffic_api
 from backend.routes.security_routes.management import get_top_traffic
+from backend.sentinel_core_bridge.traffic_sessions import reset_unified_traffic_stats
 
 @pytest.fixture(autouse=True)
 def cleanup_cores():
+    reset_unified_traffic_stats()
     yield
     stop_xray()
     stop_hysteria()
     stop_singbox()
+    reset_unified_traffic_stats()
 
 def test_real_cores_traffic_accounting_and_dashboard_aggregation(client, monkeypatch):
     """
@@ -107,8 +110,7 @@ def test_real_cores_traffic_accounting_and_dashboard_aggregation(client, monkeyp
     # from SentinelGetUnifiedTraffic and calculates deltas in Python.
     # -------------------------------------------------------------
     monkeypatch.setattr("backend.singbox.service.is_singbox_running", lambda: True)
-    from backend.singbox.service import _last_singbox_conn_stats
-    _last_singbox_conn_stats.clear()
+    reset_unified_traffic_stats()
 
     # Phase 1: sentinel-core reports cumulative 200 MB down, 20 MB up
     with patch("backend.sentinel_core_bridge.traffic_sessions.get_unified_traffic",

@@ -158,9 +158,6 @@ async def handle_client_event(action: str, client_ip: str, details_str: str):
     host_ip = await get_server_ip()
     
     protocol = "Xray" if "xray" in action else ("Sing-box" if "sing" in action else "Hysteria")
-    if protocol == "Xray":
-        tx, rx = rx, tx  # Swap: tx becomes client download, rx becomes client upload
-        
     key = (username, protocol)
     card = active_activity_cards.get(key)
     
@@ -314,13 +311,8 @@ async def update_panel_active_cards_traffic():
         if not card.get('admin_messages'):
             continue
             
-        if protocol == "Xray":
-            from backend.client_alerts import get_xray_user_traffic
-            tx, rx = get_xray_user_traffic(username)
-            tx, rx = rx, tx  # Swap: tx becomes client download, rx becomes client upload
-        else:
-            from backend.client_alerts import get_user_traffic_bytes
-            tx, rx = get_user_traffic_bytes(username)
+        from backend.client_alerts import get_user_traffic_from_db
+        tx, rx = get_user_traffic_from_db(username)
             
         msg_text = format_card_msg(host_ip, username, protocol, card['lines'], tx, rx)
         

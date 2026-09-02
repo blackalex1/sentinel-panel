@@ -1,18 +1,17 @@
 import pytest
 from unittest.mock import patch, MagicMock
 from backend.database import db_session, Inbound, ClientStats, get_all_inbounds
-from backend.singbox.service import query_singbox_traffic, _last_singbox_conn_stats, stop_singbox
+from backend.singbox.service import query_singbox_traffic, stop_singbox
 from backend.xray.service import process_stats_deltas, _last_session_stats, stop_xray
+from backend.sentinel_core_bridge.traffic_sessions import reset_unified_traffic_stats
 
 def test_singbox_traffic_calculation_cumulative_deltas(monkeypatch):
     """
     Verifies that Sing-box traffic delta calculation correctly uses cumulative
     bytes from sentinel-core get_unified_traffic() across multiple poll cycles.
-    The old _process_singbox_connection_data (Python Clash API parsing) has been
-    removed; all parsing is now delegated to Go sentinel-core.
     """
     stop_singbox()
-    _last_singbox_conn_stats.clear()
+    reset_unified_traffic_stats()
 
     email = "test_user_singbox@example.com"
     with db_session() as session:

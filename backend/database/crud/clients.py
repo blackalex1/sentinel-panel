@@ -134,58 +134,74 @@ def delete_client_db(inbound_id: int, email: str):
         return True
 
 def update_client_traffic(inbound_id: int, email: str, up_add: int, down_add: int) -> bool:
+    if up_add <= 0 and down_add <= 0:
+        return True
     with backend.database.db_session() as session:
-        # 1. Exact match by email
+        # 1. Exact match by email for this specific inbound
         c = session.query(ClientStats).filter_by(inbound_id=inbound_id, email=email).first()
-        # 2. Exact match by client_uuid_or_pwd or case-insensitive
+        # 2. Exact match by client_uuid_or_pwd or case-insensitive email
         if not c:
             c = session.query(ClientStats).filter(
                 (ClientStats.inbound_id == inbound_id) &
                 ((ClientStats.email.ilike(email)) | (ClientStats.client_uuid_or_pwd == email))
             ).first()
-        # 3. Delimiter prefix matching (e.g. 'my_double' for 'my_double@domain' or 'my_double_v2')
-        if not c:
-            clean_key = email.split(":")[0].split("@")[0].strip()
-            if clean_key:
+        # 3. Domain or token delimiter prefix matching (e.g. 'alice@domain.com' -> 'alice')
+        if not c and ("@" in email or ":" in email):
+            clean_user = email.split(":")[0].split("@")[0].strip()
+            if clean_user:
                 c = session.query(ClientStats).filter(
                     (ClientStats.inbound_id == inbound_id) &
                     (
-                        (ClientStats.email == clean_key) |
-                        (ClientStats.client_uuid_or_pwd == clean_key) |
-                        (ClientStats.email.ilike(f"{clean_key}@%")) |
-                        (ClientStats.email.ilike(f"{clean_key}_%")) |
-                        (ClientStats.email.ilike(f"{clean_key}-%"))
+                        (ClientStats.email == clean_user) |
+                        (ClientStats.client_uuid_or_pwd == clean_user) |
+                        (ClientStats.email.ilike(f"{clean_user}@%"))
                     )
                 ).first()
         if c:
-            c.up += up_add
-            c.down += down_add
+            c.up += max(0, up_add)
+            c.down += max(0, down_add)
             return True
         return False
 
-def update_client_traffic_by_email(email: str, up_add: int, down_add: int) -> bool:
+def update_client_traffic_by_email(email: str, up_add: int, down_add: int, core: str = None) -> bool:
+    if up_add <= 0 and down_add <= 0:
+        return True
     with backend.database.db_session() as session:
+        # If core is specified, prefer client matching the core's inbound
+        query = session.query(ClientStats)
+        if core:
+            from backend.models import Inbound
+            query = query.join(Inbound, ClientStats.inbound_id == Inbound.id)
+            norm_core = "singbox" if "sing" in core.lower() else ("hysteria" if "hysteria" in core.lower() else "xray")
+            c = query.filter(
+                (ClientStats.email == email) | (ClientStats.client_uuid_or_pwd == email),
+                (Inbound.core == norm_core) | (Inbound.protocol.ilike(f"%{norm_core}%"))
+            ).first()
+            if c:
+                c.up += max(0, up_add)
+                c.down += max(0, down_add)
+                return True
+
         # 1. Exact match by email
         c = session.query(ClientStats).filter_by(email=email).first()
-        # 2. Exact match by client_uuid_or_pwd or case-insensitive
+        # 2. Exact match by client_uuid_or_pwd or case-insensitive email
         if not c:
             c = session.query(ClientStats).filter(
                 (ClientStats.email.ilike(email)) | (ClientStats.client_uuid_or_pwd == email)
             ).first()
-        # 3. Delimiter prefix matching (e.g. 'my_double' for 'my_double@domain' or 'my_double_v2')
-        if not c:
-            clean_key = email.split(":")[0].split("@")[0].strip()
-            if clean_key:
+        # 3. Domain or token delimiter prefix matching (e.g. 'alice@domain.com' -> 'alice')
+        if not c and ("@" in email or ":" in email):
+            clean_user = email.split(":")[0].split("@")[0].strip()
+            if clean_user:
                 c = session.query(ClientStats).filter(
-                    (ClientStats.email == clean_key) |
-                    (ClientStats.client_uuid_or_pwd == clean_key) |
-                    (ClientStats.email.ilike(f"{clean_key}@%")) |
-                    (ClientStats.email.ilike(f"{clean_key}_%")) |
-                    (ClientStats.email.ilike(f"{clean_key}-%"))
+                    (ClientStats.email == clean_user) |
+                    (ClientStats.client_uuid_or_pwd == clean_user) |
+                    (ClientStats.email.ilike(f"{clean_user}@%"))
                 ).first()
         if c:
-            c.up += up_add
-            c.down += down_add
+            c.up += max(0, up_add)
+            c.down += max(0, down_add)
             return True
         return False
+
 
