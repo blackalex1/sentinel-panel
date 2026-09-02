@@ -47,6 +47,8 @@ from backend.sentinel_core_bridge.traffic_sessions import (
     register_external_connect,
     register_hysteria_port,
     kick_client,
+    query_all_cores_traffic,
+    reset_unified_traffic_stats,
 )
 
 from backend.sentinel_core_bridge.logs import (

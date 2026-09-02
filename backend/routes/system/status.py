@@ -195,18 +195,17 @@ async def global_traffic_details_api(request: Request, date: str = ""):
                 "down": int(r.down or 0)
             }
 
-        # If inspecting today's date, also include real-time clients that have traffic today
+        # If inspecting today's date, also include uncommitted real-time deltas from ClientStats
         if target_date == today_str:
             for cs, ib in all_clients:
-                c_up = int(cs.up or 0)
-                c_down = int(cs.down or 0)
-                if c_up > 0 or c_down > 0:
+                uncommitted_up = max(0, int(cs.up or 0) - int(cs.last_seen_up or 0))
+                uncommitted_down = max(0, int(cs.down or 0) - int(cs.last_seen_down or 0))
+                if uncommitted_up > 0 or uncommitted_down > 0:
                     if cs.email not in daily_data:
-                        daily_data[cs.email] = {"up": c_up, "down": c_down}
+                        daily_data[cs.email] = {"up": uncommitted_up, "down": uncommitted_down}
                     else:
-                        # Pick max of daily record or cumulative stats
-                        daily_data[cs.email]["up"] = max(daily_data[cs.email]["up"], c_up)
-                        daily_data[cs.email]["down"] = max(daily_data[cs.email]["down"], c_down)
+                        daily_data[cs.email]["up"] += uncommitted_up
+                        daily_data[cs.email]["down"] += uncommitted_down
 
         total_day_up = sum(d["up"] for d in daily_data.values())
         total_day_down = sum(d["down"] for d in daily_data.values())
