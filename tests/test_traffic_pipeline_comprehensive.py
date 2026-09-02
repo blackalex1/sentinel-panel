@@ -323,3 +323,92 @@ def test_pipeline_no_duplicate_accounting_architecture():
     assert "for ib in inbounds" not in xray_src
     assert "for ib in inbounds" not in hysteria_src
     assert "for ib in inbounds" not in singbox_src
+
+
+def test_pipeline_reset_endpoints_security_decoy_and_token_protection(client):
+    """
+    Security Verification:
+    Ensures that all newly added traffic reset endpoints strictly enforce:
+    1. Rejection of unauthenticated requests with decoy masquerade (Nginx 404 HTML).
+    2. Rejection of forged Bearer tokens with decoy masquerade.
+    3. Rejection of fake session cookies with decoy masquerade.
+    4. Successful execution only when valid Bearer token or authenticated session is provided.
+    """
+    from backend.config import settings
+    from backend.database import db_session, Inbound, ClientStats
+
+    # Setup a test inbound and client
+    with db_session() as session:
+        ib = Inbound(remark="SecTest Inbound", port=28001, protocol="vless", core="xray", enable=1, up=5000, down=5000)
+        session.add(ib)
+        session.commit()
+        c = ClientStats(inbound_id=ib.id, email="sec_user@shield.test", client_uuid_or_pwd="pwd-sec", up=2000, down=3000, enable=1)
+        session.add(c)
+        session.commit()
+        ib_id = ib.id
+
+    endpoints = [
+        f"/panel/api/inbounds/resetClientTraffic/{ib_id}/sec_user@shield.test",
+        f"/api/inbounds/resetClientTraffic/{ib_id}/sec_user@shield.test",
+        f"/panel/api/inbounds/resetAllClientTraffics/{ib_id}",
+        f"/api/inbounds/resetAllClientTraffics/{ib_id}",
+        "/panel/api/inbounds/resetAllTraffics",
+        "/api/inbounds/resetAllTraffics",
+        "/panel/api/clients/sec_user@shield.test/resetTraffic",
+        "/api/clients/sec_user@shield.test/resetTraffic",
+    ]
+
+    # 1. Unauthenticated requests -> Must receive Nginx decoy 404
+    for ep in endpoints:
+        r_unauth = client.post(ep)
+        assert r_unauth.status_code == 404, f"Unauthenticated request to {ep} must be masked with 404"
+        assert "<title>404 Not Found</title>" in r_unauth.text or "nginx" in r_unauth.text
+        assert "success" not in r_unauth.json if r_unauth.headers.get("content-type") == "application/json" else True
+
+    # 2. Forged Bearer Token -> Must receive Nginx decoy 404
+    for ep in endpoints:
+        r_bad_token = client.post(ep, headers={"Authorization": "Bearer invalid_malicious_token_12345"})
+        assert r_bad_token.status_code == 404, f"Invalid token to {ep} must be masked with 404"
+
+    # 3. Forged Session Cookie -> Must receive Nginx decoy 404
+    for ep in endpoints:
+        r_bad_cookie = client.post(ep, cookies={"session_id": "forged_session_id_99999"})
+        assert r_bad_cookie.status_code == 404, f"Invalid cookie to {ep} must be masked with 404"
+
+    # 4. Valid Session Cookie WITHOUT CSRF token (Cross-Site Request Forgery attempt) -> Blocked with 404
+    from backend.auth.sessions import ACTIVE_SESSIONS, CSRF_TOKENS
+    from backend.database import add_session_db
+    import secrets
+
+    test_sess_id = secrets.token_hex(16)
+    test_csrf = secrets.token_hex(16)
+    add_session_db(test_sess_id, username="admin", duration_days=1, ip_address="127.0.0.1")
+    ACTIVE_SESSIONS.add(test_sess_id)
+    CSRF_TOKENS[test_sess_id] = test_csrf
+
+    # Missing X-CSRF-Token -> Blocked with 404
+    r_no_csrf = client.post(f"/panel/api/inbounds/resetClientTraffic/{ib_id}/sec_user@shield.test", cookies={"session_id": test_sess_id})
+    assert r_no_csrf.status_code == 404, "POST request with valid session cookie but missing CSRF token MUST be blocked"
+
+    # Mismatched X-CSRF-Token -> Blocked with 404
+    r_wrong_csrf = client.post(f"/panel/api/inbounds/resetClientTraffic/{ib_id}/sec_user@shield.test", cookies={"session_id": test_sess_id}, headers={"X-CSRF-Token": "forged_csrf_token_999"})
+    assert r_wrong_csrf.status_code == 404, "POST request with mismatched CSRF token MUST be blocked"
+
+    # Valid Session Cookie AND matching X-CSRF-Token -> Succeeds (status 200)
+    r_valid_csrf = client.post(f"/panel/api/inbounds/resetClientTraffic/{ib_id}/sec_user@shield.test", cookies={"session_id": test_sess_id}, headers={"X-CSRF-Token": test_csrf})
+    assert r_valid_csrf.status_code == 200
+    assert r_valid_csrf.json().get("success") is True
+
+    # 5. Valid Bearer Token (for Telegram bot / controller) -> Must succeed (status 200, success=True)
+    auth_headers = {"Authorization": f"Bearer {settings.API_TOKEN}"}
+    r_valid = client.post(f"/panel/api/inbounds/resetClientTraffic/{ib_id}/sec_user@shield.test", headers=auth_headers)
+    assert r_valid.status_code == 200
+    assert r_valid.json().get("success") is True
+
+    # Verify that database values were reset to 0
+    with db_session() as session:
+        c_rec = session.query(ClientStats).filter_by(inbound_id=ib_id, email="sec_user@shield.test").first()
+        assert c_rec.up == 0
+        assert c_rec.down == 0
+
+

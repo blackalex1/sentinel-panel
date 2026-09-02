@@ -7,7 +7,9 @@ import {
     toggleClientActiveStatus as coreToggleClientActiveStatus,
     setLoadInboundsCallback as coreSetLoadInboundsCallback,
     deleteClient as coreDeleteClient,
-    openLinksModal as coreOpenLinksModal
+    openLinksModal as coreOpenLinksModal,
+    resetClientTraffic as coreResetClientTraffic,
+    resetAllClientsTrafficForInbound as coreResetAllClientsTrafficForInbound
 } from "./modules/clients-core.js";
 
 import {
@@ -46,6 +48,14 @@ export async function deleteClient(inboundId, clientId, loadInboundsCallback) {
 
 export async function openLinksModal(inboundId, email) {
     return await coreOpenLinksModal(inboundId, email);
+}
+
+export async function resetClientTraffic(inboundId, email) {
+    return await coreResetClientTraffic(inboundId, email);
+}
+
+export async function resetAllClientsTrafficForInbound(inboundId) {
+    return await coreResetAllClientsTrafficForInbound(inboundId);
 }
 
 export async function handleClientFormSubmit(e, loadInboundsCallback) {
