@@ -7,6 +7,7 @@ import importlib
 from backend.database import add_inbound, add_client_db, delete_inbound
 from backend.xray import generate_xray_config_json
 
+
 def test_xray_config_generation():
     """Test VLESS Reality Inbound Config Generation."""
     vless_settings = {"clients": []}

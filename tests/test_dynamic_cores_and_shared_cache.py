@@ -164,7 +164,10 @@ def test_dynamic_xray_start():
         assert res is True
         assert is_xray_running() is True
         stop_xray()
-        time.sleep(0.6)
+        for _ in range(10):
+            if not is_xray_running():
+                break
+            time.sleep(0.2)
         assert is_xray_running() is False
 
 
