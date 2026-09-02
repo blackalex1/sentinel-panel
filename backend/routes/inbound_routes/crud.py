@@ -316,3 +316,52 @@ async def delete_inbound_ui(request: Request, inbound_id: int):
         restart_services_background()
         return {"success": True}
     return {"success": False, "msg": t("inbound_not_found", lang=lang, category="backend")}
+
+@router.post("/panel/api/inbounds/resetClientTraffic/{inbound_id}/{email}")
+@router.post("/api/inbounds/resetClientTraffic/{inbound_id}/{email}")
+async def reset_client_traffic_api(request: Request, inbound_id: int, email: str):
+    if not check_auth(request):
+        return decoy_response()
+    lang = get_lang(request)
+    from backend.database import reset_client_traffic_db
+    from backend.sentinel_core_bridge import reset_unified_traffic_stats
+    if reset_client_traffic_db(inbound_id, email):
+        reset_unified_traffic_stats()
+        from backend.audit import log_action, get_actor_username
+        actor = get_actor_username(request)
+        log_action(actor, "reset_client_traffic", target=email, details=f"inbound_id:{inbound_id}")
+        return {"success": True, "msg": t("traffic_reset_success", lang=lang, category="backend", default="Traffic reset successfully")}
+    return {"success": False, "msg": t("client_not_found", lang=lang, category="backend")}
+
+@router.post("/panel/api/inbounds/resetAllClientTraffics/{inbound_id}")
+@router.post("/api/inbounds/resetAllClientTraffics/{inbound_id}")
+async def reset_all_client_traffics_api(request: Request, inbound_id: int):
+    if not check_auth(request):
+        return decoy_response()
+    lang = get_lang(request)
+    from backend.database import reset_all_client_traffics_for_inbound_db
+    from backend.sentinel_core_bridge import reset_unified_traffic_stats
+    if reset_all_client_traffics_for_inbound_db(inbound_id):
+        reset_unified_traffic_stats()
+        from backend.audit import log_action, get_actor_username
+        actor = get_actor_username(request)
+        log_action(actor, "reset_all_client_traffics", target=f"inbound_id:{inbound_id}")
+        return {"success": True, "msg": t("traffic_reset_success", lang=lang, category="backend", default="Traffic reset successfully")}
+    return {"success": False, "msg": t("inbound_not_found", lang=lang, category="backend")}
+
+@router.post("/panel/api/inbounds/resetAllTraffics")
+@router.post("/api/inbounds/resetAllTraffics")
+async def reset_all_traffics_api(request: Request):
+    if not check_auth(request):
+        return decoy_response()
+    lang = get_lang(request)
+    from backend.database import reset_all_traffics_db
+    from backend.sentinel_core_bridge import reset_unified_traffic_stats
+    if reset_all_traffics_db():
+        reset_unified_traffic_stats()
+        from backend.audit import log_action, get_actor_username
+        actor = get_actor_username(request)
+        log_action(actor, "reset_all_traffics", target="global")
+        return {"success": True, "msg": t("all_traffics_reset_success", lang=lang, category="backend", default="All traffics reset successfully")}
+    return {"success": False, "msg": t("generic_error", lang=lang, category="backend")}
+

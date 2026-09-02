@@ -52,6 +52,10 @@ from backend.database.crud.clients import (
     delete_client_db,
     update_client_traffic,
     update_client_traffic_by_email,
+    reset_client_traffic_db,
+    reset_all_client_traffics_for_inbound_db,
+    reset_client_traffic_globally_db,
+    reset_all_traffics_db,
 )
 
 from backend.database.crud.settings import (

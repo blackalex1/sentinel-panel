@@ -205,3 +205,55 @@ def update_client_traffic_by_email(email: str, up_add: int, down_add: int, core:
         return False
 
 
+def reset_client_traffic_db(inbound_id: int, email: str) -> bool:
+    """Resets cumulative upload and download traffic to 0 for a specific client on an inbound."""
+    with backend.database.db_session() as session:
+        c = session.query(ClientStats).filter_by(inbound_id=inbound_id, email=email).first()
+        if not c:
+            c = session.query(ClientStats).filter(
+                (ClientStats.inbound_id == inbound_id) &
+                ((ClientStats.email.ilike(email)) | (ClientStats.client_uuid_or_pwd == email))
+            ).first()
+        if c:
+            c.up = 0
+            c.down = 0
+            c.last_seen_up = 0
+            c.last_seen_down = 0
+            return True
+        return False
+
+
+def reset_all_client_traffics_for_inbound_db(inbound_id: int) -> bool:
+    """Resets traffic for all clients on a specific inbound."""
+    with backend.database.db_session() as session:
+        session.query(ClientStats).filter_by(inbound_id=inbound_id).update({
+            "up": 0, "down": 0, "last_seen_up": 0, "last_seen_down": 0
+        })
+        return True
+
+
+def reset_client_traffic_globally_db(email: str) -> bool:
+    """Resets traffic for a client by email across all inbounds."""
+    with backend.database.db_session() as session:
+        records = session.query(ClientStats).filter(
+            (ClientStats.email == email) | (ClientStats.email.ilike(email)) | (ClientStats.client_uuid_or_pwd == email)
+        ).all()
+        for r in records:
+            r.up = 0
+            r.down = 0
+            r.last_seen_up = 0
+            r.last_seen_down = 0
+        return len(records) > 0
+
+
+def reset_all_traffics_db() -> bool:
+    """Resets all clients, inbounds, and daily traffic counters globally."""
+    from backend.models import Inbound, ClientTrafficDaily
+    with backend.database.db_session() as session:
+        session.query(ClientStats).update({"up": 0, "down": 0, "last_seen_up": 0, "last_seen_down": 0})
+        session.query(Inbound).update({"up": 0, "down": 0})
+        session.query(ClientTrafficDaily).delete()
+        return True
+
+
+
