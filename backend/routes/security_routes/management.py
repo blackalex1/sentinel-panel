@@ -27,20 +27,32 @@ async def client_by_connection(
     if not check_auth(request):
         return decoy_response()
         
-    # 1. Hysteria 2: query in-memory core logs
+    # 1. Hysteria 2: query in-memory core logs (last 45s)
     hys_lines = get_in_memory_core_logs("hysteria", 500)
     if hys_lines:
-        email = find_hysteria_client_email(hys_lines, dst_ip, port)
+        email = find_hysteria_client_email(hys_lines, dst_ip, port, max_age_sec=45)
         if email:
-            real_client_ip = find_client_ip_for_email_in_hysteria_log(hys_lines, email)
-            return {"success": True, "email": email, "source": "hysteria", "client_ip": real_client_ip}
+            with db_session() as session:
+                c = session.query(ClientStats).filter_by(email=email).first()
+                if c and not c.enable:
+                    logging.info(f"client_by_connection: client {email} is already disabled, ignoring stale entry")
+                    email = None
+            if email:
+                real_client_ip = find_client_ip_for_email_in_hysteria_log(hys_lines, email, max_age_sec=45)
+                return {"success": True, "email": email, "source": "hysteria", "client_ip": real_client_ip}
 
-    # 2. Xray & Sing-box: query in-memory core logs
+    # 2. Xray & Sing-box: query in-memory core logs (last 45s)
     xray_lines = get_in_memory_core_logs("xray", 500) + get_in_memory_core_logs("sing-box", 500)
     if xray_lines:
-        found_email, found_ip, _ = find_xray_client_email(xray_lines, dst_ip, port, client_ip)
+        found_email, found_ip, _ = find_xray_client_email(xray_lines, dst_ip, port, client_ip, max_age_sec=45)
         if found_email:
-            return {"success": True, "email": found_email, "source": "xray", "client_ip": found_ip}
+            with db_session() as session:
+                c = session.query(ClientStats).filter_by(email=found_email).first()
+                if c and not c.enable:
+                    logging.info(f"client_by_connection: client {found_email} is already disabled, ignoring stale entry")
+                    found_email = None
+            if found_email:
+                return {"success": True, "email": found_email, "source": "xray", "client_ip": found_ip}
 
     return {"success": False, "msg": "Client not found in in-memory logs"}
 
