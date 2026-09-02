@@ -134,3 +134,20 @@ async def get_client_daily_traffic_api(request: Request, email: str):
         } for rec in records]
         
         return {"success": True, "obj": result}
+
+@router.post("/api/clients/{email}/resetTraffic")
+@router.post("/panel/api/clients/{email}/resetTraffic")
+async def reset_client_traffic_global_api(request: Request, email: str):
+    if not backend.routes.clients.check_auth(request):
+        return backend.routes.clients.decoy_response()
+    
+    from backend.database import reset_client_traffic_globally_db
+    from backend.sentinel_core_bridge import reset_unified_traffic_stats
+    if reset_client_traffic_globally_db(email):
+        reset_unified_traffic_stats()
+        from backend.audit import log_action, get_actor_username
+        actor = get_actor_username(request)
+        log_action(actor, "reset_client_traffic", target=email, details="global_email_reset")
+        return {"success": True, "msg": "Traffic reset successfully"}
+    return {"success": False, "msg": "Client not found"}
+
