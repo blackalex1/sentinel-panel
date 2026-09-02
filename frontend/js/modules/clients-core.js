@@ -158,6 +158,7 @@ function renderClientsModalTable() {
             <td>
                 <div class="actions-group">
                     <button class="table-action-btn chart-btn" id="btn-chart-${inboundId}-${c.email.replace(/@/g, '_')}" title="${t("clients_traffic_chart_btn", "График")}"><i class="fa-solid fa-chart-line"></i></button>
+                    <button class="table-action-btn reset-btn" id="btn-reset-${inboundId}-${c.email.replace(/@/g, '_')}" title="${t("clients_reset_traffic_btn", "Сбросить трафик")}"><i class="fa-solid fa-rotate-right"></i></button>
                     <button class="table-action-btn links-btn" id="btn-links-${inboundId}-${c.email.replace(/@/g, '_')}" title="${t("links_modal_title", "Ссылки подключения")}"><i class="fa-solid fa-qrcode"></i></button>
                     <button class="table-action-btn edit-btn" id="btn-edit-${inboundId}-${c.email.replace(/@/g, '_')}" title="${t("inbound_btn_edit", "Редактировать")}"><i class="fa-regular fa-pen-to-square"></i></button>
                     <button class="table-action-btn delete-btn" id="btn-del-${inboundId}-${c.email.replace(/@/g, '_')}" title="${t("inbound_btn_delete", "Удалить")}"><i class="fa-regular fa-trash-can"></i></button>
@@ -168,6 +169,7 @@ function renderClientsModalTable() {
         
         // Register event listeners
         document.getElementById(`btn-chart-${inboundId}-${c.email.replace(/@/g, '_')}`).addEventListener("click", () => showClientTrafficChart(c.email));
+        document.getElementById(`btn-reset-${inboundId}-${c.email.replace(/@/g, '_')}`).addEventListener("click", () => resetClientTraffic(inboundId, c.email));
         document.getElementById(`btn-links-${inboundId}-${c.email.replace(/@/g, '_')}`).addEventListener("click", () => openLinksModal(inboundId, c.email));
         document.getElementById(`btn-edit-${inboundId}-${c.email.replace(/@/g, '_')}`).addEventListener("click", () => openEditClientModal(inboundId, c));
         document.getElementById(`btn-del-${inboundId}-${c.email.replace(/@/g, '_')}`).addEventListener("click", () => deleteClient(inboundId, c.id || c.password || c.client_uuid_or_pwd, loadInboundsCallbackGlobal));
@@ -215,8 +217,72 @@ export async function openClientsModal(inboundId) {
     });
     
     renderClientsModalTable();
+
+    const resetAllBtn = document.getElementById("reset-all-clients-btn");
+    if (resetAllBtn) {
+        resetAllBtn.onclick = () => resetAllClientsTrafficForInbound(inboundId);
+    }
     
     document.getElementById("clients-modal").classList.add("active");
+}
+
+export async function resetClientTraffic(inboundId, email) {
+    const confirmMsg = t("confirm_reset_client_traffic_msg", "Вы уверены, что хотите сбросить трафик для клиента {email}?").replace("{email}", email);
+    const confirmed = await showConfirmDialog(
+        confirmMsg,
+        t("confirm_reset_client_traffic_title", "Сброс трафика"),
+        t("btn_reset", "Сбросить"),
+        t("btn_cancel", "Отмена")
+    );
+    if (!confirmed) return;
+
+    try {
+        const res = await apiFetch(`/panel/api/inbounds/resetClientTraffic/${inboundId}/${encodeURIComponent(email)}`, {
+            method: "POST"
+        });
+        if (res && res.success) {
+            showToast(t("traffic_reset_success", "Трафик успешно сброшен!"));
+            if (currentModalInboundId) {
+                await openClientsModal(currentModalInboundId);
+            }
+            if (loadInboundsCallbackGlobal) {
+                await loadInboundsCallbackGlobal();
+            }
+        } else {
+            showToast(res ? res.msg : t("generic_error", "Ошибка сброса трафика"), "error");
+        }
+    } catch (e) {
+        showToast(e.message, "error");
+    }
+}
+
+export async function resetAllClientsTrafficForInbound(inboundId) {
+    const confirmed = await showConfirmDialog(
+        t("confirm_reset_all_clients_traffic_msg", "Вы уверены, что хотите сбросить трафик для всех клиентов этого подключения?"),
+        t("confirm_reset_all_clients_traffic_title", "Сброс трафика всех клиентов"),
+        t("btn_reset", "Сбросить"),
+        t("btn_cancel", "Отмена")
+    );
+    if (!confirmed) return;
+
+    try {
+        const res = await apiFetch(`/panel/api/inbounds/resetAllClientTraffics/${inboundId}`, {
+            method: "POST"
+        });
+        if (res && res.success) {
+            showToast(t("traffic_reset_success", "Трафик успешно сброшен!"));
+            if (currentModalInboundId) {
+                await openClientsModal(currentModalInboundId);
+            }
+            if (loadInboundsCallbackGlobal) {
+                await loadInboundsCallbackGlobal();
+            }
+        } else {
+            showToast(res ? res.msg : t("generic_error", "Ошибка сброса трафика"), "error");
+        }
+    } catch (e) {
+        showToast(e.message, "error");
+    }
 }
 
 export async function toggleClientActiveStatus(inboundId, clientData, enabled) {
