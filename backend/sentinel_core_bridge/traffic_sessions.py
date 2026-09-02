@@ -206,6 +206,13 @@ def query_all_cores_traffic(traffic_data_override=None):
                 if up_delta <= 0 and down_delta <= 0:
                     continue
 
+                if key.startswith("outbound:"):
+                    ob_tag = key[len("outbound:"):].strip()
+                    if ob_tag:
+                        from backend.database import update_outbound_traffic
+                        update_outbound_traffic(ob_tag, max(0, up_delta), max(0, down_delta))
+                    continue
+
                 # Find candidate ClientStats
                 candidates = clients_by_key.get(key) or clients_by_key.get(key.lower()) or []
                 if not candidates and ("@" in key or ":" in key):
