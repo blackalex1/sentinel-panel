@@ -17,6 +17,8 @@ from pathlib import Path
 import pytest
 from httpx import AsyncClient, ASGITransport
 
+pytestmark = pytest.mark.xdist_group("core_ops")
+
 from backend.config import settings, SINGBOX_BIN_PATH, XRAY_BIN_PATH, HYSTERIA_BIN_PATH
 from backend.main import app, sync_session_events_loop
 from backend.database import db_session, Base, engine, Inbound, ClientStats
@@ -57,6 +59,7 @@ def setup_test_database():
 
 
 @pytest.mark.asyncio
+@pytest.mark.xdist_group("core_ops")
 async def test_e2e_real_singbox_binary_traffic_and_untrusted_ip_audit_log(tmp_path):
     """
     1. Starts a real local HTTP upstream server.
@@ -178,10 +181,19 @@ async def test_e2e_real_singbox_binary_traffic_and_untrusted_ip_audit_log(tmp_pa
         await asyncio.sleep(0.4)
 
         # 6. Send REAL HTTP request through client proxy tunnel to target upstream server
-        async with AsyncClient(proxy=f"http://127.0.0.1:{client_port}", timeout=5.0) as tunnel_client:
-            resp = await tunnel_client.get(f"http://127.0.0.1:{target_port}/test")
-            assert resp.status_code == 200
-            assert "pong-from-real-target-upstream" in resp.text
+        resp = None
+        for _ in range(6):
+            try:
+                async with AsyncClient(proxy=f"http://127.0.0.1:{client_port}", timeout=5.0) as tunnel_client:
+                    resp = await tunnel_client.get(f"http://127.0.0.1:{target_port}/test")
+                    if resp.status_code == 200:
+                        break
+            except Exception:
+                pass
+            await asyncio.sleep(0.4)
+
+        assert resp is not None and resp.status_code == 200
+        assert "pong-from-real-target-upstream" in resp.text
 
         # 7. Verify Sentinel Core SessionTracker captured the real connection
         matched = False
@@ -255,6 +267,7 @@ async def test_e2e_real_singbox_binary_traffic_and_untrusted_ip_audit_log(tmp_pa
 
 
 @pytest.mark.asyncio
+@pytest.mark.xdist_group("core_ops")
 async def test_e2e_real_xray_binary_traffic_and_untrusted_ip_audit_log(tmp_path):
     """
     1. Configures a real Xray server with Shadowsocks 2022 inbound and user 'bob_xray_user@domain.com'.
@@ -272,7 +285,13 @@ async def test_e2e_real_xray_binary_traffic_and_untrusted_ip_audit_log(tmp_path)
     allowed_whitelist = "203.0.113.50"
     server_port = get_free_port()
 
-    # 1. Setup client in Panel DB with whitelist
+    # 1. Start real HTTP upstream server
+    target_port = get_free_port()
+    httpd = http.server.HTTPServer(("127.0.0.1", target_port), SimpleHTTPHandler)
+    http_thread = threading.Thread(target=httpd.serve_forever, daemon=True)
+    http_thread.start()
+
+    # 2. Setup client in Panel DB with whitelist
     with db_session() as session:
         inbound = Inbound(
             remark="Real-Xray-Inbound",
@@ -367,11 +386,18 @@ async def test_e2e_real_xray_binary_traffic_and_untrusted_ip_audit_log(tmp_path)
         await asyncio.sleep(0.4)
 
         # 5. Trigger real proxy connection through the client
-        async with AsyncClient(proxy=f"http://127.0.0.1:{client_port}", timeout=2.0) as tunnel_client:
+        resp = None
+        for _ in range(6):
             try:
-                await tunnel_client.get("http://example.com:80")
+                async with AsyncClient(proxy=f"http://127.0.0.1:{client_port}", timeout=5.0) as tunnel_client:
+                    resp = await tunnel_client.get(f"http://127.0.0.1:{target_port}/test")
+                    if resp.status_code == 200:
+                        break
             except Exception:
                 pass
+            await asyncio.sleep(0.4)
+
+        assert resp is not None and resp.status_code == 200
 
         # 6. Verify Sentinel Core captured the real Xray session
         matched = False
@@ -436,6 +462,7 @@ async def test_e2e_real_xray_binary_traffic_and_untrusted_ip_audit_log(tmp_path)
 
 
 @pytest.mark.asyncio
+@pytest.mark.xdist_group("core_ops")
 async def test_e2e_real_hysteria_binary_traffic_and_untrusted_ip_audit_log(tmp_path):
     """
     1. Configures a real Hysteria 2 server with userpass auth and user 'charlie_hy_user'.
@@ -453,7 +480,13 @@ async def test_e2e_real_hysteria_binary_traffic_and_untrusted_ip_audit_log(tmp_p
     allowed_whitelist = "198.51.100.77"
     server_port = get_free_port()
 
-    # 1. Setup client in Panel DB with whitelist
+    # 1. Start real HTTP upstream server
+    target_port = get_free_port()
+    httpd = http.server.HTTPServer(("127.0.0.1", target_port), SimpleHTTPHandler)
+    http_thread = threading.Thread(target=httpd.serve_forever, daemon=True)
+    http_thread.start()
+
+    # 2. Setup client in Panel DB with whitelist
     with db_session() as session:
         inbound = Inbound(
             remark="Real-Hysteria-Inbound",
@@ -542,11 +575,18 @@ async def test_e2e_real_hysteria_binary_traffic_and_untrusted_ip_audit_log(tmp_p
         await asyncio.sleep(0.4)
 
         # 5. Trigger real proxy connection through the client
-        async with AsyncClient(proxy=f"http://127.0.0.1:{client_port}", timeout=2.0) as tunnel_client:
+        resp = None
+        for _ in range(6):
             try:
-                await tunnel_client.get("http://example.com:80")
+                async with AsyncClient(proxy=f"http://127.0.0.1:{client_port}", timeout=5.0) as tunnel_client:
+                    resp = await tunnel_client.get(f"http://127.0.0.1:{target_port}/test")
+                    if resp.status_code == 200:
+                        break
             except Exception:
                 pass
+            await asyncio.sleep(0.4)
+
+        assert resp is not None and resp.status_code == 200
 
         # 6. Verify Sentinel Core captured the real Hysteria session
         matched = False

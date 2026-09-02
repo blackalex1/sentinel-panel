@@ -23,11 +23,13 @@ def test_live_socket_data_transfer_xray():
     
     import json
     email = "live_socket_user@domain.com"
+    from tests.core_verifier import get_free_port
+    ib_port = get_free_port()
     with db_session() as session:
         session.query(ClientStats).filter_by(email=email).delete()
         ib = Inbound(
             remark="Live Socket HTTP",
-            port=25088,
+            port=ib_port,
             protocol="vless",
             settings=json.dumps({"decryption": "none", "fallbacks": []}),
             stream_settings=json.dumps({"network": "tcp", "security": "none"}),

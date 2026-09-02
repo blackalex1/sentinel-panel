@@ -19,6 +19,7 @@ backend.config.DB_PATH = temp_path / f"test_panel_{worker_id}.db"
 backend.config.XRAY_CONFIG_PATH = temp_path / f"config_{worker_id}.json"
 backend.config.XRAY_LOG_PATH = temp_path / f"xray_{worker_id}.log"
 backend.config.ENV_FILE = temp_path / f".env_{worker_id}"
+backend.config.settings.DATABASE_URL = f"sqlite:///{backend.config.DB_PATH}"
 
 # Set test configuration settings
 backend.config.settings.PANEL_PORT = 12345
