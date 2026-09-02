@@ -187,8 +187,14 @@ async def auto_investigate_and_resolve(dst_ip: Optional[str], dst_port: int) -> 
     # Try finding in Hysteria 2 log first
     try:
         hys_lines = get_in_memory_core_logs("hysteria", 500)
-        if hys_lines:
-            email = find_hysteria_client_email(hys_lines, dst_ip, dst_port)
+        if not hys_lines:
+            import os
+            for p in ["/var/log/hysteria.log", "bin/hysteria.log", "hysteria.log"]:
+                if os.path.exists(p):
+                    with open(p, "r", encoding="utf-8", errors="ignore") as f:
+                        hys_lines = f.read().splitlines()[-500:]
+                    break
+        email = find_hysteria_client_email(hys_lines or [], dst_ip, dst_port, max_age_sec=45)
     except Exception as e:
         logging.error(f"[Node Agent] Error reading Hysteria log: {e}")
         
@@ -196,9 +202,15 @@ async def auto_investigate_and_resolve(dst_ip: Optional[str], dst_port: int) -> 
     if not email:
         try:
             xray_lines = get_in_memory_core_logs("xray", 500) + get_in_memory_core_logs("sing-box", 500)
-            if xray_lines:
-                found_email, _, _ = find_xray_client_email(xray_lines, dst_ip, dst_port)
-                email = found_email
+            if not xray_lines:
+                import os
+                for p in ["/var/log/xray/access.log", "bin/xray.log", "xray.log", "bin/singbox.log"]:
+                    if os.path.exists(p):
+                        with open(p, "r", encoding="utf-8", errors="ignore") as f:
+                            xray_lines = f.read().splitlines()[-500:]
+                        break
+            found_email, _, _ = find_xray_client_email(xray_lines or [], dst_ip, dst_port, max_age_sec=45)
+            email = found_email
         except Exception as e:
             logging.error(f"[Node Agent] Error reading Xray log: {e}")
             
