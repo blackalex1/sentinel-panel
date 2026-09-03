@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 
 # ==============================================================================
-# Sing-box & Xray-Core Proxy Engine Downloader for Sentinel-Panel
-# Fetches official Sing-box (primary) and Xray-core binaries for current OS/Arch
+# Sing-box, Xray-Core & Hysteria 2 Proxy Engines Downloader for Sentinel-Panel
+# Fetches official Sing-box, Xray-core and Hysteria 2 binaries for current OS/Arch
 # Supports HTTP/HTTPS/SOCKS5 Proxies, VPN, and GitHub Fast Mirrors
 # ==============================================================================
 
@@ -63,7 +63,7 @@ CURL_OPTS=("-fsSL" "--connect-timeout" "10" "--retry" "2")
 if [ -n "$PROXY_URL" ]; then
     if [[ "$PROXY_URL" =~ ^(http|https|socks4|socks5|socks5h):// ]]; then
         VALID_PROXY="$PROXY_URL"
-        echo -e "${CYAN}[+] Использование прокси для Sing-box & Xray: $VALID_PROXY${NC}"
+        echo -e "${CYAN}[+] Использование прокси для proxy-движков: $VALID_PROXY${NC}"
         export http_proxy="$VALID_PROXY"
         export https_proxy="$VALID_PROXY"
         export all_proxy="$VALID_PROXY"
@@ -89,24 +89,29 @@ case "$ARCH_RAW" in
     x86_64|amd64)
         ARCH_SINGBOX="amd64"
         ARCH_XRAY="64"
+        ARCH_HYSTERIA="amd64"
         ;;
     aarch64|arm64)
         ARCH_SINGBOX="arm64"
         ARCH_XRAY="arm64-v8a"
+        ARCH_HYSTERIA="arm64"
         ;;
     armv7*|armhf)
         ARCH_SINGBOX="armv7"
         ARCH_XRAY="arm32-v7a"
+        ARCH_HYSTERIA="armv7"
         ;;
     *)
         ARCH_SINGBOX="amd64"
         ARCH_XRAY="64"
+        ARCH_HYSTERIA="amd64"
         ;;
 esac
 
 # Check existing installations
 SB_INSTALLED="Не установлено"
 XRAY_INSTALLED="Не установлено"
+HYSTERIA_INSTALLED="Не установлено"
 
 if [ -f "$BIN_DIR/sing-box" ] || [ -f "$BIN_DIR/sing-box.exe" ] || command -v sing-box &>/dev/null; then
     SB_BIN="$BIN_DIR/sing-box"
@@ -124,6 +129,17 @@ if [ -f "$BIN_DIR/xray" ] || [ -f "$BIN_DIR/xray.exe" ] || command -v xray &>/de
     fi
 fi
 
+HY_BIN="$BIN_DIR/hysteria-linux-${ARCH_HYSTERIA}"
+[ "$OS" = "windows" ] && HY_BIN="$BIN_DIR/hysteria-windows-${ARCH_HYSTERIA}.exe"
+[ ! -f "$HY_BIN" ] && [ -f "$BIN_DIR/hysteria" ] && HY_BIN="$BIN_DIR/hysteria"
+[ ! -f "$HY_BIN" ] && [ -f "$BIN_DIR/hysteria.exe" ] && HY_BIN="$BIN_DIR/hysteria.exe"
+
+if [ -f "$HY_BIN" ]; then
+    if [ -x "$HY_BIN" ]; then
+        HYSTERIA_INSTALLED=$("$HY_BIN" version 2>/dev/null | head -n 1 || echo "Установлено")
+    fi
+fi
+
 fetch_singbox() {
     echo -e "${CYAN}[+] Загрузка Sing-box из официального репозитория SagerNet/sing-box...${NC}"
     local SB_TAG=""
@@ -132,8 +148,9 @@ fetch_singbox() {
 import urllib.request, json, os
 urls = [
     'https://api.github.com/repos/SagerNet/sing-box/releases/latest',
-    'https://ghproxy.net/https://api.github.com/repos/SagerNet/sing-box/releases/latest',
-    'https://gh-proxy.com/https://api.github.com/repos/SagerNet/sing-box/releases/latest'
+    'https://gh-proxy.com/https://api.github.com/repos/SagerNet/sing-box/releases/latest',
+    'https://ghfast.top/https://api.github.com/repos/SagerNet/sing-box/releases/latest',
+    'https://ghproxy.net/https://api.github.com/repos/SagerNet/sing-box/releases/latest'
 ]
 proxy = '$VALID_PROXY'
 handlers = [urllib.request.ProxyHandler({'http': proxy, 'https': proxy})] if proxy else []
@@ -167,8 +184,9 @@ for u in urls:
 
     local SB_CANDIDATES=(
         "https://github.com/SagerNet/sing-box/releases/download/${SB_TAG}/${SB_FILENAME}"
-        "https://ghproxy.net/https://github.com/SagerNet/sing-box/releases/download/${SB_TAG}/${SB_FILENAME}"
         "https://gh-proxy.com/https://github.com/SagerNet/sing-box/releases/download/${SB_TAG}/${SB_FILENAME}"
+        "https://ghfast.top/https://github.com/SagerNet/sing-box/releases/download/${SB_TAG}/${SB_FILENAME}"
+        "https://ghproxy.net/https://github.com/SagerNet/sing-box/releases/download/${SB_TAG}/${SB_FILENAME}"
         "https://mirror.ghproxy.com/https://github.com/SagerNet/sing-box/releases/download/${SB_TAG}/${SB_FILENAME}"
     )
 
@@ -213,8 +231,9 @@ fetch_xray() {
 
     local XRAY_CANDIDATES=(
         "https://github.com/XTLS/Xray-core/releases/latest/download/${XRAY_FILENAME}"
-        "https://ghproxy.net/https://github.com/XTLS/Xray-core/releases/latest/download/${XRAY_FILENAME}"
         "https://gh-proxy.com/https://github.com/XTLS/Xray-core/releases/latest/download/${XRAY_FILENAME}"
+        "https://ghfast.top/https://github.com/XTLS/Xray-core/releases/latest/download/${XRAY_FILENAME}"
+        "https://ghproxy.net/https://github.com/XTLS/Xray-core/releases/latest/download/${XRAY_FILENAME}"
         "https://mirror.ghproxy.com/https://github.com/XTLS/Xray-core/releases/latest/download/${XRAY_FILENAME}"
     )
 
@@ -244,12 +263,127 @@ fetch_xray() {
     return 1
 }
 
-if [ "$AUTO_MODE" -eq 1 ]; then
-    if [ "$SB_INSTALLED" = "Не установлено" ]; then
-        fetch_singbox || true
+fetch_hysteria() {
+    echo -e "${CYAN}[+] Загрузка Hysteria 2 из официального репозитория apernet/hysteria...${NC}"
+    local HY_FILENAME="hysteria-linux-${ARCH_HYSTERIA}"
+    local HY_DEST="$BIN_DIR/hysteria-linux-${ARCH_HYSTERIA}"
+    local HY_SYMLINK="$BIN_DIR/hysteria"
+
+    if [ "$OS" = "windows" ]; then
+        HY_FILENAME="hysteria-windows-${ARCH_HYSTERIA}.exe"
+        HY_DEST="$BIN_DIR/hysteria-windows-${ARCH_HYSTERIA}.exe"
+        HY_SYMLINK="$BIN_DIR/hysteria.exe"
+    elif [ "$OS" = "macos" ]; then
+        HY_FILENAME="hysteria-darwin-${ARCH_HYSTERIA}"
+        HY_DEST="$BIN_DIR/hysteria-darwin-${ARCH_HYSTERIA}"
+        HY_SYMLINK="$BIN_DIR/hysteria"
     fi
-else
+
+    local HY_CANDIDATES=(
+        "https://github.com/apernet/hysteria/releases/latest/download/${HY_FILENAME}"
+        "https://gh-proxy.com/https://github.com/apernet/hysteria/releases/latest/download/${HY_FILENAME}"
+        "https://ghfast.top/https://github.com/apernet/hysteria/releases/latest/download/${HY_FILENAME}"
+        "https://ghproxy.net/https://github.com/apernet/hysteria/releases/latest/download/${HY_FILENAME}"
+        "https://mirror.ghproxy.com/https://github.com/apernet/hysteria/releases/latest/download/${HY_FILENAME}"
+    )
+
+    local TMP_HY="/tmp/${HY_FILENAME}.$$"
+    for URL in "${HY_CANDIDATES[@]}"; do
+        rm -f "$TMP_HY"
+        if curl "${CURL_OPTS[@]}" -o "$TMP_HY" "$URL" 2>/dev/null; then
+            if [ -s "$TMP_HY" ] && ! head -n 1 "$TMP_HY" | grep -iqE "<!DOCTYPE|<html|404: Not Found|\{\"message\":"; then
+                rm -f "$HY_DEST"
+                mv -f "$TMP_HY" "$HY_DEST"
+                chmod +x "$HY_DEST" 2>/dev/null || true
+
+                # Create alias / symlink
+                if [ "$OS" != "windows" ]; then
+                    ln -sf "$HY_DEST" "$HY_SYMLINK" 2>/dev/null || cp -f "$HY_DEST" "$HY_SYMLINK" 2>/dev/null || true
+                else
+                    cp -f "$HY_DEST" "$HY_SYMLINK" 2>/dev/null || true
+                fi
+                chmod +x "$HY_SYMLINK" 2>/dev/null || true
+
+                echo -e "${GREEN}✓ Hysteria 2 успешно установлена в $BIN_DIR${NC}"
+                return 0
+            fi
+        fi
+    done
+
+    echo -e "${RED}⚠️ Не удалось загрузить Hysteria 2 напрямую${NC}"
+    return 1
+}
+
+fetch_geodata() {
+    # Ensure geoip.dat and geosite.dat exist
+    if [ ! -f "$BIN_DIR/geoip.dat" ] || [ ! -f "$BIN_DIR/geosite.dat" ]; then
+        echo -e "${CYAN}[+] Загрузка баз маршрутизации geoip.dat и geosite.dat...${NC}"
+        local GEOIP_URLS=(
+            "https://github.com/Loyalsoldier/v2ray-rules-dat/releases/latest/download/geoip.dat"
+            "https://gh-proxy.com/https://github.com/Loyalsoldier/v2ray-rules-dat/releases/latest/download/geoip.dat"
+            "https://ghfast.top/https://github.com/Loyalsoldier/v2ray-rules-dat/releases/latest/download/geoip.dat"
+        )
+        local GEOSITE_URLS=(
+            "https://github.com/Loyalsoldier/v2ray-rules-dat/releases/latest/download/geosite.dat"
+            "https://gh-proxy.com/https://github.com/Loyalsoldier/v2ray-rules-dat/releases/latest/download/geosite.dat"
+            "https://ghfast.top/https://github.com/Loyalsoldier/v2ray-rules-dat/releases/latest/download/geosite.dat"
+        )
+
+        if [ ! -f "$BIN_DIR/geoip.dat" ]; then
+            for u in "${GEOIP_URLS[@]}"; do
+                if curl "${CURL_OPTS[@]}" -o "$BIN_DIR/geoip.dat" "$u" 2>/dev/null && [ -s "$BIN_DIR/geoip.dat" ]; then
+                    break
+                fi
+            done
+        fi
+
+        if [ ! -f "$BIN_DIR/geosite.dat" ]; then
+            for u in "${GEOSITE_URLS[@]}"; do
+                if curl "${CURL_OPTS[@]}" -o "$BIN_DIR/geosite.dat" "$u" 2>/dev/null && [ -s "$BIN_DIR/geosite.dat" ]; then
+                    break
+                fi
+            done
+        fi
+    fi
+}
+
+if [ "$AUTO_MODE" -eq 1 ]; then
+    echo -e "${CYAN}[+] Автоматическая загрузка proxy-движков для Sentinel-Panel...${NC}"
     fetch_singbox || true
+    fetch_xray || true
+    fetch_hysteria || true
+    fetch_geodata || true
+else
+    DEFAULT_PROXY_CHOICE="1"
+    echo ""
+    echo -e "${CYAN}====================================================${NC}"
+    echo -e "${BLUE}🚀  ВЫБОР PROXY-ДВИЖКОВ ДЛЯ ПАНЕЛИ${NC}"
+    echo -e "${CYAN}====================================================${NC}"
+    echo -e "📌 Текущее состояние:"
+    echo -e "  • ${YELLOW}Sing-box:${NC}   $SB_INSTALLED"
+    echo -e "  • ${YELLOW}Xray-core:${NC}  $XRAY_INSTALLED"
+    echo -e "  • ${YELLOW}Hysteria 2:${NC} $HYSTERIA_INSTALLED"
+    echo -e "${CYAN}====================================================${NC}"
+    echo -e "Варианты установки:"
+    echo -e "  1) ${GREEN}🟢 Установить ВСЕ движки (Sing-box + Xray-core + Hysteria 2) [Рекомендуется]${NC}"
+    echo -e "  2) 🟡 Только Sing-box"
+    echo -e "  3) 🟡 Только Xray-core"
+    echo -e "  4) 🟡 Только Hysteria 2"
+    echo -e "  5) ⏹️  Оставить текущие версии (Пропустить обновление)"
+    read -t 15 -p "Выберите вариант [1-5] (по умолчанию $DEFAULT_PROXY_CHOICE): " PROXY_CHOICE || PROXY_CHOICE="$DEFAULT_PROXY_CHOICE"
+    PROXY_CHOICE="${PROXY_CHOICE:-$DEFAULT_PROXY_CHOICE}"
+
+    case "$PROXY_CHOICE" in
+        1) fetch_singbox; fetch_xray; fetch_hysteria; fetch_geodata ;;
+        2) fetch_singbox ;;
+        3) fetch_xray; fetch_geodata ;;
+        4) fetch_hysteria ;;
+        5) echo -e "${GREEN}[+] Обновление прокси-движков пропущено.${NC}" ;;
+        *) fetch_singbox; fetch_xray; fetch_hysteria; fetch_geodata ;;
+    esac
 fi
+
+# Ensure all binaries in bin are executable
+chmod +x "$BIN_DIR"/* 2>/dev/null || true
 
 exit 0
