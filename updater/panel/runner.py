@@ -142,6 +142,21 @@ class PanelRunner:
             if target_ver:
                 core_mgr.download_core(target_ver)
 
+            # Ensure proxy engines are also present
+            fetch_proxy_sh = os.path.join(self.project_dir, "installation", "fetch_proxy_core.sh")
+            if os.path.isfile(fetch_proxy_sh):
+                sb_bin = os.path.join(bin_dir, "sing-box")
+                xray_bin = os.path.join(bin_dir, "xray")
+                if not os.path.isfile(sb_bin) and not os.path.isfile(sb_bin + ".exe") or not os.path.isfile(xray_bin) and not os.path.isfile(xray_bin + ".exe"):
+                    log_info("Проверка и загрузка базовых proxy-движков...")
+                    proxy_cmd = ["bash", fetch_proxy_sh, bin_dir, "--auto"]
+                    if active_proxy:
+                        proxy_cmd.extend(["--proxy", active_proxy])
+                    try:
+                        subprocess.run(proxy_cmd, timeout=120)
+                    except Exception as e:
+                        log_warn(f"Не удалось автоматически загрузить proxy-движки: {e}")
+
             # Step 4: Docker Containers Build & Restart
             docker_mgr = DockerManager(project_dir=self.project_dir, proxy_url=active_proxy)
             if not self.skip_docker:
