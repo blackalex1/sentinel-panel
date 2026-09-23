@@ -211,9 +211,12 @@ let tg2faPollInterval = null;
 function startTg2faPolling(token) {
     if (tg2faPollInterval) {
         clearInterval(tg2faPollInterval);
+        tg2faPollInterval = null;
     }
     const errorDiv = document.getElementById("login-error");
     const tgMsgDiv = document.getElementById("login-tg-2fa-message");
+    const totpDivider = document.getElementById("login-2fa-divider");
+    const totpGroup = document.getElementById("login-totp-group");
     const btnBack = document.getElementById("btn-login-2fa-back");
 
     tg2faPollInterval = setInterval(async () => {
@@ -236,8 +239,14 @@ function startTg2faPolling(token) {
                 } else if (res.status === "expired") {
                     clearInterval(tg2faPollInterval);
                     tg2faPollInterval = null;
-                    if (errorDiv) errorDiv.innerText = t("login_time_expired", "Время подтверждения входа истекло.");
-                    if (btnBack) btnBack.click();
+                    if (totpGroup && totpGroup.style.display !== "none") {
+                        if (tgMsgDiv) tgMsgDiv.style.display = "none";
+                        if (totpDivider) totpDivider.style.display = "none";
+                        if (errorDiv) errorDiv.innerText = t("login_tg_expired_fallback", "Время подтверждения в Telegram истекло. Используйте код аутентификатора.");
+                    } else {
+                        if (errorDiv) errorDiv.innerText = t("login_time_expired", "Время подтверждения входа истекло.");
+                        if (btnBack) btnBack.click();
+                    }
                 }
             }
         } catch (e) {
@@ -253,26 +262,47 @@ function setupLoginListener() {
     const btnBack = document.getElementById("btn-login-2fa-back");
     const totpInput = document.getElementById("login-totp-code");
     const totpGroup = document.getElementById("login-totp-group");
+    const totpDivider = document.getElementById("login-2fa-divider");
     const tgMsgDiv = document.getElementById("login-tg-2fa-message");
+    const btnSubmit = document.getElementById("btn-login-submit");
     
     let is2faState = false;
+    let isSubmitting = false;
     let cachedUsername = "";
     let cachedPassword = "";
     let currentTgToken = "";
 
+    if (totpInput) {
+        totpInput.addEventListener("input", () => {
+            totpInput.value = totpInput.value.replace(/\D/g, "").slice(0, 6);
+        });
+    }
+
+    function resetSubmitButton() {
+        if (btnSubmit) {
+            btnSubmit.disabled = false;
+            btnSubmit.innerHTML = '<i class="fa-solid fa-right-to-bracket"></i> <span data-i18n="login_btn">' + t("login_btn", "Войти в систему") + '</span>';
+        }
+    }
+
     if (btnBack) {
         btnBack.addEventListener("click", () => {
             is2faState = false;
+            isSubmitting = false;
             if (tg2faPollInterval) {
                 clearInterval(tg2faPollInterval);
                 tg2faPollInterval = null;
             }
+            currentTgToken = "";
             if (credentialsGroup) credentialsGroup.style.display = "block";
             if (faGroup) faGroup.style.display = "none";
             if (btnBack) btnBack.style.display = "none";
             if (totpInput) totpInput.value = "";
+            if (totpDivider) totpDivider.style.display = "none";
             if (tgMsgDiv) tgMsgDiv.style.display = "none";
             if (totpGroup) totpGroup.style.display = "block";
+            if (btnSubmit) btnSubmit.style.display = "";
+            resetSubmitButton();
             const errorDiv = document.getElementById("login-error");
             if (errorDiv) errorDiv.innerText = "";
         });
@@ -281,6 +311,8 @@ function setupLoginListener() {
     if (loginForm) {
         loginForm.addEventListener("submit", async (e) => {
             e.preventDefault();
+            if (isSubmitting) return;
+
             const errorDiv = document.getElementById("login-error");
             if (errorDiv) errorDiv.innerText = "";
             
@@ -304,6 +336,7 @@ function setupLoginListener() {
                 const code = totpInput ? totpInput.value.trim() : "";
                 if (!code || code.length !== 6 || isNaN(code)) {
                     if (errorDiv) errorDiv.innerText = t("login_empty_2fa_code", "Введите 6-значный код");
+                    if (totpInput) totpInput.focus();
                     return;
                 }
                 payload = { username: cachedUsername, password: cachedPassword, code };
@@ -312,51 +345,86 @@ function setupLoginListener() {
                 }
             }
             
-            const res = await apiFetch("/login", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(payload)
-            });
-            
-            if (res && res.success) {
-                if (res.requires_2fa) {
-                    is2faState = true;
-                    if (credentialsGroup) credentialsGroup.style.display = "none";
-                    if (faGroup) faGroup.style.display = "block";
-                    if (btnBack) btnBack.style.display = "block";
-                    
-                    if (res.type === "tg_2fa") {
-                        if (totpGroup) totpGroup.style.display = "none";
-                        if (tgMsgDiv) tgMsgDiv.style.display = "block";
-                        currentTgToken = res.token;
-                        startTg2faPolling(res.token);
-                    } else if (res.type === "both") {
-                        if (totpGroup) totpGroup.style.display = "block";
-                        if (tgMsgDiv) tgMsgDiv.style.display = "block";
-                        if (totpInput) totpInput.focus();
-                        currentTgToken = res.token;
-                        startTg2faPolling(res.token);
+            isSubmitting = true;
+            if (btnSubmit) {
+                btnSubmit.disabled = true;
+                btnSubmit.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i>';
+            }
+
+            try {
+                const res = await apiFetch("/login", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(payload)
+                });
+                
+                if (res && res.success) {
+                    if (res.requires_2fa) {
+                        is2faState = true;
+                        if (credentialsGroup) credentialsGroup.style.display = "none";
+                        if (faGroup) faGroup.style.display = "block";
+                        if (btnBack) btnBack.style.display = "block";
+                        
+                        if (res.type === "tg_2fa") {
+                            if (totpGroup) totpGroup.style.display = "none";
+                            if (totpDivider) totpDivider.style.display = "none";
+                            if (tgMsgDiv) tgMsgDiv.style.display = "block";
+                            if (btnSubmit) btnSubmit.style.display = "none";
+                            currentTgToken = res.token;
+                            startTg2faPolling(res.token);
+                        } else if (res.type === "both") {
+                            if (totpGroup) totpGroup.style.display = "block";
+                            if (totpDivider) totpDivider.style.display = "flex";
+                            if (tgMsgDiv) tgMsgDiv.style.display = "block";
+                            if (btnSubmit) btnSubmit.style.display = "";
+                            if (totpInput) {
+                                totpInput.value = "";
+                                totpInput.focus();
+                            }
+                            currentTgToken = res.token;
+                            startTg2faPolling(res.token);
+                        } else {
+                            if (totpGroup) totpGroup.style.display = "block";
+                            if (totpDivider) totpDivider.style.display = "none";
+                            if (tgMsgDiv) tgMsgDiv.style.display = "none";
+                            if (btnSubmit) btnSubmit.style.display = "";
+                            if (totpInput) {
+                                totpInput.value = "";
+                                totpInput.focus();
+                            }
+                            currentTgToken = "";
+                        }
+                        resetSubmitButton();
+                        isSubmitting = false;
                     } else {
-                        if (totpGroup) totpGroup.style.display = "block";
-                        if (tgMsgDiv) tgMsgDiv.style.display = "none";
-                        if (totpInput) totpInput.focus();
-                        currentTgToken = "";
+                        if (tg2faPollInterval) {
+                            clearInterval(tg2faPollInterval);
+                            tg2faPollInterval = null;
+                        }
+                        const csrfRes = await apiFetch("/csrf-token");
+                        if (csrfRes && csrfRes.success) {
+                            setCsrfToken(csrfRes.obj);
+                        }
+                        await startPanel();
                     }
                 } else {
-                    if (tg2faPollInterval) {
-                        clearInterval(tg2faPollInterval);
-                        tg2faPollInterval = null;
+                    if (errorDiv) {
+                        errorDiv.innerText = (res && res.msg) ? res.msg : t("login_failed", "Не удалось авторизоваться");
                     }
-                    const csrfRes = await apiFetch("/csrf-token");
-                    if (csrfRes && csrfRes.success) {
-                        setCsrfToken(csrfRes.obj);
+                    resetSubmitButton();
+                    isSubmitting = false;
+                    if (is2faState && totpInput) {
+                        totpInput.focus();
+                        totpInput.select();
                     }
-                    await startPanel();
                 }
-            } else {
+            } catch (err) {
+                console.error("Login submission error:", err);
                 if (errorDiv) {
-                    errorDiv.innerText = res ? res.msg : t("login_failed", "Не удалось авторизоваться");
+                    errorDiv.innerText = t("login_failed", "Не удалось авторизоваться");
                 }
+                resetSubmitButton();
+                isSubmitting = false;
             }
         });
     }
