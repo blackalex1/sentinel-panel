@@ -140,11 +140,11 @@ def test_hysteria_endpoints(client):
     assert response.json()["current"].startswith("v2.")
 
     # 9. Update without auth -> 404
-    response = client.post("/api/hysteria/update", json={"download_url": "https://github.com/apernet/hysteria/releases/download/v2.5.0/hysteria-linux-amd64"})
+    response = client.post("/api/hysteria/update", json={"download_url": "https://github.com/HyNetworks/hysteria/releases/download/v2.5.0/hysteria-linux-amd64"})
     assert response.status_code == 404
 
     # 10. Update with auth -> 200
-    response = client.post("/api/hysteria/update", json={"download_url": "https://github.com/apernet/hysteria/releases/download/v2.5.0/hysteria-linux-amd64"}, headers=headers)
+    response = client.post("/api/hysteria/update", json={"download_url": "https://github.com/HyNetworks/hysteria/releases/download/v2.5.0/hysteria-linux-amd64"}, headers=headers)
     assert response.status_code == 200
     assert isinstance(response.json()["success"], bool)
 
@@ -205,11 +205,11 @@ def test_hysteria_version_api(client, monkeypatch):
                 "assets": [
                     {
                         "name": "hysteria-windows-amd64.exe",
-                        "browser_download_url": "https://github.com/apernet/hysteria/releases/download/app/v2.9.2/hysteria-windows-amd64.exe"
+                        "browser_download_url": "https://github.com/HyNetworks/hysteria/releases/download/app/v2.9.2/hysteria-windows-amd64.exe"
                     },
                     {
                         "name": "hysteria-linux-amd64",
-                        "browser_download_url": "https://github.com/apernet/hysteria/releases/download/app/v2.9.2/hysteria-linux-amd64"
+                        "browser_download_url": "https://github.com/HyNetworks/hysteria/releases/download/app/v2.9.2/hysteria-linux-amd64"
                     }
                 ]
             }
@@ -243,7 +243,7 @@ def test_download_hysteria_core_verification_failure_actual(monkeypatch, tmp_pat
     # Mock get_latest_hysteria_version_info
     monkeypatch.setattr(backend.hysteria, "get_latest_hysteria_version_info", lambda: {
         "version": "v2.5.0",
-        "download_url": "https://github.com/apernet/hysteria/releases/download/v2.5.0/hysteria"
+        "download_url": "https://github.com/HyNetworks/hysteria/releases/download/v2.5.0/hysteria"
     })
     
     # Mock requests.get
@@ -258,8 +258,8 @@ def test_download_hysteria_core_verification_failure_actual(monkeypatch, tmp_pat
                 {
                     "tag_name": "app/v2.5.0",
                     "assets": [
-                        {"name": "hysteria-windows-amd64.exe", "browser_download_url": "https://github.com/apernet/hysteria/releases/download/v2.5.0/hysteria"},
-                        {"name": "hysteria-linux-amd64", "browser_download_url": "https://github.com/apernet/hysteria/releases/download/v2.5.0/hysteria"}
+                        {"name": "hysteria-windows-amd64.exe", "browser_download_url": "https://github.com/HyNetworks/hysteria/releases/download/v2.5.0/hysteria"},
+                        {"name": "hysteria-linux-amd64", "browser_download_url": "https://github.com/HyNetworks/hysteria/releases/download/v2.5.0/hysteria"}
                     ]
                 }
             ]
