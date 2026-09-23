@@ -264,7 +264,7 @@ fetch_xray() {
 }
 
 fetch_hysteria() {
-    echo -e "${CYAN}[+] Загрузка Hysteria 2 из официального репозитория apernet/hysteria...${NC}"
+    echo -e "${CYAN}[+] Загрузка Hysteria 2 из официального репозитория HyNetworks/hysteria...${NC}"
     local HY_FILENAME="hysteria-linux-${ARCH_HYSTERIA}"
     local HY_DEST="$BIN_DIR/hysteria-linux-${ARCH_HYSTERIA}"
     local HY_SYMLINK="$BIN_DIR/hysteria"
@@ -280,11 +280,11 @@ fetch_hysteria() {
     fi
 
     local HY_CANDIDATES=(
-        "https://github.com/apernet/hysteria/releases/latest/download/${HY_FILENAME}"
-        "https://gh-proxy.com/https://github.com/apernet/hysteria/releases/latest/download/${HY_FILENAME}"
-        "https://ghfast.top/https://github.com/apernet/hysteria/releases/latest/download/${HY_FILENAME}"
-        "https://ghproxy.net/https://github.com/apernet/hysteria/releases/latest/download/${HY_FILENAME}"
-        "https://mirror.ghproxy.com/https://github.com/apernet/hysteria/releases/latest/download/${HY_FILENAME}"
+        "https://github.com/HyNetworks/hysteria/releases/latest/download/${HY_FILENAME}"
+        "https://gh-proxy.com/https://github.com/HyNetworks/hysteria/releases/latest/download/${HY_FILENAME}"
+        "https://ghfast.top/https://github.com/HyNetworks/hysteria/releases/latest/download/${HY_FILENAME}"
+        "https://ghproxy.net/https://github.com/HyNetworks/hysteria/releases/latest/download/${HY_FILENAME}"
+        "https://mirror.ghproxy.com/https://github.com/HyNetworks/hysteria/releases/latest/download/${HY_FILENAME}"
     )
 
     local TMP_HY="/tmp/${HY_FILENAME}.$$"

@@ -20,7 +20,7 @@ CACHE_TTL = 3600  # 1 hour cache for releases
 
 def _fetch_hysteria_releases_atom(include_prerelease: bool = False, limit: int = 20) -> list[dict]:
     try:
-        url = "https://github.com/apernet/hysteria/releases.atom"
+        url = "https://github.com/HyNetworks/hysteria/releases.atom"
         resp = requests.get(url, headers=HEADERS, timeout=6)
         if resp.status_code != 200:
             return []
@@ -53,7 +53,7 @@ def _fetch_hysteria_releases_atom(include_prerelease: bool = False, limit: int =
                 target_name = f"hysteria-windows-arm64.exe" if is_arm else f"hysteria-windows-amd64.exe"
             else:
                 target_name = f"hysteria-linux-arm64" if is_arm else f"hysteria-linux-amd64"
-            download_url = f"https://github.com/apernet/hysteria/releases/download/{tag}/{target_name}"
+            download_url = f"https://github.com/HyNetworks/hysteria/releases/download/{tag}/{target_name}"
             releases.append({
                 "version": clean_tag,
                 "download_url": download_url,
@@ -77,7 +77,7 @@ def get_hysteria_releases(include_prerelease: bool = False, limit: int = 20) -> 
         if now - ts < CACHE_TTL and cached:
             return cached
 
-    url = "https://api.github.com/repos/apernet/hysteria/releases"
+    url = "https://api.github.com/repos/HyNetworks/hysteria/releases"
     releases = []
     try:
         response = requests.get(url, headers=HEADERS, timeout=6)
@@ -141,7 +141,7 @@ def get_latest_hysteria_version_info(include_prerelease: bool = False):
         if now - ts < CACHE_TTL and cached:
             return cached
 
-    url = "https://api.github.com/repos/apernet/hysteria/releases/latest"
+    url = "https://api.github.com/repos/HyNetworks/hysteria/releases/latest"
     try:
         response = requests.get(url, headers=HEADERS, timeout=3)
         if response.status_code == 200:
@@ -190,7 +190,7 @@ def download_hysteria_core(download_url: str = None):
             is_safe = (
                 parsed.scheme == "https"
                 and parsed.netloc.lower() == "github.com"
-                and path_lower.startswith("/apernet/hysteria/releases/download/")
+                and path_lower.startswith("/hynetworks/hysteria/releases/download/")
             )
         except Exception:
             is_safe = False
