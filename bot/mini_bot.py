@@ -687,6 +687,12 @@ if dp:
 
     @dp.callback_query(F.data.startswith("tg_2fa_approve:"))
     async def cb_tg_2fa_approve(callback: CallbackQuery):
+        user_id = callback.from_user.id
+        lang = callback.from_user.language_code or "ru"
+        if not is_admin(user_id):
+            await callback.answer(t("access_denied_general", lang, "bot"), show_alert=True)
+            return
+
         token = callback.data.split(":", 1)[1]
         import aiohttp
         url = f"http://127.0.0.1:{settings.PANEL_PORT}/api/auth/tg-2fa/action"
@@ -708,6 +714,12 @@ if dp:
 
     @dp.callback_query(F.data.startswith("tg_2fa_block:"))
     async def cb_tg_2fa_block(callback: CallbackQuery):
+        user_id = callback.from_user.id
+        lang = callback.from_user.language_code or "ru"
+        if not is_admin(user_id):
+            await callback.answer(t("access_denied_general", lang, "bot"), show_alert=True)
+            return
+
         parts = callback.data.split(":", 1)
         token = parts[1]
         

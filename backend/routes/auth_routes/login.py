@@ -162,16 +162,19 @@ async def login_api(request: Request, response: Response):
             
             if totp_active or telegram_active:
                 code = None
+                req_token = None
                 if "application/json" in content_type:
                     try:
                         body = await request.json()
                         code = body.get("code")
+                        req_token = body.get("token")
                     except Exception:
                         pass
                 else:
                     try:
                         form = await request.form()
                         code = form.get("code")
+                        req_token = form.get("token")
                     except Exception:
                         pass
                 
@@ -180,6 +183,10 @@ async def login_api(request: Request, response: Response):
                     from backend.totp import verify_totp_token
                     if verify_totp_token(totp_secret, code):
                         totp_verified = True
+                        if req_token:
+                            from backend.models import SystemSetting
+                            session.query(SystemSetting).filter_by(key=f"tg_2fa_req_{req_token}").delete()
+                            session.commit()
                 
                 if not totp_verified:
                     if totp_active and code:
