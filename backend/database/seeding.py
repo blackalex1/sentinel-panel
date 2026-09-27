@@ -11,7 +11,7 @@ from backend.config import settings, DB_PATH
 from backend.models import (
     Base, User, Inbound, ClientStats, SystemSetting, Outbound, RoutingRule, UserSession
 )
-from backend.database.connection import db_session
+from backend.database.connection import db_session, normalize_database_url
 from backend.database.crud.auth import hash_password
 
 def init_db():
@@ -20,8 +20,8 @@ def init_db():
     admin_url = settings.DATABASE_ADMIN_URL or settings.DATABASE_URL
     if not admin_url:
         admin_url = f"sqlite:///{DB_PATH}"
-    if admin_url.startswith("postgres://"):
-        admin_url = admin_url.replace("postgres://", "postgresql://", 1)
+    else:
+        admin_url = normalize_database_url(admin_url)
         
     connect_args_admin = {}
     if admin_url.startswith("sqlite"):

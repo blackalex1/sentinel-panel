@@ -6,14 +6,48 @@ from sqlalchemy.orm import sessionmaker, scoped_session
 from backend.config import settings, DB_PATH
 from backend.models import Base
 
+def normalize_database_url(url: str) -> str:
+    """
+    Нормализует URL базы данных PostgreSQL, обеспечивая совместимость драйверов
+    (psycopg v3 и psycopg2) как для SQLAlchemy 2.0, так и для SQLAlchemy 2.1+.
+    """
+    if not url:
+        return url
+    if url.startswith("postgres://"):
+        url = url.replace("postgres://", "postgresql://", 1)
+
+    has_psycopg = False
+    try:
+        import psycopg  # noqa: F401
+        has_psycopg = True
+    except ImportError:
+        pass
+
+    has_psycopg2 = False
+    try:
+        import psycopg2  # noqa: F401
+        has_psycopg2 = True
+    except ImportError:
+        pass
+
+    if url.startswith("postgresql://"):
+        if not has_psycopg and has_psycopg2:
+            url = url.replace("postgresql://", "postgresql+psycopg2://", 1)
+        elif has_psycopg and not has_psycopg2:
+            url = url.replace("postgresql://", "postgresql+psycopg://", 1)
+    elif url.startswith("postgresql+psycopg://") and not has_psycopg and has_psycopg2:
+        url = url.replace("postgresql+psycopg://", "postgresql+psycopg2://", 1)
+    elif url.startswith("postgresql+psycopg2://") and not has_psycopg2 and has_psycopg:
+        url = url.replace("postgresql+psycopg2://", "postgresql+psycopg://", 1)
+
+    return url
+
 # Определяем URL подключения (DML для приложения)
 database_url = settings.DATABASE_URL
 if not database_url:
     database_url = f"sqlite:///{DB_PATH}"
-
-# Обеспечиваем совместимость с префиксом postgres://
-if database_url.startswith("postgres://"):
-    database_url = database_url.replace("postgres://", "postgresql://", 1)
+else:
+    database_url = normalize_database_url(database_url)
 
 # Добавляем параметры подключения для SQLite
 connect_args = {}

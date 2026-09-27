@@ -49,12 +49,14 @@ def ensure_postgres_db_exists(admin_url: str):
         return
         
     from sqlalchemy import create_engine, text
+    from backend.database.connection import normalize_database_url
+    admin_url = normalize_database_url(admin_url)
     parsed = urllib.parse.urlparse(admin_url)
     db_name = parsed.path.lstrip("/")
     
     # Подключаемся к системной БД postgres для выполнения DDL-команды создания базы
     postgres_parsed = parsed._replace(path="/postgres")
-    postgres_url = urllib.parse.urlunparse(postgres_parsed)
+    postgres_url = normalize_database_url(urllib.parse.urlunparse(postgres_parsed))
     
     # Используем AUTOCOMMIT для выполнения CREATE DATABASE вне транзакции
     temp_engine = create_engine(postgres_url, isolation_level="AUTOCOMMIT")
