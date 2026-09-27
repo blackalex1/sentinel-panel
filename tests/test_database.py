@@ -90,3 +90,56 @@ def test_database_crud():
     d_success = delete_inbound(ib_id)
     assert d_success is True
     assert get_inbound_by_id(ib_id) is None
+
+
+def test_normalize_database_url():
+    """Test auto-detection and normalization of PostgreSQL database URLs."""
+    from backend.database.connection import normalize_database_url
+
+    # SQLite URLs should remain unchanged
+    assert normalize_database_url("sqlite:///app/panel.db") == "sqlite:///app/panel.db"
+    assert normalize_database_url("") == ""
+
+    # Legacy postgres:// prefix should be converted
+    res_legacy = normalize_database_url("postgres://user:pass@127.0.0.1:5432/db")
+    assert res_legacy.startswith("postgresql")
+
+    # In our current test environment (where psycopg2 is installed and psycopg is not),
+    # postgresql:// should normalize to postgresql+psycopg2://
+    res = normalize_database_url("postgresql://user:pass@127.0.0.1:5432/db")
+    assert res.startswith("postgresql")
+    try:
+        import psycopg
+        assert res == "postgresql://user:pass@127.0.0.1:5432/db" or "psycopg" in res
+    except ImportError:
+        try:
+            import psycopg2
+            assert res == "postgresql+psycopg2://user:pass@127.0.0.1:5432/db"
+        except ImportError:
+            pass
+
+    # Test with monkeypatched modules
+    import sys
+    orig_modules = dict(sys.modules)
+    try:
+        # Scenario A: only psycopg2 available
+        sys.modules["psycopg"] = None
+        sys.modules["psycopg2"] = type(sys)("psycopg2")
+        assert normalize_database_url("postgresql://u:p@127.0.0.1/db") == "postgresql+psycopg2://u:p@127.0.0.1/db"
+        assert normalize_database_url("postgresql+psycopg://u:p@127.0.0.1/db") == "postgresql+psycopg2://u:p@127.0.0.1/db"
+
+        # Scenario B: only psycopg available
+        sys.modules["psycopg"] = type(sys)("psycopg")
+        sys.modules["psycopg2"] = None
+        assert normalize_database_url("postgresql://u:p@127.0.0.1/db") == "postgresql+psycopg://u:p@127.0.0.1/db"
+        assert normalize_database_url("postgresql+psycopg2://u:p@127.0.0.1/db") == "postgresql+psycopg://u:p@127.0.0.1/db"
+
+        # Scenario C: both available (prefers default postgresql:// for SQLAlchemy 2.1+)
+        sys.modules["psycopg"] = type(sys)("psycopg")
+        sys.modules["psycopg2"] = type(sys)("psycopg2")
+        assert normalize_database_url("postgresql://u:p@127.0.0.1/db") == "postgresql://u:p@127.0.0.1/db"
+    finally:
+        sys.modules.clear()
+        sys.modules.update(orig_modules)
+
+
