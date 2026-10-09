@@ -256,4 +256,45 @@ def reset_all_traffics_db() -> bool:
         return True
 
 
+def sanitize_anomalous_traffic_db(threshold_bytes: int = 100 * 1024 * 1024 * 1024 * 1024) -> int:
+    """
+    Finds and resets client, inbound, and daily traffic records with impossible / corrupted traffic (> 100 TB),
+    which resulted from compounding cumulative counter bugs. Re-syncs the live traffic baseline and
+    returns the total number of repaired client records.
+    """
+    from backend.models import Inbound, ClientTrafficDaily
+    repaired_count = 0
+    with backend.database.db_session() as session:
+        corrupted_clients = session.query(ClientStats).filter(
+            (ClientStats.down > threshold_bytes) | (ClientStats.up > threshold_bytes)
+        ).all()
+        for c in corrupted_clients:
+            c.down = 0
+            c.up = 0
+            c.last_seen_down = 0
+            c.last_seen_up = 0
+            repaired_count += 1
+
+        corrupted_inbounds = session.query(Inbound).filter(
+            (Inbound.down > threshold_bytes) | (Inbound.up > threshold_bytes)
+        ).all()
+        for ib in corrupted_inbounds:
+            clients_sum = session.query(ClientStats).filter_by(inbound_id=ib.id).all()
+            ib.down = sum(cl.down for cl in clients_sum)
+            ib.up = sum(cl.up for cl in clients_sum)
+
+        session.query(ClientTrafficDaily).filter(
+            (ClientTrafficDaily.down > threshold_bytes) | (ClientTrafficDaily.up > threshold_bytes)
+        ).delete()
+
+    if repaired_count > 0:
+        try:
+            from backend.sentinel_core_bridge import sync_unified_traffic_baseline
+            sync_unified_traffic_baseline()
+        except Exception:
+            pass
+
+    return repaired_count
+
+
 

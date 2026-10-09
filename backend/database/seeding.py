@@ -379,3 +379,12 @@ def init_db():
                 logging.info(f"[Auto-Migration] Successfully removed {deleted_count} deprecated default routing rules.")
     except Exception as e:
         logging.error(f"[Auto-Migration] Failed to remove deprecated default routing rules: {e}")
+
+    # 10. Auto-remediation: repair anomalous Petabyte/inflated traffic counters caused by compounding bugs
+    try:
+        from backend.database.crud.clients import sanitize_anomalous_traffic_db
+        repaired = sanitize_anomalous_traffic_db()
+        if repaired > 0:
+            logging.info(f"[Auto-Remediation] Repaired {repaired} client traffic record(s) with anomalous/inflated stats.")
+    except Exception as e:
+        logging.error(f"[Auto-Remediation] Failed to sanitize anomalous traffic: {e}")

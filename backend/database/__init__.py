@@ -56,6 +56,7 @@ from backend.database.crud.clients import (
     reset_all_client_traffics_for_inbound_db,
     reset_client_traffic_globally_db,
     reset_all_traffics_db,
+    sanitize_anomalous_traffic_db,
 )
 
 from backend.database.crud.settings import (
