@@ -324,9 +324,9 @@ async def reset_client_traffic_api(request: Request, inbound_id: int, email: str
         return decoy_response()
     lang = get_lang(request)
     from backend.database import reset_client_traffic_db
-    from backend.sentinel_core_bridge import reset_unified_traffic_stats
+    from backend.sentinel_core_bridge import sync_client_traffic_baseline
     if reset_client_traffic_db(inbound_id, email):
-        reset_unified_traffic_stats()
+        sync_client_traffic_baseline(email)
         from backend.audit import log_action, get_actor_username
         actor = get_actor_username(request)
         log_action(actor, "reset_client_traffic", target=email, details=f"inbound_id:{inbound_id}")
@@ -340,9 +340,9 @@ async def reset_all_client_traffics_api(request: Request, inbound_id: int):
         return decoy_response()
     lang = get_lang(request)
     from backend.database import reset_all_client_traffics_for_inbound_db
-    from backend.sentinel_core_bridge import reset_unified_traffic_stats
+    from backend.sentinel_core_bridge import sync_unified_traffic_baseline
     if reset_all_client_traffics_for_inbound_db(inbound_id):
-        reset_unified_traffic_stats()
+        sync_unified_traffic_baseline()
         from backend.audit import log_action, get_actor_username
         actor = get_actor_username(request)
         log_action(actor, "reset_all_client_traffics", target=f"inbound_id:{inbound_id}")
@@ -356,9 +356,9 @@ async def reset_all_traffics_api(request: Request):
         return decoy_response()
     lang = get_lang(request)
     from backend.database import reset_all_traffics_db
-    from backend.sentinel_core_bridge import reset_unified_traffic_stats
+    from backend.sentinel_core_bridge import sync_unified_traffic_baseline
     if reset_all_traffics_db():
-        reset_unified_traffic_stats()
+        sync_unified_traffic_baseline()
         from backend.audit import log_action, get_actor_username
         actor = get_actor_username(request)
         log_action(actor, "reset_all_traffics", target="global")

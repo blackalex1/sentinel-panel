@@ -49,6 +49,8 @@ from backend.sentinel_core_bridge.traffic_sessions import (
     kick_client,
     query_all_cores_traffic,
     reset_unified_traffic_stats,
+    sync_unified_traffic_baseline,
+    sync_client_traffic_baseline,
 )
 
 from backend.sentinel_core_bridge.logs import (
@@ -111,6 +113,10 @@ __all__ = [
     "register_external_connect",
     "register_hysteria_port",
     "kick_client",
+    "query_all_cores_traffic",
+    "reset_unified_traffic_stats",
+    "sync_unified_traffic_baseline",
+    "sync_client_traffic_baseline",
     # Logs
     "get_core_logs",
     "pop_core_log_line",

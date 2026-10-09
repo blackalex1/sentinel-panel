@@ -246,3 +246,99 @@ def test_custom_token_uuid_and_bot_search_client_traffic_integration(monkeypatch
     assert client_item_2["down"] == 80 * 1024 * 1024
     assert client_item_2["up"] == 12 * 1024 * 1024
 
+
+def test_hysteria2_multi_poll_and_client_reset_isolation(client, monkeypatch):
+    """
+    Verifies that:
+    1. Consecutive polls of Hysteria 2 traffic with static cumulative stats DO NOT compound (no N*traffic inflation).
+    2. Incremental traffic increases (e.g. 50MB -> 60MB) are recorded as accurate deltas (10MB).
+    3. Resetting traffic for client A synchronizes their baseline and leaves client B completely intact.
+    4. sanitize_anomalous_traffic_db() safely detects and repairs impossible Petabyte values.
+    """
+    from backend.sentinel_core_bridge.traffic_sessions import (
+        reset_unified_traffic_stats,
+        sync_client_traffic_baseline,
+        query_all_cores_traffic,
+    )
+    from backend.database.crud.clients import (
+        reset_client_traffic_globally_db,
+        sanitize_anomalous_traffic_db,
+    )
+
+    reset_unified_traffic_stats()
+    user_a = "user_a@hysteria.test"
+    user_b = "user_b@hysteria.test"
+
+    with db_session() as session:
+        session.query(ClientTrafficDaily).delete()
+        session.query(ClientStats).delete()
+        session.query(Inbound).delete()
+        session.commit()
+
+        ib = Inbound(remark="Hysteria MultiPoll", port=21050, protocol="hysteria2", core="hysteria", enable=1)
+        session.add(ib)
+        session.commit()
+
+        ca = ClientStats(inbound_id=ib.id, email=user_a, client_uuid_or_pwd="pwd-a", up=0, down=0, enable=1)
+        cb = ClientStats(inbound_id=ib.id, email=user_b, client_uuid_or_pwd="pwd-b", up=0, down=0, enable=1)
+        session.add_all([ca, cb])
+        session.commit()
+
+    # 1. Simulate 5 consecutive 5-second polling intervals where core cumulative stats remain static at 50 MB / 5 MB
+    simulated_traffic = {
+        user_a: {"downBytes": 50 * 1024 * 1024, "upBytes": 5 * 1024 * 1024},
+        user_b: {"downBytes": 100 * 1024 * 1024, "upBytes": 10 * 1024 * 1024},
+    }
+    for poll in range(5):
+        query_all_cores_traffic(traffic_data_override=simulated_traffic)
+
+    # Verify NO compounding occurred! user_a must have 50MB (not 250MB), user_b must have 100MB (not 500MB)
+    with db_session() as session:
+        rec_a = session.query(ClientStats).filter_by(email=user_a).first()
+        rec_b = session.query(ClientStats).filter_by(email=user_b).first()
+        assert rec_a.down == 50 * 1024 * 1024, f"Expected 50MB down for user_a, got {rec_a.down}"
+        assert rec_a.up == 5 * 1024 * 1024, f"Expected 5MB up for user_a, got {rec_a.up}"
+        assert rec_b.down == 100 * 1024 * 1024, f"Expected 100MB down for user_b, got {rec_b.down}"
+        assert rec_b.up == 10 * 1024 * 1024, f"Expected 10MB up for user_b, got {rec_b.up}"
+
+    # 2. Incremental download: user_a transfers 10MB more (cumulative: 60MB), user_b idle (cumulative: 100MB)
+    simulated_traffic[user_a] = {"downBytes": 60 * 1024 * 1024, "upBytes": 6 * 1024 * 1024}
+    query_all_cores_traffic(traffic_data_override=simulated_traffic)
+
+    with db_session() as session:
+        rec_a = session.query(ClientStats).filter_by(email=user_a).first()
+        rec_b = session.query(ClientStats).filter_by(email=user_b).first()
+        assert rec_a.down == 60 * 1024 * 1024, f"Expected 60MB down for user_a, got {rec_a.down}"
+        assert rec_a.up == 6 * 1024 * 1024, f"Expected 6MB up for user_a, got {rec_a.up}"
+        assert rec_b.down == 100 * 1024 * 1024, f"Expected 100MB down for user_b, got {rec_b.down}"
+
+    # 3. Reset user_a traffic in DB and sync baseline
+    reset_client_traffic_globally_db(user_a)
+    sync_client_traffic_baseline(user_a)
+
+    # Next poll with same cumulative data from cores
+    query_all_cores_traffic(traffic_data_override=simulated_traffic)
+
+    with db_session() as session:
+        rec_a = session.query(ClientStats).filter_by(email=user_a).first()
+        rec_b = session.query(ClientStats).filter_by(email=user_b).first()
+        # user_a must remain at 0 (not re-polluted with old 60MB)
+        assert rec_a.down == 0, f"Expected 0MB down for reset user_a, got {rec_a.down}"
+        assert rec_a.up == 0, f"Expected 0MB up for reset user_a, got {rec_a.up}"
+        # user_b must NOT be doubled (stays at 100MB)
+        assert rec_b.down == 100 * 1024 * 1024, f"Expected user_b to stay at 100MB, got {rec_b.down}"
+
+    # 4. Corrupted Petabyte traffic remediation
+    with db_session() as session:
+        rec_b = session.query(ClientStats).filter_by(email=user_b).first()
+        rec_b.down = 5 * 1024 * 1024 * 1024 * 1024 * 1024  # 5 PB!
+        session.commit()
+
+    repaired = sanitize_anomalous_traffic_db()
+    assert repaired == 1
+
+    with db_session() as session:
+        rec_b = session.query(ClientStats).filter_by(email=user_b).first()
+        assert rec_b.down == 0
+
+
