@@ -60,7 +60,7 @@
 
 .tab-content.active {
     display: block;
-    animation: tabSlideIn var(--transition-normal) forwards;
+    animation: tabSlideIn var(--transition-normal);
 }
 
 @keyframes tabSlideIn {
@@ -158,8 +158,10 @@
     backdrop-filter: var(--blur-glass);
     border: 1px solid var(--border-color);
     transition: border-color var(--transition-normal), box-shadow var(--transition-normal);
-    isolation: isolate;
-    transform: translateZ(0);
+}
+
+.info-card {
+    overflow: hidden !important;
 }
 
 .chart-card:hover, .info-card:hover, .client-list-card:hover {
