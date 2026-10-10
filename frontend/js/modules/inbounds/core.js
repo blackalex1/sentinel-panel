@@ -296,8 +296,8 @@ export async function handleInboundFormSubmit(e, loadInboundsCallback) {
         loadInboundsCallback();
     } else {
         const errMsg = editInboundId !== null 
-            ? (res ? res.msg : t("inbound_update_error_toast", "Ошибка обновления подключения"))
-            : (res ? res.msg : t("inbound_create_error_toast", "Ошибка создания подключения"));
+            ? (res && res.msg ? res.msg : t("inbound_update_error_toast", "Ошибка обновления подключения"))
+            : (res && res.msg ? res.msg : t("inbound_create_error_toast", "Ошибка создания подключения"));
         showToast(errMsg, "error");
     }
 }

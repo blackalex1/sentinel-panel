@@ -192,9 +192,6 @@ export function filterAndRenderClients() {
         const emailSafe = c.email.replace(/@/g, '_').replace(/\./g, '_');
 
         const tr = document.createElement("tr");
-        tr.style.cssText = "transition: background 0.2s ease;";
-        tr.addEventListener("mouseenter", () => tr.style.background = "rgba(255, 255, 255, 0.03)");
-        tr.addEventListener("mouseleave", () => tr.style.background = "transparent");
 
         tr.innerHTML = `
             <td class="client-email-cell" title="${c.email}"><strong>${c.email}</strong></td>

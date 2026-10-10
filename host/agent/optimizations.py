@@ -77,7 +77,19 @@ def get_optimization_status() -> bool:
         if os.path.exists(fastopen_path):
             with open(fastopen_path, "r") as f:
                 val = f.read().strip()
-                return val == "3"
+                if val == "3":
+                    return True
+
+        somaxconn_path = "/proc/sys/net/core/somaxconn"
+        if os.path.exists(somaxconn_path):
+            with open(somaxconn_path, "r") as f:
+                val = f.read().strip()
+                if val.isdigit() and int(val) >= 32768:
+                    return True
+
+        conf_file = Path("/etc/sysctl.d/99-sentinel-profile.conf")
+        if conf_file.exists():
+            return True
     except Exception:
         pass
     return False
@@ -143,12 +155,39 @@ net.ipv4.tcp_fastopen = 3
 """
         with open(conf_file, "w") as f:
             f.write(presets)
+
+        # Apply directly to procfs if available for immediate live effect
+        proc_mappings = {
+            "/proc/sys/fs/file-max": "65535000",
+            "/proc/sys/net/core/somaxconn": "32768",
+            "/proc/sys/net/ipv4/tcp_max_syn_backlog": "16384",
+            "/proc/sys/net/ipv4/tcp_rmem": "4096 87380 16777216",
+            "/proc/sys/net/ipv4/tcp_wmem": "4096 65536 16777216",
+            "/proc/sys/net/core/netdev_max_backlog": "16384",
+            "/proc/sys/net/core/default_qdisc": "fq",
+            "/proc/sys/net/ipv4/tcp_congestion_control": "bbr",
+            "/proc/sys/net/ipv4/tcp_keepalive_time": "1200",
+            "/proc/sys/net/ipv4/tcp_keepalive_intvl": "15",
+            "/proc/sys/net/ipv4/tcp_keepalive_probes": "5",
+            "/proc/sys/net/ipv4/tcp_fastopen": "3",
+        }
+        for p_path, p_val in proc_mappings.items():
+            if os.path.exists(p_path):
+                try:
+                    with open(p_path, "w") as pf:
+                        pf.write(p_val)
+                except Exception as write_err:
+                    logging.warning(f"Could not write directly to {p_path}: {write_err}")
+
+        # Reload the specific sentinel configuration file
+        try:
+            subprocess.run(["sysctl", "-p", str(conf_file)], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        except Exception:
+            pass
             
         try:
             subprocess.run(["sysctl", "--system"], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         except subprocess.CalledProcessError as e:
-            # sysctl --system can exit with 1 if there are unsupported/invalid keys in other/existing config files.
-            # We check if our FastOpen setting is active, which indicates that our sysctl presets were applied.
             if get_optimization_status():
                 logging.warning(f"sysctl --system returned non-zero code ({e}), but our sentinel settings are active.")
             else:

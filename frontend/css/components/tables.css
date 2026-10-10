@@ -3,8 +3,8 @@
     overflow-x: auto;
     border-radius: var(--radius-lg);
     border: 1px solid var(--border-color);
-    background: rgba(10, 14, 28, 0.45);
-    backdrop-filter: blur(6px);
+    background: rgba(10, 14, 28, 0.65);
+    contain: paint;
 }
 
 .glass-table {
@@ -27,9 +27,7 @@
     text-transform: uppercase;
     font-size: 11px;
     letter-spacing: 1.2px;
-    background: rgba(4, 7, 16, 0.5);
-    backdrop-filter: blur(6px);
-    -webkit-backdrop-filter: blur(6px);
+    background: rgba(10, 14, 28, 0.95);
 }
 
 .glass-table tr:last-child td {

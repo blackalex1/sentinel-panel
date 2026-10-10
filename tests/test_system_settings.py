@@ -218,6 +218,8 @@ def test_locales_endpoints(client, monkeypatch):
 
 def test_system_optimization_endpoints(client, monkeypatch):
     """Test network optimization status and apply endpoints."""
+    from tests.conftest import mock_opt_state
+    mock_opt_state["optimized"] = False
     import backend.routes.system
     monkeypatch.setattr(backend.routes.system, "check_auth", lambda r: True)
     
@@ -234,6 +236,13 @@ def test_system_optimization_endpoints(client, monkeypatch):
     res_data = response.json()
     assert res_data["success"] is True
     assert "[Mock] Network optimized." in res_data["msg"]
+
+    # Verify that status now reflects optimized is True
+    response = client.get("/api/system/optimization/status")
+    assert response.status_code == 200
+    res_data = response.json()
+    assert res_data["success"] is True
+    assert res_data["optimized"] is True
 
 
 def test_host_client_dynamic_mock(tmp_path):
