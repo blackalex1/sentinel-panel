@@ -76,7 +76,7 @@ function generateRandomUsername() {
         // Standard & Network
         "user", "client", "guest", "member", "peer", "agent", "runner", "scout", "voyager", "pioneer", "relay", "proxy", "node",
         // Cyber & Stealth
-        "shadow", "ghost", "cyber", "spectre", "sentinel", "phantom", "stealth", "cipher", "shroud", "viper", "cobra", "raven",
+        "shadow", "ghost", "cyber", "vanguard", "sentinel", "phantom", "stealth", "cipher", "shroud", "viper", "cobra", "raven",
         "falcon", "phoenix", "ninja", "samurai", "ronin", "anonym", "mask", "blade", "razor", "tracer", "hacker", "veiled", "shade",
         // Tech & Science
         "nexus", "vector", "matrix", "vertex", "quantum", "pulse", "orbit", "prism", "proton", "electron", "neutron", "cortex",
