@@ -105,7 +105,7 @@ async function loadAuthorizedComponents() {
     if (loadingOverlay) loadingOverlay.classList.add("active");
     if (loadingText) loadingText.innerText = t("loading_components", "Загрузка компонентов...");
     
-    const BUNDLE_STORAGE_KEY = "sentinel_comp_bundle_v62";
+    const BUNDLE_STORAGE_KEY = "sentinel_comp_bundle_v63";
     let bundle = null;
 
     // Clear any obsolete bundle versions from session storage
