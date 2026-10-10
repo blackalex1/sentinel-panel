@@ -128,11 +128,11 @@ def test_security_client_by_connection_hysteria(client, monkeypatch):
     now_iso = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     
     log_content = [
-        f'{now_iso}\tinfo\t[socks5] tcp request\t{{"client": "1.2.3.4:5678", "auth": "tunnel_user@example.com", "req": "185.112.14.3:22"}}\n'
+        f'{now_iso}\tinfo\t[socks5] tcp request\t{{"client": "1.2.3.4:5678", "auth": "tunnel_user@example.com", "req": "203.0.113.88:22"}}\n'
     ]
     monkeypatch.setattr("backend.routes.security_routes.management.get_in_memory_core_logs", lambda core, limit: log_content if core == "hysteria" else [])
     
-    response = client.get("/api/security/client-by-connection?dst_ip=185.112.14.3&port=22", headers=headers)
+    response = client.get("/api/security/client-by-connection?dst_ip=203.0.113.88&port=22", headers=headers)
     assert response.status_code == 200
     data = response.json()
     assert data["success"] is True

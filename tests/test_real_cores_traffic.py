@@ -342,3 +342,289 @@ def test_hysteria2_multi_poll_and_client_reset_isolation(client, monkeypatch):
         assert rec_b.down == 0
 
 
+def test_singbox_clash_api_direct_traffic_and_closed_connections(monkeypatch):
+    """
+    Verifies that:
+    1. Direct Sing-box Clash API traffic (/connections) correctly attributes active connection deltas.
+    2. Closed connections (uploadTotal/downloadTotal - active deltas) are credited without byte loss.
+    3. Multi-polling with static cumulative stats does not produce compounding inflation.
+    4. Client resets properly clear local cumulative and baseline stats.
+    """
+    import json
+    from backend.sentinel_core_bridge.traffic_sessions import (
+        reset_unified_traffic_stats,
+        sync_client_traffic_baseline,
+        query_all_cores_traffic,
+    )
+    from backend.database.crud.clients import reset_client_traffic_globally_db
+    from backend.scheduler_jobs.limits import ACTIVE_IP_CACHE
+
+    reset_unified_traffic_stats()
+    client_email = "test_user_singbox"
+    ACTIVE_IP_CACHE.clear()
+    ACTIVE_IP_CACHE[client_email] = {"192.168.1.100": time.time()}
+
+    with db_session() as session:
+        session.query(ClientTrafficDaily).delete()
+        session.query(ClientStats).delete()
+        session.query(Inbound).delete()
+        session.commit()
+
+        ib_sb = Inbound(remark="VLESS (fallback)", port=21099, protocol="vless", core="singbox", enable=1)
+        session.add(ib_sb)
+        session.commit()
+
+        c_stat = ClientStats(inbound_id=ib_sb.id, email=client_email, client_uuid_or_pwd="uuid-test-user", up=0, down=0, enable=1)
+        session.add(c_stat)
+        session.commit()
+
+    # Mock Clash API responses
+    current_clash_payload = {
+        "downloadTotal": 1024 * 1024,
+        "uploadTotal": 256 * 1024,
+        "connections": [
+            {
+                "id": "conn-test-1",
+                "upload": 256 * 1024,
+                "download": 1024 * 1024,
+                "metadata": {
+                    "sourceIP": "192.168.1.100",
+                    "sourcePort": 49152,
+                    "type": "vless-fallback",
+                }
+            }
+        ]
+    }
+
+    class MockHTTPResponse:
+        def __init__(self, data):
+            self.data = data
+            self.status = 200
+        def read(self):
+            return json.dumps(self.data).encode("utf-8")
+        def __enter__(self):
+            return self
+        def __exit__(self, *args):
+            pass
+
+    import urllib.request
+    monkeypatch.setattr(urllib.request, "urlopen", lambda req, timeout=None: MockHTTPResponse(current_clash_payload))
+    monkeypatch.setattr("backend.sentinel_core_bridge.traffic_sessions.get_unified_traffic", lambda: {})
+    monkeypatch.setattr("backend.sentinel_core_bridge.traffic_sessions.get_active_sessions", lambda: [
+        {"email": client_email, "core": "singbox", "ip": "192.168.1.100"}
+    ])
+
+    # Poll 1: Active connection with 1MB down, 256KB up
+    query_all_cores_traffic()
+
+    with db_session() as session:
+        rec = session.query(ClientStats).filter_by(email=client_email).first()
+        assert rec.down == 1024 * 1024, f"Expected 1MB down, got {rec.down}"
+        assert rec.up == 256 * 1024, f"Expected 256KB up, got {rec.up}"
+
+    # Poll 2: Connection closed! Total climbed to 3MB down, 768KB up
+    current_clash_payload["downloadTotal"] = 3 * 1024 * 1024
+    current_clash_payload["uploadTotal"] = 768 * 1024
+    current_clash_payload["connections"] = []  # No active connections!
+
+    query_all_cores_traffic()
+
+    with db_session() as session:
+        rec = session.query(ClientStats).filter_by(email=client_email).first()
+        assert rec.down == 3 * 1024 * 1024, f"Expected 3MB down, got {rec.down}"
+        assert rec.up == 768 * 1024, f"Expected 768KB up, got {rec.up}"
+
+    # Poll 3: Idle multi-polling - no new traffic
+    for _ in range(3):
+        query_all_cores_traffic()
+
+    with db_session() as session:
+        rec = session.query(ClientStats).filter_by(email=client_email).first()
+        assert rec.down == 3 * 1024 * 1024, f"Expected 3MB down after idle poll, got {rec.down}"
+        assert rec.up == 768 * 1024, f"Expected 768KB up after idle poll, got {rec.up}"
+
+    # Poll 4: Reset user stats and verify baseline isolation
+    reset_client_traffic_globally_db(client_email)
+    sync_client_traffic_baseline(client_email)
+
+    query_all_cores_traffic()
+
+    with db_session() as session:
+        rec = session.query(ClientStats).filter_by(email=client_email).first()
+        assert rec.down == 0, f"Expected 0 down after reset, got {rec.down}"
+        assert rec.up == 0, f"Expected 0 up after reset, got {rec.up}"
+
+
+def test_multiple_concurrent_clients_pushing_traffic_singbox(monkeypatch):
+    """
+    Simulates multiple concurrent clients streaming and downloading traffic simultaneously on Sing-box.
+    Verifies:
+    1. Independent per-client counters with multiple concurrent connections.
+    2. Connection close attribution without cross-user leakage.
+    3. Idempotent multi-polling without compounding inflation.
+    4. Client reset baseline isolation.
+    """
+    import json
+    from backend.sentinel_core_bridge.traffic_sessions import (
+        reset_unified_traffic_stats,
+        sync_client_traffic_baseline,
+        query_all_cores_traffic,
+    )
+    from backend.database.crud.clients import reset_client_traffic_globally_db
+    from backend.scheduler_jobs.limits import ACTIVE_IP_CACHE
+
+    reset_unified_traffic_stats()
+    user_alpha = "client_alpha@vpn.lan"
+    user_beta = "client_beta@vpn.lan"
+    user_gamma = "client_gamma@vpn.lan"
+
+    ACTIVE_IP_CACHE.clear()
+    ACTIVE_IP_CACHE[user_alpha] = {"198.51.100.10": time.time()}
+    ACTIVE_IP_CACHE[user_beta] = {"198.51.100.20": time.time()}
+    ACTIVE_IP_CACHE[user_gamma] = {"198.51.100.30": time.time()}
+
+    with db_session() as session:
+        session.query(ClientTrafficDaily).delete()
+        session.query(ClientStats).delete()
+        session.query(Inbound).delete()
+        session.commit()
+
+        ib_sb = Inbound(remark="VLESS (fallback)", port=21099, protocol="vless", core="singbox", enable=1)
+        session.add(ib_sb)
+        session.commit()
+
+        c1 = ClientStats(inbound_id=ib_sb.id, email=user_alpha, client_uuid_or_pwd="pwd-alpha", up=0, down=0, enable=1)
+        c2 = ClientStats(inbound_id=ib_sb.id, email=user_beta, client_uuid_or_pwd="pwd-beta", up=0, down=0, enable=1)
+        c3 = ClientStats(inbound_id=ib_sb.id, email=user_gamma, client_uuid_or_pwd="pwd-gamma", up=0, down=0, enable=1)
+        session.add_all([c1, c2, c3])
+        session.commit()
+
+    current_clash_payload = {
+        "downloadTotal": 0,
+        "uploadTotal": 0,
+        "connections": []
+    }
+
+    class MockHTTPResponse:
+        def __init__(self, data):
+            self.data = data
+            self.status = 200
+        def read(self):
+            return json.dumps(self.data).encode("utf-8")
+        def __enter__(self):
+            return self
+        def __exit__(self, *args):
+            pass
+
+    import urllib.request
+    monkeypatch.setattr(urllib.request, "urlopen", lambda req, timeout=None: MockHTTPResponse(current_clash_payload))
+    monkeypatch.setattr("backend.sentinel_core_bridge.traffic_sessions.get_unified_traffic", lambda: {})
+    monkeypatch.setattr("backend.sentinel_core_bridge.traffic_sessions.get_active_sessions", lambda: [
+        {"email": user_alpha, "core": "singbox", "ip": "198.51.100.10"},
+        {"email": user_beta, "core": "singbox", "ip": "198.51.100.20"},
+        {"email": user_gamma, "core": "singbox", "ip": "198.51.100.30"},
+    ])
+
+    # -------------------------------------------------------------
+    # PHASE 1: Concurrent streaming (Alpha 2 conns, Beta 1 conn, Gamma 1 conn)
+    # Alpha: 7MB + 3MB = 10MB down, 1MB up
+    # Beta: 5MB down, 500KB up
+    # Gamma: 2MB down, 200KB up
+    # Grand Total: 17MB down, 1.7MB up
+    # -------------------------------------------------------------
+    current_clash_payload["downloadTotal"] = 17 * 1024 * 1024
+    current_clash_payload["uploadTotal"] = 1700 * 1024
+    current_clash_payload["connections"] = [
+        {"id": "conn-a1", "download": 7 * 1024 * 1024, "upload": 700 * 1024, "metadata": {"sourceIP": "198.51.100.10", "sourcePort": 10001, "type": "vless-fallback"}},
+        {"id": "conn-a2", "download": 3 * 1024 * 1024, "upload": 300 * 1024, "metadata": {"sourceIP": "198.51.100.10", "sourcePort": 10002, "type": "vless-fallback"}},
+        {"id": "conn-b1", "download": 5 * 1024 * 1024, "upload": 500 * 1024, "metadata": {"sourceIP": "198.51.100.20", "sourcePort": 20001, "type": "vless-fallback"}},
+        {"id": "conn-g1", "download": 2 * 1024 * 1024, "upload": 200 * 1024, "metadata": {"sourceIP": "198.51.100.30", "sourcePort": 30001, "type": "vless-fallback"}},
+    ]
+
+    query_all_cores_traffic()
+
+    with db_session() as session:
+        rec_a = session.query(ClientStats).filter_by(email=user_alpha).first()
+        rec_b = session.query(ClientStats).filter_by(email=user_beta).first()
+        rec_c = session.query(ClientStats).filter_by(email=user_gamma).first()
+
+        assert rec_a.down == 10 * 1024 * 1024, f"Phase 1 Alpha expected 10MB down, got {rec_a.down}"
+        assert rec_a.up == 1000 * 1024, f"Phase 1 Alpha expected 1MB up, got {rec_a.up}"
+
+        assert rec_b.down == 5 * 1024 * 1024, f"Phase 1 Beta expected 5MB down, got {rec_b.down}"
+        assert rec_b.up == 500 * 1024, f"Phase 1 Beta expected 500KB up, got {rec_b.up}"
+
+        assert rec_c.down == 2 * 1024 * 1024, f"Phase 1 Gamma expected 2MB down, got {rec_c.down}"
+        assert rec_c.up == 200 * 1024, f"Phase 1 Gamma expected 200KB up, got {rec_c.up}"
+
+    # -------------------------------------------------------------
+    # PHASE 2: Alpha adds +5MB, Beta adds +5MB, Gamma transfers +3MB and DISCONNECTS!
+    # Alpha total = 15MB down, 1.5MB up
+    # Beta total = 10MB down, 1.0MB up
+    # Gamma total = 5MB down, 500KB up
+    # Grand Total: 30MB down, 3.0MB up
+    # -------------------------------------------------------------
+    current_clash_payload["downloadTotal"] = 30 * 1024 * 1024
+    current_clash_payload["uploadTotal"] = 3000 * 1024
+    current_clash_payload["connections"] = [
+        {"id": "conn-a1", "download": 10 * 1024 * 1024, "upload": 1000 * 1024, "metadata": {"sourceIP": "198.51.100.10", "sourcePort": 10001, "type": "vless-fallback"}},
+        {"id": "conn-a2", "download": 5 * 1024 * 1024, "upload": 500 * 1024, "metadata": {"sourceIP": "198.51.100.10", "sourcePort": 10002, "type": "vless-fallback"}},
+        {"id": "conn-b1", "download": 10 * 1024 * 1024, "upload": 1000 * 1024, "metadata": {"sourceIP": "198.51.100.20", "sourcePort": 20001, "type": "vless-fallback"}},
+        # conn-g1 is closed/gone
+    ]
+
+    query_all_cores_traffic()
+
+    with db_session() as session:
+        rec_a = session.query(ClientStats).filter_by(email=user_alpha).first()
+        rec_b = session.query(ClientStats).filter_by(email=user_beta).first()
+        rec_c = session.query(ClientStats).filter_by(email=user_gamma).first()
+
+        assert rec_a.down == 15 * 1024 * 1024, f"Phase 2 Alpha expected 15MB down, got {rec_a.down}"
+        assert rec_a.up == 1500 * 1024, f"Phase 2 Alpha expected 1.5MB up, got {rec_a.up}"
+
+        assert rec_b.down == 10 * 1024 * 1024, f"Phase 2 Beta expected 10MB down, got {rec_b.down}"
+        assert rec_b.up == 1000 * 1024, f"Phase 2 Beta expected 1MB up, got {rec_b.up}"
+
+        assert rec_c.down == 5 * 1024 * 1024, f"Phase 2 Gamma expected 5MB down, got {rec_c.down}"
+        assert rec_c.up == 500 * 1024, f"Phase 2 Gamma expected 500KB up, got {rec_c.up}"
+
+    # -------------------------------------------------------------
+    # PHASE 3: Idempotent multi-polling (no new traffic)
+    # -------------------------------------------------------------
+    for _ in range(3):
+        query_all_cores_traffic()
+
+    with db_session() as session:
+        rec_a = session.query(ClientStats).filter_by(email=user_alpha).first()
+        rec_b = session.query(ClientStats).filter_by(email=user_beta).first()
+        rec_c = session.query(ClientStats).filter_by(email=user_gamma).first()
+
+        assert rec_a.down == 15 * 1024 * 1024
+        assert rec_b.down == 10 * 1024 * 1024
+        assert rec_c.down == 5 * 1024 * 1024
+
+    # -------------------------------------------------------------
+    # PHASE 4: Reset Alpha only, ensure Beta & Gamma remain unchanged
+    # -------------------------------------------------------------
+    reset_client_traffic_globally_db(user_alpha)
+    sync_client_traffic_baseline(user_alpha)
+
+    query_all_cores_traffic()
+
+    with db_session() as session:
+        rec_a = session.query(ClientStats).filter_by(email=user_alpha).first()
+        rec_b = session.query(ClientStats).filter_by(email=user_beta).first()
+        rec_c = session.query(ClientStats).filter_by(email=user_gamma).first()
+
+        assert rec_a.down == 0, f"Expected Alpha reset to 0, got {rec_a.down}"
+        assert rec_a.up == 0, f"Expected Alpha reset to 0, got {rec_a.up}"
+
+        assert rec_b.down == 10 * 1024 * 1024, f"Expected Beta unchanged at 10MB, got {rec_b.down}"
+        assert rec_b.up == 1000 * 1024, f"Expected Beta unchanged at 1MB, got {rec_b.up}"
+
+        assert rec_c.down == 5 * 1024 * 1024, f"Expected Gamma unchanged at 5MB, got {rec_c.down}"
+        assert rec_c.up == 500 * 1024, f"Expected Gamma unchanged at 500KB, got {rec_c.up}"
+
+
+

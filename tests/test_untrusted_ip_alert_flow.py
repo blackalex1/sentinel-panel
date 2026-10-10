@@ -12,11 +12,11 @@ from backend.alerts.client_connections import check_new_ip_and_get_history
 async def test_full_pipeline_untrusted_singbox_connection_and_warning(client, monkeypatch):
     """
     Complete end-to-end pipeline test for an untrusted Sing-box connection:
-    1. Client 'phone' connects from an unknown external IP (188.170.74.89).
+    1. Client 'phone' connects from an unknown external IP (198.51.100.89).
     2. Core SessionTracker catches the connection and returns the structured connect event.
     3. sync_session_events_loop saves the record into the AuditLog table.
     4. Panel /api/security/audit-logs exposes the new event.
-    5. The alert system detects that 188.170.74.89 is UNTRUSTED (is_new_ip=True) and generates a security warning.
+    5. The alert system detects that 198.51.100.89 is UNTRUSTED (is_new_ip=True) and generates a security warning.
     """
     import backend.routes.security_routes.bans
     monkeypatch.setattr(backend.routes.security_routes.bans, "check_auth", lambda r: True)
