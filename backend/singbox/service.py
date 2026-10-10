@@ -140,7 +140,6 @@ def kick_singbox_user(username: str):
 def stop_singbox():
     """Останавливает процесс sing-box через sentinel-core"""
     global singbox_process, _last_singbox_conn_stats
-    kick_all_singbox_connections()
     _last_singbox_conn_stats.clear()
 
     try:

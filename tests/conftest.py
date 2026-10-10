@@ -208,14 +208,16 @@ def cleanup_real_core_processes(request):
 
 # 2.5 Mock Host Client
 import backend.host_client
+mock_opt_state = {"optimized": False}
 def mock_send_command(action: str, params: dict = None, timeout: float = 3.0) -> dict:
     if action == "get_bbr_status":
         return {"success": True, "bbr_enabled": True}
     elif action == "enable_bbr":
         return {"success": True, "msg": "BBR enabled successfully"}
     elif action == "get_optimization_status":
-        return {"success": True, "optimized": False}
+        return {"success": True, "optimized": mock_opt_state["optimized"]}
     elif action == "apply_optimizations":
+        mock_opt_state["optimized"] = True
         return {"success": True, "msg": "[Mock] Network optimized."}
     elif action == "get_system_stats":
         return {

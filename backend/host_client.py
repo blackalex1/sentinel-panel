@@ -78,6 +78,7 @@ class HostClient:
         self.mock_warp_connected = False
         self.mock_warp_type = "free"
         self.mock_warp_license = ""
+        self.mock_network_optimized = False
         if os.path.exists(self._mock_file):
             try:
                 with open(self._mock_file, "r") as f:
@@ -170,8 +171,9 @@ class HostClient:
         elif action == "enable_bbr":
             return {"success": True, "msg": "[Mock] BBR enabled (mock configuration successful)."}
         elif action == "get_optimization_status":
-            return {"success": True, "optimized": False}
+            return {"success": True, "optimized": getattr(self, "mock_network_optimized", False)}
         elif action == "apply_optimizations":
+            self.mock_network_optimized = True
             return {"success": True, "msg": "[Mock] Network optimized."}
         elif action == "get_ipv6_status":
             return {"success": True, "ipv6_disabled": getattr(self, "mock_ipv6_disabled", False), "supported": True}

@@ -27,7 +27,7 @@ async def enable_bbr_api(request: Request):
     if not system_facade.check_auth(request):
         return system_facade.decoy_response()
     res = host_client.send_command("enable_bbr", timeout=10.0)
-    if not res.get("success"):
+    if not res.get("success") or res.get("msg", "").startswith("[Mock]"):
         try:
             from host.agent.optimizations import enable_bbr as direct_enable_bbr
             success, msg = direct_enable_bbr()
@@ -48,7 +48,17 @@ async def get_optimization_status_api(request: Request):
     import backend.routes.system as system_facade
     if not system_facade.check_auth(request):
         return system_facade.decoy_response()
+
     res = host_client.send_command("get_optimization_status")
+    if (not res.get("success") or host_client.is_mock):
+        import sys, os
+        if sys.platform == "linux" and not os.path.exists("/.dockerenv"):
+            try:
+                from host.agent.optimizations import get_optimization_status as direct_get_optimization_status
+                if direct_get_optimization_status():
+                    return {"success": True, "optimized": True}
+            except Exception:
+                pass
     return res
 
 @router.post("/api/system/optimization/apply")
@@ -56,7 +66,19 @@ async def apply_optimizations_api(request: Request):
     import backend.routes.system as system_facade
     if not system_facade.check_auth(request):
         return system_facade.decoy_response()
+
     res = host_client.send_command("apply_optimizations", timeout=15.0)
+    if (not res.get("success") or res.get("msg", "").startswith("[Mock]")):
+        import sys, os
+        if sys.platform == "linux" and not os.path.exists("/.dockerenv"):
+            try:
+                from host.agent.optimizations import apply_network_optimizations as direct_apply_network_optimizations
+                success, msg = direct_apply_network_optimizations()
+                res = {"success": success, "msg": msg}
+            except Exception as e:
+                if not res.get("success"):
+                    res = {"success": False, "msg": str(e)}
+
     from backend.audit import log_action, get_actor_username
     actor = get_actor_username(request)
     if res.get("success"):
@@ -97,7 +119,7 @@ async def set_ipv6_status_api(request: Request):
         disable = True
 
     res = host_client.send_command("set_ipv6_disabled", {"disable": disable}, timeout=10.0)
-    if not res.get("success"):
+    if not res.get("success") or res.get("msg", "").startswith("[Mock]"):
         try:
             from host.agent.optimizations import set_ipv6_disabled as direct_set_ipv6
             success, msg = direct_set_ipv6(disable)

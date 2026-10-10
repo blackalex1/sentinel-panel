@@ -158,6 +158,8 @@
     backdrop-filter: var(--blur-glass);
     border: 1px solid var(--border-color);
     transition: border-color var(--transition-normal), box-shadow var(--transition-normal);
+    isolation: isolate;
+    transform: translateZ(0);
 }
 
 .chart-card:hover, .info-card:hover, .client-list-card:hover {

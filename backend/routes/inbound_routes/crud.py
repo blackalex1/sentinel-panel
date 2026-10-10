@@ -204,24 +204,8 @@ async def create_inbound_ui(request: Request, payload: InboundCreate):
         from backend.audit import log_action, get_actor_username
         actor = get_actor_username(request)
         log_action(actor, "create_inbound", target=f"port:{payload.port}", details=f"remark:{payload.remark}, protocol:{payload.protocol}, core:{payload.core}")
-        xray_ok = restart_xray()
-        restart_hysteria()
-        singbox_ok = restart_singbox()
         target_core = payload.core or ("hysteria" if payload.protocol == "hysteria2" else "xray")
-        if (target_core == "xray" and xray_ok is False) or (target_core == "singbox" and singbox_ok is False):
-            # Rollback newly created inbound from DB so database is never left corrupted
-            delete_inbound(inbound_id)
-            restart_xray()
-            restart_singbox()
-            restart_hysteria()
-            if target_core == "xray":
-                from backend.xray.service import get_last_xray_error
-                last_err = get_last_xray_error() or "Failed to start or validate Xray process"
-                return {"success": False, "msg": t("xray_config_error", lang=lang, category="backend", error=last_err)}
-            else:
-                from backend.singbox.service import get_last_singbox_error
-                last_err = get_last_singbox_error() or "Failed to start or validate Sing-box process"
-                return {"success": False, "msg": t("singbox_config_error", lang=lang, category="backend", error=last_err)}
+        restart_services_background(delay=0.3, core=target_core)
         return {"success": True, "id": inbound_id}
     return {"success": False, "msg": t("inbound_port_busy", lang=lang, category="backend")}
 
@@ -244,10 +228,6 @@ async def update_inbound_ui(request: Request, inbound_id: int, payload: InboundU
         enc_err = validate_vless_encryption_settings(payload.settings, lang=lang)
         if enc_err:
             return {"success": False, "msg": enc_err}
-
-    # Save previous state for automatic database rollback if config validation fails
-    from backend.database.crud.inbounds import get_inbound_by_id
-    previous_ib = get_inbound_by_id(inbound_id)
             
     success = update_inbound(
         inbound_id=inbound_id,
@@ -266,41 +246,8 @@ async def update_inbound_ui(request: Request, inbound_id: int, payload: InboundU
         from backend.audit import log_action, get_actor_username
         actor = get_actor_username(request)
         log_action(actor, "update_inbound", target=f"id:{inbound_id}", details=f"remark:{payload.remark}, port:{payload.port}, protocol:{payload.protocol}, core:{payload.core}, enable:{payload.enable}")
-        xray_ok = restart_xray()
-        restart_hysteria()
-        singbox_ok = restart_singbox()
         target_core = payload.core or ("hysteria" if payload.protocol == "hysteria2" else "xray")
-        if (target_core == "xray" and xray_ok is False) or (target_core == "singbox" and singbox_ok is False):
-            # Rollback database record to previous working state
-            if previous_ib:
-                prev_settings = json.loads(previous_ib.get("settings") or "{}")
-                prev_stream = json.loads(previous_ib.get("stream_settings") or "{}")
-                prev_sniff = json.loads(previous_ib.get("sniffing") or "{}")
-                update_inbound(
-                    inbound_id=inbound_id,
-                    remark=previous_ib["remark"],
-                    port=previous_ib["port"],
-                    protocol=previous_ib["protocol"],
-                    core=previous_ib.get("core"),
-                    settings_dict=prev_settings,
-                    stream_settings_dict=prev_stream,
-                    sniffing_dict=prev_sniff,
-                    enable=previous_ib["enable"],
-                    total=previous_ib["total"],
-                    expiry_time=previous_ib["expiry_time"]
-                )
-                restart_xray()
-                restart_singbox()
-                restart_hysteria()
-
-            if target_core == "xray":
-                from backend.xray.service import get_last_xray_error
-                last_err = get_last_xray_error() or "Failed to start or validate Xray process"
-                return {"success": False, "msg": t("xray_config_error", lang=lang, category="backend", error=last_err)}
-            else:
-                from backend.singbox.service import get_last_singbox_error
-                last_err = get_last_singbox_error() or "Failed to start or validate Sing-box process"
-                return {"success": False, "msg": t("singbox_config_error", lang=lang, category="backend", error=last_err)}
+        restart_services_background(delay=0.3, core=target_core)
         return {"success": True}
     return {"success": False, "msg": t("inbound_not_found_or_port_busy", lang=lang, category="backend")}
 

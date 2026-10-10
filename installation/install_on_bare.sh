@@ -39,6 +39,17 @@ chmod +x "$SCRIPT_DIR/bin"/* 2>/dev/null || true
 
 export PYTHONPATH="$SCRIPT_DIR:${PYTHONPATH:-}"
 
+echo "[+] Настройка фоновой службы хост-агента Sentinel..."
+if [ "$EUID" -eq 0 ] && [ -f "$SCRIPT_DIR/host/sentinel-agent.service" ] && command -v systemctl &>/dev/null && [ -d "/etc/systemd/system" ]; then
+    sed "s|/opt/sentinel-panel|$SCRIPT_DIR|g" "$SCRIPT_DIR/host/sentinel-agent.service" > /etc/systemd/system/sentinel-agent.service
+    systemctl daemon-reload
+    systemctl enable sentinel-agent
+    systemctl restart sentinel-agent 2>/dev/null || true
+elif [ -f "$SCRIPT_DIR/host/host_agent.py" ] && [ "$(uname -s)" = "Linux" ]; then
+    mkdir -p /var/run/sentinel 2>/dev/null || true
+    python "$SCRIPT_DIR/host/host_agent.py" >/dev/null 2>&1 &
+fi
+
 echo "[+] Запуск Sentinel Panel в фоновом режиме..."
 python -m backend.main &
 PANEL_PID=$!
