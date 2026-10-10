@@ -190,7 +190,7 @@ input:checked + .switch-slider:before {
     background: rgba(4, 6, 15, 0.82);
     backdrop-filter: var(--blur-modal);
     -webkit-backdrop-filter: var(--blur-modal);
-    display: flex;
+    display: none;
     justify-content: center;
     align-items: flex-start;
     overflow-y: auto;
@@ -206,6 +206,7 @@ input:checked + .switch-slider:before {
 }
 
 .modal.active {
+    display: flex;
     opacity: 1;
     pointer-events: auto;
 }
