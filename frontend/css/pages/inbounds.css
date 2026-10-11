@@ -53,8 +53,9 @@
     display: flex;
     flex-direction: column;
     border-radius: var(--radius-lg);
-    background: var(--bg-card);
-    backdrop-filter: var(--blur-glass);
+    background: rgba(14, 19, 36, 0.92);
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
     border: 1px solid var(--border-color);
     box-shadow: var(--shadow-card);
     transition: border-color var(--transition-normal), box-shadow var(--transition-normal), transform var(--transition-normal);
