@@ -36,7 +36,8 @@ def get_base_host(host_url: str) -> str:
         host_url = "http://" + host_url
     parsed = urlparse(host_url)
     h = parsed.hostname or ""
-    if not h or h in ("127.0.0.1", "localhost", "0.0.0.0", "::1"):
+    import re
+    if not h or h in ("127.0.0.1", "localhost", "0.0.0.0", "::1") or not re.match(r"^[a-zA-Z0-9.\-_\[\]:]+$", h):
         return get_lan_ip()
     return h
 

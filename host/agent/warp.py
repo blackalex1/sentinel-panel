@@ -247,15 +247,17 @@ def install_warp() -> tuple[bool, str]:
             return False, f"Failed to import Cloudflare GPG key: {p.stderr or p.stdout}"
 
         # 2. Add apt repository
-        codename_cmd = "lsb_release -cs"
-        cp = subprocess.run(codename_cmd, shell=True, capture_output=True, text=True, timeout=10)
-        codename = cp.stdout.strip()
-        if not codename or cp.returncode != 0:
+        try:
+            cp = subprocess.run(["lsb_release", "-cs"], capture_output=True, text=True, timeout=10)
+            codename = cp.stdout.strip()
+        except Exception:
+            codename = ""
+        if not codename:
             match = re.search(r'VERSION_CODENAME=(.*)', os_release)
             if match:
                 codename = match.group(1).strip().strip('"')
-            else:
-                codename = "bookworm" # Safe default fallback
+        if not codename or not re.match(r"^[a-z0-9_-]+$", codename):
+            codename = "bookworm"  # Safe default fallback
 
         repo_line = f"deb [signed-by=/usr/share/keyrings/cloudflare-warp-archive-keyring.gpg] https://pkg.cloudflareclient.com/ {codename} main"
         with open("/etc/apt/sources.list.d/cloudflare-warp.list", "w") as f:

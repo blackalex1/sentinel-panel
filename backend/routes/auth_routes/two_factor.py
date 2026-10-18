@@ -153,6 +153,10 @@ async def tg_2fa_poll(request: Request, response: Response, token: str):
     import json
     import time
     
+    import re
+    if not token or len(token) > 64 or not re.match(r"^[a-zA-Z0-9_-]+$", token):
+        return {"success": False, "status": "expired"}
+
     lang = get_lang(request)
     with db_session() as session:
         setting = session.query(SystemSetting).filter_by(key=f"tg_2fa_req_{token}").first()
@@ -222,8 +226,14 @@ async def tg_2fa_action(payload: Tg2faActionBody, request: Request):
     import subprocess
     
     lang = get_lang(request)
-    token = payload.token
-    action = payload.action
+    token = (payload.token or "").strip()
+    action = (payload.action or "").strip()
+
+    import re
+    if not token or len(token) > 64 or not re.match(r"^[a-zA-Z0-9_-]+$", token):
+        return {"success": False, "msg": t("invalid_request_format", lang=lang, category="backend")}
+    if action not in ("approve", "block"):
+        return {"success": False, "msg": t("invalid_request_format", lang=lang, category="backend")}
     
     with db_session() as session:
         setting = session.query(SystemSetting).filter_by(key=f"tg_2fa_req_{token}").first()

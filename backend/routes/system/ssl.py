@@ -15,8 +15,12 @@ async def generate_ssl_api(request: Request):
         data = await request.json()
         domain = data.get("domain", "").strip()
         email = data.get("email", "").strip()
-        if not domain:
+        
+        import re
+        if not domain or not re.match(r"^(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}$", domain):
             return {"success": False, "msg": t("ssl_domain_required", lang=lang, category="backend")}
+        if email and not re.match(r"^[^@\s]+@[^@\s]+\.[^@\s]+$", email):
+            return {"success": False, "msg": t("ssl_missing_params", lang=lang, category="backend")}
         
         import asyncio
         from backend.ssl_utils import request_ssl_cert
