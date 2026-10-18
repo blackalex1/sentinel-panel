@@ -129,6 +129,10 @@ def test_dynamic_xray_start():
 
     res = start_xray()
     assert res is True
+    for _ in range(25):
+        if not is_xray_running():
+            break
+        time.sleep(0.2)
     assert is_xray_running() is False
 
     # 2. Add a valid VLESS inbound + client — xray should start
