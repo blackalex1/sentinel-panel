@@ -4,6 +4,7 @@ import json
 import socket
 import logging
 import signal
+import threading
 from pathlib import Path
 
 # Add the directory to sys.path to allow running directly from anywhere on the host
@@ -43,8 +44,11 @@ def handle_client(conn):
             if not data:
                 break
             buffer += data.decode("utf-8")
-            if "\n" in buffer:
+            while "\n" in buffer:
                 line, buffer = buffer.split("\n", 1)
+                line = line.strip()
+                if not line:
+                    continue
                 try:
                     request = json.loads(line)
                     action = request.get("action")
@@ -155,7 +159,7 @@ def main():
         # Handle connection loop
         while True:
             conn, addr = server.accept()
-            handle_client(conn)
+            threading.Thread(target=handle_client, args=(conn,), daemon=True).start()
             
     except Exception as e:
         logging.critical(f"HostAgent crashed: {e}")

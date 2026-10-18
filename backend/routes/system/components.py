@@ -14,19 +14,24 @@ async def get_components_bundle(request: Request):
     if not check_auth(request):
         return decoy_response()
 
-    components = {}
-    comp_dir = FRONTEND_DIR / "components"
-    if comp_dir.exists():
-        for root, _, files in os.walk(comp_dir):
-            for file in files:
-                if file.endswith(".html"):
-                    full_path = Path(root) / file
-                    rel_path = full_path.relative_to(FRONTEND_DIR).as_posix()
-                    try:
-                        with open(full_path, "r", encoding="utf-8") as f:
-                            components[rel_path] = f.read()
-                    except Exception:
-                        pass
+    global _COMPONENTS_CACHE
+    if _COMPONENTS_CACHE and not request.query_params.get("nocache"):
+        components = _COMPONENTS_CACHE
+    else:
+        components = {}
+        comp_dir = FRONTEND_DIR / "components"
+        if comp_dir.exists():
+            for root, _, files in os.walk(comp_dir):
+                for file in files:
+                    if file.endswith(".html"):
+                        full_path = Path(root) / file
+                        rel_path = full_path.relative_to(FRONTEND_DIR).as_posix()
+                        try:
+                            with open(full_path, "r", encoding="utf-8") as f:
+                                components[rel_path] = f.read()
+                        except Exception:
+                            pass
+        _COMPONENTS_CACHE = components
 
     from fastapi.responses import JSONResponse
     return JSONResponse(

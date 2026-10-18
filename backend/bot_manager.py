@@ -59,26 +59,25 @@ def restart_telegram_bot() -> bool:
     
     try:
         # Открываем лог-файл на дозапись
-        log_file = open(TELEGRAM_BOT_LOG_PATH, "a", encoding="utf-8", errors="ignore")
-        
-        # Запуск в фоновом режиме, независимом от родительского процесса
-        if sys.platform != "win32":
-            subprocess.Popen(
-                [sys.executable, str(bot_path)],
-                stdout=log_file,
-                stderr=log_file,
-                close_fds=True,
-                start_new_session=True
-            )
-        else:
-            # На Windows используем специальные флаги создания процесса
-            subprocess.Popen(
-                [sys.executable, str(bot_path)],
-                stdout=log_file,
-                stderr=log_file,
-                close_fds=True,
-                creationflags=subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.DETACHED_PROCESS
-            )
+        with open(TELEGRAM_BOT_LOG_PATH, "a", encoding="utf-8", errors="ignore") as log_file:
+            # Запуск в фоновом режиме, независимом от родительского процесса
+            if sys.platform != "win32":
+                subprocess.Popen(
+                    [sys.executable, str(bot_path)],
+                    stdout=log_file,
+                    stderr=log_file,
+                    close_fds=True,
+                    start_new_session=True
+                )
+            else:
+                # На Windows используем специальные флаги создания процесса
+                subprocess.Popen(
+                    [sys.executable, str(bot_path)],
+                    stdout=log_file,
+                    stderr=log_file,
+                    close_fds=True,
+                    creationflags=subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.DETACHED_PROCESS
+                )
             
         logging.info("[Bot Manager] Telegram Bot process spawned successfully.")
         return True

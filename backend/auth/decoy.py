@@ -66,69 +66,72 @@ def get_templates():
 
 
 def render_static_decoy(request: Request, path: str = "") -> Response:
-    decoy_dir = BASE_DIR / "frontend" / "decoy"
-    if not decoy_dir.exists():
-        return decoy_response_html()
-        
-    path = path.strip("/")
-    if not path:
-        decoy_value = get_setting("decoy_value", "company_landing")
-        template_name = decoy_value if decoy_value.endswith(".html") else f"{decoy_value}.html"
-        file_path = decoy_dir / template_name
-        if not file_path.exists():
-            file_path = decoy_dir / "index.html"
-    else:
-        file_path = decoy_dir / path
-        
-    if file_path.exists() and file_path.is_dir():
-        file_path = file_path / "index.html"
-        
-    if not file_path.exists() and path:
-        html_file = decoy_dir / f"{path}.html"
-        if html_file.exists() and html_file.is_file():
-            file_path = html_file
-
-    # Защита от Path Traversal: файл должен находиться строго внутри decoy_dir
-    if file_path.exists():
-        try:
-            file_path.resolve().relative_to(decoy_dir.resolve())
-        except (ValueError, RuntimeError):
+    try:
+        decoy_dir = BASE_DIR / "frontend" / "decoy"
+        if not decoy_dir.exists():
             return decoy_response_html()
+            
+        path = path.strip("/")
+        if not path:
+            decoy_value = get_setting("decoy_value", "company_landing")
+            template_name = decoy_value if decoy_value.endswith(".html") else f"{decoy_value}.html"
+            file_path = decoy_dir / template_name
+            if not file_path.exists():
+                file_path = decoy_dir / "index.html"
+        else:
+            file_path = decoy_dir / path
+            
+        if file_path.exists() and file_path.is_dir():
+            file_path = file_path / "index.html"
+            
+        if not file_path.exists() and path:
+            html_file = decoy_dir / f"{path}.html"
+            if html_file.exists() and html_file.is_file():
+                file_path = html_file
 
-    if file_path.exists() and file_path.is_file():
-        # Поддержка динамических полей Jinja2 для стандартной заглушки и index.html
-        if file_path.name in ("company_landing.html", "index.html"):
-            tpls = get_templates()
-            if tpls:
-                try:
-                    server_host = request.headers.get("host", "localhost")
-                    h = sum(ord(c) for c in server_host)
-                    served_count = 120 + (h % 380)
-                    domain = server_host.split(":")[0]
-                    contact_email = f"info@{domain}" if "." in domain else "info@nimbus.solutions"
-                    current_year = datetime.datetime.now().year
-                    
-                    rel_name = file_path.relative_to(decoy_dir)
-                    return tpls.TemplateResponse(
-                        request,
-                        str(rel_name).replace("\\", "/"),
-                        {
-                            "contact_email": contact_email,
-                            "served_count": served_count,
-                            "current_year": current_year,
-                            "server_host": server_host
-                        }
-                    )
-                except Exception as e:
-                    logging.error(f"Error rendering static decoy template: {e}")
-                    
-        return FileResponse(str(file_path))
-        
-    custom_404 = decoy_dir / "404.html"
-    if custom_404.exists() and custom_404.is_file():
-        return FileResponse(str(custom_404), status_code=404)
-        
-    return decoy_response_html()
+        # Защита от Path Traversal: файл должен находиться строго внутри decoy_dir
+        if file_path.exists():
+            try:
+                file_path.resolve().relative_to(decoy_dir.resolve())
+            except (ValueError, RuntimeError):
+                return decoy_response_html()
+
+        if file_path.exists() and file_path.is_file():
+            # Поддержка динамических полей Jinja2 для стандартной заглушки и index.html
+            if file_path.name in ("company_landing.html", "index.html"):
+                tpls = get_templates()
+                if tpls:
+                    try:
+                        server_host = request.headers.get("host", "localhost")
+                        h = sum(ord(c) for c in server_host)
+                        served_count = 120 + (h % 380)
+                        domain = server_host.split(":")[0]
+                        contact_email = f"info@{domain}" if "." in domain else "info@nimbus.solutions"
+                        current_year = datetime.datetime.now().year
+                        
+                        rel_name = file_path.relative_to(decoy_dir)
+                        return tpls.TemplateResponse(
+                            request,
+                            str(rel_name).replace("\\", "/"),
+                            {
+                                "contact_email": contact_email,
+                                "served_count": served_count,
+                                "current_year": current_year,
+                                "server_host": server_host
+                            }
+                        )
+                    except Exception as e:
+                        logging.error(f"Error rendering static decoy template: {e}")
+                        
+            return FileResponse(str(file_path))
+            
+        custom_404 = decoy_dir / "404.html"
+        if custom_404.exists() and custom_404.is_file():
+            return FileResponse(str(custom_404), status_code=404)
+            
+        return decoy_response_html()
+    except Exception:
+        return decoy_response_html()
 
 
 async def proxy_decoy_request(request: Request, path: str) -> Response:
@@ -147,16 +150,32 @@ async def proxy_decoy_request(request: Request, path: str) -> Response:
             
         headers = {k: v for k, v in request.headers.items() if k.lower() not in ("host", "accept-encoding")}
         
-        async with httpx.AsyncClient(follow_redirects=True, timeout=10.0, verify=False) as client:
+        async with httpx.AsyncClient(follow_redirects=False, timeout=10.0, verify=False) as client:
             req_method = request.method
             req_content = await request.body()
+            current_url = target_url
+            proxy_res = None
             
-            proxy_res = await client.request(
-                method=req_method,
-                url=target_url,
-                headers=headers,
-                content=req_content
-            )
+            for _ in range(5):
+                if not is_safe_url(current_url):
+                    logging.warning(f"SSRF block triggered for redirect target URL: {current_url}")
+                    return render_static_decoy(request)
+                    
+                proxy_res = await client.request(
+                    method=req_method,
+                    url=current_url,
+                    headers=headers,
+                    content=req_content
+                )
+                
+                is_redir = getattr(proxy_res, "is_redirect", False) or getattr(proxy_res, "status_code", 0) in (301, 302, 303, 307, 308)
+                if is_redir and "location" in proxy_res.headers:
+                    from urllib.parse import urljoin
+                    current_url = urljoin(current_url, proxy_res.headers["location"])
+                    req_method = "GET"
+                    req_content = b""
+                else:
+                    break
             
             exclude_headers = ("content-encoding", "content-length", "transfer-encoding", "connection")
             res_headers = {k: v for k, v in proxy_res.headers.items() if k.lower() not in exclude_headers}

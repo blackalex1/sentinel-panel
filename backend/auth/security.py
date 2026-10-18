@@ -6,6 +6,8 @@ def is_safe_url(url: str) -> bool:
     """Проверяет URL на безопасность от SSRF-атак"""
     try:
         parsed = urlparse(url)
+        if parsed.scheme not in ("http", "https"):
+            return False
         host = parsed.hostname
         if not host:
             return False

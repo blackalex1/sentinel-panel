@@ -50,9 +50,15 @@ def push_log_line(core: CoreName, line: str) -> None:
     with _lock:
         _history[core].append(line)
         dead = set()
-        for q in _subscribers[core]:
+        for q in list(_subscribers[core]):
             try:
                 q.put_nowait(line)
+            except asyncio.QueueFull:
+                try:
+                    q.get_nowait()
+                    q.put_nowait(line)
+                except Exception:
+                    dead.add(q)
             except Exception:
                 dead.add(q)
         _subscribers[core] -= dead

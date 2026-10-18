@@ -8,6 +8,25 @@ from backend.alerts.geoip import get_server_ip
 
 active_activity_cards = {}
 
+_last_new_ip_alerts = {}
+
+def is_new_ip_in_cooldown(username: str, client_ip: str, now: float = None) -> bool:
+    if now is None:
+        now = time.time()
+    cooldown = 3600
+    try:
+        cooldown = int(get_setting("vpn_new_ip_cooldown_sec", "3600"))
+    except Exception:
+        pass
+    key = (username.lower(), client_ip)
+    last_time = _last_new_ip_alerts.get(key, 0)
+    return (now - last_time) < cooldown
+
+def mark_new_ip_alert_sent(username: str, client_ip: str, now: float = None):
+    if now is None:
+        now = time.time()
+    _last_new_ip_alerts[(username.lower(), client_ip)] = now
+
 def format_card_msg(host_ip, username, protocol, lines, tx, rx):
     displayed_lines = lines[-15:]
     timeline = "\n".join(displayed_lines)
@@ -208,7 +227,8 @@ async def handle_client_event(action: str, client_ip: str, details_str: str):
                 } for l in db_logs]
             
             is_new_ip, history = check_new_ip_and_get_history(username, client_ip, now_time, logs_list, allowed_ips=allowed_ips_str)
-            if is_new_ip:
+            if is_new_ip and not is_new_ip_in_cooldown(username, client_ip, now_time):
+                mark_new_ip_alert_sent(username, client_ip, now_time)
                 history_lines = []
                 for h in history:
                     time_formatted = datetime.datetime.fromtimestamp(h["timestamp"]).strftime("%d.%m %H:%M")
@@ -233,6 +253,8 @@ async def handle_client_event(action: str, client_ip: str, details_str: str):
                     ]
                 }
                 await send_to_all(alert_text, reply_markup=inline_buttons)
+            elif is_new_ip:
+                logging.info(f"[Telegram Client Alerts] Suppressed repeated New IP alert for {username} ({client_ip}) - in cooldown")
         except Exception as e:
             logging.error(f"[Telegram Client Alerts] Error checking new IP: {e}")
 
@@ -245,6 +267,8 @@ async def handle_client_event(action: str, client_ip: str, details_str: str):
             card['connections'][client_ip].append(datetime.datetime.now())
             
             msg_text = format_card_msg(host_ip, username, protocol, card['lines'], tx, rx)
+            card['last_edited_traffic'] = tx + rx
+            card['last_edited_time'] = now_time
             await edit_all(card['admin_messages'], msg_text)
         else:
             lines = [event_line]
@@ -255,6 +279,8 @@ async def handle_client_event(action: str, client_ip: str, details_str: str):
             active_activity_cards[key] = {
                 'started_at': now_time,
                 'last_activity_at': now_time,
+                'last_edited_traffic': tx + rx,
+                'last_edited_time': now_time,
                 'lines': lines,
                 'connections': connections,
                 'admin_messages': msgs
@@ -284,6 +310,8 @@ async def handle_client_event(action: str, client_ip: str, details_str: str):
             card['lines'].append(event_line)
             
             msg_text = format_card_msg(host_ip, username, protocol, card['lines'], tx, rx)
+            card['last_edited_traffic'] = tx + rx
+            card['last_edited_time'] = now_time
             await edit_all(card['admin_messages'], msg_text)
         else:
             msg_text = (
@@ -303,24 +331,52 @@ async def update_panel_active_cards_traffic():
         return
         
     now_time = time.time()
+    
+    # Prune old _last_new_ip_alerts entries older than 24h
+    for k, last_t in list(_last_new_ip_alerts.items()):
+        if now_time - last_t > 86400:
+            _last_new_ip_alerts.pop(k, None)
+
     host_ip = await get_server_ip()
     
-    for (username, protocol), card in list(active_activity_cards.items()):
-        if not is_card_active(card, now_time):
-            continue
-        if not card.get('admin_messages'):
-            continue
+    async with httpx.AsyncClient(timeout=5.0) as client:
+        for (username, protocol), card in list(active_activity_cards.items()):
+            if not is_card_active(card, now_time):
+                # Prune inactive cards that have had no activity for over 15 minutes
+                if now_time - card.get('last_activity_at', card.get('started_at', 0)) > 900:
+                    active_activity_cards.pop((username, protocol), None)
+                continue
+                
+            if not card.get('admin_messages'):
+                continue
+                
+            from backend.client_alerts import get_user_traffic_from_db
+            tx, rx = get_user_traffic_from_db(username)
+            total_traffic = tx + rx
             
-        from backend.client_alerts import get_user_traffic_from_db
-        tx, rx = get_user_traffic_from_db(username)
+            last_traffic = card.get('last_edited_traffic', 0)
+            last_edit_time = card.get('last_edited_time', 0)
+            traffic_diff = total_traffic - last_traffic
+            time_diff = now_time - last_edit_time
             
-        msg_text = format_card_msg(host_ip, username, protocol, card['lines'], tx, rx)
-        
-        async with httpx.AsyncClient(timeout=5.0) as client:
+            # Rate limit Telegram edits: edit only if traffic changed by >= 1MB, or if >= 45s passed with any traffic change
+            if last_edit_time > 0:
+                if traffic_diff < 1024 * 1024 and (time_diff < 45 or traffic_diff <= 0):
+                    continue
+                
+            msg_text = format_card_msg(host_ip, username, protocol, card['lines'], tx, rx)
+            
+            edited_any = False
             for m in card['admin_messages']:
                 try:
                     url = f"https://api.telegram.org/bot{bot_token}/editMessageText"
                     payload = {"chat_id": m["chat_id"], "message_id": m["message_id"], "text": msg_text, "parse_mode": "HTML"}
-                    await client.post(url, json=payload)
+                    resp = await client.post(url, json=payload)
+                    if resp.status_code == 200:
+                        edited_any = True
                 except Exception:
                     pass
+                    
+            if edited_any or last_edit_time == 0:
+                card['last_edited_traffic'] = total_traffic
+                card['last_edited_time'] = now_time

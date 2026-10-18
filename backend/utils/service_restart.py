@@ -21,13 +21,15 @@ import logging
 DEBOUNCE_SECONDS = 0.3
 
 _lock = threading.Lock()
+_restart_exec_lock = threading.Lock()
 _pending_timer: threading.Timer | None = None
 _pending_cores: set[str] = set()
 
 
 def _do_restart(cores: set[str] | None = None) -> None:
     """Выполняется в daemon-потоке. Перезапускает необходимые сервисы."""
-    restart_all = not cores or "all" in cores
+    with _restart_exec_lock:
+        restart_all = not cores or "all" in cores
 
     if restart_all or "xray" in cores:
         try:

@@ -39,9 +39,9 @@ class ClientStats(Base):
     __tablename__ = "client_stats"
     
     id = Column(Integer, primary_key=True, autoincrement=True)
-    inbound_id = Column(Integer, ForeignKey("inbounds.id", ondelete="CASCADE"), nullable=False)
+    inbound_id = Column(Integer, ForeignKey("inbounds.id", ondelete="CASCADE"), nullable=False, index=True)
     email = Column(String, nullable=False, index=True)
-    client_uuid_or_pwd = Column(String, nullable=False)
+    client_uuid_or_pwd = Column(String, nullable=False, index=True)
     up = Column(BigInteger, default=0)
     down = Column(BigInteger, default=0)
     total = Column(BigInteger, default=0)
@@ -91,9 +91,14 @@ class AuditLog(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     timestamp = Column(BigInteger, nullable=False, index=True)  # UTC epoch seconds
     username = Column(String, nullable=False)
-    action = Column(String, nullable=False)
-    target = Column(String, nullable=True)
+    action = Column(String, nullable=False, index=True)
+    target = Column(String, nullable=True, index=True)
     details = Column(String, nullable=True)
+
+    __table_args__ = (
+        Index("ix_audit_logs_action_target_timestamp", "action", "target", "timestamp"),
+        Index("ix_audit_logs_target_timestamp", "target", "timestamp"),
+    )
 
 
 class UserSession(Base):

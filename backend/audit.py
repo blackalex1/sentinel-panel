@@ -13,7 +13,8 @@ def get_actor_username(request: Request) -> str:
     auth_header = request.headers.get("Authorization", "")
     if auth_header.startswith("Bearer "):
         token = auth_header.split(" ")[1]
-        if token == settings.API_TOKEN:
+        import hmac
+        if settings.API_TOKEN and token and hmac.compare_digest(token, settings.API_TOKEN):
             return "bot"
             
     session_id = request.cookies.get("session_id")

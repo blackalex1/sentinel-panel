@@ -38,6 +38,7 @@ def create_backup_dump() -> str:
                         "remark": ib.remark,
                         "port": ib.port,
                         "protocol": ib.protocol,
+                        "core": ib.core or ("hysteria" if ib.protocol == "hysteria2" else "xray"),
                         "settings": ib.settings,
                         "stream_settings": ib.stream_settings,
                         "sniffing": ib.sniffing,
@@ -59,6 +60,7 @@ def create_backup_dump() -> str:
                         "expiry_time": c.expiry_time,
                         "enable": c.enable,
                         "limit_ip": c.limit_ip,
+                        "allowed_ips": c.allowed_ips or "",
                         "block_reason": c.block_reason or "",
                         "last_seen_up": c.last_seen_up,
                         "last_seen_down": c.last_seen_down
@@ -151,11 +153,14 @@ def restore_backup_dump(dump_str: str, lang: str = None) -> tuple[bool, str]:
                 
             # 4. Restore inbounds
             for ib in data.get("inbounds", []):
+                ib_proto = ib.get("protocol", "")
+                ib_core = ib.get("core") or ("hysteria" if ib_proto == "hysteria2" else "xray")
                 session.add(Inbound(
                     id=ib["id"],
                     remark=ib["remark"],
                     port=ib["port"],
-                    protocol=ib["protocol"],
+                    protocol=ib_proto,
+                    core=ib_core,
                     settings=ib["settings"],
                     stream_settings=ib["stream_settings"],
                     sniffing=ib["sniffing"],
@@ -247,12 +252,20 @@ def restore_backup_dump(dump_str: str, lang: str = None) -> tuple[bool, str]:
                     expiry_time=c.get("expiry_time", 0),
                     enable=c.get("enable", 1),
                     limit_ip=c.get("limit_ip", 0),
+                    allowed_ips=c.get("allowed_ips", ""),
                     block_reason=c.get("block_reason", ""),
                     last_seen_up=c.get("last_seen_up", 0),
                     last_seen_down=c.get("last_seen_down", 0)
                 ))
                 
-        # 8. Update configurations and restart services
+        # 8. Update configurations and restart services (all 3 cores)
+        try:
+            from backend.singbox import write_singbox_config, restart_singbox
+            write_singbox_config(force=True)
+            restart_singbox()
+        except Exception as e_sb:
+            logging.error(f"[Backup Restore] Failed to restart Sing-box: {e_sb}")
+
         write_xray_config()
         restart_hysteria()
         

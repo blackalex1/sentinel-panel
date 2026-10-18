@@ -43,6 +43,7 @@ from backend.database.crud.inbounds import (
 from backend.database.crud.clients import (
     client_to_dict,
     get_clients_for_inbound,
+    get_all_clients_grouped_by_inbound,
     get_client_by_email,
     get_client_by_id_or_pwd,
     add_client_db,

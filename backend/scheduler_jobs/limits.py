@@ -191,19 +191,27 @@ def asyncio_notify_admin(email: str, reason: str, bot_token: str, tg_admin_ids: 
             lang = get_setting("language", "ru")
             temp_bot = Bot(token=bot_token)
             admin_ids = [x.strip() for x in tg_admin_ids.split(",") if x.strip()]
-            for admin_id in admin_ids:
-                msg = t("limits_user_blocked_notification", lang=lang, category="backend", email=email, reason=reason)
+            msg = t("limits_user_blocked_notification", lang=lang, category="backend", email=email, reason=reason)
+            
+            async def dispatch_limit_alerts(bot_inst, chats, text):
                 try:
-                    loop = asyncio.get_running_loop()
-                    
-                    async def send_and_close(bot_inst, chat, text):
-                        try:
-                            await bot_inst.send_message(chat_id=chat, text=text, parse_mode="HTML")
-                        finally:
-                            await bot_inst.session.close()
-                            
-                    loop.create_task(send_and_close(temp_bot, admin_id, msg))
-                except RuntimeError:
-                    pass
+                    tasks = [
+                        bot_inst.send_message(chat_id=chat, text=text, parse_mode="HTML")
+                        for chat in chats
+                    ]
+                    await asyncio.gather(*tasks, return_exceptions=True)
+                except Exception as ex:
+                    logging.error(f"[Scheduler] Error sending Telegram alert: {ex}")
+                finally:
+                    try:
+                        await bot_inst.session.close()
+                    except Exception:
+                        pass
+                        
+            try:
+                loop = asyncio.get_running_loop()
+                loop.create_task(dispatch_limit_alerts(temp_bot, admin_ids, msg))
+            except RuntimeError:
+                pass
     except Exception as e:
         logging.error(f"[Scheduler] Failed to send Telegram alert: {e}")

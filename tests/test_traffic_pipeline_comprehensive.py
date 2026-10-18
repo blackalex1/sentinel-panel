@@ -371,9 +371,11 @@ def test_pipeline_reset_endpoints_security_decoy_and_token_protection(client):
         assert r_bad_token.status_code == 404, f"Invalid token to {ep} must be masked with 404"
 
     # 3. Forged Session Cookie -> Must receive Nginx decoy 404
+    client.cookies.set("session_id", "forged_session_id_99999")
     for ep in endpoints:
-        r_bad_cookie = client.post(ep, cookies={"session_id": "forged_session_id_99999"})
+        r_bad_cookie = client.post(ep)
         assert r_bad_cookie.status_code == 404, f"Invalid cookie to {ep} must be masked with 404"
+    client.cookies.clear()
 
     # 4. Valid Session Cookie WITHOUT CSRF token (Cross-Site Request Forgery attempt) -> Blocked with 404
     from backend.auth.sessions import ACTIVE_SESSIONS, CSRF_TOKENS
@@ -386,18 +388,20 @@ def test_pipeline_reset_endpoints_security_decoy_and_token_protection(client):
     ACTIVE_SESSIONS.add(test_sess_id)
     CSRF_TOKENS[test_sess_id] = test_csrf
 
+    client.cookies.set("session_id", test_sess_id)
     # Missing X-CSRF-Token -> Blocked with 404
-    r_no_csrf = client.post(f"/panel/api/inbounds/resetClientTraffic/{ib_id}/sec_user@shield.test", cookies={"session_id": test_sess_id})
+    r_no_csrf = client.post(f"/panel/api/inbounds/resetClientTraffic/{ib_id}/sec_user@shield.test")
     assert r_no_csrf.status_code == 404, "POST request with valid session cookie but missing CSRF token MUST be blocked"
 
     # Mismatched X-CSRF-Token -> Blocked with 404
-    r_wrong_csrf = client.post(f"/panel/api/inbounds/resetClientTraffic/{ib_id}/sec_user@shield.test", cookies={"session_id": test_sess_id}, headers={"X-CSRF-Token": "forged_csrf_token_999"})
+    r_wrong_csrf = client.post(f"/panel/api/inbounds/resetClientTraffic/{ib_id}/sec_user@shield.test", headers={"X-CSRF-Token": "forged_csrf_token_999"})
     assert r_wrong_csrf.status_code == 404, "POST request with mismatched CSRF token MUST be blocked"
 
     # Valid Session Cookie AND matching X-CSRF-Token -> Succeeds (status 200)
-    r_valid_csrf = client.post(f"/panel/api/inbounds/resetClientTraffic/{ib_id}/sec_user@shield.test", cookies={"session_id": test_sess_id}, headers={"X-CSRF-Token": test_csrf})
+    r_valid_csrf = client.post(f"/panel/api/inbounds/resetClientTraffic/{ib_id}/sec_user@shield.test", headers={"X-CSRF-Token": test_csrf})
     assert r_valid_csrf.status_code == 200
     assert r_valid_csrf.json().get("success") is True
+    client.cookies.clear()
 
     # 5. Valid Bearer Token (for Telegram bot / controller) -> Must succeed (status 200, success=True)
     auth_headers = {"Authorization": f"Bearer {settings.API_TOKEN}"}

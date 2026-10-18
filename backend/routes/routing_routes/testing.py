@@ -23,6 +23,8 @@ def extract_address_port(protocol: str, settings: dict, stream_settings: dict = 
 def system_ping(host: str, timeout: float = 3.0, lang: str = "ru") -> dict:
     if not host:
         return {"success": False, "msg": t("testing_address_not_specified", lang=lang, category="backend")}
+    if host.startswith("-") or any(ch in host for ch in (";", "&", "|", "`", "$", "\n", "\r", " ")):
+        return {"success": False, "msg": t("testing_cannot_determine_address", lang=lang, category="backend")}
         
     try:
         if sys.platform == "win32":
@@ -311,7 +313,9 @@ async def test_outbound_api(request: Request, payload: dict):
         if protocol == "freedom":
             start_time = time.perf_counter()
             try:
-                resp = requests.get("https://www.gstatic.com/generate_204", timeout=3.0, verify=False)
+                import httpx
+                async with httpx.AsyncClient(timeout=3.0, verify=False) as client:
+                    resp = await client.get("https://www.gstatic.com/generate_204")
                 latency = (time.perf_counter() - start_time) * 1000
                 if resp.status_code in (200, 204):
                     return {"success": True, "ping": round(latency, 2), "msg": t("testing_direct_working", lang=lang, category="backend")}
@@ -321,12 +325,12 @@ async def test_outbound_api(request: Request, payload: dict):
                 return {"success": False, "msg": t("testing_connection_exception", lang=lang, category="backend", error=str(e))}
                 
         if core and core != "auto":
-            return routing_facade.test_outbound_transit(protocol, settings, stream_settings, core=core)
-        return routing_facade.test_outbound_transit(protocol, settings, stream_settings)
+            return await asyncio.to_thread(routing_facade.test_outbound_transit, protocol, settings, stream_settings, core=core)
+        return await asyncio.to_thread(routing_facade.test_outbound_transit, protocol, settings, stream_settings)
         
     else:  # TCP Ping
         if protocol == "freedom":
-            res = routing_facade.tcp_ping("8.8.8.8", 53, 3.0)
+            res = await asyncio.to_thread(routing_facade.tcp_ping, "8.8.8.8", 53, 3.0)
             if res["success"]:
                 return {"success": True, "ping": res["ping"], "msg": t("testing_direct_available", lang=lang, category="backend")}
             else:
@@ -336,13 +340,13 @@ async def test_outbound_api(request: Request, payload: dict):
             host, port = extract_address_port(protocol, settings, stream_settings)
             if not host:
                 return {"success": False, "msg": t("testing_cannot_determine_address_proto", lang=lang, category="backend")}
-            return routing_facade.system_ping(host)
+            return await asyncio.to_thread(routing_facade.system_ping, host)
             
         host, port = extract_address_port(protocol, settings, stream_settings)
         if not host or not port:
             return {"success": False, "msg": t("testing_cannot_determine_address_port_proto", lang=lang, category="backend")}
             
-        res = routing_facade.tcp_ping(host, port)
+        res = await asyncio.to_thread(routing_facade.tcp_ping, host, port)
         return res
 
 @router.post("/api/routing/outbounds/test/{id}")
@@ -381,7 +385,9 @@ async def test_outbound_by_id_api(request: Request, id: int, test_type: str = "t
         if protocol == "freedom":
             start_time = time.perf_counter()
             try:
-                resp = requests.get("https://www.gstatic.com/generate_204", timeout=3.0, verify=False)
+                import httpx
+                async with httpx.AsyncClient(timeout=3.0, verify=False) as client:
+                    resp = await client.get("https://www.gstatic.com/generate_204")
                 latency = (time.perf_counter() - start_time) * 1000
                 if resp.status_code in (200, 204):
                     return {"success": True, "ping": round(latency, 2), "msg": t("testing_direct_working", lang=lang, category="backend")}
@@ -391,12 +397,12 @@ async def test_outbound_by_id_api(request: Request, id: int, test_type: str = "t
                 return {"success": False, "msg": t("testing_connection_exception", lang=lang, category="backend", error=str(e))}
                 
         if core and core != "auto":
-            return routing_facade.test_outbound_transit(protocol, settings, stream_settings, core=core)
-        return routing_facade.test_outbound_transit(protocol, settings, stream_settings)
+            return await asyncio.to_thread(routing_facade.test_outbound_transit, protocol, settings, stream_settings, core=core)
+        return await asyncio.to_thread(routing_facade.test_outbound_transit, protocol, settings, stream_settings)
         
     else:  # TCP/ICMP Ping
         if protocol == "freedom":
-            res = routing_facade.tcp_ping("8.8.8.8", 53, 3.0)
+            res = await asyncio.to_thread(routing_facade.tcp_ping, "8.8.8.8", 53, 3.0)
             if res["success"]:
                 return {"success": True, "ping": res["ping"], "msg": t("testing_direct_available", lang=lang, category="backend")}
             else:
@@ -406,13 +412,13 @@ async def test_outbound_by_id_api(request: Request, id: int, test_type: str = "t
             host, port = extract_address_port(protocol, settings, stream_settings)
             if not host:
                 return {"success": False, "msg": t("testing_cannot_determine_address", lang=lang, category="backend")}
-            return routing_facade.system_ping(host)
+            return await asyncio.to_thread(routing_facade.system_ping, host)
             
         host, port = extract_address_port(protocol, settings, stream_settings)
         if not host or not port:
             return {"success": False, "msg": t("testing_cannot_determine_address_port", lang=lang, category="backend")}
             
-        res = routing_facade.tcp_ping(host, port)
+        res = await asyncio.to_thread(routing_facade.tcp_ping, host, port)
         return res
 
 @router.post("/api/routing/outbounds/generate-warp")

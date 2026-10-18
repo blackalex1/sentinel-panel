@@ -112,7 +112,8 @@ async def change_backup_password_api(request: Request):
         encrypt_enabled = get_setting("backup_encrypt", "false") == "true"
         if stored_password:
             if current_password:
-                if current_password != stored_password:
+                import hmac
+                if not hmac.compare_digest(current_password, stored_password):
                     return {"success": False, "msg": t("backup_current_password_incorrect", lang)}
             elif encrypt_enabled:
                 return {"success": False, "msg": t("backup_password_fields_required", lang)}

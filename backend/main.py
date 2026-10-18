@@ -45,75 +45,75 @@ async def sync_session_events_loop():
             # 1. Process recent event stream from Go sentinel-core SessionTracker
             events = get_recent_session_events(0, limit=100)
             if events and isinstance(events, list):
-                for ev in events:
-                    ev_ts = ev.get("timestamp", 0)
-                    action_type = ev.get("action")
-                    core_name = str(ev.get("core", "singbox")).replace("-", "")
-                    action = f"{core_name}_{action_type}"
-                    email = ev.get("email")
-                    ip = ev.get("ip")
-                    if email and ip and ip != "127.0.0.1":
-                        ev_key = (core_name, action_type, email, ip, ev_ts)
-                        if ev_key in seen_events:
-                            continue
-                        seen_events.add(ev_key)
-                        if len(seen_events) > 5000:
-                            seen_events.clear()
+                now_ts = int(time.time())
+                with db_session() as a_sess:
+                    for ev in events:
+                        ev_ts = ev.get("timestamp", 0)
+                        action_type = ev.get("action")
+                        core_name = str(ev.get("core", "singbox")).replace("-", "")
+                        action = f"{core_name}_{action_type}"
+                        email = ev.get("email")
+                        ip = ev.get("ip")
+                        if email and ip and ip != "127.0.0.1":
+                            ev_key = (core_name, action_type, email, ip, ev_ts)
+                            if ev_key in seen_events:
+                                continue
+                            seen_events.add(ev_key)
+                            if len(seen_events) > 5000:
+                                seen_events.clear()
 
-                        if action_type == "disconnect":
-                            reconciled_active.discard((core_name, email, ip))
+                            if action_type == "disconnect":
+                                reconciled_active.discard((core_name, email, ip))
 
-                        is_dup = False
-                        with db_session() as a_sess:
                             dup_count = a_sess.query(AuditLog).filter(
                                 AuditLog.action == action,
                                 AuditLog.target == ip,
-                                AuditLog.timestamp >= int(time.time()) - 10
+                                AuditLog.timestamp >= now_ts - 10
                             ).count()
-                            is_dup = dup_count > 0
-                        if not is_dup:
-                            tx, rx = get_user_traffic_from_db(email)
-                            details_dict = {"username": email, "tx": tx, "rx": rx}
-                            if action_type == "disconnect":
-                                details_dict["duration"] = ev.get("duration", "несколько секунд")
-                            logging.info(f"[SessionTracker Sync] Recording AuditLog: action={action}, target={ip}, user={email}")
-                            log_action(
-                                username="system",
-                                action=action,
-                                target=ip,
-                                details=json.dumps(details_dict, ensure_ascii=False)
-                            )
-
-            # 2. Active sessions reconciliation: ensure all active core sessions have an AuditLog entry
-            active_list = get_active_sessions()
-            current_active_keys = set()
-            if active_list and isinstance(active_list, list):
-                for sess_info in active_list:
-                    email = sess_info.get("email")
-                    ip = sess_info.get("ip")
-                    core_name = str(sess_info.get("core", "singbox")).replace("-", "")
-                    action = f"{core_name}_connect"
-                    if email and ip and ip != "127.0.0.1":
-                        s_key = (core_name, email, ip)
-                        current_active_keys.add(s_key)
-                        if s_key not in reconciled_active:
-                            with db_session() as a_sess:
-                                has_recent = a_sess.query(AuditLog).filter(
-                                    AuditLog.action.in_((f"{core_name}_connect", "singbox_connect", "xray_connect", "hysteria2_connect", "hysteria_connect")),
-                                    AuditLog.target == ip,
-                                    AuditLog.timestamp >= int(time.time()) - 60
-                                ).count() > 0
-                            if not has_recent:
+                            if dup_count == 0:
                                 tx, rx = get_user_traffic_from_db(email)
                                 details_dict = {"username": email, "tx": tx, "rx": rx}
-                                logging.info(f"[SessionTracker Sync] Reconciled active session in AuditLog: action={action}, target={ip}, user={email}")
+                                if action_type == "disconnect":
+                                    details_dict["duration"] = ev.get("duration", "несколько секунд")
+                                logging.info(f"[SessionTracker Sync] Recording AuditLog: action={action}, target={ip}, user={email}")
                                 log_action(
                                     username="system",
                                     action=action,
                                     target=ip,
                                     details=json.dumps(details_dict, ensure_ascii=False)
                                 )
-                            reconciled_active.add(s_key)
+
+            # 2. Active sessions reconciliation: ensure all active core sessions have an AuditLog entry
+            active_list = get_active_sessions()
+            current_active_keys = set()
+            if active_list and isinstance(active_list, list):
+                now_ts = int(time.time())
+                with db_session() as a_sess:
+                    for sess_info in active_list:
+                        email = sess_info.get("email")
+                        ip = sess_info.get("ip")
+                        core_name = str(sess_info.get("core", "singbox")).replace("-", "")
+                        action = f"{core_name}_connect"
+                        if email and ip and ip != "127.0.0.1":
+                            s_key = (core_name, email, ip)
+                            current_active_keys.add(s_key)
+                            if s_key not in reconciled_active:
+                                has_recent = a_sess.query(AuditLog).filter(
+                                    AuditLog.action.in_((f"{core_name}_connect", "singbox_connect", "xray_connect", "hysteria2_connect", "hysteria_connect")),
+                                    AuditLog.target == ip,
+                                    AuditLog.timestamp >= now_ts - 60
+                                ).count() > 0
+                                if not has_recent:
+                                    tx, rx = get_user_traffic_from_db(email)
+                                    details_dict = {"username": email, "tx": tx, "rx": rx}
+                                    logging.info(f"[SessionTracker Sync] Reconciled active session in AuditLog: action={action}, target={ip}, user={email}")
+                                    log_action(
+                                        username="system",
+                                        action=action,
+                                        target=ip,
+                                        details=json.dumps(details_dict, ensure_ascii=False)
+                                    )
+                                reconciled_active.add(s_key)
 
             # Clean reconciled sessions that are no longer active
             for stale_key in list(reconciled_active):
@@ -334,6 +334,9 @@ async def add_no_cache_headers(request: Request, call_next):
 
     # Mask real server technology — replace uvicorn header with nginx decoy on all responses
     response.headers["Server"] = "nginx/1.24.0 (Ubuntu)"
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    response.headers["Content-Security-Policy"] = "frame-ancestors 'self' https://web.telegram.org https://*.telegram.org;"
     try:
         del response.headers["x-powered-by"]
     except (KeyError, Exception):
@@ -418,7 +421,7 @@ else:
     logging.warning("Frontend directory not found. Serving API only.")
 
 # Роут-фолбек на все остальные пути для скрытности
-@app.api_route("/{path_name:path}", methods=["GET", "POST", "PUT", "DELETE"])
+@app.api_route("/{path_name:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS"])
 async def catch_all(request: Request, path_name: str):
     # Если путь не совпадает с секретным путем, отдаем заглушку Nginx или маскируемся
     return await handle_decoy_route(request, path_name)

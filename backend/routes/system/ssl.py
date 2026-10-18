@@ -18,8 +18,9 @@ async def generate_ssl_api(request: Request):
         if not domain:
             return {"success": False, "msg": t("ssl_domain_required", lang=lang, category="backend")}
         
+        import asyncio
         from backend.ssl_utils import request_ssl_cert
-        success, msg = request_ssl_cert(domain, email)
+        success, msg = await asyncio.to_thread(request_ssl_cert, domain, email)
         from backend.audit import log_action, get_actor_username
         actor = get_actor_username(request)
         if success:

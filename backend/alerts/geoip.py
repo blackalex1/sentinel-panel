@@ -2,11 +2,15 @@ import logging
 import httpx
 
 _server_public_ip = None
+_GEOIP_CACHE: dict[str, str] = {}
 
 async def get_geoip_info(ip: str) -> str:
     """Gets country, city, and ISP geolocation info for an IP address."""
     if not ip or ip == "unknown" or ip.startswith("127.") or ip.startswith("192.168.") or ip.startswith("10.") or ip.startswith("172.16."):
         return "Локальная сеть"
+        
+    if ip in _GEOIP_CACHE:
+        return _GEOIP_CACHE[ip]
         
     try:
         async with httpx.AsyncClient(timeout=3.0) as client:
@@ -24,7 +28,11 @@ async def get_geoip_info(ip: str) -> str:
                         geo_parts.append(city)
                     if org:
                         geo_parts.append(f"ISP: {org}")
-                    return " - ".join(geo_parts) if geo_parts else "Определено"
+                    res_str = " - ".join(geo_parts) if geo_parts else "Определено"
+                    if len(_GEOIP_CACHE) > 5000:
+                        _GEOIP_CACHE.clear()
+                    _GEOIP_CACHE[ip] = res_str
+                    return res_str
     except Exception as e:
         logging.warning(f"[GeoIP] Не удалось получить данные для {ip}: {e}")
     return "Неизвестно"

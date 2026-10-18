@@ -156,7 +156,9 @@ def register_warp(license_key: str = None) -> tuple[bool, str]:
 
     # 3. Apply license key if provided (and validate it via warp-cli)
     if license_key:
-        license_key = license_key.strip()
+        license_key = str(license_key).strip()
+        if not re.match(r"^[a-zA-Z0-9_\-]{8,64}$", license_key):
+            return False, "Invalid license key format."
         try:
             # Modern command
             p = subprocess.run(["warp-cli", "registration", "license", license_key], capture_output=True, text=True, timeout=15)

@@ -260,10 +260,19 @@ async def test_e2e_real_singbox_binary_traffic_and_untrusted_ip_audit_log(tmp_pa
 
     finally:
         if client_proc:
+            try:
+                if client_proc.stderr:
+                    client_proc.stderr.close()
+            except Exception:
+                pass
             client_proc.terminate()
             client_proc.wait()
         stop_core("sing-box")
-        httpd.shutdown()
+        try:
+            httpd.shutdown()
+            httpd.server_close()
+        except Exception:
+            pass
 
 
 @pytest.mark.asyncio
@@ -456,9 +465,19 @@ async def test_e2e_real_xray_binary_traffic_and_untrusted_ip_audit_log(tmp_path)
 
     finally:
         if client_proc:
+            try:
+                if client_proc.stderr:
+                    client_proc.stderr.close()
+            except Exception:
+                pass
             client_proc.terminate()
             client_proc.wait()
         stop_core("xray")
+        try:
+            httpd.shutdown()
+            httpd.server_close()
+        except Exception:
+            pass
 
 
 @pytest.mark.asyncio
@@ -645,6 +664,16 @@ async def test_e2e_real_hysteria_binary_traffic_and_untrusted_ip_audit_log(tmp_p
 
     finally:
         if client_proc:
+            try:
+                if client_proc.stderr:
+                    client_proc.stderr.close()
+            except Exception:
+                pass
             client_proc.terminate()
             client_proc.wait()
         stop_core("hysteria")
+        try:
+            httpd.shutdown()
+            httpd.server_close()
+        except Exception:
+            pass

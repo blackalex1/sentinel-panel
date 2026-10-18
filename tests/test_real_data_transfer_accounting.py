@@ -247,10 +247,19 @@ async def test_real_singbox_vless_data_transfer_volume_accounting(tmp_path):
 
     finally:
         if client_proc:
+            try:
+                if client_proc.stderr:
+                    client_proc.stderr.close()
+            except Exception:
+                pass
             client_proc.terminate()
             client_proc.wait()
         stop_core("sing-box")
-        httpd.shutdown()
+        try:
+            httpd.shutdown()
+            httpd.server_close()
+        except Exception:
+            pass
 
 
 @pytest.mark.asyncio
@@ -449,10 +458,19 @@ async def test_real_xray_data_transfer_volume_accounting(tmp_path):
 
     finally:
         if client_proc:
+            try:
+                if client_proc.stderr:
+                    client_proc.stderr.close()
+            except Exception:
+                pass
             client_proc.terminate()
             client_proc.wait()
         stop_core("xray")
-        httpd.shutdown()
+        try:
+            httpd.shutdown()
+            httpd.server_close()
+        except Exception:
+            pass
 
 
 @pytest.mark.asyncio
