@@ -3,7 +3,7 @@ import sys
 import json
 import logging
 from backend.sentinel_core_bridge import build_server_config
-from backend.database import get_setting
+from backend.database import get_setting, set_setting
 from backend.config import settings
 from backend.ssl_utils import SSL_CERT_PATH, SSL_KEY_PATH
 
@@ -30,7 +30,12 @@ def generate_hysteria_config(inbound_id: int, port: int, clients: list, stream_s
 
         use_https = SSL_CERT_PATH.exists() and SSL_KEY_PATH.exists()
         panel_proto = "https" if use_https else "http"
-        secret_key = get_setting("telegram_bot_token") or settings.API_TOKEN or "secret"
+        internal_secret = get_setting("hysteria_internal_secret")
+        if not internal_secret:
+            import secrets
+            internal_secret = secrets.token_hex(24)
+            set_setting("hysteria_internal_secret", internal_secret)
+        secret_key = get_setting("telegram_bot_token") or settings.API_TOKEN or internal_secret
         panel_port = getattr(settings, "PANEL_PORT", 2053)
         auth_url = f"{panel_proto}://127.0.0.1:{panel_port}/api/hysteria/auth?secret={secret_key}"
 

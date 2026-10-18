@@ -53,8 +53,10 @@ async def hysteria_client_auth(request: Request, payload: dict, secret: str = No
     provided_secret = secret or auth_header or x_secret
 
     if not is_local:
-        valid_secrets = {s for s in [settings.API_TOKEN, bot_token, "secret"] if s}
-        if not provided_secret or provided_secret not in valid_secrets:
+        import hmac
+        internal_secret = backend.database.get_setting("hysteria_internal_secret")
+        valid_secrets = [s for s in [settings.API_TOKEN, bot_token, internal_secret] if s]
+        if not provided_secret or not any(hmac.compare_digest(provided_secret, s) for s in valid_secrets):
             return decoy_response()
 
     raw_auth = payload.get("auth", "")
