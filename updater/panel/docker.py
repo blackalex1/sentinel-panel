@@ -4,8 +4,10 @@ from __future__ import annotations
 
 import os
 import shutil
+import socket
 import subprocess
 import time
+import urllib.parse
 from typing import Dict, List, Optional
 
 from ..core.common import (
@@ -116,10 +118,24 @@ class DockerManager:
                 p_url = p_url.replace(":10818", ":10819")
             if p_url.startswith("socks5://") or p_url.startswith("socks4://"):
                 p_url = "http://" + p_url.split("://", 1)[1]
-            docker_env["http_proxy"] = p_url
-            docker_env["https_proxy"] = p_url
-            docker_env["HTTP_PROXY"] = p_url
-            docker_env["HTTPS_PROXY"] = p_url
+
+            proxy_ok = False
+            try:
+                parsed = urllib.parse.urlparse(p_url)
+                host = parsed.hostname or "127.0.0.1"
+                port = parsed.port or (443 if parsed.scheme == "https" else 80)
+                with socket.create_connection((host, port), timeout=0.5):
+                    proxy_ok = True
+            except Exception:
+                proxy_ok = False
+
+            if proxy_ok:
+                docker_env["http_proxy"] = p_url
+                docker_env["https_proxy"] = p_url
+                docker_env["HTTP_PROXY"] = p_url
+                docker_env["HTTPS_PROXY"] = p_url
+            else:
+                log_info(f"Прокси {p_url} не отвечает или закрыт, сборка Docker будет выполнена напрямую.")
 
         try:
             run_command(compose_cmd + ["up", "-d", "--build"], cwd=self.project_dir, env=docker_env if docker_env else None, check=True)
