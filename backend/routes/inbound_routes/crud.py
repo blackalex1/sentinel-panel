@@ -4,7 +4,7 @@ from fastapi import APIRouter, Request
 from pydantic import BaseModel, Field
 
 from backend.database import (
-    get_all_inbounds, get_clients_for_inbound, add_inbound, update_inbound, delete_inbound, add_client_db
+    get_all_inbounds, get_clients_for_inbound, get_all_clients_grouped_by_inbound, add_inbound, update_inbound, delete_inbound, add_client_db
 )
 from backend.xray import restart_xray
 from backend.hysteria import restart_hysteria
@@ -45,11 +45,12 @@ async def list_inbounds_api(request: Request):
         return decoy_response()
         
     inbounds = get_all_inbounds()
+    clients_by_ib = get_all_clients_grouped_by_inbound()
     obj_list = []
     
     for ib in inbounds:
         ib_id = ib["id"]
-        clients = get_clients_for_inbound(ib_id)
+        clients = clients_by_ib.get(ib_id, [])
         
         # Формируем settings.clients для совместимости
         db_settings_dict = json.loads(ib["settings"] or "{}")

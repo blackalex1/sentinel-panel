@@ -45,5 +45,8 @@ def update_admin_credentials(current_username: str, new_username: str, new_passw
         user.username = new_username
         if new_password_plain:
             user.password = backend.database.hash_password(new_password_plain)
+        if current_username != new_username:
+            from backend.models import UserSession
+            session.query(UserSession).filter_by(username=current_username).update({"username": new_username})
         return True
 

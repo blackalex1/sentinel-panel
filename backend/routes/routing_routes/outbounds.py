@@ -1,3 +1,4 @@
+import asyncio
 from fastapi import APIRouter, Request
 from backend.database import get_all_outbounds, get_outbound_by_id, add_outbound, update_outbound, delete_outbound
 from backend.auth_utils import check_auth, decoy_response
@@ -35,16 +36,20 @@ async def create_outbound_api(request: Request, payload: dict):
     if ob_id is None:
         return {"success": False, "msg": t("outbound_tag_must_be_unique", lang=lang, category="backend")}
         
-    from backend.singbox import write_singbox_config, restart_singbox
-    from backend.xray import write_xray_config, restart_xray
-    from backend.hysteria import restart_hysteria
+    def _apply_configs():
+        from backend.singbox import write_singbox_config, restart_singbox
+        from backend.xray import write_xray_config, restart_xray
+        from backend.hysteria import restart_hysteria
 
-    write_singbox_config(force=True)
-    write_xray_config()
+        write_singbox_config(force=True)
+        write_xray_config()
 
-    singbox_ok = restart_singbox()
-    xray_ok = restart_xray()
-    restart_hysteria()
+        sb_ok = restart_singbox()
+        xr_ok = restart_xray()
+        restart_hysteria()
+        return sb_ok, xr_ok
+
+    singbox_ok, xray_ok = await asyncio.to_thread(_apply_configs)
 
     if singbox_ok is False:
         from backend.singbox.service import get_last_singbox_error
@@ -82,16 +87,20 @@ async def update_outbound_api(request: Request, id: int, payload: dict):
     if not success:
         return {"success": False, "msg": t("outbound_update_tag_conflict", lang=lang, category="backend")}
         
-    from backend.singbox import write_singbox_config, restart_singbox
-    from backend.xray import write_xray_config, restart_xray
-    from backend.hysteria import restart_hysteria
+    def _apply_configs():
+        from backend.singbox import write_singbox_config, restart_singbox
+        from backend.xray import write_xray_config, restart_xray
+        from backend.hysteria import restart_hysteria
 
-    write_singbox_config(force=True)
-    write_xray_config()
+        write_singbox_config(force=True)
+        write_xray_config()
 
-    singbox_ok = restart_singbox()
-    xray_ok = restart_xray()
-    restart_hysteria()
+        sb_ok = restart_singbox()
+        xr_ok = restart_xray()
+        restart_hysteria()
+        return sb_ok, xr_ok
+
+    singbox_ok, xray_ok = await asyncio.to_thread(_apply_configs)
 
     if singbox_ok is False:
         from backend.singbox.service import get_last_singbox_error

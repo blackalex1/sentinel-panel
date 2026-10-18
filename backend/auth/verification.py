@@ -18,7 +18,7 @@ def check_auth(request: Request) -> bool:
     auth_header = request.headers.get("Authorization", "")
     if auth_header.startswith("Bearer "):
         token = auth_header.split(" ")[1]
-        if hmac.compare_digest(token, settings.API_TOKEN):
+        if settings.API_TOKEN and token and hmac.compare_digest(token, settings.API_TOKEN):
             return True
             
     # 2. Проверка Session Cookie
@@ -38,9 +38,10 @@ def check_auth(request: Request) -> bool:
                         logging.error(f"Failed to update session IP: {e}")
                 
                 # Валидация CSRF для небезопасных методов
-                if request.method in ("POST", "PUT", "DELETE"):
+                if request.method in ("POST", "PUT", "DELETE", "PATCH"):
                     csrf_token = request.headers.get("X-CSRF-Token")
-                    if not csrf_token or CSRF_TOKENS.get(session_id) != csrf_token:
+                    stored_csrf = CSRF_TOKENS.get(session_id)
+                    if not csrf_token or not stored_csrf or not hmac.compare_digest(stored_csrf, csrf_token):
                         return False
                 return True
             else:
@@ -57,7 +58,7 @@ def check_ws_auth(websocket) -> bool:
     auth_header = websocket.headers.get("Authorization", "")
     if auth_header.startswith("Bearer "):
         token = auth_header.split(" ")[1]
-    if token and hmac.compare_digest(token, settings.API_TOKEN):
+    if settings.API_TOKEN and token and hmac.compare_digest(token, settings.API_TOKEN):
         return True
 
     # 2. Проверка Token через Session / CSRF Cache
@@ -157,8 +158,8 @@ def verify_telegram_webapp(init_data: str) -> Optional[dict]:
         time_diff = time.time() - auth_date
         logging.info(f"[verify_telegram_webapp] Signature verified successfully. auth_date diff: {time_diff:.1f}s")
         
-        if time_diff > 86400:
-            logging.warning(f"[verify_telegram_webapp] initData expired. auth_date diff is {time_diff:.1f}s (> 86400s)")
+        if time_diff > 86400 or time_diff < -300:
+            logging.warning(f"[verify_telegram_webapp] initData expired or timestamp in the future. auth_date diff is {time_diff:.1f}s")
             return None
             
         user_json = parsed.get("user")

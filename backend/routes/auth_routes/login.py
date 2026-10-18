@@ -80,8 +80,11 @@ class LoginRequest(BaseModel):
 async def get_csrf_token(request: Request):
     """Returns CSRF token for the session."""
     auth_header = request.headers.get("Authorization", "")
-    if auth_header.startswith("Bearer ") and auth_header.split(" ")[1] == settings.API_TOKEN:
-        return {"success": True, "obj": "bearer_bypass"}
+    if auth_header.startswith("Bearer "):
+        token = auth_header.split(" ")[1]
+        import hmac
+        if settings.API_TOKEN and token and hmac.compare_digest(token, settings.API_TOKEN):
+            return {"success": True, "obj": "bearer_bypass"}
         
     session_id = request.cookies.get("session_id")
     if not session_id or session_id not in ACTIVE_SESSIONS:
@@ -137,13 +140,10 @@ async def login_api(request: Request, response: Response):
         return JSONResponse(status_code=429, content={"success": False, "msg": t("login_rate_limited", lang=lang, category="backend", period=period)})
         
     record_attempt(client_ip)
-        
-    fail_delay = float(get_setting("login_fail_delay", str(settings.LOGIN_FAIL_DELAY)))
-    if fail_delay > 0:
-        await asyncio.sleep(fail_delay)
     
     from backend.audit import log_action
-    if authenticate_admin(uname, pwd):
+    is_authenticated = await asyncio.to_thread(authenticate_admin, uname, pwd)
+    if is_authenticated:
         from backend.models import User
         from backend.database import db_session
         
@@ -240,23 +240,29 @@ async def login_api(request: Request, response: Response):
                             
                             admin_ids = [x.strip() for x in tg_admin_ids.split(",") if x.strip()]
                             
-                            async def send_2fa_alert(bot_inst, chat, ip, keyboard):
+                            async def dispatch_2fa_alerts(bot_inst, chats, ip, keyboard):
                                 try:
-                                    await bot_inst.send_message(
-                                        chat_id=chat,
-                                        text=t("tg_2fa_alert_text", lang=lang, category="backend", ip=ip),
-                                        reply_markup=keyboard,
-                                        parse_mode="HTML"
-                                    )
+                                    tasks = [
+                                        bot_inst.send_message(
+                                            chat_id=chat,
+                                            text=t("tg_2fa_alert_text", lang=lang, category="backend", ip=ip),
+                                            reply_markup=keyboard,
+                                            parse_mode="HTML"
+                                        )
+                                        for chat in chats
+                                    ]
+                                    await asyncio.gather(*tasks, return_exceptions=True)
                                 except Exception as ex:
                                     logging.error(f"Failed to send 2FA alert: {ex}")
                                 finally:
-                                    await bot_inst.session.close()
+                                    try:
+                                        await bot_inst.session.close()
+                                    except Exception:
+                                        pass
                                     
                             try:
                                 loop = asyncio.get_running_loop()
-                                for admin_id in admin_ids:
-                                    loop.create_task(send_2fa_alert(temp_bot, admin_id, client_ip, kb))
+                                loop.create_task(dispatch_2fa_alerts(temp_bot, admin_ids, client_ip, kb))
                             except RuntimeError:
                                 pass
                                 
@@ -281,17 +287,21 @@ async def login_api(request: Request, response: Response):
         csrf_token = secrets.token_hex(16)
         CSRF_TOKENS[session_id] = csrf_token
         
+        is_secure = request.url.scheme == "https" or request.headers.get("x-forwarded-proto", "").lower() == "https"
         response.set_cookie(
             key="session_id", 
             value=session_id, 
             httponly=True, 
             samesite="lax",
-            secure=True,
+            secure=is_secure,
             max_age=timeout_days * 24 * 3600
         )
         log_action(uname, "login_success", target=client_ip, details="Web password login success")
         return {"success": True, "msg": t("login_success", lang=lang, category="backend")}
         
+    fail_delay = float(get_setting("login_fail_delay", str(settings.LOGIN_FAIL_DELAY)))
+    if fail_delay > 0:
+        await asyncio.sleep(fail_delay)
     log_action(uname, "login_failure", target=client_ip, details="Invalid password")
     return {"success": False, "msg": t("login_invalid_credentials", lang=lang, category="backend")}
 
@@ -304,9 +314,17 @@ async def telegram_webapp_auth(request: Request, response: Response, payload: di
         return JSONResponse(status_code=400, content={"success": False, "msg": "Missing initData"})
         
     client_ip = request.client.host if request.client else "unknown"
+    if not check_rate_limit(client_ip):
+        from backend.audit import log_action
+        from backend.database import get_setting
+        period = int(get_setting("login_attempts_period", str(settings.LOGIN_ATTEMPTS_PERIOD)))
+        log_action("system", "login_rate_limited", target=client_ip, details=f"IP {client_ip} exceeded max Telegram webapp login attempts. Blocked for {period}s.")
+        return JSONResponse(status_code=429, content={"success": False, "msg": t("login_rate_limited", lang=lang, category="backend", period=period)})
+
     from backend.audit import log_action
     user = verify_telegram_webapp(init_data)
     if not user:
+        record_attempt(client_ip)
         log_action("unknown_tg", "login_telegram_failure", target=client_ip, details="Invalid Telegram webapp signature")
         return JSONResponse(status_code=401, content={"success": False, "msg": t("login_tg_invalid_signature", lang=lang, category="backend")})
         
@@ -317,6 +335,7 @@ async def telegram_webapp_auth(request: Request, response: Response, payload: di
     tg_admin_ids = get_setting("telegram_admin_ids", "")
     allowed_ids = [x.strip() for x in tg_admin_ids.split(",") if x.strip()]
     if not allowed_ids or tg_id not in allowed_ids:
+        record_attempt(client_ip)
         logging.warning(f"Unauthorized Telegram login attempt: ID {tg_id} ({user.get('username')})")
         log_action(username_tg, "login_telegram_failure", target=client_ip, details=f"Telegram ID {tg_id} not in whitelist")
         return JSONResponse(status_code=403, content={"success": False, "msg": t("login_tg_not_whitelisted", lang=lang, category="backend")})
@@ -335,14 +354,6 @@ async def telegram_webapp_auth(request: Request, response: Response, payload: di
                 "success": False,
                 "msg": t("login_tg_blocked_totp_active", lang=lang, category="backend")
             })
-        
-    if not check_rate_limit(client_ip):
-        from backend.audit import log_action
-        period = int(get_setting("login_attempts_period", str(settings.LOGIN_ATTEMPTS_PERIOD)))
-        log_action("system", "login_rate_limited", target=client_ip, details=f"IP {client_ip} exceeded max Telegram webapp login attempts. Blocked for {period}s.")
-        return JSONResponse(status_code=429, content={"success": False, "msg": t("login_rate_limited", lang=lang, category="backend", period=period)})
-        
-    record_attempt(client_ip)
 
     session_id = secrets.token_hex(16)
     
@@ -355,12 +366,13 @@ async def telegram_webapp_auth(request: Request, response: Response, payload: di
     csrf_token = secrets.token_hex(16)
     CSRF_TOKENS[session_id] = csrf_token
     
+    is_secure = request.url.scheme == "https" or request.headers.get("x-forwarded-proto", "").lower() == "https"
     response.set_cookie(
         key="session_id", 
         value=session_id, 
         httponly=True, 
         samesite="lax",
-        secure=True,
+        secure=is_secure,
         max_age=timeout_days * 24 * 3600
     )
     
@@ -378,6 +390,6 @@ async def logout(request: Request, response: Response):
         ACTIVE_SESSIONS.discard(session_id)
         CSRF_TOKENS.pop(session_id, None)
         client_ip = request.client.host if request.client else "unknown"
-        log_action(actor, "logout", target=client_ip)
-    response.delete_cookie("session_id")
+    is_secure = request.url.scheme == "https" or request.headers.get("x-forwarded-proto", "").lower() == "https"
+    response.delete_cookie("session_id", httponly=True, samesite="lax", secure=is_secure)
     return {"success": True}

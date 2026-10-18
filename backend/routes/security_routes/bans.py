@@ -1,3 +1,4 @@
+import os
 import json
 import logging
 import subprocess
@@ -56,10 +57,13 @@ async def unban_ip(request: Request, ip: str = Form(None)):
         set_setting("banned_login_ips", ",".join(banned_list))
         
         # Также пробуем удалить из iptables
-        try:
-            subprocess.run(["iptables", "-D", "INPUT", "-s", target_ip, "-j", "DROP"], capture_output=True)
-        except Exception as ex:
-            logging.warning(f"Failed to remove IP from iptables: {ex}")
+        if os.name != "nt":
+            try:
+                import ipaddress
+                ipaddress.ip_address(target_ip)
+                subprocess.run(["iptables", "-D", "INPUT", "-s", target_ip, "-j", "DROP"], capture_output=True)
+            except Exception as ex:
+                logging.warning(f"Failed to remove IP from iptables: {ex}")
             
         return {"success": True, "msg": t("security_ip_unbanned", lang=lang, category="backend", ip=target_ip)}
     return {"success": False, "msg": t("security_ip_not_in_banned_list", lang=lang, category="backend", ip=target_ip)}
@@ -268,6 +272,19 @@ async def unban_client(body: UnbanClientBody, request: Request):
         
     log_action(get_actor_username(request), "unban_client", target=body.email, details=f"Unbanned via API (inbound_id={body.inbound_id})")
     
+    # Reset active IP cache in scheduler so the client isn't immediately re-blocked by IP limit
+    try:
+        from backend.scheduler_jobs.limits import ACTIVE_IP_CACHE
+        if body.email in ACTIVE_IP_CACHE:
+            ACTIVE_IP_CACHE[body.email] = {}
+        for cs in clients:
+            if cs.email in ACTIVE_IP_CACHE:
+                ACTIVE_IP_CACHE[cs.email] = {}
+            if cs.client_uuid_or_pwd in ACTIVE_IP_CACHE:
+                ACTIVE_IP_CACHE[cs.client_uuid_or_pwd] = {}
+    except Exception as e:
+        logging.error(f"Failed to reset active IP cache during unban: {e}")
+
     restart_services_background(delay=0.5)
         
     return {"success": True, "msg": t("security_client_unbanned_success", lang=lang, category="backend", email=body.email)}

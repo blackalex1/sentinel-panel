@@ -24,6 +24,15 @@ def get_clients_for_inbound(inbound_id: int):
         clients = session.query(ClientStats).filter_by(inbound_id=inbound_id).order_by(ClientStats.id.asc()).all()
         return [backend.database.client_to_dict(c) for c in clients]
 
+def get_all_clients_grouped_by_inbound() -> dict:
+    with backend.database.db_session() as session:
+        clients = session.query(ClientStats).order_by(ClientStats.id.asc()).all()
+        res = {}
+        for c in clients:
+            d = backend.database.client_to_dict(c)
+            res.setdefault(c.inbound_id, []).append(d)
+        return res
+
 def get_client_by_email(inbound_id: int, email: str):
     with backend.database.db_session() as session:
         c = session.query(ClientStats).filter_by(inbound_id=inbound_id, email=email).first()

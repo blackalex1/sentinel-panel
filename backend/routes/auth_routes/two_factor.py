@@ -3,6 +3,7 @@ import time
 import json
 import subprocess
 import logging
+import os
 from fastapi import APIRouter, Request, Response
 from pydantic import BaseModel
 from backend.config import settings
@@ -181,12 +182,13 @@ async def tg_2fa_poll(request: Request, response: Response, token: str):
             csrf_token = secrets.token_hex(16)
             CSRF_TOKENS[session_id] = csrf_token
             
+            is_secure = request.url.scheme == "https" or request.headers.get("x-forwarded-proto", "").lower() == "https"
             response.set_cookie(
                 key="session_id", 
                 value=session_id, 
                 httponly=True, 
                 samesite="lax",
-                secure=True,
+                secure=is_secure,
                 max_age=timeout_days * 24 * 3600
             )
             
@@ -256,10 +258,13 @@ async def tg_2fa_action(payload: Tg2faActionBody, request: Request):
                     banned_list.append(client_ip)
                     set_setting("banned_login_ips", ",".join(banned_list))
                     
-                try:
-                    subprocess.run(["iptables", "-I", "INPUT", "-s", client_ip, "-j", "DROP"], capture_output=True)
-                except Exception as ex:
-                    logging.warning(f"Failed to block IP via iptables: {ex}")
+                if os.name != "nt":
+                    try:
+                        import ipaddress
+                        ipaddress.ip_address(client_ip)
+                        subprocess.run(["iptables", "-I", "INPUT", "-s", client_ip, "-j", "DROP"], capture_output=True)
+                    except Exception as ex:
+                        logging.warning(f"Failed to block IP via iptables: {ex}")
                     
             session.commit()
             return {"success": True, "msg": t("two_factor_ip_blocked", lang=lang, category="backend")}

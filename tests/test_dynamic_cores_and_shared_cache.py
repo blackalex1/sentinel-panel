@@ -164,7 +164,7 @@ def test_dynamic_xray_start():
         assert res is True
         assert is_xray_running() is True
         stop_xray()
-        for _ in range(10):
+        for _ in range(25):
             if not is_xray_running():
                 break
             time.sleep(0.2)
@@ -209,6 +209,10 @@ def test_dynamic_xray_start_via_hysteria_routing():
     assert res is True
     assert is_xray_running() is True
     stop_xray()
+    for _ in range(25):
+        if not is_xray_running():
+            break
+        time.sleep(0.2)
     assert is_xray_running() is False
 
 @_skip_no_hysteria
