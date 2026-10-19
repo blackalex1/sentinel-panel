@@ -28,6 +28,20 @@ def clean_stream_settings(stream_settings: dict) -> dict:
                             if p and p not in cleaned_names:
                                 cleaned_names.append(p)
                 reality_opts["serverNames"] = cleaned_names
+                if "serverName" not in reality_opts and cleaned_names:
+                    reality_opts["serverName"] = cleaned_names[0]
+
+        if "publicKey" not in reality_opts:
+            for alt in ("public_key", "pbk"):
+                if alt in reality_opts and reality_opts[alt]:
+                    reality_opts["publicKey"] = reality_opts[alt]
+                    break
+
+        if "shortId" not in reality_opts:
+            for alt in ("short_id", "sid"):
+                if alt in reality_opts and reality_opts[alt] is not None:
+                    reality_opts["shortId"] = reality_opts[alt]
+                    break
         for key in ["maxTimeDiff", "max_time_difference"]:
             if key in reality_opts:
                 val = reality_opts[key]
