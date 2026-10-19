@@ -39,10 +39,10 @@ def get_configured_fingerprint(stream_settings: dict, security_type: str = "real
     """
     Extracts the user-configured TLS/REALITY fingerprint from stream_settings.
     Checks inner settings, security settings dict, root stream_settings dict,
-    and falls back to 'randomized' if not specified.
+    and falls back to 'chrome' if not specified.
     """
     if not stream_settings:
-        return "randomized"
+        return "chrome"
 
     sec_settings = stream_settings.get(f"{security_type}Settings") or stream_settings.get("tlsSettings") or stream_settings.get("realitySettings") or {}
     inner_settings = sec_settings.get("settings") or {} if isinstance(sec_settings, dict) else {}
@@ -55,5 +55,5 @@ def get_configured_fingerprint(stream_settings: dict, security_type: str = "real
         stream_settings.get("fp")
     )
 
-    return str(fp).strip() if fp else "randomized"
+    return str(fp).strip() if fp else "chrome"
 

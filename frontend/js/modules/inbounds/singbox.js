@@ -8,6 +8,8 @@ export function compileSingboxSettings(protocol, security, network, streamSettin
         const priv = document.getElementById("ib-reality-priv").value.trim();
         const shortIdsInput = document.getElementById("ib-reality-shortids").value.trim();
         const shortIds = shortIdsInput ? shortIdsInput.split(",").map(s => s.trim()).filter(Boolean) : [];
+        const fp = document.getElementById("ib-reality-fp") ? (document.getElementById("ib-reality-fp").value || "chrome") : "chrome";
+        const spx = document.getElementById("ib-reality-spx") ? (document.getElementById("ib-reality-spx").value.trim() || "/") : "/";
         const maxTimeDiffInput = document.getElementById("ib-reality-max-time-diff").value.trim();
         
         streamSettings.realitySettings = {
@@ -16,7 +18,9 @@ export function compileSingboxSettings(protocol, security, network, streamSettin
             serverNames: sni ? sni.split(",").map(s => s.trim()).filter(Boolean) : [],
             privateKey: priv,
             publicKey: pbk,
-            shortIds: shortIds
+            shortIds: shortIds,
+            fingerprint: fp,
+            spiderX: spx
         };
 
         if (maxTimeDiffInput && maxTimeDiffInput !== "0s" && maxTimeDiffInput !== "0") {
@@ -28,11 +32,13 @@ export function compileSingboxSettings(protocol, security, network, streamSettin
         const alpnInput = document.getElementById("ib-tls-alpn").value || "h2,http/1.1";
         const alpn = alpnInput.split(",").map(s => s.trim()).filter(Boolean);
         const allowInsecure = document.getElementById("ib-tls-insecure").checked;
+        const fp = document.getElementById("ib-tls-fp") ? (document.getElementById("ib-tls-fp").value || "chrome") : "chrome";
         
         streamSettings.tlsSettings = {
             serverName: sni,
             allowInsecure: allowInsecure,
-            alpn: alpn
+            alpn: alpn,
+            fingerprint: fp
         };
     }
 
@@ -74,6 +80,12 @@ export function populateSingboxSettings(protocol, security, network, streamSetti
         document.getElementById("ib-reality-pbk").value = rs.publicKey || "";
         document.getElementById("ib-reality-priv").value = rs.privateKey || "";
         document.getElementById("ib-reality-shortids").value = (rs.shortIds || []).join(", ");
+        if (document.getElementById("ib-reality-fp")) {
+            document.getElementById("ib-reality-fp").value = rs.fingerprint || "chrome";
+        }
+        if (document.getElementById("ib-reality-spx")) {
+            document.getElementById("ib-reality-spx").value = rs.spiderX || "";
+        }
         const mtd = rs.maxTimeDiff || rs.max_time_difference || "";
         document.getElementById("ib-reality-max-time-diff").value = (mtd === "0s" || mtd === "0") ? "" : mtd;
     } else if (security === "tls") {
@@ -81,6 +93,9 @@ export function populateSingboxSettings(protocol, security, network, streamSetti
         document.getElementById("ib-tls-sni").value = ts.serverName || "";
         document.getElementById("ib-tls-alpn").value = (ts.alpn || []).join(", ");
         document.getElementById("ib-tls-insecure").checked = ts.allowInsecure || false;
+        if (document.getElementById("ib-tls-fp")) {
+            document.getElementById("ib-tls-fp").value = ts.fingerprint || "chrome";
+        }
     }
 
     if (network === "ws") {
