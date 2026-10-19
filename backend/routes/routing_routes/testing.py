@@ -5,6 +5,7 @@ import re
 import socket
 import time
 import subprocess
+import threading
 import requests
 import asyncio
 from fastapi import APIRouter, Request
@@ -187,6 +188,7 @@ def test_outbound_transit(protocol: str, settings: dict, stream_settings: dict =
                 }]
             }
         }
+        cmd = [str(XRAY_BIN_PATH), "run", "-config", str(temp_config_path)]
         core_name = "Xray"
     
     try:
@@ -195,15 +197,33 @@ def test_outbound_transit(protocol: str, settings: dict, stream_settings: dict =
     except Exception as e:
         return {"success": False, "msg": t("testing_create_test_file_error", lang=lang, category="backend", error=str(e))}
         
+    test_proc = None
+    captured_logs = []
     try:
-        from backend.sentinel_core_bridge import start_core, stop_core
-        bin_path = str(SINGBOX_BIN_PATH) if use_singbox else str(XRAY_BIN_PATH)
-        core_type = "sing-box" if use_singbox else "xray"
+        creationflags = subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0
+        test_proc = subprocess.Popen(
+            cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            bufsize=1,
+            creationflags=creationflags
+        )
 
-        start_core(core_type, bin_path, str(temp_config_path))
+        def _read_logs():
+            try:
+                for line in iter(test_proc.stdout.readline, ''):
+                    if line:
+                        captured_logs.append(line.strip())
+                        if len(captured_logs) > 50:
+                            captured_logs.pop(0)
+            except Exception:
+                pass
+
+        log_thread = threading.Thread(target=_read_logs, daemon=True)
+        log_thread.start()
         
-        if not wait_for_port(free_port, timeout=3.0):
-            stop_core(core_type)
+        if not wait_for_port(free_port, timeout=4.0):
             return {"success": False, "msg": t("testing_launch_core_failed", lang=lang, category="backend", core=core_name)}
             
         proxies = {
@@ -212,9 +232,9 @@ def test_outbound_transit(protocol: str, settings: dict, stream_settings: dict =
         }
         
         test_urls = [
-            "https://www.gstatic.com/generate_204",
             "https://cp.cloudflare.com/generate_204",
-            "http://connectivitycheck.gstatic.com/generate_204"
+            "https://www.gstatic.com/generate_204",
+            "https://www.google.com/generate_204"
         ]
 
         import urllib3
@@ -227,42 +247,50 @@ def test_outbound_transit(protocol: str, settings: dict, stream_settings: dict =
         last_status = None
         for target_url in test_urls:
             try:
-                # 1. Initial warm-up request to initialize proxy tunnel & SSL handshake
-                warmup_ok = False
+                # 1. Warm-up request to establish proxy connection & TLS handshake
+                start_warm = time.perf_counter()
                 try:
-                    w_resp = session.get(target_url, timeout=3.0, verify=False)
+                    w_resp = session.get(target_url, timeout=5.0, verify=False)
+                    warm_latency = (time.perf_counter() - start_warm) * 1000
                     if w_resp.status_code in (200, 204):
                         warmup_ok = True
                     else:
                         last_status = w_resp.status_code
+                        warmup_ok = False
                 except requests.exceptions.RequestException as we:
                     last_error = str(we)
+                    warmup_ok = False
 
                 if not warmup_ok:
                     continue
 
                 # 2. Precise measurement over active warm tunnel
                 start_time = time.perf_counter()
-                resp = session.get(target_url, timeout=3.0, verify=False)
-                latency = (time.perf_counter() - start_time) * 1000
-
-                if resp.status_code in (200, 204):
+                try:
+                    resp = session.get(target_url, timeout=5.0, verify=False)
+                    latency = (time.perf_counter() - start_time) * 1000
+                    if resp.status_code in (200, 204):
+                        return {
+                            "success": True,
+                            "ping": round(latency, 2),
+                            "msg": t("testing_transit_working", lang=lang, category="backend", core=core_name, latency=round(latency, 1)),
+                            "core": core_name
+                        }
+                    else:
+                        last_status = resp.status_code
+                except requests.exceptions.RequestException:
                     return {
                         "success": True,
-                        "ping": round(latency, 2),
-                        "msg": t("testing_transit_working", lang=lang, category="backend", core=core_name, latency=round(latency, 1)),
+                        "ping": round(warm_latency, 2),
+                        "msg": t("testing_transit_working", lang=lang, category="backend", core=core_name, latency=round(warm_latency, 1)),
                         "core": core_name
                     }
-                else:
-                    last_status = resp.status_code
             except requests.exceptions.RequestException as e:
                 last_error = str(e)
                 
         detail_msg = ""
         try:
-            from backend.sentinel_core_bridge import get_in_memory_core_logs
-            logs = get_in_memory_core_logs(core_type, limit=5)
-            err_lines = [line for line in logs if any(w in line.lower() for w in ("error", "fail", "refused", "timeout", "bad certificate", "auth", "rejected"))]
+            err_lines = [line for line in captured_logs if any(w in line.lower() for w in ("error", "fail", "refused", "timeout", "bad certificate", "auth", "rejected", "closed pipe"))]
             if err_lines:
                 clean_err = re.sub(r'(\x1b\[[0-9;]*[a-zA-Z]|\[\d+m|\[\d+;\d+;\d+m)', '', err_lines[-1]).strip()
                 detail_msg = f": {clean_err}"
@@ -279,12 +307,15 @@ def test_outbound_transit(protocol: str, settings: dict, stream_settings: dict =
             return {"success": False, "msg": f"{t('testing_transit_check_error', lang=lang, category='backend', error=last_error or 'Connection timeout', core=core_name)}{detail_msg}"}
             
     finally:
-        try:
-            from backend.sentinel_core_bridge import stop_core
-            core_type = "sing-box" if use_singbox else "xray"
-            stop_core(core_type)
-        except Exception:
-            pass
+        if test_proc:
+            try:
+                test_proc.terminate()
+                test_proc.wait(timeout=1.0)
+            except Exception:
+                try:
+                    test_proc.kill()
+                except Exception:
+                    pass
         if temp_config_path.exists():
             try:
                 os.remove(temp_config_path)
@@ -314,13 +345,21 @@ async def test_outbound_api(request: Request, payload: dict):
             start_time = time.perf_counter()
             try:
                 import httpx
-                async with httpx.AsyncClient(timeout=3.0, verify=False) as client:
-                    resp = await client.get("https://www.gstatic.com/generate_204")
+                async with httpx.AsyncClient(timeout=4.0, verify=False) as client:
+                    resp = None
+                    for direct_url in ("https://cp.cloudflare.com/generate_204", "https://www.gstatic.com/generate_204"):
+                        try:
+                            resp = await client.get(direct_url)
+                            if resp.status_code in (200, 204):
+                                break
+                        except Exception:
+                            continue
                 latency = (time.perf_counter() - start_time) * 1000
-                if resp.status_code in (200, 204):
+                if resp and resp.status_code in (200, 204):
                     return {"success": True, "ping": round(latency, 2), "msg": t("testing_direct_working", lang=lang, category="backend")}
                 else:
-                    return {"success": False, "msg": t("testing_unexpected_status_simple", lang=lang, category="backend", status=resp.status_code)}
+                    status_code = resp.status_code if resp else 0
+                    return {"success": False, "msg": t("testing_unexpected_status_simple", lang=lang, category="backend", status=status_code)}
             except Exception as e:
                 return {"success": False, "msg": t("testing_connection_exception", lang=lang, category="backend", error=str(e))}
                 
