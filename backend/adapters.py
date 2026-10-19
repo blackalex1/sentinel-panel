@@ -189,9 +189,28 @@ def build_singbox_outbound(protocol: str, settings: dict, stream_settings: dict 
                 "insecure": True,
                 "server_name": params["sni"]
             }
+            fp = (
+                params["reality_settings"].get("fingerprint")
+                or params["reality_settings"].get("fp")
+                or params["tls_settings"].get("fingerprint")
+                or params["tls_settings"].get("fp")
+                or "chrome"
+            )
+            sb_ob["tls"]["utls"] = {
+                "enabled": True,
+                "fingerprint": fp
+            }
             if params["security"] == "reality":
-                pbk = params["reality_settings"].get("publicKey")
-                sid = params["reality_settings"].get("shortId")
+                pbk = (
+                    params["reality_settings"].get("publicKey")
+                    or params["reality_settings"].get("public_key")
+                    or params["reality_settings"].get("pbk")
+                )
+                sid = (
+                    params["reality_settings"].get("shortId")
+                    or params["reality_settings"].get("short_id")
+                    or params["reality_settings"].get("sid")
+                )
                 sb_ob["tls"]["reality"] = {
                     "enabled": True,
                     "public_key": pbk or "",
