@@ -91,11 +91,20 @@ def extract_common_outbound_params(settings: dict, stream_settings: dict) -> dic
     network_val = stream_settings.get("network") or settings.get("network") or "tcp"
     security_val = stream_settings.get("security") or settings.get("security") or "none"
 
+    raw_reality_sns = reality_settings.get("serverNames") or tls_settings.get("serverNames")
+    if isinstance(raw_reality_sns, list) and raw_reality_sns:
+        first_sn = raw_reality_sns[0]
+    elif isinstance(raw_reality_sns, str):
+        first_sn = raw_reality_sns.split(",")[0].strip()
+    else:
+        first_sn = None
+
     sni_val = (
         tls_settings.get("serverName")
         or tls_settings.get("sni")
         or reality_settings.get("serverName")
         or reality_settings.get("sni")
+        or first_sn
         or hyst_settings.get("sni")
         or stream_settings.get("sni")
         or settings.get("sni")
@@ -272,8 +281,197 @@ def build_xray_outbound(protocol: str, settings: dict, stream_settings: dict = N
             "tag": tag
         }
 
-    # Для остальных протоколов Xray используем стандартные настройки
     from backend.xray import clean_stream_settings
+
+    if proto == "vless":
+        xray_settings = {
+            "vnext": [
+                {
+                    "address": params["address"],
+                    "port": params["port"],
+                    "users": [
+                        {
+                            "id": params["uuid"] or params["password"],
+                            "encryption": "none",
+                            "flow": params["flow"]
+                        }
+                    ]
+                }
+            ]
+        }
+        # Сохраняем encryption, если был явно передан
+        raw_vnext = params["raw_settings"].get("vnext")
+        if isinstance(raw_vnext, list) and raw_vnext:
+            users_list = raw_vnext[0].get("users") or [{}]
+            if users_list and users_list[0].get("encryption"):
+                xray_settings["vnext"][0]["users"][0]["encryption"] = users_list[0]["encryption"]
+        elif params["raw_settings"].get("encryption"):
+            xray_settings["vnext"][0]["users"][0]["encryption"] = params["raw_settings"]["encryption"]
+
+        stream_settings_out = {
+            "network": params["network"] or "tcp",
+            "security": params["security"] or "none"
+        }
+        if params["security"] == "reality":
+            real_set = params["reality_settings"]
+            pbk = real_set.get("publicKey") or real_set.get("public_key") or real_set.get("pbk") or ""
+            sid = real_set.get("shortId") or real_set.get("short_id") or real_set.get("sid") or ""
+            spx = real_set.get("spiderX") or real_set.get("spider_x") or real_set.get("spx") or "/"
+            fp = (
+                real_set.get("fingerprint")
+                or real_set.get("fp")
+                or params["tls_settings"].get("fingerprint")
+                or params["tls_settings"].get("fp")
+                or "chrome"
+            )
+            stream_settings_out["realitySettings"] = {
+                "serverName": params["sni"],
+                "fingerprint": fp,
+                "show": False,
+                "publicKey": pbk,
+                "shortId": sid,
+                "spiderX": spx
+            }
+        elif params["security"] == "tls":
+            tls_set = params["tls_settings"]
+            fp = tls_set.get("fingerprint") or tls_set.get("fp") or "chrome"
+            stream_settings_out["tlsSettings"] = {
+                "serverName": params["sni"],
+                "fingerprint": fp
+            }
+            alpn = tls_set.get("alpn")
+            if alpn:
+                if isinstance(alpn, str):
+                    stream_settings_out["tlsSettings"]["alpn"] = [x.strip() for x in alpn.split(",") if x.strip()]
+                elif isinstance(alpn, list):
+                    stream_settings_out["tlsSettings"]["alpn"] = alpn
+
+        if params["network"] in ("ws", "httpupgrade", "xhttp"):
+            ws_set = params["ws_settings"]
+            stream_settings_out["wsSettings"] = {
+                "path": ws_set.get("path") or "/",
+                "headers": ws_set.get("headers") or {}
+            }
+        elif params["network"] == "grpc":
+            grpc_set = params["grpc_settings"]
+            stream_settings_out["grpcSettings"] = {
+                "serviceName": grpc_set.get("serviceName") or grpc_set.get("service_name") or "grpc"
+            }
+
+        return {
+            "protocol": "vless",
+            "settings": xray_settings,
+            "streamSettings": clean_stream_settings(stream_settings_out),
+            "tag": tag
+        }
+
+    if proto == "vmess":
+        xray_settings = {
+            "vnext": [
+                {
+                    "address": params["address"],
+                    "port": params["port"],
+                    "users": [
+                        {
+                            "id": params["uuid"] or params["password"],
+                            "security": "auto"
+                        }
+                    ]
+                }
+            ]
+        }
+        stream_settings_out = {
+            "network": params["network"] or "tcp",
+            "security": params["security"] or "none"
+        }
+        if params["security"] == "tls":
+            stream_settings_out["tlsSettings"] = {
+                "serverName": params["sni"],
+                "fingerprint": params["tls_settings"].get("fingerprint") or "chrome"
+            }
+        return {
+            "protocol": "vmess",
+            "settings": xray_settings,
+            "streamSettings": clean_stream_settings(stream_settings_out),
+            "tag": tag
+        }
+
+    if proto == "trojan":
+        xray_settings = {
+            "servers": [
+                {
+                    "address": params["address"],
+                    "port": params["port"],
+                    "password": params["password"] or params["uuid"]
+                }
+            ]
+        }
+        stream_settings_out = {
+            "network": params["network"] or "tcp",
+            "security": "tls",
+            "tlsSettings": {
+                "serverName": params["sni"],
+                "fingerprint": params["tls_settings"].get("fingerprint") or "chrome"
+            }
+        }
+        return {
+            "protocol": "trojan",
+            "settings": xray_settings,
+            "streamSettings": clean_stream_settings(stream_settings_out),
+            "tag": tag
+        }
+
+    if proto in ("shadowsocks", "ss"):
+        method = params["raw_settings"].get("method") or "2022-blake3-aes-128-gcm"
+        xray_settings = {
+            "servers": [
+                {
+                    "address": params["address"],
+                    "port": params["port"],
+                    "password": params["password"],
+                    "method": method
+                }
+            ]
+        }
+        return {
+            "protocol": "shadowsocks",
+            "settings": xray_settings,
+            "tag": tag
+        }
+
+    if proto in ("socks", "http"):
+        users = []
+        if params["username"] or params["password"]:
+            users.append({"user": params["username"], "pass": params["password"]})
+        return {
+            "protocol": proto,
+            "settings": {
+                "servers": [
+                    {
+                        "address": params["address"],
+                        "port": params["port"],
+                        "users": users
+                    }
+                ]
+            },
+            "tag": tag
+        }
+
+    if proto in ("freedom", "direct"):
+        return {
+            "protocol": "freedom",
+            "settings": {"domainStrategy": "AsIs"},
+            "tag": tag
+        }
+
+    if proto in ("blackhole", "block"):
+        return {
+            "protocol": "blackhole",
+            "settings": {"response": {"type": "none"}},
+            "tag": tag
+        }
+
+    # Для остальных протоколов Xray используем сырые настройки с очисткой
     outbound = {
         "protocol": proto,
         "settings": parse_json_or_dict(settings),
