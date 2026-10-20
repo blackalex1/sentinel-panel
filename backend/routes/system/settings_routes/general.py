@@ -75,7 +75,7 @@ async def get_settings_api(request: Request):
             "mux_xver": get_setting("mux_xver", "0") == "1",
             "dns_preset": get_setting("dns_preset", "google"),
             "dns_remote_server": get_setting("dns_remote_server", "https://dns.google/dns-query"),
-            "dns_direct_server": get_setting("dns_direct_server", "https://8.8.8.8/dns-query"),
+            "dns_direct_server": get_setting("dns_direct_server", "8.8.8.8"),
             "dns_strategy": get_setting("dns_strategy", "ipv4_only"),
             "dns_custom_servers": get_setting("dns_custom_servers", ""),
             "use_custom_xray_config": get_setting("use_custom_xray_config", "false"),
