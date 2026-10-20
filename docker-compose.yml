@@ -27,6 +27,7 @@ services:
       - ./bin:/app/bin
       - ./backups:/app/backups
       - ./frontend/decoy:/app/frontend/decoy
+      - ./updater:/app/updater
       - /var/run/sentinel:/var/run/sentinel
     environment:
       - PYTHONUNBUFFERED=1

@@ -52,6 +52,9 @@ COPY frontend/ /app/frontend/
 COPY dist-react/ /app/dist-react/
 COPY bot/ /app/bot/
 COPY locales/ /app/locales/
+COPY updater/ /app/updater/
+COPY host/ /app/host/
+COPY update.sh /app/
 COPY register_node.py /app/
 
 # Set volume mount points

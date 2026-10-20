@@ -137,12 +137,14 @@ function renderCoreUI(data) {
     const githubLink = document.getElementById("btn-open-core-github");
 
     if (currentVerEl && data.current_version) {
-        currentVerEl.innerText = data.current_version.startsWith("v") || data.current_version.includes("dev")
+        const isTextOnly = /^(не|not)/i.test(data.current_version.trim());
+        currentVerEl.innerText = isTextOnly || data.current_version.startsWith("v") || data.current_version.includes("dev")
             ? data.current_version
             : `v${data.current_version}`;
     }
     if (latestVerEl && data.latest_version) {
-        latestVerEl.innerText = data.latest_version.startsWith("v")
+        const isTextOnly = /^(не|not)/i.test(data.latest_version.trim());
+        latestVerEl.innerText = isTextOnly || data.latest_version.startsWith("v")
             ? data.latest_version
             : `v${data.latest_version}`;
     }
