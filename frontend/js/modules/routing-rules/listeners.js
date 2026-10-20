@@ -83,6 +83,18 @@ export function setupRoutingRulesListeners() {
                     payload[outSettingKey] = outSelect.value;
                 }
             });
+
+            // Include DNS settings if present in Quick Rules tab
+            const dnsPresetSelect = document.getElementById("setting-dns-preset");
+            if (dnsPresetSelect) payload.dns_preset = dnsPresetSelect.value;
+            const dnsRemoteInput = document.getElementById("setting-dns-remote");
+            if (dnsRemoteInput) payload.dns_remote_server = dnsRemoteInput.value.trim();
+            const dnsDirectInput = document.getElementById("setting-dns-direct");
+            if (dnsDirectInput) payload.dns_direct_server = dnsDirectInput.value.trim();
+            const dnsStrategySelect = document.getElementById("setting-dns-strategy");
+            if (dnsStrategySelect) payload.dns_strategy = dnsStrategySelect.value;
+            const dnsCustomInput = document.getElementById("setting-dns-custom");
+            if (dnsCustomInput) payload.dns_custom_servers = dnsCustomInput.value.trim();
             
             btnSaveQuickRules.disabled = true;
             const res = await apiFetch("/api/settings/update", {
@@ -97,6 +109,66 @@ export function setupRoutingRulesListeners() {
                 loadRoutingRules();
             } else {
                 showToast(res ? res.msg : t("settings_save_error", "Не удалось сохранить настройки"), "error");
+            }
+        });
+    }
+
+    // DNS Presets and dedicated save button in Routing -> Quick Rules
+    const DNS_PRESET_MAP = {
+        "google": { remote: "https://dns.google/dns-query", direct: "https://8.8.8.8/dns-query", custom: "https://dns.google/dns-query, https://8.8.8.8/dns-query, 8.8.8.8" },
+        "cloudflare": { remote: "https://1.1.1.1/dns-query", direct: "https://8.8.8.8/dns-query", custom: "https://1.1.1.1/dns-query, https://8.8.8.8/dns-query, 1.1.1.1" },
+        "adguard": { remote: "https://dns.adguard-dns.com/dns-query", direct: "https://8.8.8.8/dns-query", custom: "https://dns.adguard-dns.com/dns-query, https://8.8.8.8/dns-query, 94.140.14.14" },
+        "yandex": { remote: "https://77.88.8.8/dns-query", direct: "https://77.88.8.8/dns-query", custom: "https://77.88.8.8/dns-query, 77.88.8.8" }
+    };
+
+    const dnsPresetSelect = document.getElementById("setting-dns-preset");
+    if (dnsPresetSelect) {
+        dnsPresetSelect.addEventListener("change", (e) => {
+            const val = e.target.value;
+            if (DNS_PRESET_MAP[val]) {
+                const remoteInp = document.getElementById("setting-dns-remote");
+                const directInp = document.getElementById("setting-dns-direct");
+                const customInp = document.getElementById("setting-dns-custom");
+                if (remoteInp) remoteInp.value = DNS_PRESET_MAP[val].remote;
+                if (directInp) directInp.value = DNS_PRESET_MAP[val].direct;
+                if (customInp && !customInp.value) customInp.value = DNS_PRESET_MAP[val].custom;
+            }
+        });
+    }
+
+    const btnSaveDns = document.getElementById("btn-save-dns");
+    if (btnSaveDns) {
+        btnSaveDns.addEventListener("click", async () => {
+            const preset = dnsPresetSelect ? dnsPresetSelect.value : "google";
+            const remote = (document.getElementById("setting-dns-remote")?.value || "").trim();
+            const direct = (document.getElementById("setting-dns-direct")?.value || "").trim();
+            const strategy = document.getElementById("setting-dns-strategy")?.value || "ipv4_only";
+            const custom = (document.getElementById("setting-dns-custom")?.value || "").trim();
+
+            btnSaveDns.disabled = true;
+            const originalHtml = btnSaveDns.innerHTML;
+            btnSaveDns.innerHTML = `<i class="fa-solid fa-circle-notch fa-spin"></i> ${t("saving", "Сохранение...")}`;
+
+            const res = await apiFetch("/api/settings/update", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    dns_preset: preset,
+                    dns_remote_server: remote,
+                    dns_direct_server: direct,
+                    dns_strategy: strategy,
+                    dns_custom_servers: custom
+                })
+            });
+
+            btnSaveDns.disabled = false;
+            btnSaveDns.innerHTML = originalHtml;
+
+            if (res && res.success) {
+                showToast(t("settings_saved_toast", "Настройки DNS успешно сохранены и применены!"));
+                loadRoutingRules();
+            } else {
+                showToast(res ? res.msg : t("settings_save_error", "Не удалось сохранить настройки DNS"), "error");
             }
         });
     }
