@@ -351,32 +351,35 @@ def compile_node_server_config(target_core: str) -> Dict[str, Any]:
         access_log = get_setting("xray_access_log") or ""
         error_log = get_setting("xray_error_log") or ""
         
-        # DNS Configuration resolution (Default: Google DoH)
+        # DNS Configuration resolution
         dns_preset = (get_setting("dns_preset") or "google").lower()
         dns_remote = get_setting("dns_remote_server") or ""
         dns_direct = get_setting("dns_direct_server") or ""
         dns_strategy = get_setting("dns_strategy") or "ipv4_only"
         dns_custom = get_setting("dns_custom_servers") or ""
 
+        # Default direct DNS for server/local resolution should always be standard UDP (8.8.8.8)
+        default_direct = "8.8.8.8"
+
         if dns_preset == "cloudflare":
             remote = dns_remote or "https://1.1.1.1/dns-query"
-            direct = dns_direct or "https://8.8.8.8/dns-query"
+            direct = dns_direct or default_direct
             servers = [remote, direct, "1.1.1.1"]
         elif dns_preset == "google":
             remote = dns_remote or "https://dns.google/dns-query"
-            direct = dns_direct or "https://8.8.8.8/dns-query"
+            direct = dns_direct or default_direct
             servers = [remote, direct, "8.8.8.8"]
         elif dns_preset == "adguard":
             remote = dns_remote or "https://dns.adguard-dns.com/dns-query"
-            direct = dns_direct or "https://8.8.8.8/dns-query"
+            direct = dns_direct or default_direct
             servers = [remote, direct, "94.140.14.14"]
         elif dns_preset == "yandex":
             remote = dns_remote or "https://77.88.8.8/dns-query"
-            direct = dns_direct or "https://77.88.8.8/dns-query"
+            direct = dns_direct or "77.88.8.8"
             servers = [remote, direct, "77.88.8.8"]
         else:  # custom
             remote = dns_remote or "https://1.1.1.1/dns-query"
-            direct = dns_direct or "https://8.8.8.8/dns-query"
+            direct = dns_direct or default_direct
             servers = [s.strip() for s in dns_custom.replace("\n", ",").split(",") if s.strip()]
             if not servers:
                 servers = [remote, direct]
