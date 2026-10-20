@@ -73,6 +73,11 @@ async def get_settings_api(request: Request):
             "mux_enabled": get_setting("mux_enabled", "false") == "true",
             "mux_concurrency": int(get_setting("mux_concurrency", "8")),
             "mux_xver": get_setting("mux_xver", "0") == "1",
+            "dns_preset": get_setting("dns_preset", "cloudflare"),
+            "dns_remote_server": get_setting("dns_remote_server", "https://1.1.1.1/dns-query"),
+            "dns_direct_server": get_setting("dns_direct_server", "https://8.8.8.8/dns-query"),
+            "dns_strategy": get_setting("dns_strategy", "ipv4_only"),
+            "dns_custom_servers": get_setting("dns_custom_servers", ""),
             "use_custom_xray_config": get_setting("use_custom_xray_config", "false"),
             "use_custom_singbox_config": get_setting("use_custom_singbox_config", "false"),
             "use_custom_hysteria_config": "true" if has_custom_hysteria else "false"
@@ -274,6 +279,46 @@ async def update_settings_api(request: Request):
                 return {"success": False, "msg": t("invalid_mux_concurrency", lang=lang, category="backend")}
         if "mux_xver" in data:
             set_setting("mux_xver", "1" if data.get("mux_xver") in (True, "true", "1", 1) else "0")
+
+        # 8. DNS Settings (Encrypted DoH & Split-DNS via sentinel-core)
+        dns_changed = False
+        if "dns_preset" in data:
+            set_setting("dns_preset", str(data.get("dns_preset", "cloudflare")).strip().lower())
+            dns_changed = True
+        if "dns_remote_server" in data:
+            set_setting("dns_remote_server", str(data.get("dns_remote_server", "")).strip())
+            dns_changed = True
+        if "dns_direct_server" in data:
+            set_setting("dns_direct_server", str(data.get("dns_direct_server", "")).strip())
+            dns_changed = True
+        if "dns_strategy" in data:
+            strat = str(data.get("dns_strategy", "ipv4_only")).strip()
+            if strat in ("ipv4_only", "prefer_ipv4", "prefer_ipv6", "ipv6_only"):
+                set_setting("dns_strategy", strat)
+                dns_changed = True
+        if "dns_custom_servers" in data:
+            set_setting("dns_custom_servers", str(data.get("dns_custom_servers", "")).strip())
+            dns_changed = True
+
+        if dns_changed:
+            import logging
+            try:
+                from backend.singbox import write_singbox_config, restart_singbox
+                write_singbox_config(force=True)
+                restart_singbox()
+            except Exception as e:
+                logging.error(f"Error restarting sing-box after DNS update: {e}")
+            try:
+                from backend.xray import write_xray_config, restart_xray
+                write_xray_config()
+                restart_xray()
+            except Exception as e:
+                logging.error(f"Error restarting Xray after DNS update: {e}")
+            try:
+                from backend.hysteria import restart_hysteria
+                restart_hysteria()
+            except Exception as e:
+                logging.error(f"Error restarting Hysteria after DNS update: {e}")
 
         # Log action
         from backend.audit import log_action, get_actor_username

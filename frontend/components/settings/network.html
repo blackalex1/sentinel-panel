@@ -84,4 +84,55 @@
 </div>
 </div>
 </div>
+
+<div class="glass-card settings-card" id="card-dns">
+<h3 data-i18n="settings_dns_title"></h3>
+<p class="card-desc" data-i18n="settings_dns_desc"></p>
+<div class="settings-form-content" style="margin-top: auto; display: flex; flex-direction: column; gap: 15px;">
+<div class="input-group">
+<label data-i18n="settings_dns_preset" for="setting-dns-preset"></label>
+<select id="setting-dns-preset">
+<option value="cloudflare">Cloudflare (1.1.1.1 DoH)</option>
+<option value="google">Google DNS (8.8.8.8 DoH)</option>
+<option value="adguard">AdGuard DNS (AdBlock DoH)</option>
+<option value="yandex">Yandex DNS (77.88.8.8 DoH - Direct RU)</option>
+<option value="custom" data-i18n="settings_dns_preset_custom"></option>
+</select>
+</div>
+
+<div class="input-row" style="display: flex; flex-wrap: wrap; gap: 15px;">
+<div class="input-group" style="flex: 1 1 200px;">
+<label data-i18n="settings_dns_remote" for="setting-dns-remote"></label>
+<input id="setting-dns-remote" placeholder="https://1.1.1.1/dns-query" type="text"/>
+<span class="field-desc" data-i18n="settings_dns_remote_desc"></span>
+</div>
+<div class="input-group" style="flex: 1 1 200px;">
+<label data-i18n="settings_dns_direct" for="setting-dns-direct"></label>
+<input id="setting-dns-direct" placeholder="https://8.8.8.8/dns-query" type="text"/>
+<span class="field-desc" data-i18n="settings_dns_direct_desc"></span>
+</div>
+</div>
+
+<div class="input-row" style="display: flex; flex-wrap: wrap; gap: 15px;">
+<div class="input-group" style="flex: 1 1 200px;">
+<label data-i18n="settings_dns_strategy" for="setting-dns-strategy"></label>
+<select id="setting-dns-strategy">
+<option value="ipv4_only">IPv4 Only (Рекомендовано)</option>
+<option value="prefer_ipv4">Prefer IPv4</option>
+<option value="prefer_ipv6">Prefer IPv6</option>
+<option value="ipv6_only">IPv6 Only</option>
+</select>
+</div>
+<div class="input-group" id="setting-dns-custom-group" style="flex: 1 1 200px;">
+<label data-i18n="settings_dns_custom_servers" for="setting-dns-custom"></label>
+<input id="setting-dns-custom" placeholder="https://1.1.1.1/dns-query, 8.8.8.8" type="text"/>
+<span class="field-desc" data-i18n="settings_dns_custom_desc"></span>
+</div>
+</div>
+
+<div style="margin-top: 10px;">
+<button class="btn primary-btn w-100" id="btn-save-dns" style="padding: 10px; font-weight: 600;" type="button"><i class="fa-solid fa-floppy-disk"></i> <span data-i18n="settings_btn_save_short"></span></button>
+</div>
+</div>
+</div>
 </div>

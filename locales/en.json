@@ -1027,7 +1027,18 @@
     "settings_backup_current_password_required": "Current password is required to change password!",
     "settings_current_password_required": "Enter current password",
     "settings_new_username_required": "Enter new username",
-    "settings_passwords_mismatch": "New passwords do not match"
+    "settings_passwords_mismatch": "New passwords do not match",
+    "settings_dns_title": "DNS Server Configuration",
+    "settings_dns_desc": "Encrypted DNS queries (DoH) to prevent snooping, DNS poisoning, and ISP censorship.",
+    "settings_dns_preset": "DNS Preset",
+    "settings_dns_preset_custom": "Custom Configuration",
+    "settings_dns_remote": "Remote DNS Resolver (DoH)",
+    "settings_dns_remote_desc": "Used for external queries and bypass via proxy detour",
+    "settings_dns_direct": "Direct DNS Resolver (DoH)",
+    "settings_dns_direct_desc": "Used for bootstrap, direct routing, and domestic domains (.ru, .su)",
+    "settings_dns_strategy": "Resolution Strategy",
+    "settings_dns_custom_servers": "Additional Servers (comma-separated)",
+    "settings_dns_custom_desc": "List of fallback DoH/DoT/IP addresses (e.g. https://1.1.1.1/dns-query, 8.8.8.8)"
   },
   "backend": {
     "traffic_limit_exceeded": "Traffic limit exceeded",

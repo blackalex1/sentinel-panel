@@ -20,7 +20,8 @@ def build_server_config(
     log_path: str = "",
     log_level: str = "",
     access_log: str = "",
-    error_log: str = ""
+    error_log: str = "",
+    dns: Optional[Dict[str, Any]] = None
 ) -> Dict[str, Any]:
     """Compiles complete core configuration (Xray, Sing-box, Hysteria 2) via sentinel-core AST engine."""
     spec = {
@@ -33,6 +34,8 @@ def build_server_config(
         "accessLog": access_log,
         "errorLog": error_log
     }
+    if dns:
+        spec["dns"] = dns
     input_json = json.dumps(spec)
 
     try:
@@ -348,6 +351,44 @@ def compile_node_server_config(target_core: str) -> Dict[str, Any]:
         access_log = get_setting("xray_access_log") or ""
         error_log = get_setting("xray_error_log") or ""
         
+        # DNS Configuration resolution
+        dns_preset = (get_setting("dns_preset") or "cloudflare").lower()
+        dns_remote = get_setting("dns_remote_server") or ""
+        dns_direct = get_setting("dns_direct_server") or ""
+        dns_strategy = get_setting("dns_strategy") or "ipv4_only"
+        dns_custom = get_setting("dns_custom_servers") or ""
+
+        if dns_preset == "cloudflare":
+            remote = dns_remote or "https://1.1.1.1/dns-query"
+            direct = dns_direct or "https://8.8.8.8/dns-query"
+            servers = [remote, direct, "1.1.1.1"]
+        elif dns_preset == "google":
+            remote = dns_remote or "https://dns.google/dns-query"
+            direct = dns_direct or "https://8.8.8.8/dns-query"
+            servers = [remote, direct, "8.8.8.8"]
+        elif dns_preset == "adguard":
+            remote = dns_remote or "https://dns.adguard-dns.com/dns-query"
+            direct = dns_direct or "https://8.8.8.8/dns-query"
+            servers = [remote, direct, "94.140.14.14"]
+        elif dns_preset == "yandex":
+            remote = dns_remote or "https://77.88.8.8/dns-query"
+            direct = dns_direct or "https://77.88.8.8/dns-query"
+            servers = [remote, direct, "77.88.8.8"]
+        else:  # custom
+            remote = dns_remote or "https://1.1.1.1/dns-query"
+            direct = dns_direct or "https://8.8.8.8/dns-query"
+            servers = [s.strip() for s in dns_custom.replace("\n", ",").split(",") if s.strip()]
+            if not servers:
+                servers = [remote, direct]
+
+        dns_spec = {
+            "remoteServer": remote,
+            "directServer": direct,
+            "strategy": dns_strategy,
+            "servers": servers,
+            "finalServer": "dns-remote" if referenced_outbounds else "dns-direct"
+        }
+
         return build_server_config(
             target_core,
             server_inbounds,
@@ -356,7 +397,8 @@ def compile_node_server_config(target_core: str) -> Dict[str, Any]:
             log_path=log_path,
             log_level=log_level,
             access_log=access_log,
-            error_log=error_log
+            error_log=error_log,
+            dns=dns_spec
         )
     except Exception as e:
         logger.exception("Error compiling server config via sentinel-core: %s", e)

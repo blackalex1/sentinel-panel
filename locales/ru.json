@@ -1027,7 +1027,18 @@
     "settings_backup_current_password_required": "Для смены пароля введите текущий пароль!",
     "settings_current_password_required": "Введите текущий пароль",
     "settings_new_username_required": "Введите новый логин",
-    "settings_passwords_mismatch": "Новые пароли не совпадают"
+    "settings_passwords_mismatch": "Новые пароли не совпадают",
+    "settings_dns_title": "Настройки DNS-серверов",
+    "settings_dns_desc": "Шифрование DNS-запросов (DoH) для защиты от блокировок, цензуры и подмены ответов провайдерами.",
+    "settings_dns_preset": "Пресет DNS",
+    "settings_dns_preset_custom": "Пользовательский (Custom)",
+    "settings_dns_remote": "Удалённый DNS-резолвер (DoH)",
+    "settings_dns_remote_desc": "Используется для внешних запросов и обхода блокировок через прокси/туннель",
+    "settings_dns_direct": "Прямой DNS-резолвер (Direct DoH)",
+    "settings_dns_direct_desc": "Используется для прямого подключения, bootstrap и отечественных доменов (.ru, .su)",
+    "settings_dns_strategy": "Стратегия резолва",
+    "settings_dns_custom_servers": "Дополнительные серверы (через запятую)",
+    "settings_dns_custom_desc": "Список резервных DoH/DoT/IP адресов (например: https://1.1.1.1/dns-query, 8.8.8.8)"
   },
   "backend": {
     "traffic_limit_exceeded": "Лимит трафика исчерпан",
