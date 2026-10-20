@@ -360,6 +360,8 @@ def compile_node_server_config(target_core: str) -> Dict[str, Any]:
 
         # Default direct DNS for server/local resolution should always be standard UDP (8.8.8.8)
         default_direct = "8.8.8.8"
+        if dns_direct in ("https://8.8.8.8/dns-query", "https://8.8.8.8", "https://dns.google/dns-query"):
+            dns_direct = default_direct
 
         if dns_preset == "cloudflare":
             remote = dns_remote or "https://1.1.1.1/dns-query"
