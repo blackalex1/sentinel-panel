@@ -101,6 +101,23 @@ def handle_client(conn):
                             response = {"success": True, "msg": "Служба обновления запущена на хост-сервере."}
                         else:
                             response = {"success": False, "msg": f"Файл {update_script} не найден."}
+                    elif action == "trigger_core_update":
+                        core_ver = str(request.get("version", "")).strip()
+                        force = bool(request.get("force", False))
+                        try:
+                            from updater.core.sentinel_core import SentinelCoreManager
+                            bin_dir = "/opt/sentinel-panel/bin" if os.path.isdir("/opt/sentinel-panel/bin") else os.path.abspath("bin")
+                            mgr = SentinelCoreManager(bin_dir=bin_dir, auto_mode=True, force=force)
+                            if not core_ver:
+                                stable_v, _, latest_v = mgr.fetch_releases()
+                                core_ver = stable_v or latest_v
+                            if core_ver and mgr.download_core(core_ver):
+                                _, inst_ver = mgr.get_installed_version()
+                                response = {"success": True, "version": inst_ver or core_ver, "msg": f"Sentinel ядро {inst_ver or core_ver} успешно установлено."}
+                            else:
+                                response = {"success": False, "msg": "Не удалось загрузить ядро с GitHub."}
+                        except Exception as ce:
+                            response = {"success": False, "msg": str(ce)}
                         
                     conn.sendall((json.dumps(response) + "\n").encode("utf-8"))
                 except json.JSONDecodeError:
