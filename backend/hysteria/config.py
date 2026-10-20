@@ -98,8 +98,8 @@ def generate_hysteria_config(inbound_id: int, port: int, clients: list, stream_s
             ]
         }]
 
-        # DNS Configuration resolution for Hysteria 2
-        dns_preset = (get_setting("dns_preset") or "cloudflare").lower()
+        # DNS Configuration resolution for Hysteria 2 (Default: Google DoH)
+        dns_preset = (get_setting("dns_preset") or "google").lower()
         dns_remote = get_setting("dns_remote_server") or ""
         dns_direct = get_setting("dns_direct_server") or ""
         dns_strategy = get_setting("dns_strategy") or "ipv4_only"
