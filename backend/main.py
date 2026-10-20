@@ -255,6 +255,7 @@ async def lifespan(app: FastAPI):
 # Отключаем документацию для скрытности (Stealth Mode)
 app = FastAPI(
     title="Sentinel Panel",
+    version="0.0.1",
     docs_url=None,
     redoc_url=None,
     openapi_url=None,
