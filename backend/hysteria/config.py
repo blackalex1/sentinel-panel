@@ -98,7 +98,44 @@ def generate_hysteria_config(inbound_id: int, port: int, clients: list, stream_s
             ]
         }]
 
-        res = build_server_config("hysteria2", inbound_spec)
+        # DNS Configuration resolution for Hysteria 2
+        dns_preset = (get_setting("dns_preset") or "cloudflare").lower()
+        dns_remote = get_setting("dns_remote_server") or ""
+        dns_direct = get_setting("dns_direct_server") or ""
+        dns_strategy = get_setting("dns_strategy") or "ipv4_only"
+        dns_custom = get_setting("dns_custom_servers") or ""
+
+        if dns_preset == "cloudflare":
+            remote = dns_remote or "https://1.1.1.1/dns-query"
+            direct = dns_direct or "https://8.8.8.8/dns-query"
+            servers = [remote, direct, "1.1.1.1"]
+        elif dns_preset == "google":
+            remote = dns_remote or "https://dns.google/dns-query"
+            direct = dns_direct or "https://8.8.8.8/dns-query"
+            servers = [remote, direct, "8.8.8.8"]
+        elif dns_preset == "adguard":
+            remote = dns_remote or "https://dns.adguard-dns.com/dns-query"
+            direct = dns_direct or "https://8.8.8.8/dns-query"
+            servers = [remote, direct, "94.140.14.14"]
+        elif dns_preset == "yandex":
+            remote = dns_remote or "https://77.88.8.8/dns-query"
+            direct = dns_direct or "https://77.88.8.8/dns-query"
+            servers = [remote, direct, "77.88.8.8"]
+        else:
+            remote = dns_remote or "https://dns.google/dns-query"
+            direct = dns_direct or "https://8.8.8.8/dns-query"
+            servers = [s.strip() for s in dns_custom.replace("\n", ",").split(",") if s.strip()]
+            if not servers:
+                servers = [remote, direct]
+
+        dns_spec = {
+            "remoteServer": remote,
+            "directServer": direct,
+            "strategy": dns_strategy,
+            "servers": servers
+        }
+
+        res = build_server_config("hysteria2", inbound_spec, dns=dns_spec)
         cfg_dict = {}
         if isinstance(res, dict):
             if "config" in res:
