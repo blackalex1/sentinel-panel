@@ -6,7 +6,7 @@ import { loadHysteriaCoreInfo, loadHysteriaLogs, setupHysteriaListeners } from "
 import { loadOutbounds, loadRoutingRules, setupRoutingListeners } from "./routing.js";
 import { setupSslListeners } from "./modules/ssl.js";
 import { switchTab, currentTab } from "./modules/router.js";
-import { setupSettingsListeners, loadSettings } from "./modules/settings-ui.js";
+import { setupSettingsListeners, loadSettings, checkPanelUpdates } from "./modules/settings-ui.js";
 import { setupInboundListeners, loadInbounds, toggleInbound, deleteInbound, openEditInboundModal } from "./inbound-modal.js";
 import { setupClientListeners, openClientsModal, setLoadInboundsCallback } from "./clients.js";
 
@@ -99,6 +99,7 @@ function setupAuthorizedEventListeners() {
 
     setupSslListeners();
     setupSettingsListeners();
+    checkPanelUpdates();
     setupInboundListeners(loadInbounds);
     setupClientListeners(loadInbounds);
     setupHysteriaListeners();

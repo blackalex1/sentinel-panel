@@ -89,6 +89,7 @@ const COMPONENT_MANIFEST = [
     { id: "sec-system", path: "components/settings/system.html", target: ".settings-sections-content" },
     { id: "sec-backups", path: "components/settings/backups.html", target: ".settings-sections-content" },
     { id: "sec-logs", path: "components/settings/logs.html", target: ".settings-sections-content" },
+    { id: "sec-update", path: "components/settings/update.html", target: ".settings-sections-content" },
 
     // Routing components
     { id: "routing-quick-security", path: "components/routing/quick-security-rules.html", target: "#routing-quick-security-container" },
@@ -105,7 +106,7 @@ async function loadAuthorizedComponents() {
     if (loadingOverlay) loadingOverlay.classList.add("active");
     if (loadingText) loadingText.innerText = t("loading_components", "Загрузка компонентов...");
     
-    const BUNDLE_STORAGE_KEY = "sentinel_comp_bundle_v64";
+    const BUNDLE_STORAGE_KEY = "sentinel_comp_bundle_v66";
     let bundle = null;
 
     // Clear any obsolete bundle versions from session storage
