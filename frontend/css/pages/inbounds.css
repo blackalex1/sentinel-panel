@@ -104,13 +104,18 @@
     position: relative;
     display: inline-block;
     width: 48px;
+    min-width: 48px;
+    max-width: 48px;
     height: 26px;
+    flex-shrink: 0;
+    box-sizing: border-box;
 }
 
 .switch-toggle input {
     opacity: 0;
     width: 0;
     height: 0;
+    position: absolute;
 }
 
 .switch-slider {
@@ -124,6 +129,7 @@
     border: 1px solid var(--border-color);
     transition: 0.3s cubic-bezier(0.16, 1, 0.3, 1);
     border-radius: var(--radius-pill);
+    box-sizing: border-box;
 }
 
 .switch-slider:before {

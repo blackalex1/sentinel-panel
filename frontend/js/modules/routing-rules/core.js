@@ -300,12 +300,12 @@ export async function loadQuickSecurityRules() {
                     });
 
                     card.innerHTML = `
-                        <label for="quick-block-${presetId}" style="display: flex; align-items: center; justify-content: space-between; cursor: pointer; user-select: none; margin: 0;">
-                            <div style="display: flex; flex-direction: column; gap: 4px;">
-                                <span style="font-weight: 600; font-size: 14px;">${p.name}</span>
-                                <span style="font-size: 11px; color: var(--text-secondary);">${p.description || ""}</span>
+                        <label for="quick-block-${presetId}" style="display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; cursor: pointer; user-select: none; margin: 0;">
+                            <div style="display: flex; flex-direction: column; gap: 4px; min-width: 0; flex: 1;">
+                                <span style="font-weight: 600; font-size: 14px; line-height: 1.3;">${p.name}</span>
+                                <span style="font-size: 11px; color: var(--text-secondary); line-height: 1.4; word-break: break-word;">${p.description || ""}</span>
                             </div>
-                            <span class="switch-toggle">
+                            <span class="switch-toggle" style="flex-shrink: 0; min-width: 48px; max-width: 48px; width: 48px; height: 26px; margin-top: 2px;">
                                 <input id="quick-block-${presetId}" type="checkbox" ${isChecked ? "checked" : ""}/>
                                 <span class="switch-slider"></span>
                             </span>
@@ -322,6 +322,33 @@ export async function loadQuickSecurityRules() {
 
                 // Initialize custom selects on newly created quick rule cards
                 enhanceAllSelects(gridContainer);
+            }
+
+            // Populate DNS Settings Card if present in the DOM
+            const dnsPresetSelect = document.getElementById("setting-dns-preset");
+            if (dnsPresetSelect) {
+                dnsPresetSelect.value = setObj.dns_preset || "google";
+            }
+            const dnsRemoteInput = document.getElementById("setting-dns-remote");
+            if (dnsRemoteInput) {
+                dnsRemoteInput.value = setObj.dns_remote_server || "https://dns.google/dns-query";
+            }
+            const dnsDirectInput = document.getElementById("setting-dns-direct");
+            if (dnsDirectInput) {
+                dnsDirectInput.value = setObj.dns_direct_server || "https://8.8.8.8/dns-query";
+            }
+            const dnsStrategySelect = document.getElementById("setting-dns-strategy");
+            if (dnsStrategySelect) {
+                dnsStrategySelect.value = setObj.dns_strategy || "ipv4_only";
+            }
+            const dnsCustomInput = document.getElementById("setting-dns-custom");
+            if (dnsCustomInput) {
+                dnsCustomInput.value = setObj.dns_custom_servers || "";
+            }
+
+            const dnsCard = document.getElementById("card-dns");
+            if (dnsCard) {
+                enhanceAllSelects(dnsCard);
             }
 
             // Custom Config Warning Banner

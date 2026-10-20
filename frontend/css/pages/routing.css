@@ -68,3 +68,66 @@
     color: #fff;
     box-shadow: 0 0 16px rgba(139, 92, 246, 0.4);
 }
+
+/* Quick Security Rules Switch Toggle Fix */
+.quick-rules-grid .switch-toggle,
+.switch-toggle {
+    position: relative;
+    display: inline-block;
+    width: 48px !important;
+    min-width: 48px !important;
+    max-width: 48px !important;
+    height: 26px !important;
+    flex-shrink: 0 !important;
+    box-sizing: border-box;
+}
+
+.quick-rules-grid .switch-toggle input,
+.switch-toggle input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+    position: absolute;
+}
+
+.quick-rules-grid .switch-slider,
+.switch-slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: var(--bg-input);
+    border: 1px solid var(--border-color);
+    transition: 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    border-radius: var(--radius-pill);
+    box-sizing: border-box;
+}
+
+.quick-rules-grid .switch-slider:before,
+.switch-slider:before {
+    position: absolute;
+    content: "";
+    height: 18px;
+    width: 18px;
+    left: 3px;
+    bottom: 3px;
+    background-color: var(--text-muted);
+    transition: 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+    border-radius: 50%;
+    box-sizing: border-box;
+}
+
+.quick-rules-grid input:checked + .switch-slider,
+input:checked + .switch-slider {
+    background-color: var(--primary);
+    border-color: var(--primary-hover);
+    box-shadow: 0 0 14px var(--primary-glow);
+}
+
+.quick-rules-grid input:checked + .switch-slider:before,
+input:checked + .switch-slider:before {
+    transform: translateX(22px);
+    background-color: #ffffff;
+}
