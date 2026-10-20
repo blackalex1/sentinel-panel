@@ -158,9 +158,16 @@ def sync_quick_security_rules(settings_dict: dict):
                     rule.domains = json.dumps(spec["domains"])
                     rule.ips = json.dumps(spec["ips"])
                     rule.protocols = json.dumps(spec["protocols"])
+                    if pid == "ipv6" and rule.sort_order > 3:
+                        rule.sort_order = 1
                 elif enabled:
-                    max_order = session.query(RoutingRule.sort_order).order_by(RoutingRule.sort_order.desc()).first()
-                    sort_order = (max_order[0] + 1) if max_order else 1
+                    if pid == "ipv6":
+                        sort_order = 1
+                        for existing_r in session.query(RoutingRule).all():
+                            existing_r.sort_order += 1
+                    else:
+                        max_order = session.query(RoutingRule.sort_order).order_by(RoutingRule.sort_order.desc()).first()
+                        sort_order = (max_order[0] + 1) if max_order else 1
                     new_rule = RoutingRule(
                         remark=spec["remark"],
                         outbound_tag=out_tag,

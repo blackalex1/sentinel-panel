@@ -241,6 +241,9 @@ def init_db():
                 domains = "[]"
                 ips = "[]"
 
+            if not session.query(SystemSetting).filter_by(key="block_ipv6").first():
+                session.add(SystemSetting(key="block_ipv6", value="false"))
+                session.add(SystemSetting(key="block_ipv6_outbound", value="blocked"))
             block_torrent_val = session.query(SystemSetting).filter_by(key="block_torrent").first()
             bt_enable = 1 if (block_torrent_val and block_torrent_val.value == "true") else 0
             

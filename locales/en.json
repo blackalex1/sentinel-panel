@@ -19,7 +19,6 @@
     "dashboard_disk": "Disk",
     "mascot_name": "Sentinel Guardian",
     "mascot_guardian": "Sentinel Guardian",
-
     "mascot_status_online": "ONLINE",
     "mascot_status_standby": "STANDBY",
     "mascot_node_cores": "NODE CORES",
@@ -32,8 +31,6 @@
     "mascot_cores_active_2": "2 CORES ACTIVE",
     "mascot_cores_active_3": "3 CORES ACTIVE",
     "mascot_cores_active": "{count} CORES ACTIVE",
-
-
     "loading": "Loading...",
     "xray_updated": "Updated",
     "dashboard_global_traffic": "Traffic Consumption (30 days)",
@@ -781,7 +778,7 @@
     "routing_modal_wg_mtu": "MTU (optional)",
     "routing_preset_import_title": "Import Routing Preset",
     "routing_preset_select_label": "Choose a preset template or upload a file",
-    "routing_preset_opt_custom": "-- Upload custom JSON file --",
+    "routing_preset_opt_custom": "Upload custom JSON file",
     "routing_preset_opt_ai": "Route OpenAI / ChatGPT / AI via VPN",
     "routing_preset_opt_block_ads": "Block Ads and BitTorrent",
     "routing_preset_opt_split_ru": "Split RU traffic (Direct) and VPN",
@@ -847,8 +844,7 @@
     "routing_count_pcs": "pcs",
     "routing_condition_any": "Any (Always)",
     "routing_via_xray": "via Xray",
-    "routing_preset_opt_custom": "Upload custom JSON file",
-    "routing_custom_config_reset_success": "Core configuration successfully reset to panel auto mode!",
+    "routing_custom_config_reset_success": "Core configurations successfully reset to panel auto-mode!",
     "settings_backup_deleted_success": "Local backups deleted successfully!",
     "settings_backup_delete_error": "Failed to delete local backups",
     "settings_backup_delete_err_prefix": "Error deleting backups: ",
@@ -892,13 +888,11 @@
     "settings_warp_register_free_error": "Failed to register free account",
     "unit_pieces": "pcs.",
     "top_bar_title": "Control Panel",
-    "routing_via_xray": "via Xray",
     "core_btn_install": "Install",
     "singbox_config_inbounds": "Inbound Connections (Inbounds)",
     "singbox_config_outbounds": "Outbound Connections (Outbounds)",
     "singbox_config_routing": "Routing (Routing Rules)",
     "invalid_mux_concurrency": "Invalid connection limit (must be a positive integer)",
-    "routing_custom_config_reset_success": "Core configurations successfully reset to panel auto-mode!",
     "api_connection_error": "API connection error",
     "nav_singbox": "Sing-box Core",
     "clients_traffic_chart_title": "Traffic Chart",
@@ -1326,5 +1320,6 @@
     "audit_action_update_settings": "Update Settings",
     "audit_action_clear_all_backups": "Clear Backups",
     "audit_action_block_client_ips": "Block Client IPs"
-  }
+  },
+  "routing_preset_opt_ipv6": "Block IPv6 (::/0)"
 }

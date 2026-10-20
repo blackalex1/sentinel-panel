@@ -66,6 +66,8 @@ async def get_settings_api(request: Request):
             "block_ru_outbound": quick_states.get("block_ru_outbound", get_setting("block_ru_outbound", "blocked")),
             "block_us": quick_states.get("block_us", get_setting("block_us", "false") == "true"),
             "block_us_outbound": quick_states.get("block_us_outbound", get_setting("block_us_outbound", "blocked")),
+            "block_ipv6": quick_states.get("block_ipv6", get_setting("block_ipv6", "false") == "true"),
+            "block_ipv6_outbound": quick_states.get("block_ipv6_outbound", get_setting("block_ipv6_outbound", "blocked")),
             "ip_checkers": quick_states.get("ip_checkers", get_setting("ip_checkers", "false") == "true"),
             "ip_checkers_outbound": quick_states.get("ip_checkers_outbound", get_setting("ip_checkers_outbound", "direct")),
             "mux_enabled": get_setting("mux_enabled", "false") == "true",
