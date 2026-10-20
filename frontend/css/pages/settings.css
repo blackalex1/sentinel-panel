@@ -371,3 +371,39 @@
     backdrop-filter: none !important;
     -webkit-backdrop-filter: none !important;
 }
+
+
+/* Update Badges (Red Exclamation Mark) */
+.nav-update-badge, .update-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: #ef4444;
+    color: #ffffff;
+    font-size: 11px;
+    font-weight: 800;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    margin-left: 8px;
+    box-shadow: 0 0 10px rgba(239, 68, 68, 0.7);
+    animation: pulse-update-badge 2s infinite ease-in-out;
+}
+
+.settings-nav-item .update-badge {
+    position: absolute;
+    right: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+}
+
+@keyframes pulse-update-badge {
+    0%, 100% {
+        transform: scale(1);
+        box-shadow: 0 0 8px rgba(239, 68, 68, 0.7);
+    }
+    50% {
+        transform: scale(1.18);
+        box-shadow: 0 0 16px rgba(239, 68, 68, 1);
+    }
+}

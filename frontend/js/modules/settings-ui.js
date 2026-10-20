@@ -3,10 +3,12 @@ import { setupSecurityListeners } from "./settings/security.js";
 import { setupBackupsListeners } from "./settings/backups.js";
 import { setupTelegramListeners } from "./settings/telegram.js";
 import { setupNetworkListeners } from "./settings/network.js";
+import { setupUpdateListeners, checkPanelUpdates } from "./settings/update.js";
 
 export { originalSecretPath, setOriginalSecretPath, loadSettings, updateDecoyUI } from "./settings/core.js";
 export { loadActiveSessions } from "./settings/security.js";
 export { loadOptimizationStatus, loadIpv6Status } from "./settings/network.js";
+export { setupUpdateListeners, checkPanelUpdates };
 
 export function setupSettingsListeners() {
     setupGeneralListeners();
@@ -14,4 +16,5 @@ export function setupSettingsListeners() {
     setupBackupsListeners();
     setupTelegramListeners();
     setupNetworkListeners();
+    setupUpdateListeners();
 }

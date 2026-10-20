@@ -1,0 +1,64 @@
+<!-- SECTION 7: PANEL UPDATE -->
+<div class="settings-section-panel" id="sec-update">
+
+<div class="glass-card settings-card" style="margin-bottom: 24px;">
+    <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 18px; flex-wrap: wrap; gap: 12px;">
+        <div>
+            <h3 style="margin: 0; font-size: 18px; font-weight: 700; color: #f8fafc; display: flex; align-items: center; gap: 10px;">
+                <i class="fa-solid fa-cloud-arrow-down" style="color: #a855f7;"></i>
+                <span>Обновление Sentinel Control Panel</span>
+            </h3>
+            <p class="card-desc" style="margin: 4px 0 0 0; color: #94a3b8; font-size: 13px;">Проверка релизов на GitHub и автоматическое обновление системы</p>
+        </div>
+        <span class="badge" id="panel-update-status-badge" style="background: rgba(168, 85, 247, 0.15); color: #c084fc; border: 1px solid rgba(168, 85, 247, 0.3); padding: 6px 14px; font-weight: 600; border-radius: 8px;">
+            Проверка...
+        </span>
+    </div>
+
+    <!-- Status Boxes -->
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 20px;">
+        <div style="background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 16px;">
+            <div style="font-size: 11px; color: #94a3b8; font-family: monospace; text-transform: uppercase; letter-spacing: 0.5px;">Текущая версия</div>
+            <div id="panel-current-version-display" style="font-size: 22px; font-weight: 700; color: #ffffff; margin-top: 4px; font-family: monospace;">v0.0.1</div>
+        </div>
+        <div style="background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; padding: 16px;">
+            <div style="font-size: 11px; color: #94a3b8; font-family: monospace; text-transform: uppercase; letter-spacing: 0.5px;">Версия на GitHub</div>
+            <div id="panel-latest-version-display" style="font-size: 22px; font-weight: 700; color: #38bdf8; margin-top: 4px; font-family: monospace;">Проверка...</div>
+        </div>
+    </div>
+
+    <!-- Alert Box (Visible if update is available) -->
+    <div id="panel-update-alert-box" style="display: none; background: rgba(239, 68, 68, 0.12); border: 1px solid rgba(239, 68, 68, 0.35); border-radius: 12px; padding: 16px; margin-bottom: 20px;">
+        <div style="display: flex; align-items: center; gap: 14px;">
+            <div style="width: 36px; height: 36px; border-radius: 50%; background: #ef4444; color: white; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 18px; flex-shrink: 0; box-shadow: 0 0 12px rgba(239, 68, 68, 0.7);">!</div>
+            <div>
+                <div style="font-weight: 700; color: #f87171; font-size: 14px;" id="panel-update-alert-title">Доступна новая версия панели!</div>
+                <div style="font-size: 12px; color: #cbd5e1; margin-top: 2px;" id="panel-update-alert-desc">Рекомендуется обновить панель до актуальной версии для применения новых возможностей и обновлений безопасности.</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Release Notes Container -->
+    <div id="panel-release-notes-container" style="display: none; margin-bottom: 20px;">
+        <label style="font-size: 12px; font-weight: 600; color: #94a3b8; margin-bottom: 8px; display: block;">Список изменений (Release Notes):</label>
+        <div id="panel-release-notes-content" style="background: rgba(0, 0, 0, 0.3); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 10px; padding: 14px; font-size: 12.5px; color: #e2e8f0; max-height: 180px; overflow-y: auto; font-family: monospace; line-height: 1.5; white-space: pre-wrap;"></div>
+    </div>
+
+    <!-- Actions -->
+    <div style="display: flex; gap: 12px; flex-wrap: wrap; align-items: center;">
+        <button type="button" class="btn secondary-btn" id="btn-check-panel-update" style="display: flex; align-items: center; gap: 8px; padding: 10px 20px; border-radius: 10px; cursor: pointer;">
+            <i class="fa-solid fa-arrows-rotate" id="icon-check-update"></i>
+            <span>Проверить обновления</span>
+        </button>
+        <button type="button" class="btn" id="btn-apply-panel-update" style="display: none; background: linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%); color: #ffffff; border: none; padding: 10px 24px; border-radius: 10px; font-weight: 600; cursor: pointer; box-shadow: 0 4px 18px rgba(124, 58, 237, 0.4); align-items: center; gap: 8px;">
+            <i class="fa-solid fa-bolt"></i>
+            <span id="btn-apply-update-text">Обновить панель</span>
+        </button>
+        <a id="btn-open-github-release" href="https://github.com/blackalex1/sentinel-panel/releases" target="_blank" class="btn" style="text-decoration: none; display: flex; align-items: center; gap: 8px; color: #94a3b8; background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.08); padding: 10px 18px; border-radius: 10px;">
+            <i class="fa-brands fa-github"></i>
+            <span>GitHub Releases</span>
+        </a>
+    </div>
+</div>
+
+</div>

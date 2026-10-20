@@ -93,6 +93,14 @@ def handle_client(conn):
                     elif action == "uninstall_warp":
                         success, msg = uninstall_warp()
                         response = {"success": success, "msg": msg}
+                    elif action == "trigger_panel_update":
+                        import subprocess
+                        update_script = "/opt/sentinel-panel/update.sh"
+                        if os.path.isfile(update_script):
+                            subprocess.Popen(["bash", update_script], start_new_session=True)
+                            response = {"success": True, "msg": "Служба обновления запущена на хост-сервере."}
+                        else:
+                            response = {"success": False, "msg": f"Файл {update_script} не найден."}
                         
                     conn.sendall((json.dumps(response) + "\n").encode("utf-8"))
                 except json.JSONDecodeError:

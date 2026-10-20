@@ -1,3 +1,4 @@
+from backend.version import PANEL_VERSION
 import asyncio
 import logging
 import time
@@ -255,7 +256,7 @@ async def lifespan(app: FastAPI):
 # Отключаем документацию для скрытности (Stealth Mode)
 app = FastAPI(
     title="Sentinel Panel",
-    version="0.0.1",
+    version=PANEL_VERSION,
     docs_url=None,
     redoc_url=None,
     openapi_url=None,
