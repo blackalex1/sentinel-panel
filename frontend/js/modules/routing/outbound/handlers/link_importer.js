@@ -157,7 +157,7 @@ export function bindLinkImporterListener() {
                 if (editingId && existingVals.fallback_outbound) {
                     parsed.fallback_outbound = existingVals.fallback_outbound;
                     parsed.fallback_strategy = existingVals.fallback_strategy || "priority";
-                    parsed.health_check_interval = existingVals.health_check_interval || 300;
+                    parsed.health_check_interval = existingVals.health_check_interval || 15;
                 }
 
                 setCurrentOutboundValues(parsed);

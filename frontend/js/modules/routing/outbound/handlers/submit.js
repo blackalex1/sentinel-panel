@@ -216,7 +216,7 @@ export function bindSubmitListener() {
         // Attach fallback route and failover strategy if set
         const fallbackRoute = (document.getElementById("fallback_outbound") ? document.getElementById("fallback_outbound").value : vals.fallback_outbound) || "";
         const fallbackStrategy = (document.getElementById("fallback_strategy") ? document.getElementById("fallback_strategy").value : vals.fallback_strategy) || "priority";
-        const healthCheckInt = parseInt(document.getElementById("health_check_interval") ? document.getElementById("health_check_interval").value : vals.health_check_interval) || 300;
+        const healthCheckInt = parseInt(document.getElementById("health_check_interval") ? document.getElementById("health_check_interval").value : vals.health_check_interval) || 15;
 
         if (fallbackRoute) {
             settings.backup_outbounds = [fallbackRoute];

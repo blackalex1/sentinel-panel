@@ -96,7 +96,7 @@ export async function openOutboundModal(id = null) {
                 enable: ob.enable !== 0,
                 fallback_outbound: settingsObj.fallback_outbound || (settingsObj.backup_outbounds && settingsObj.backup_outbounds[0]) || "",
                 fallback_strategy: settingsObj.fallback_strategy || "priority",
-                health_check_interval: settingsObj.health_check_interval || 300,
+                health_check_interval: settingsObj.health_check_interval || 15,
                 ...settingsObj,
                 ...streamObj
             };

@@ -391,7 +391,7 @@ def compile_node_server_config(target_core: str) -> Dict[str, Any]:
             "directServer": direct,
             "strategy": dns_strategy,
             "servers": servers,
-            "finalServer": "dns-remote" if referenced_outbounds else "dns-direct"
+            "finalServer": "dns-remote" if custom_obs else "dns-direct"
         }
 
         return build_server_config(
