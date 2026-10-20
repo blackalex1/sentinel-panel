@@ -86,3 +86,58 @@ def test_get_preset_details_from_core_api(client, monkeypatch):
     assert "geosite:yandex" in obj["domains"]
     assert "geoip:ru" in obj["ips"]
 
+
+
+def test_get_ipv6_preset_details_from_core_api(client, monkeypatch):
+    """Test fetching IPv6 preset details dynamically from sentinel-core."""
+    import backend.routes.routing_routes.rules
+    monkeypatch.setattr(backend.routes.routing_routes.rules, "check_auth", lambda r: True)
+
+    res = client.get("/api/v1/routing/presets/ipv6")
+    assert res.status_code == 200
+    data = res.json()
+    assert data["success"] is True
+    obj = data["obj"]
+    assert obj["id"] == "ipv6"
+    assert "::/0" in obj["ips"]
+    assert obj.get("ipVersion") == 6
+    assert obj["defaultTarget"] == "block"
+
+
+def test_quick_security_rules_ipv6_sync_and_compilation(client, monkeypatch):
+    """Test enabling IPv6 block rule via /api/settings/update and compiling Sing-box & Xray configs."""
+    import backend.routes.system as system_facade
+    monkeypatch.setattr(system_facade, "check_auth", lambda r: True)
+
+    # 1. Update settings with block_ipv6 = True
+    payload = {
+        "block_ipv6": True,
+        "block_ipv6_outbound": "blocked"
+    }
+    res = client.post("/api/settings/update", json=payload)
+    assert res.status_code == 200
+    assert res.json()["success"] is True
+
+    # 2. Check /api/settings returns block_ipv6
+    res_get = client.get("/api/settings")
+    assert res_get.status_code == 200
+    data_get = res_get.json()
+    assert data_get["block_ipv6"] is True
+    assert data_get["block_ipv6_outbound"] == "blocked"
+
+    # 3. Check sing-box compilation
+    from backend.sentinel_core_bridge import compile_node_server_config
+    sb_res = compile_node_server_config("sing-box")
+    sb_cfg = json.loads(sb_res["config"]) if (isinstance(sb_res, dict) and "config" in sb_res and isinstance(sb_res["config"], str)) else sb_res
+    rules = sb_cfg.get("route", {}).get("rules", [])
+    ipv6_rule = next((r for r in rules if r.get("ip_version") == 6 or "::/0" in r.get("ip_cidr", [])), None)
+    assert ipv6_rule is not None
+    assert ipv6_rule.get("outbound") in ("block", "blocked")
+
+    # 4. Check Xray compilation
+    xray_res = compile_node_server_config("xray")
+    xray_cfg = json.loads(xray_res["config"]) if (isinstance(xray_res, dict) and "config" in xray_res and isinstance(xray_res["config"], str)) else xray_res
+    x_rules = xray_cfg.get("routing", {}).get("rules", [])
+    x_ipv6_rule = next((r for r in x_rules if "::/0" in r.get("ip", [])), None)
+    assert x_ipv6_rule is not None
+    assert x_ipv6_rule.get("outboundTag") in ("block", "blocked")

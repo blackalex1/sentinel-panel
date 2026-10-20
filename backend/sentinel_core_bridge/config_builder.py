@@ -235,19 +235,23 @@ def compile_node_server_config(target_core: str) -> Dict[str, Any]:
             elif target_core == "xray" and outbound_tag == "block":
                 outbound_tag = "blocked"
             
+            r_ips = json.loads(r.get("ips") or r.get("ip") or "[]") if isinstance(r.get("ips") or r.get("ip"), str) else (r.get("ips") or r.get("ip") or [])
+            is_ipv6_rule = ("::/0" in r_ips) or ("ipv6" in (r.get("remark", "").lower()))
             compiled_rules.append({
                 "id": r.get("id"),
                 "remark": r.get("remark", ""),
                 "outboundTag": outbound_tag,
                 "domains": json.loads(r.get("domains") or "[]") if isinstance(r.get("domains"), str) else (r.get("domains") or []),
-                "ips": json.loads(r.get("ips") or r.get("ip") or "[]") if isinstance(r.get("ips") or r.get("ip"), str) else (r.get("ips") or r.get("ip") or []),
+                "ips": r_ips,
                 "protocols": json.loads(r.get("protocols") or "[]") if isinstance(r.get("protocols"), str) else (r.get("protocols") or []),
                 "users": json.loads(r.get("users") or "[]") if isinstance(r.get("users"), str) else (r.get("users") or []),
                 "inboundTags": r_inbound_tags,
+                "ipVersion": 6 if is_ipv6_rule else 0,
                 "enable": bool(r.get("enable", 1)),
                 "sortOrder": r.get("sort_order", 0)
             })
 
+        compiled_rules.sort(key=lambda x: x.get("sortOrder", 0))
         referenced_outbounds = {r.get("outboundTag") for r in compiled_rules if r.get("enable", True)}
         
         added_new = True

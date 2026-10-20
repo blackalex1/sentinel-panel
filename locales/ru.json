@@ -19,7 +19,6 @@
     "dashboard_disk": "Диск",
     "mascot_name": "Sentinel Guardian",
     "mascot_guardian": "Серверный страж",
-
     "mascot_status_online": "ОНЛАЙН",
     "mascot_status_standby": "ОЖИДАНИЕ",
     "mascot_node_cores": "ЯДРА НОДЫ",
@@ -32,8 +31,6 @@
     "mascot_cores_active_2": "2 ЯДРА АКТИВНО",
     "mascot_cores_active_3": "3 ЯДРА АКТИВНО",
     "mascot_cores_active": "{count} ЯДРА АКТИВНО",
-
-
     "loading": "Загрузка...",
     "xray_updated": "Обновлено",
     "dashboard_global_traffic": "Потребление трафика за 30 дней",
@@ -781,7 +778,7 @@
     "routing_modal_wg_mtu": "MTU (опционально)",
     "routing_preset_import_title": "Импорт пресета маршрутизации",
     "routing_preset_select_label": "Выберите готовый шаблон или загрузите файл",
-    "routing_preset_opt_custom": "-- Загрузить собственный JSON файл --",
+    "routing_preset_opt_custom": "Загрузить свой JSON файл",
     "routing_preset_opt_ai": "Маршрутизация OpenAI / ChatGPT / AI в VPN",
     "routing_preset_opt_block_ads": "Блокировка рекламы и BitTorrent",
     "routing_preset_opt_split_ru": "Разделение RU-трафика (Direct) и VPN",
@@ -847,7 +844,6 @@
     "routing_count_pcs": "шт.",
     "routing_condition_any": "Any (Всегда)",
     "routing_via_xray": "через Xray",
-    "routing_preset_opt_custom": "Загрузить свой JSON файл",
     "routing_custom_config_reset_success": "Конфигурация ядер успешно сброшена к авто-режиму панели!",
     "settings_backup_deleted_success": "Локальные бэкапы успешно удалены!",
     "settings_backup_delete_error": "Не удалось удалить локальные бэкапы",
@@ -892,13 +888,11 @@
     "settings_warp_register_free_error": "Не удалось зарегистрировать бесплатный аккаунт",
     "unit_pieces": "шт.",
     "top_bar_title": "Панель управления",
-    "routing_via_xray": "через Xray",
     "core_btn_install": "Установить",
     "singbox_config_inbounds": "Входящие подключения (Inbounds)",
     "singbox_config_outbounds": "Исходящие подключения (Outbounds)",
     "singbox_config_routing": "Маршрутизация (Routing Rules)",
     "invalid_mux_concurrency": "Неверный лимит соединений (должно быть целое положительное число)",
-    "routing_custom_config_reset_success": "Конфигурация ядер успешно сброшена к авто-режиму панели!",
     "api_connection_error": "Ошибка соединения с API",
     "nav_singbox": "Ядро Sing-box",
     "clients_traffic_chart_title": "График трафика",
@@ -1326,5 +1320,6 @@
     "audit_action_update_settings": "Обновление настроек",
     "audit_action_clear_all_backups": "Очистка бэкапов",
     "audit_action_block_client_ips": "Блокировка IP клиента"
-  }
+  },
+  "routing_preset_opt_ipv6": "Блокировка IPv6 (::/0)"
 }
