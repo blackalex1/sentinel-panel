@@ -351,8 +351,8 @@ def compile_node_server_config(target_core: str) -> Dict[str, Any]:
         access_log = get_setting("xray_access_log") or ""
         error_log = get_setting("xray_error_log") or ""
         
-        # DNS Configuration resolution
-        dns_preset = (get_setting("dns_preset") or "cloudflare").lower()
+        # DNS Configuration resolution (Default: Google DoH)
+        dns_preset = (get_setting("dns_preset") or "google").lower()
         dns_remote = get_setting("dns_remote_server") or ""
         dns_direct = get_setting("dns_direct_server") or ""
         dns_strategy = get_setting("dns_strategy") or "ipv4_only"
