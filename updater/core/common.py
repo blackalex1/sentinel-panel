@@ -14,6 +14,16 @@ import time
 import unicodedata
 from typing import Dict, List, Optional, Union
 
+# Ensure UTF-8 console output on Windows to prevent UnicodeEncodeError with symbols/emojis
+if sys.platform == "win32":
+    try:
+        if sys.stdout and hasattr(sys.stdout, "reconfigure"):
+            sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+        if sys.stderr and hasattr(sys.stderr, "reconfigure"):
+            sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
+
 # ANSI Colors & Styles
 RESET = "\033[0m"
 BOLD = "\033[1m"

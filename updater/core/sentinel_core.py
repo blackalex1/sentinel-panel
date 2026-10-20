@@ -305,7 +305,11 @@ class SentinelCoreManager:
         base_release_url = f"https://github.com/{self.REPO}/releases/download/{tag}"
         checksum_map, size_map = self._fetch_release_metadata(tag)
 
-        lib_asset = f"libsentinel-core-{os_name}-{arch}{lib_ext}"
+        lib_candidates = [
+            f"libsentinel-core-{os_name}-{arch}{lib_ext}",
+            f"sentinel-core-{os_name}-{arch}{lib_ext}",
+        ]
+        lib_asset = next((c for c in lib_candidates if c in size_map or c in checksum_map), lib_candidates[0])
         target_lib = os.path.join(self.bin_dir, f"libsentinel-core{lib_ext}")
 
         # Download Shared Library
@@ -349,13 +353,27 @@ class SentinelCoreManager:
                 except Exception:
                     pass
 
-        # Create alias symlink sentinel-core.so in project bin if needed
+        # Create alias in project bin (sentinel-core.dll/so <-> libsentinel-core.dll/so)
         alt_lib = os.path.join(self.bin_dir, f"sentinel-core{lib_ext}")
         try:
-            if not os.path.exists(alt_lib) and os_name != "windows":
-                os.symlink(target_lib, alt_lib)
+            if not os.path.exists(alt_lib) and os.path.exists(target_lib):
+                if os_name != "windows":
+                    os.symlink(target_lib, alt_lib)
+                else:
+                    shutil.copy2(target_lib, alt_lib)
         except Exception:
             pass
+
+        # Also download sentinel-core.h if present
+        h_asset = "sentinel-core.h"
+        target_h = os.path.join(self.bin_dir, h_asset)
+        if h_asset in size_map or h_asset in checksum_map:
+            self.downloader.download_file_with_mirrors(
+                f"{base_release_url}/{h_asset}",
+                target_h,
+                filename_for_log=h_asset,
+                expected_size=size_map.get(h_asset, 0),
+            )
 
         return True
 
