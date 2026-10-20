@@ -7,8 +7,7 @@ Type=simple
 User=root
 # Adjust WorkingDirectory and ExecStart to the actual path where you clone or copy
 # the panel repository on your host machine (Linux).
-# For example, if you place files in /opt/sentinel-panel/host:
-WorkingDirectory=/opt/sentinel-panel/host
+WorkingDirectory=/opt/sentinel-panel
 ExecStart=/usr/bin/python3 /opt/sentinel-panel/host/host_agent.py
 Restart=always
 RestartSec=5

@@ -7,8 +7,12 @@ import signal
 import threading
 from pathlib import Path
 
-# Add the directory to sys.path to allow running directly from anywhere on the host
-sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+# Add the directory and project root to sys.path to allow running directly from anywhere on the host
+_host_dir = os.path.dirname(os.path.abspath(__file__))
+_parent_dir = os.path.dirname(_host_dir)
+for _p in [_parent_dir, _host_dir, "/opt/sentinel-panel"]:
+    if os.path.isdir(_p) and _p not in sys.path:
+        sys.path.insert(0, _p)
 
 from agent.optimizations import (
     get_bbr_status,
@@ -34,6 +38,20 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s - [HostAgent] - %(le
 
 SOCKET_DIR = Path("/var/run/sentinel")
 SOCKET_PATH = SOCKET_DIR / "agent.sock"
+
+def _resolve_bin_dir() -> str:
+    """Find the valid bin directory for sentinel-core."""
+    candidates = [
+        os.path.join(_parent_dir, "bin"),
+        "/opt/sentinel-panel/bin",
+        os.path.abspath("bin"),
+    ]
+    for c in candidates:
+        if os.path.isdir(c):
+            return c
+    target = os.path.join(_parent_dir, "bin")
+    os.makedirs(target, exist_ok=True)
+    return target
 
 def handle_client(conn):
     """Handles Unix socket client connection."""
@@ -95,29 +113,82 @@ def handle_client(conn):
                         response = {"success": success, "msg": msg}
                     elif action == "trigger_panel_update":
                         import subprocess
-                        update_script = "/opt/sentinel-panel/update.sh"
-                        if os.path.isfile(update_script):
+                        update_scripts = [
+                            os.path.join(_parent_dir, "update.sh"),
+                            "/opt/sentinel-panel/update.sh",
+                            "update.sh",
+                        ]
+                        update_script = next((s for s in update_scripts if os.path.isfile(s)), None)
+                        if update_script:
                             subprocess.Popen(["bash", update_script], start_new_session=True)
                             response = {"success": True, "msg": "Служба обновления запущена на хост-сервере."}
                         else:
-                            response = {"success": False, "msg": f"Файл {update_script} не найден."}
+                            response = {"success": False, "msg": "Скрипт обновления update.sh не найден."}
+                    elif action == "get_core_version":
+                        bin_dir = _resolve_bin_dir()
+                        try:
+                            from updater.core.sentinel_core import SentinelCoreManager
+                            mgr = SentinelCoreManager(bin_dir=bin_dir, auto_mode=True)
+                            is_installed, current_ver = mgr.get_installed_version()
+                            response = {"success": True, "is_installed": is_installed, "version": current_ver}
+                        except Exception as ce:
+                            response = {"success": False, "msg": str(ce)}
                     elif action == "trigger_core_update":
                         core_ver = str(request.get("version", "")).strip()
                         force = bool(request.get("force", False))
+                        bin_dir = _resolve_bin_dir()
+                        installed_ok = False
+                        inst_ver = ""
+                        err_msg = ""
+
+                        # Attempt 1: Modular updater SentinelCoreManager
                         try:
                             from updater.core.sentinel_core import SentinelCoreManager
-                            bin_dir = "/opt/sentinel-panel/bin" if os.path.isdir("/opt/sentinel-panel/bin") else os.path.abspath("bin")
                             mgr = SentinelCoreManager(bin_dir=bin_dir, auto_mode=True, force=force)
                             if not core_ver:
                                 stable_v, _, latest_v = mgr.fetch_releases()
                                 core_ver = stable_v or latest_v
                             if core_ver and mgr.download_core(core_ver):
                                 _, inst_ver = mgr.get_installed_version()
+                                installed_ok = True
                                 response = {"success": True, "version": inst_ver or core_ver, "msg": f"Sentinel ядро {inst_ver or core_ver} успешно установлено."}
                             else:
-                                response = {"success": False, "msg": "Не удалось загрузить ядро с GitHub."}
+                                err_msg = "Не удалось загрузить ядро через SentinelCoreManager."
                         except Exception as ce:
-                            response = {"success": False, "msg": str(ce)}
+                            err_msg = str(ce)
+                            logging.warning(f"HostAgent SentinelCoreManager update error: {ce}")
+
+                        # Attempt 2: Fallback to fetch_core.sh script
+                        if not installed_ok:
+                            fetch_candidates = [
+                                os.path.join(_parent_dir, "installation", "fetch_core.sh"),
+                                "/opt/sentinel-panel/installation/fetch_core.sh",
+                                os.path.abspath("installation/fetch_core.sh"),
+                            ]
+                            fetch_script = next((s for s in fetch_candidates if os.path.isfile(s)), None)
+                            if fetch_script:
+                                try:
+                                    import subprocess
+                                    cmd = ["bash", fetch_script, bin_dir, "--auto"]
+                                    if force:
+                                        cmd.append("--force")
+                                    sub_res = subprocess.run(cmd, capture_output=True, text=True, timeout=90)
+                                    if sub_res.returncode == 0:
+                                        installed_ok = True
+                                        response = {
+                                            "success": True,
+                                            "version": core_ver or "latest",
+                                            "msg": f"Sentinel ядро успешно установлено через {os.path.basename(fetch_script)}.",
+                                        }
+                                    else:
+                                        response = {
+                                            "success": False,
+                                            "msg": f"Ошибка {fetch_script}: {sub_res.stderr or sub_res.stdout or err_msg}",
+                                        }
+                                except Exception as fe:
+                                    response = {"success": False, "msg": f"{err_msg}; fallback error: {fe}"}
+                            else:
+                                response = {"success": False, "msg": err_msg or "Ошибка установки ядра"}
                         
                     conn.sendall((json.dumps(response) + "\n").encode("utf-8"))
                 except json.JSONDecodeError:

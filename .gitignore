@@ -76,3 +76,4 @@ config/*.log
 config/*.sni
 test_preview/
 *.glb
+bin/rules/
