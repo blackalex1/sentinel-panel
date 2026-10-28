@@ -14,6 +14,27 @@ for _p in [_parent_dir, _host_dir, "/opt/sentinel-panel"]:
     if os.path.isdir(_p) and _p not in sys.path:
         sys.path.insert(0, _p)
 
+_host_agent_core_progress = {
+    "active": False,
+    "percent": 0,
+    "downloaded_bytes": 0,
+    "total_bytes": 0,
+    "speed": "0.0 KB/s",
+    "eta": "--",
+    "stage": "",
+    "filename": "",
+    "finished": False,
+    "success": False,
+    "error": "",
+}
+
+
+def _update_host_core_progress(data: dict) -> None:
+    global _host_agent_core_progress
+    _host_agent_core_progress.update(data)
+    _host_agent_core_progress["active"] = True
+
+
 from agent.optimizations import (
     get_bbr_status,
     enable_bbr,
@@ -133,6 +154,8 @@ def handle_client(conn):
                             response = {"success": True, "is_installed": is_installed, "version": current_ver}
                         except Exception as ce:
                             response = {"success": False, "msg": str(ce)}
+                    elif action == "get_core_progress":
+                        response = {"success": True, "progress": dict(_host_agent_core_progress)}
                     elif action == "trigger_core_update":
                         core_ver = str(request.get("version", "")).strip()
                         force = bool(request.get("force", False))
@@ -140,11 +163,24 @@ def handle_client(conn):
                         installed_ok = False
                         inst_ver = ""
                         err_msg = ""
+                        _update_host_core_progress({
+                            "active": True,
+                            "percent": 0,
+                            "stage": f"Подготовка к установке Sentinel-Core {core_ver or 'latest'}...",
+                            "finished": False,
+                            "success": False,
+                            "error": "",
+                        })
 
                         # Attempt 1: Modular updater SentinelCoreManager
                         try:
                             from updater.core.sentinel_core import SentinelCoreManager
-                            mgr = SentinelCoreManager(bin_dir=bin_dir, auto_mode=True, force=force)
+                            mgr = SentinelCoreManager(
+                                bin_dir=bin_dir,
+                                auto_mode=True,
+                                force=force,
+                                progress_callback=_update_host_core_progress,
+                            )
                             if not core_ver:
                                 stable_v, _, latest_v = mgr.fetch_releases()
                                 core_ver = stable_v or latest_v
@@ -152,6 +188,13 @@ def handle_client(conn):
                                 _, inst_ver = mgr.get_installed_version()
                                 installed_ok = True
                                 response = {"success": True, "version": inst_ver or core_ver, "msg": f"Sentinel ядро {inst_ver or core_ver} успешно установлено."}
+                                _update_host_core_progress({
+                                    "active": False,
+                                    "percent": 100,
+                                    "finished": True,
+                                    "success": True,
+                                    "stage": "Sentinel-Core успешно установлен!",
+                                })
                             else:
                                 err_msg = "Не удалось загрузить ядро через SentinelCoreManager."
                         except Exception as ce:

@@ -75,3 +75,32 @@ def test_detect_installed_core_version():
     is_inst, ver = _detect_installed_core_version(bin_dir)
     assert isinstance(is_inst, bool)
     assert isinstance(ver, str)
+
+def test_core_update_progress_endpoint(client, monkeypatch):
+    monkeypatch.setattr("backend.routes.system.settings_routes.update.check_auth", lambda req: True)
+    resp = client.get("/api/system/settings/update/core/progress")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert "active" in data
+    assert "percent" in data
+    assert "stage" in data
+    assert "downloaded_bytes" in data
+    assert "total_bytes" in data
+
+
+def test_docker_manager_cleanup_build_artifacts(monkeypatch):
+    from updater.panel.docker import DockerManager
+    executed_commands = []
+
+    def mock_run_command(cmd, **kwargs):
+        executed_commands.append(cmd)
+        return None
+
+    monkeypatch.setattr("updater.panel.docker.run_command", mock_run_command)
+    mgr = DockerManager(project_dir="/tmp/test")
+    mgr.cleanup_build_artifacts()
+
+    assert any(cmd == ["docker", "image", "prune", "-f"] for cmd in executed_commands)
+    assert any("builder" in cmd and "prune" in cmd for cmd in executed_commands)
+
+

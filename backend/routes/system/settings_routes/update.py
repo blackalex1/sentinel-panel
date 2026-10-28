@@ -12,6 +12,7 @@ import subprocess
 import sys
 import time
 import urllib.request
+import threading
 from typing import Any, Dict, Optional, Tuple
 
 from fastapi import APIRouter, Query, Request
@@ -32,6 +33,75 @@ _CORE_CACHE: Dict[str, Any] = {
     "timestamp": 0.0,
 }
 CACHE_TTL_SECONDS = 900  # 15 minutes
+
+_PROGRESS_LOCK = threading.Lock()
+_CORE_DOWNLOAD_PROGRESS: Dict[str, Any] = {
+    "active": False,
+    "percent": 0,
+    "downloaded_bytes": 0,
+    "total_bytes": 0,
+    "speed": "0.0 KB/s",
+    "eta": "--",
+    "stage": "",
+    "filename": "",
+    "finished": False,
+    "success": False,
+    "error": "",
+}
+
+
+def _set_core_progress(
+    active: Optional[bool] = None,
+    percent: Optional[int] = None,
+    downloaded_bytes: Optional[int] = None,
+    total_bytes: Optional[int] = None,
+    speed: Optional[str] = None,
+    eta: Optional[str] = None,
+    stage: Optional[str] = None,
+    filename: Optional[str] = None,
+    finished: Optional[bool] = None,
+    success: Optional[bool] = None,
+    error: Optional[str] = None,
+) -> None:
+    with _PROGRESS_LOCK:
+        if active is not None:
+            _CORE_DOWNLOAD_PROGRESS["active"] = active
+        if percent is not None:
+            _CORE_DOWNLOAD_PROGRESS["percent"] = percent
+        if downloaded_bytes is not None:
+            _CORE_DOWNLOAD_PROGRESS["downloaded_bytes"] = downloaded_bytes
+        if total_bytes is not None:
+            _CORE_DOWNLOAD_PROGRESS["total_bytes"] = total_bytes
+        if speed is not None:
+            _CORE_DOWNLOAD_PROGRESS["speed"] = speed
+        if eta is not None:
+            _CORE_DOWNLOAD_PROGRESS["eta"] = eta
+        if stage is not None:
+            _CORE_DOWNLOAD_PROGRESS["stage"] = stage
+        if filename is not None:
+            _CORE_DOWNLOAD_PROGRESS["filename"] = filename
+        if finished is not None:
+            _CORE_DOWNLOAD_PROGRESS["finished"] = finished
+        if success is not None:
+            _CORE_DOWNLOAD_PROGRESS["success"] = success
+        if error is not None:
+            _CORE_DOWNLOAD_PROGRESS["error"] = error
+
+
+def _on_core_download_progress(data: Dict[str, Any]) -> None:
+    _set_core_progress(
+        active=True,
+        percent=data.get("percent"),
+        downloaded_bytes=data.get("downloaded_bytes"),
+        total_bytes=data.get("total_bytes"),
+        speed=data.get("speed"),
+        eta=data.get("eta"),
+        stage=data.get("stage"),
+        filename=data.get("filename"),
+        finished=data.get("finished"),
+        success=data.get("success"),
+        error=data.get("error", ""),
+    )
 
 
 def _parse_version(v_str: str) -> tuple:
@@ -275,7 +345,12 @@ def _check_github_release(force: bool = False) -> Dict[str, Any]:
     return fallback
 
 
-def _standalone_download_core_sync(bin_dir: str, target_tag: str, force: bool = False) -> Tuple[bool, str, str]:
+def _standalone_download_core_sync(
+    bin_dir: str,
+    target_tag: str,
+    force: bool = False,
+    progress_callback: Optional[Any] = None,
+) -> Tuple[bool, str, str]:
     """Self-contained standalone downloader for Sentinel-Core when updater package is unavailable."""
     cur_file = os.path.abspath(__file__)
     base_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(cur_file)))))
@@ -289,12 +364,16 @@ def _standalone_download_core_sync(bin_dir: str, target_tag: str, force: bool = 
     fetch_script = next((s for s in fetch_candidates if os.path.isfile(s)), None)
     if fetch_script and platform.system() != "Windows":
         try:
+            if progress_callback:
+                progress_callback({"stage": "Запуск fetch_core.sh...", "percent": 10})
             cmd = ["bash", fetch_script, bin_dir, "--auto"]
             if force:
                 cmd.append("--force")
             res = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
             if res.returncode == 0:
                 is_inst, ver = _detect_installed_core_version(bin_dir)
+                if progress_callback:
+                    progress_callback({"stage": "Sentinel-Core успешно установлен!", "percent": 100, "finished": True, "success": True})
                 return True, ver or target_tag, f"Sentinel-Core {ver or target_tag} успешно установлен через {os.path.basename(fetch_script)}."
         except Exception as e:
             logger.warning(f"fetch_core.sh standalone execution failed: {e}")
@@ -326,8 +405,38 @@ def _standalone_download_core_sync(bin_dir: str, target_tag: str, force: bool = 
             req = urllib.request.Request(url, headers={"User-Agent": "Sentinel-Panel-Updater/0.0.1"})
             with urllib.request.urlopen(req, timeout=30) as resp:
                 if resp.status == 200:
+                    cl_header = resp.headers.get("Content-Length")
+                    total_bytes = int(cl_header) if cl_header and cl_header.isdigit() else 0
+                    downloaded = 0
+                    start_time = time.time()
+                    last_cb_time = start_time
                     with open(target_lib, "wb") as f:
-                        shutil.copyfileobj(resp, f)
+                        while True:
+                            chunk = resp.read(65536)
+                            if not chunk:
+                                break
+                            f.write(chunk)
+                            downloaded += len(chunk)
+                            now = time.time()
+                            if progress_callback and (now - last_cb_time >= 0.1 or (total_bytes > 0 and downloaded >= total_bytes)):
+                                last_cb_time = now
+                                elapsed = max(0.001, now - start_time)
+                                speed = downloaded / elapsed
+                                spd_str = f"{speed / (1024*1024):.1f} MB/s" if speed >= 1024*1024 else f"{speed / 1024:.1f} KB/s"
+                                pct = int((downloaded / total_bytes) * 100) if total_bytes > 0 else 0
+                                rem = max(0, total_bytes - downloaded)
+                                eta_s = int(rem / speed) if speed > 0 and total_bytes > 0 else 0
+                                eta_str = f"{eta_s}s" if eta_s < 60 else f"{eta_s // 60}m {eta_s % 60}s"
+                                progress_callback({
+                                    "stage": f"Загрузка {lib_name}",
+                                    "percent": pct,
+                                    "downloaded_bytes": downloaded,
+                                    "total_bytes": total_bytes,
+                                    "speed": spd_str,
+                                    "eta": eta_str,
+                                    "filename": lib_name,
+                                    "finished": False,
+                                })
                     if os_name != "windows":
                         try:
                             os.chmod(target_lib, 0o755)
@@ -345,8 +454,38 @@ def _standalone_download_core_sync(bin_dir: str, target_tag: str, force: bool = 
             req = urllib.request.Request(url, headers={"User-Agent": "Sentinel-Panel-Updater/0.0.1"})
             with urllib.request.urlopen(req, timeout=30) as resp:
                 if resp.status == 200:
+                    cl_header = resp.headers.get("Content-Length")
+                    total_bytes = int(cl_header) if cl_header and cl_header.isdigit() else 0
+                    downloaded = 0
+                    start_time = time.time()
+                    last_cb_time = start_time
                     with open(target_cli, "wb") as f:
-                        shutil.copyfileobj(resp, f)
+                        while True:
+                            chunk = resp.read(65536)
+                            if not chunk:
+                                break
+                            f.write(chunk)
+                            downloaded += len(chunk)
+                            now = time.time()
+                            if progress_callback and (now - last_cb_time >= 0.1 or (total_bytes > 0 and downloaded >= total_bytes)):
+                                last_cb_time = now
+                                elapsed = max(0.001, now - start_time)
+                                speed = downloaded / elapsed
+                                spd_str = f"{speed / (1024*1024):.1f} MB/s" if speed >= 1024*1024 else f"{speed / 1024:.1f} KB/s"
+                                pct = int((downloaded / total_bytes) * 100) if total_bytes > 0 else 0
+                                rem = max(0, total_bytes - downloaded)
+                                eta_s = int(rem / speed) if speed > 0 and total_bytes > 0 else 0
+                                eta_str = f"{eta_s}s" if eta_s < 60 else f"{eta_s // 60}m {eta_s % 60}s"
+                                progress_callback({
+                                    "stage": f"Загрузка {cli_name}",
+                                    "percent": pct,
+                                    "downloaded_bytes": downloaded,
+                                    "total_bytes": total_bytes,
+                                    "speed": spd_str,
+                                    "eta": eta_str,
+                                    "filename": cli_name,
+                                    "finished": False,
+                                })
                     if os_name != "windows":
                         try:
                             os.chmod(target_cli, 0o755)
@@ -368,6 +507,13 @@ def _standalone_download_core_sync(bin_dir: str, target_tag: str, force: bool = 
         pass
 
     if lib_downloaded:
+        if progress_callback:
+            progress_callback({
+                "stage": "Sentinel-Core успешно установлен!",
+                "percent": 100,
+                "finished": True,
+                "success": True,
+            })
         is_inst, ver = _detect_installed_core_version(bin_dir)
         return True, ver or target_tag, f"Sentinel-Core {ver or target_tag} успешно установлен."
 
@@ -470,6 +616,35 @@ async def check_core_update(request: Request, force: bool = Query(False)):
     return JSONResponse(content=result)
 
 
+@router.get("/api/system/settings/update/core/progress")
+async def get_core_update_progress(request: Request):
+    """Returns real-time Sentinel-Core download and installation progress."""
+    if not check_auth(request):
+        return decoy_response()
+
+    with _PROGRESS_LOCK:
+        local_active = _CORE_DOWNLOAD_PROGRESS["active"]
+        data = dict(_CORE_DOWNLOAD_PROGRESS)
+
+    sock_path = "/var/run/sentinel/agent.sock"
+    if not local_active and os.path.exists(sock_path):
+        try:
+            client = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+            client.settimeout(1.5)
+            client.connect(sock_path)
+            cmd = json.dumps({"action": "get_core_progress"}) + "\n"
+            client.sendall(cmd.encode("utf-8"))
+            resp_data = client.recv(4096).decode("utf-8")
+            client.close()
+            resp = json.loads(resp_data)
+            if resp.get("success") and resp.get("progress"):
+                return JSONResponse(content=resp["progress"])
+        except Exception:
+            pass
+
+    return JSONResponse(content=data)
+
+
 @router.post("/api/system/settings/update/core/apply")
 async def apply_core_update(request: Request):
     """Update or reinstall Sentinel Core engine."""
@@ -486,6 +661,20 @@ async def apply_core_update(request: Request):
 
     logger.info(f"Initiating Sentinel Core installation (tag={target_tag or 'latest'}, force={force})...")
     bin_dir = _get_bin_dir()
+
+    _set_core_progress(
+        active=True,
+        percent=0,
+        downloaded_bytes=0,
+        total_bytes=0,
+        speed="0.0 KB/s",
+        eta="--",
+        stage=f"Подготовка к установке Sentinel-Core {target_tag or 'latest'}...",
+        filename="",
+        finished=False,
+        success=False,
+        error="",
+    )
 
     applied = False
     details = ""
@@ -518,12 +707,23 @@ async def apply_core_update(request: Request):
         try:
             from updater.core.sentinel_core import SentinelCoreManager
 
-            mgr = SentinelCoreManager(bin_dir=bin_dir, auto_mode=True, force=force)
+            mgr = SentinelCoreManager(
+                bin_dir=bin_dir,
+                auto_mode=True,
+                force=force,
+                progress_callback=_on_core_download_progress,
+            )
             if not target_tag:
                 stable_v, pre_v, latest_v = await asyncio.to_thread(mgr.fetch_releases)
                 target_tag = stable_v or latest_v
 
             if not target_tag:
+                _set_core_progress(
+                    active=False,
+                    finished=True,
+                    success=False,
+                    error="Не удалось определить версию ядра для загрузки",
+                )
                 return JSONResponse(
                     status_code=400,
                     content={"success": False, "msg": "Не удалось определить версию ядра для загрузки"},
@@ -544,8 +744,13 @@ async def apply_core_update(request: Request):
     if not applied:
         try:
             logger.info("Attempting standalone core download fallback...")
+            import inspect
+            sig = inspect.signature(_standalone_download_core_sync)
+            kwargs = {}
+            if "progress_callback" in sig.parameters:
+                kwargs["progress_callback"] = _on_core_download_progress
             success, installed_ver, fallback_msg = await asyncio.to_thread(
-                _standalone_download_core_sync, bin_dir, target_tag, force
+                _standalone_download_core_sync, bin_dir, target_tag, force, **kwargs
             )
             if success:
                 applied = True
@@ -557,6 +762,15 @@ async def apply_core_update(request: Request):
             details = f"Ошибка установки ядра: {str(e)}"
 
     _CORE_CACHE["data"] = None
+
+    _set_core_progress(
+        active=False,
+        percent=100 if applied else 0,
+        finished=True,
+        success=applied,
+        stage="Sentinel-Core успешно установлен!" if applied else "Ошибка установки",
+        error="" if applied else details,
+    )
 
     return JSONResponse(
         content={

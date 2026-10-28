@@ -4,6 +4,81 @@ import { t } from "../../i18n.js";
 
 let latestUpdateData = null;
 let latestCoreData = null;
+let coreProgressPollInterval = null;
+
+function renderCoreProgress(prog) {
+    if (!prog) return;
+
+    const fillEl = document.getElementById("core-progress-bar-fill");
+    const pctEl = document.getElementById("core-progress-pct");
+    const stageEl = document.getElementById("core-progress-stage-text");
+    const bytesEl = document.getElementById("core-progress-bytes-val");
+    const speedEl = document.getElementById("core-progress-speed-val");
+    const etaEl = document.getElementById("core-progress-eta-val");
+
+    const pct = Math.max(0, Math.min(100, Math.round(prog.percent || 0)));
+    if (fillEl) fillEl.style.width = `${pct}%`;
+    if (pctEl) pctEl.innerText = `${pct}%`;
+    if (stageEl && prog.stage) stageEl.innerText = prog.stage;
+
+    if (bytesEl) {
+        if (prog.total_bytes && prog.total_bytes > 0) {
+            const dlMb = ((prog.downloaded_bytes || 0) / (1024 * 1024)).toFixed(1);
+            const totMb = (prog.total_bytes / (1024 * 1024)).toFixed(1);
+            bytesEl.innerText = `${dlMb} / ${totMb} MB`;
+        } else if (prog.downloaded_bytes > 0) {
+            const dlMb = (prog.downloaded_bytes / (1024 * 1024)).toFixed(1);
+            bytesEl.innerText = `${dlMb} MB`;
+        }
+    }
+
+    if (speedEl && prog.speed) speedEl.innerText = prog.speed;
+    if (etaEl && prog.eta) etaEl.innerText = prog.eta;
+}
+
+function startCoreProgressPolling() {
+    if (coreProgressPollInterval) clearInterval(coreProgressPollInterval);
+    coreProgressPollInterval = setInterval(async () => {
+        try {
+            const prog = await apiFetch("/api/system/settings/update/core/progress");
+            if (prog && prog.active) {
+                renderCoreProgress(prog);
+            }
+        } catch (e) {
+            // ignore
+        }
+    }, 250);
+}
+
+function stopCoreProgressPolling() {
+    if (coreProgressPollInterval) {
+        clearInterval(coreProgressPollInterval);
+        coreProgressPollInterval = null;
+    }
+}
+
+async function checkActiveCoreProgress() {
+    try {
+        const prog = await apiFetch("/api/system/settings/update/core/progress");
+        if (prog && prog.active) {
+            const feedbackEl = document.getElementById("core-install-feedback");
+            const alertEl = document.getElementById("core-install-alert");
+            const progressBox = document.getElementById("core-install-progress-container");
+            const btnApply = document.getElementById("btn-apply-core-update");
+            const btnReinstall = document.getElementById("btn-reinstall-core");
+
+            if (btnApply) btnApply.disabled = true;
+            if (btnReinstall) btnReinstall.disabled = true;
+            if (feedbackEl) feedbackEl.style.display = "block";
+            if (alertEl) alertEl.style.display = "none";
+            if (progressBox) progressBox.style.display = "block";
+            renderCoreProgress(prog);
+            startCoreProgressPolling();
+        }
+    } catch (e) {
+        // ignore
+    }
+}
 
 function updateUnifiedBadges() {
     const sidebarBadge = document.getElementById("sidebar-settings-update-badge");
@@ -115,6 +190,7 @@ export async function checkCoreUpdates(force = false) {
             latestCoreData = res;
             renderCoreUI(res);
             updateUnifiedBadges();
+            await checkActiveCoreProgress();
             return res;
         }
     } catch (e) {
@@ -232,21 +308,35 @@ function updateSelectedReleaseNotes() {
 
 async function executeCoreInstallation(targetVersion, force = false) {
     const feedbackEl = document.getElementById("core-install-feedback");
+    const alertEl = document.getElementById("core-install-alert");
+    const progressBox = document.getElementById("core-install-progress-container");
+    const titleEl = document.getElementById("core-progress-title");
     const btnApply = document.getElementById("btn-apply-core-update");
     const btnReinstall = document.getElementById("btn-reinstall-core");
 
     if (btnApply) btnApply.disabled = true;
     if (btnReinstall) btnReinstall.disabled = true;
 
-    if (feedbackEl) {
-        feedbackEl.style.display = "block";
-        feedbackEl.style.background = "rgba(14, 165, 233, 0.12)";
-        feedbackEl.style.border = "1px solid rgba(14, 165, 233, 0.35)";
-        feedbackEl.style.color = "#38bdf8";
-        feedbackEl.innerHTML = `<i class="fa-solid fa-spinner fa-spin" style="margin-right: 8px;"></i> ${
-            force ? "Переустановка Sentinel-Core: загрузка бинарников и библиотеки C-FFI с GitHub..." : "Обновление Sentinel-Core: загрузка и установка..."
-        }`;
+    if (feedbackEl) feedbackEl.style.display = "block";
+    if (alertEl) alertEl.style.display = "none";
+    if (progressBox) {
+        progressBox.style.display = "block";
+        if (titleEl) {
+            titleEl.innerText = force
+                ? "Переустановка Sentinel-Core: загрузка бинарников и библиотеки C-FFI с GitHub..."
+                : "Обновление Sentinel-Core: загрузка и установка...";
+        }
+        renderCoreProgress({
+            percent: 0,
+            stage: "Подготовка к загрузке...",
+            downloaded_bytes: 0,
+            total_bytes: 0,
+            speed: "0.0 KB/s",
+            eta: "--",
+        });
     }
+
+    startCoreProgressPolling();
 
     try {
         const res = await apiFetch("/api/system/settings/update/core/apply", {
@@ -257,32 +347,47 @@ async function executeCoreInstallation(targetVersion, force = false) {
             })
         });
 
+        stopCoreProgressPolling();
+
         if (res && res.success) {
+            renderCoreProgress({
+                percent: 100,
+                stage: "Установка успешно завершена!",
+            });
+            await new Promise(r => setTimeout(r, 600));
+
             showToast(res.msg || `Sentinel-Core успешно ${force ? "переустановлен" : "обновлен"}!`, "success");
-            if (feedbackEl) {
-                feedbackEl.style.background = "rgba(34, 197, 94, 0.12)";
-                feedbackEl.style.border = "1px solid rgba(34, 197, 94, 0.35)";
-                feedbackEl.style.color = "#4ade80";
-                feedbackEl.innerHTML = `<i class="fa-solid fa-check" style="margin-right: 8px;"></i> ${res.msg || "Ядро успешно установлено!"}`;
+            if (progressBox) progressBox.style.display = "none";
+            if (alertEl) {
+                alertEl.style.display = "flex";
+                alertEl.style.background = "rgba(34, 197, 94, 0.12)";
+                alertEl.style.border = "1px solid rgba(34, 197, 94, 0.35)";
+                alertEl.style.color = "#4ade80";
+                alertEl.innerHTML = `<i class="fa-solid fa-circle-check" style="font-size: 16px; margin-right: 8px;"></i> <span>${res.msg || "Ядро успешно установлено!"}</span>`;
             }
             await checkCoreUpdates(true);
         } else {
             showToast(res?.msg || "Ошибка установки Sentinel-Core.", "error");
-            if (feedbackEl) {
-                feedbackEl.style.background = "rgba(239, 68, 68, 0.12)";
-                feedbackEl.style.border = "1px solid rgba(239, 68, 68, 0.35)";
-                feedbackEl.style.color = "#f87171";
-                feedbackEl.innerHTML = `<i class="fa-solid fa-triangle-exclamation" style="margin-right: 8px;"></i> ${res?.msg || "Не удалось установить ядро."}`;
+            if (progressBox) progressBox.style.display = "none";
+            if (alertEl) {
+                alertEl.style.display = "flex";
+                alertEl.style.background = "rgba(239, 68, 68, 0.12)";
+                alertEl.style.border = "1px solid rgba(239, 68, 68, 0.35)";
+                alertEl.style.color = "#f87171";
+                alertEl.innerHTML = `<i class="fa-solid fa-triangle-exclamation" style="font-size: 16px; margin-right: 8px;"></i> <span>${res?.msg || "Не удалось установить ядро."}</span>`;
             }
         }
     } catch (err) {
+        stopCoreProgressPolling();
         console.error("Execute core installation error:", err);
         showToast("Ошибка сети при установке Sentinel-Core.", "error");
-        if (feedbackEl) {
-            feedbackEl.style.background = "rgba(239, 68, 68, 0.12)";
-            feedbackEl.style.border = "1px solid rgba(239, 68, 68, 0.35)";
-            feedbackEl.style.color = "#f87171";
-            feedbackEl.innerHTML = `<i class="fa-solid fa-triangle-exclamation" style="margin-right: 8px;"></i> Ошибка: ${err.message || err}`;
+        if (progressBox) progressBox.style.display = "none";
+        if (alertEl) {
+            alertEl.style.display = "flex";
+            alertEl.style.background = "rgba(239, 68, 68, 0.12)";
+            alertEl.style.border = "1px solid rgba(239, 68, 68, 0.35)";
+            alertEl.style.color = "#f87171";
+            alertEl.innerHTML = `<i class="fa-solid fa-triangle-exclamation" style="font-size: 16px; margin-right: 8px;"></i> <span>Ошибка: ${err.message || err}</span>`;
         }
     } finally {
         if (btnApply) btnApply.disabled = false;

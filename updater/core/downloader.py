@@ -48,8 +48,23 @@ FAST_MIRRORS = [
 class Downloader:
     """Handles resilient file downloads with real-time ProgressBar, HTTP API requests, and SHA-256 validation."""
 
-    def __init__(self, proxy_url: Optional[str] = None) -> None:
+    def __init__(self, proxy_url: Optional[str] = None, progress_callback: Optional[Any] = None) -> None:
         self.proxy_url = proxy_url
+        self.progress_callback = progress_callback
+
+    @staticmethod
+    def _compute_progress_stats(downloaded: int, total: int, start_time: float, current_speed: float = 0.0) -> Tuple[int, str, str]:
+        pct = int((downloaded / total) * 100) if total > 0 else 0
+        elapsed = max(0.001, time.time() - start_time)
+        speed = current_speed if current_speed > 0 else (downloaded / elapsed)
+        if speed >= 1024 * 1024:
+            speed_str = f"{speed / (1024 * 1024):.1f} MB/s"
+        else:
+            speed_str = f"{speed / 1024:.1f} KB/s"
+        remaining = max(0, total - downloaded)
+        eta_sec = int(remaining / speed) if speed > 0 and total > 0 else 0
+        eta_str = f"{eta_sec}s" if eta_sec < 60 else f"{eta_sec // 60}m {eta_sec % 60}s"
+        return pct, speed_str, eta_str
 
     def _query_content_length(self, url: str, use_proxy: bool) -> int:
         """Fetches Content-Length header by following redirects (-L)."""
@@ -85,11 +100,13 @@ class Downloader:
         filename_label: str,
         expected_size: int = 0,
         timeout: float = 30.0,
+        progress_callback: Optional[Any] = None,
     ) -> bool:
         """Executes curl with live ProgressBar updating as file chunks arrive on disk."""
         if not shutil.which("curl"):
             return False
 
+        cb = progress_callback or self.progress_callback
         tmp_dest = f"{dest}.tmp.{os.getpid()}"
         if os.path.isfile(tmp_dest):
             try:
@@ -131,6 +148,21 @@ class Downloader:
                     if delta > 0:
                         pbar.update(delta)
                         last_size = cur_size
+                        if cb:
+                            pct, spd, eta = self._compute_progress_stats(cur_size, total_size, pbar.start_time, pbar.current_speed)
+                            try:
+                                cb({
+                                    "stage": f"Загрузка {filename_label}",
+                                    "percent": pct,
+                                    "downloaded_bytes": cur_size,
+                                    "total_bytes": total_size,
+                                    "speed": spd,
+                                    "eta": eta,
+                                    "filename": filename_label,
+                                    "finished": False,
+                                })
+                            except Exception:
+                                pass
                 time.sleep(0.06)
 
             if proc.returncode == 0 and os.path.isfile(tmp_dest):
@@ -148,6 +180,20 @@ class Downloader:
                             pass
                     os.replace(tmp_dest, dest)
                     pbar.finish(success=True)
+                    if cb:
+                        try:
+                            cb({
+                                "stage": f"Загрузка {filename_label} завершена",
+                                "percent": 100,
+                                "downloaded_bytes": file_size,
+                                "total_bytes": total_size or file_size,
+                                "speed": "",
+                                "eta": "0s",
+                                "filename": filename_label,
+                                "finished": False,
+                            })
+                        except Exception:
+                            pass
                     return True
         except Exception:
             pass
@@ -169,8 +215,10 @@ class Downloader:
         filename_label: str,
         expected_size: int = 0,
         timeout: float = 25.0,
+        progress_callback: Optional[Any] = None,
     ) -> bool:
         """Fallback urllib streaming downloader with live ProgressBar."""
+        cb = progress_callback or self.progress_callback
         tmp_dest = f"{dest}.tmp.{os.getpid()}"
         if os.path.isfile(tmp_dest):
             try:
@@ -197,6 +245,7 @@ class Downloader:
                     cl_header = resp.headers.get("Content-Length")
                     total_bytes = expected_size if expected_size > 0 else (int(cl_header) if cl_header and cl_header.isdigit() else 0)
                     pbar = ProgressBar(filename=filename_label, total_bytes=total_bytes)
+                    last_cb_time = time.time()
 
                     while True:
                         if time.time() - start_time > timeout:
@@ -206,6 +255,23 @@ class Downloader:
                             break
                         f_out.write(chunk)
                         pbar.update(len(chunk))
+                        now = time.time()
+                        if cb and (now - last_cb_time >= 0.1 or (total_bytes > 0 and pbar.downloaded_bytes >= total_bytes)):
+                            last_cb_time = now
+                            pct, spd, eta = self._compute_progress_stats(pbar.downloaded_bytes, total_bytes, start_time, pbar.current_speed)
+                            try:
+                                cb({
+                                    "stage": f"Загрузка {filename_label}",
+                                    "percent": pct,
+                                    "downloaded_bytes": pbar.downloaded_bytes,
+                                    "total_bytes": total_bytes,
+                                    "speed": spd,
+                                    "eta": eta,
+                                    "filename": filename_label,
+                                    "finished": False,
+                                })
+                            except Exception:
+                                pass
 
             if os.path.isfile(tmp_dest):
                 file_size = os.path.getsize(tmp_dest)
@@ -219,6 +285,20 @@ class Downloader:
                     os.replace(tmp_dest, dest)
                     if pbar:
                         pbar.finish(success=True)
+                    if cb:
+                        try:
+                            cb({
+                                "stage": f"Загрузка {filename_label} завершена",
+                                "percent": 100,
+                                "downloaded_bytes": file_size,
+                                "total_bytes": total_bytes or file_size,
+                                "speed": "",
+                                "eta": "0s",
+                                "filename": filename_label,
+                                "finished": False,
+                            })
+                        except Exception:
+                            pass
                     return True
         except Exception:
             pass
@@ -239,8 +319,10 @@ class Downloader:
         dest_path: str,
         filename_for_log: str = "",
         expected_size: int = 0,
+        progress_callback: Optional[Any] = None,
     ) -> bool:
         """Downloads a file trying active proxy FIRST if available, then fast CDN mirrors."""
+        cb = progress_callback or self.progress_callback
         log_name = filename_for_log or os.path.basename(dest_path)
         log_info(f"Загрузка {BOLD}{log_name}{RESET}...")
 
@@ -255,9 +337,9 @@ class Downloader:
             candidate_urls.append((direct_url, False))
 
         for url, use_proxy in candidate_urls:
-            if self._download_with_curl(url, dest_path, use_proxy=use_proxy, filename_label=log_name, expected_size=expected_size, timeout=30.0):
+            if self._download_with_curl(url, dest_path, use_proxy=use_proxy, filename_label=log_name, expected_size=expected_size, timeout=30.0, progress_callback=cb):
                 return True
-            if self._download_with_urllib(url, dest_path, use_proxy=use_proxy, filename_label=log_name, expected_size=expected_size, timeout=25.0):
+            if self._download_with_urllib(url, dest_path, use_proxy=use_proxy, filename_label=log_name, expected_size=expected_size, timeout=25.0, progress_callback=cb):
                 return True
 
         log_error(f"Не удалось загрузить {log_name} ни с одного источника.")

@@ -42,12 +42,14 @@ class SentinelCoreManager:
         proxy_url: Optional[str] = None,
         auto_mode: bool = False,
         force: bool = False,
+        progress_callback: Optional[Any] = None,
     ) -> None:
         self.bin_dir = bin_dir
         self.proxy_url = proxy_url
         self.auto_mode = auto_mode
         self.force = force
-        self.downloader = Downloader(proxy_url=proxy_url)
+        self.progress_callback = progress_callback
+        self.downloader = Downloader(proxy_url=proxy_url, progress_callback=progress_callback)
 
         os.makedirs(self.bin_dir, exist_ok=True)
 
@@ -312,6 +314,19 @@ class SentinelCoreManager:
         lib_asset = next((c for c in lib_candidates if c in size_map or c in checksum_map), lib_candidates[0])
         target_lib = os.path.join(self.bin_dir, f"libsentinel-core{lib_ext}")
 
+        if self.progress_callback:
+            try:
+                self.progress_callback({
+                    "stage": f"Подготовка к загрузке {lib_asset}...",
+                    "percent": 0,
+                    "downloaded_bytes": 0,
+                    "total_bytes": size_map.get(lib_asset, 0),
+                    "filename": lib_asset,
+                    "finished": False,
+                })
+            except Exception:
+                pass
+
         # Download Shared Library
         lib_ok = self.downloader.download_file_with_mirrors(
             f"{base_release_url}/{lib_asset}",
@@ -330,6 +345,16 @@ class SentinelCoreManager:
                 pass
 
         if lib_asset in checksum_map:
+            if self.progress_callback:
+                try:
+                    self.progress_callback({
+                        "stage": f"Проверка контрольной суммы SHA-256 для {lib_asset}...",
+                        "percent": 90,
+                        "filename": lib_asset,
+                        "finished": False,
+                    })
+                except Exception:
+                    pass
             actual = Downloader.compute_sha256(target_lib)
             if actual.lower() == checksum_map[lib_asset].lower():
                 log_success(f"SHA-256 проверен ({actual[:16]}...)")
@@ -341,6 +366,16 @@ class SentinelCoreManager:
         cli_asset = f"sentinel-core-{os_name}-{arch}{exe_ext}"
         target_cli = os.path.join(self.bin_dir, f"sentinel-core{exe_ext}")
         if cli_asset in size_map or cli_asset in checksum_map:
+            if self.progress_callback:
+                try:
+                    self.progress_callback({
+                        "stage": f"Загрузка бинарника {cli_asset}...",
+                        "percent": 92,
+                        "filename": cli_asset,
+                        "finished": False,
+                    })
+                except Exception:
+                    pass
             cli_ok = self.downloader.download_file_with_mirrors(
                 f"{base_release_url}/{cli_asset}",
                 target_cli,
@@ -374,6 +409,17 @@ class SentinelCoreManager:
                 filename_for_log=h_asset,
                 expected_size=size_map.get(h_asset, 0),
             )
+
+        if self.progress_callback:
+            try:
+                self.progress_callback({
+                    "stage": "Sentinel-Core успешно установлен!",
+                    "percent": 100,
+                    "finished": True,
+                    "success": True,
+                })
+            except Exception:
+                pass
 
         return True
 
