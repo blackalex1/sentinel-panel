@@ -92,6 +92,23 @@ class DockerManager:
         except Exception as e:
             log_warn(f"Пропуск автоматической миграции томов Docker: {e}")
 
+    def cleanup_build_artifacts(self) -> None:
+        """Removes dangling images and stale BuildKit cache after building."""
+        log_info("Очистка неиспользуемых слоев и кэша сборщика Docker...")
+        try:
+            # 1. Удаление висячих (dangling) образов (<none>:<none>) от старых сборок
+            run_command(["docker", "image", "prune", "-f"], check=False)
+        except Exception as e:
+            log_warn(f"Не удалось выполнить docker image prune: {e}")
+
+        try:
+            # 2. Удаление висячего кэша сборщика BuildKit
+            run_command(["docker", "builder", "prune", "-f"], check=False)
+            # 3. Удаление всех неиспользуемых слоев кэша сборщика старше 24 часов
+            run_command(["docker", "builder", "prune", "-a", "-f", "--filter", "until=24h"], check=False)
+        except Exception as e:
+            log_warn(f"Не удалось выполнить docker builder prune: {e}")
+
     def rebuild_and_restart(self) -> bool:
         """Rebuilds and restarts all Docker containers."""
         if not shutil.which("docker"):
@@ -140,6 +157,7 @@ class DockerManager:
         try:
             run_command(compose_cmd + ["up", "-d", "--build"], cwd=self.project_dir, env=docker_env if docker_env else None, check=True)
             log_success("Контейнеры Docker успешно собраны и запущены!")
+            self.cleanup_build_artifacts()
             return True
         except Exception as e:
             if docker_env:
@@ -147,6 +165,7 @@ class DockerManager:
                 try:
                     run_command(compose_cmd + ["up", "-d", "--build"], cwd=self.project_dir, env=None, check=True)
                     log_success("Контейнеры Docker успешно собраны и запущены (напрямую)!")
+                    self.cleanup_build_artifacts()
                     return True
                 except Exception as e_direct:
                     log_error(f"Ошибка запуска Docker Compose: {e_direct}")

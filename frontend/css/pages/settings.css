@@ -407,3 +407,56 @@
         box-shadow: 0 0 16px rgba(239, 68, 68, 1);
     }
 }
+
+
+/* Sentinel-Core Download Progress Bar */
+.core-pbar-track {
+    width: 100%;
+    height: 9px;
+    background: rgba(15, 23, 42, 0.9);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    overflow: hidden;
+    position: relative;
+    box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.6);
+}
+
+.core-pbar-fill {
+    width: 0%;
+    height: 100%;
+    background: linear-gradient(90deg, #0284c7 0%, #38bdf8 55%, #818cf8 100%);
+    border-radius: 7px;
+    transition: width 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 0 14px rgba(56, 189, 248, 0.7);
+    position: relative;
+    overflow: hidden;
+}
+
+.core-pbar-shimmer {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-image: linear-gradient(
+        -45deg,
+        rgba(255, 255, 255, 0.25) 25%,
+        transparent 25%,
+        transparent 50%,
+        rgba(255, 255, 255, 0.25) 50%,
+        rgba(255, 255, 255, 0.25) 75%,
+        transparent 75%,
+        transparent
+    );
+    background-size: 26px 26px;
+    animation: core-pbar-shimmer-anim 1.2s linear infinite;
+}
+
+@keyframes core-pbar-shimmer-anim {
+    0% {
+        background-position: 0 0;
+    }
+    100% {
+        background-position: 26px 0;
+    }
+}

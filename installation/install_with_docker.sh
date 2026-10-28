@@ -228,6 +228,11 @@ cd "$SCRIPT_DIR" || exit 1
 docker compose build
 docker compose up -d
 
+# Clean up dangling build artifacts and temporary layers
+echo "[+] Cleaning up Docker build cache and unused images..."
+docker image prune -f 2>/dev/null || true
+docker builder prune -f 2>/dev/null || true
+
 # 7. Seed Telegram settings in the database after container startup if provided
 if [ -n "$TG_TOKEN" ] || [ -n "$TG_IDS" ]; then
     echo "[+] Saving Telegram settings to the database..."
