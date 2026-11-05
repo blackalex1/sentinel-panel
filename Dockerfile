@@ -12,7 +12,7 @@ ENV VIRTUAL_ENV=/app/.venv
 ENV PATH="$VIRTUAL_ENV/bin:$PATH"
 ENV UV_COMPILE_BYTECODE=1
 
-# Install uv directly and create virtualenv
+# Install uv directly, upgrade setuptools and create virtualenv
 RUN pip install --no-cache-dir --upgrade uv "setuptools>=78.1.1" && \
     uv venv $VIRTUAL_ENV
 COPY requirements.txt /app/
@@ -43,9 +43,6 @@ RUN apt-get update && apt-get upgrade -y && apt-get install -y --no-install-reco
     nftables \
     && rm -rf /var/lib/apt/lists/*
 
-# Create unprivileged user (DS-0002)
-RUN useradd -u 1000 -m appuser
-
 # Set working directory
 WORKDIR /app
 
@@ -63,13 +60,8 @@ COPY host/ /app/host/
 COPY update.sh /app/
 COPY register_node.py /app/
 
-# Set volume mount points and ownership
-RUN mkdir -p /app/config /app/bin /app/backups /var/run/sentinel && \
-    chown -R appuser:appuser /app /var/run/sentinel
+# Set volume mount points
 VOLUME [ "/app/config", "/app/bin" ]
-
-# Switch to unprivileged user (DS-0002)
-USER appuser
 
 # Healthcheck to monitor service status (DS-0026)
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
