@@ -276,20 +276,11 @@ def main():
         server.bind(str(SOCKET_PATH))
         server.listen(5)
         
-        # Set broad permissions so the docker group or containers can access it
+        # Set permissions so container processes (including unprivileged appuser) can access the socket
         try:
+            os.chmod(str(SOCKET_DIR), 0o777)
             os.chmod(str(SOCKET_PATH), 0o666)
-            # Try to chown to docker group if exists
-            import grp
-            try:
-                docker_grp = grp.getgrnam("docker")
-                os.chown(str(SOCKET_PATH), 0, docker_grp.gr_gid)
-                os.chmod(str(SOCKET_PATH), 0o660) # 0660 is secure enough if group is docker
-                logging.info("Socket permissions set to 0660 (root:docker)")
-            except KeyError:
-                # Docker group not found, leave 0666 so any container user can connect
-                os.chmod(str(SOCKET_PATH), 0o666)
-                logging.info("Socket permissions set to 0666 (docker group not found)")
+            logging.info("Socket permissions set to 0666 (accessible by unprivileged container appuser)")
         except Exception as e:
             logging.warning(f"Could not adjust socket permissions: {e}")
 
