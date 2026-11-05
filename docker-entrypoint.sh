@@ -7,12 +7,20 @@ set -e
 
 # 1. Normalize permissions on host-mounted volumes
 # Automatically adjusts ownership and permissions so appuser (UID 1000) has full read/write access
-for dir in "/app/config" "/app/bin" "/app/backups" "/var/run/sentinel" "/app/frontend/decoy"; do
+for dir in "/app/config" "/app/bin" "/app/backups" "/app/frontend/decoy"; do
     if [ -d "$dir" ]; then
         chown -R appuser:appuser "$dir" 2>/dev/null || true
         chmod 775 "$dir" 2>/dev/null || true
     fi
 done
+
+# Ensure socket directory allows IPC communication with host agent
+if [ -d "/var/run/sentinel" ]; then
+    chmod 777 /var/run/sentinel 2>/dev/null || true
+    if [ -e "/var/run/sentinel/agent.sock" ]; then
+        chmod 666 /var/run/sentinel/agent.sock 2>/dev/null || true
+    fi
+fi
 
 if [ -f "/app/config/.env" ]; then
     chown appuser:appuser "/app/config/.env" 2>/dev/null || true
