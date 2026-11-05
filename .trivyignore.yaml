@@ -1,8 +1,0 @@
-# ==============================================================================
-# Modern Trivy Ignore Configuration for Sentinel Panel
-# ==============================================================================
-misconfigurations:
-  - id: AVD-DS-0002
-    paths:
-      - "Dockerfile"
-    statement: "Privilege dropping is handled dynamically via gosu appuser in docker-entrypoint.sh"
