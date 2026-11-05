@@ -85,10 +85,11 @@ jobs:
               --exclude='.coverage' \
               -czf "release-artifacts/${ARCHIVE_NAME}" \
               backend/ frontend/ dist-react/ bot/ locales/ host/ installation/ \
-              docker-compose.yml Dockerfile requirements.txt update.sh .env.example register_node.py README.md
+              docker-compose.yml Dockerfile docker-entrypoint.sh requirements.txt update.sh .env.example register_node.py README.md
 
           echo "==> Preparing standalone deployment files..."
           cp docker-compose.yml release-artifacts/
+          cp docker-entrypoint.sh release-artifacts/
           cp .env.example release-artifacts/
           cp installation/install_with_docker.sh release-artifacts/
           cp update.sh release-artifacts/
@@ -106,6 +107,7 @@ jobs:
           files: |
             release-artifacts/*.tar.gz
             release-artifacts/docker-compose.yml
+            release-artifacts/docker-entrypoint.sh
             release-artifacts/.env.example
             release-artifacts/install_with_docker.sh
             release-artifacts/update.sh
