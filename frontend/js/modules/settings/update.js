@@ -450,17 +450,23 @@ export function setupUpdateListeners() {
                             try {
                                 const check = await fetch(`/api/system/settings/update/check?force=true&t=${Date.now()}`);
                                 if (check.ok) {
-                                    clearInterval(pollInterval);
-                                    showToast("Панель успешно обновлена! Перезагрузка страницы...", "success");
-                                    setTimeout(() => window.location.reload(), 1500);
+                                    const checkData = await check.json();
+                                    if (checkData && (checkData.current_version === targetVer || !checkData.has_update)) {
+                                        clearInterval(pollInterval);
+                                        showToast(`Панель успешно обновлена до v${checkData.current_version}! Перезагрузка страницы...`, "success");
+                                        setTimeout(() => window.location.reload(), 1500);
+                                        return;
+                                    }
                                 }
                             } catch (e) {
-                                if (attempts > 15) {
-                                    clearInterval(pollInterval);
-                                    window.location.reload();
-                                }
+                                // Container may be restarting
                             }
-                        }, 2000);
+                            if (attempts > 30) {
+                                clearInterval(pollInterval);
+                                showToast("Ожидание завершения обновления. Перезагрузка страницы...", "info");
+                                setTimeout(() => window.location.reload(), 1500);
+                            }
+                        }, 2500);
                     }, 4000);
                 } else {
                     showToast(res?.msg || "Не удалось запустить обновление.", "error");

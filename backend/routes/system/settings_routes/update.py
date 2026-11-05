@@ -230,7 +230,7 @@ def _check_core_release(force: bool = False) -> Dict[str, Any]:
     req = urllib.request.Request(
         api_url,
         headers={
-            "User-Agent": "Sentinel-Panel-Updater/0.0.1",
+            "User-Agent": f"Sentinel-Panel-Updater/{PANEL_VERSION}",
             "Accept": "application/vnd.github.v3+json",
         },
     )
@@ -297,7 +297,7 @@ def _check_github_release(force: bool = False) -> Dict[str, Any]:
     req = urllib.request.Request(
         api_url,
         headers={
-            "User-Agent": "Sentinel-Panel-Updater/0.0.1",
+            "User-Agent": f"Sentinel-Panel-Updater/{PANEL_VERSION}",
             "Accept": "application/vnd.github.v3+json",
         },
     )
@@ -569,7 +569,7 @@ async def apply_update(request: Request):
             if os.path.isfile(p) and os.access(p, os.X_OK):
                 try:
                     subprocess.Popen(
-                        ["bash", p],
+                        ["bash", p, "--auto"],
                         stdout=subprocess.DEVNULL,
                         stderr=subprocess.DEVNULL,
                         start_new_session=True,

@@ -141,7 +141,7 @@ def handle_client(conn):
                         ]
                         update_script = next((s for s in update_scripts if os.path.isfile(s)), None)
                         if update_script:
-                            subprocess.Popen(["bash", update_script], start_new_session=True)
+                            subprocess.Popen(["bash", update_script, "--auto"], start_new_session=True)
                             response = {"success": True, "msg": "Служба обновления запущена на хост-сервере."}
                         else:
                             response = {"success": False, "msg": "Скрипт обновления update.sh не найден."}

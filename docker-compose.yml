@@ -15,6 +15,7 @@ services:
 
   sentinel-panel:
     build: .
+    image: ghcr.io/blackalex1/sentinel-panel:latest
     container_name: sentinel-panel
     restart: always
     network_mode: host
