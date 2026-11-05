@@ -13,7 +13,7 @@ ENV PATH="$VIRTUAL_ENV/bin:$PATH"
 ENV UV_COMPILE_BYTECODE=1
 
 # Install uv directly and create virtualenv
-RUN pip install --no-cache-dir uv && \
+RUN pip install --no-cache-dir --upgrade uv "setuptools>=78.1.1" && \
     uv venv $VIRTUAL_ENV
 COPY requirements.txt /app/
 RUN uv pip install --no-cache -r requirements.txt
