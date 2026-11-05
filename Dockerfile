@@ -50,8 +50,8 @@ RUN apt-get update && apt-get upgrade -y && apt-get install -y --no-install-reco
     sudo \
     && rm -rf /var/lib/apt/lists/*
 
-# Upgrade system pip in runtime image to eliminate vendored package vulnerabilities
-RUN pip install --no-cache-dir --upgrade pip
+# Upgrade system pip and setuptools in runtime image to eliminate CVE-2025-47273 and vendored package vulnerabilities
+RUN pip install --no-cache-dir --upgrade pip "setuptools>=78.1.1"
 
 # Create unprivileged user (UID 1000) and configure passwordless sudo for network firewall tools
 RUN useradd -u 1000 -m -s /bin/bash appuser && \
