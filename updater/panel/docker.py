@@ -120,6 +120,10 @@ class DockerManager:
         log_info("Остановка предыдущих контейнеров Docker...")
         try:
             run_command(compose_cmd + ["down", "--remove-orphans"], cwd=self.project_dir, check=False)
+            run_command(compose_cmd + ["-p", "spectre-panel", "down", "--remove-orphans"], cwd=self.project_dir, check=False)
+            # Remove any lingering containers with conflicting fixed names from prior installs
+            for cname in ("sentinel-db", "sentinel-panel", "spectre-panel", "spectre-db"):
+                run_command(["docker", "rm", "-f", cname], check=False)
         except Exception:
             pass
 
