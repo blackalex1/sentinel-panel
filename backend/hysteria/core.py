@@ -13,7 +13,10 @@ def _get_bin_suffix():
 HEADERS = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 SentinelPanel/1.0"}
 
 import time
-import xml.etree.ElementTree as ET
+try:
+    import defusedxml.ElementTree as ET
+except ImportError:
+    import xml.etree.ElementTree as ET
 
 _HYSTERIA_RELEASES_CACHE = {}
 CACHE_TTL = 3600  # 1 hour cache for releases
