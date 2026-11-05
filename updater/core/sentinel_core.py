@@ -106,7 +106,7 @@ class SentinelCoreManager:
         if os.path.isfile(exe_path):
             if platform.system() != "Windows":
                 try:
-                    os.chmod(exe_path, 0o755)
+                    os.chmod(exe_path, 0o750)
                 except Exception:
                     pass
             for arg in ["version", "--version", "-v"]:
@@ -340,7 +340,7 @@ class SentinelCoreManager:
 
         if os_name != "windows":
             try:
-                os.chmod(target_lib, 0o755)
+                os.chmod(target_lib, 0o750)
             except Exception:
                 pass
 
@@ -384,7 +384,7 @@ class SentinelCoreManager:
             )
             if cli_ok and os_name != "windows" and os.path.exists(target_cli):
                 try:
-                    os.chmod(target_cli, 0o755)
+                    os.chmod(target_cli, 0o750)
                 except Exception:
                     pass
 

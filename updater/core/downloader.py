@@ -175,7 +175,7 @@ class Downloader:
                 if file_size >= min_size:
                     if platform.system() != "Windows" and not dest.endswith(".h"):
                         try:
-                            os.chmod(tmp_dest, 0o755)
+                            os.chmod(tmp_dest, 0o750)
                         except Exception:
                             pass
                     os.replace(tmp_dest, dest)
@@ -279,7 +279,7 @@ class Downloader:
                 if file_size >= min_size:
                     if platform.system() != "Windows" and not dest.endswith(".h"):
                         try:
-                            os.chmod(tmp_dest, 0o755)
+                            os.chmod(tmp_dest, 0o750)
                         except Exception:
                             pass
                     os.replace(tmp_dest, dest)
