@@ -1,6 +1,9 @@
 # Stage 1: Build dependencies
 FROM python:3.14-slim AS builder
 
+# Update base OS packages to patch known Debian vulnerabilities (util-linux, zlib1g)
+RUN apt-get update && apt-get upgrade -y && rm -rf /var/lib/apt/lists/*
+
 # Set working directory
 WORKDIR /app
 
@@ -28,8 +31,8 @@ ENV LANG=C.UTF-8
 ENV LC_ALL=C.UTF-8
 ENV PYTHONPATH=/app
 
-# Install runtime system dependencies (including procps, psmisc, and iputils-ping)
-RUN apt-get update && apt-get install -y --no-install-recommends \
+# Update base OS packages and install runtime system dependencies (including procps, psmisc, and iputils-ping)
+RUN apt-get update && apt-get upgrade -y && apt-get install -y --no-install-recommends \
     openssl \
     procps \
     psmisc \
@@ -39,6 +42,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     iptables \
     nftables \
     && rm -rf /var/lib/apt/lists/*
+
+# Create unprivileged user (DS-0002)
+RUN useradd -u 1000 -m appuser
 
 # Set working directory
 WORKDIR /app
@@ -57,8 +63,17 @@ COPY host/ /app/host/
 COPY update.sh /app/
 COPY register_node.py /app/
 
-# Set volume mount points
+# Set volume mount points and ownership
+RUN mkdir -p /app/config /app/bin /app/backups /var/run/sentinel && \
+    chown -R appuser:appuser /app /var/run/sentinel
 VOLUME [ "/app/config", "/app/bin" ]
+
+# Switch to unprivileged user (DS-0002)
+USER appuser
+
+# Healthcheck to monitor service status (DS-0026)
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+    CMD curl -f http://localhost:8000/ || curl -f -k https://localhost:2053/ || exit 1
 
 # Run the backend as a module
 CMD ["python", "-m", "backend.main"]
