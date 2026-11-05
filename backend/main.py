@@ -338,7 +338,15 @@ async def add_no_cache_headers(request: Request, call_next):
     response.headers["Server"] = "nginx/1.24.0 (Ubuntu)"
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
-    response.headers["Content-Security-Policy"] = "frame-ancestors 'self' https://web.telegram.org https://*.telegram.org;"
+    response.headers["Content-Security-Policy"] = (
+        "default-src 'self'; "
+        "script-src 'self' 'unsafe-inline' https://telegram.org https://web.telegram.org; "
+        "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
+        "font-src 'self' data: https://fonts.gstatic.com; "
+        "img-src 'self' data: blob:; "
+        "connect-src 'self' ws: wss:; "
+        "frame-ancestors 'self' https://web.telegram.org https://*.telegram.org;"
+    )
     try:
         del response.headers["x-powered-by"]
     except (KeyError, Exception):
