@@ -1,0 +1,8 @@
+# ==============================================================================
+# Trivy Ignore Rules for Sentinel Panel
+# ==============================================================================
+
+# DS-0002 / AVD-DS-0002: Least Privilege User
+# False positive: Container privilege dropping is handled dynamically via gosu appuser in docker-entrypoint.sh
+AVD-DS-0002
+DS-0002

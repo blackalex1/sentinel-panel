@@ -12,14 +12,18 @@ ENV VIRTUAL_ENV=/app/.venv
 ENV PATH="$VIRTUAL_ENV/bin:$PATH"
 ENV UV_COMPILE_BYTECODE=1
 
-# Install uv directly, upgrade setuptools and create virtualenv
-RUN pip install --no-cache-dir --upgrade uv "setuptools>=78.1.1" && \
+# Upgrade system pip, install uv, upgrade setuptools and create virtualenv
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir --upgrade uv "setuptools>=78.1.1" && \
     uv venv $VIRTUAL_ENV
 COPY requirements.txt /app/
 RUN uv pip install --no-cache -r requirements.txt
 
 # Stage 2: Final runtime image
 FROM python:3.14-slim
+
+# trivy:ignore:AVD-DS-0002: Privilege dropping is handled dynamically via gosu appuser in docker-entrypoint.sh
+# checkov:skip=CKV_DOCKER_3: Privilege dropping is handled dynamically via gosu appuser in docker-entrypoint.sh
 
 # Set environment variables
 ENV PYTHONDONTWRITEBYTECODE=1
@@ -45,6 +49,9 @@ RUN apt-get update && apt-get upgrade -y && apt-get install -y --no-install-reco
     libcap2-bin \
     sudo \
     && rm -rf /var/lib/apt/lists/*
+
+# Upgrade system pip in runtime image to eliminate vendored package vulnerabilities
+RUN pip install --no-cache-dir --upgrade pip
 
 # Create unprivileged user (UID 1000) and configure passwordless sudo for network firewall tools
 RUN useradd -u 1000 -m -s /bin/bash appuser && \
