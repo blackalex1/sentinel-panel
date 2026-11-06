@@ -10,6 +10,7 @@ export function getByPath(obj, path, defaultValue = undefined) {
     const parts = path.split(".");
     let current = obj;
     for (const part of parts) {
+        if (part === '__proto__' || part === 'constructor' || part === 'prototype') return defaultValue;
         if (current === undefined || current === null) return defaultValue;
         current = current[part];
     }
@@ -22,12 +23,16 @@ export function setByPath(obj, path, value) {
     let current = obj;
     for (let i = 0; i < parts.length - 1; i++) {
         const part = parts[i];
+        if (part === '__proto__' || part === 'constructor' || part === 'prototype') return;
         if (!current[part] || typeof current[part] !== "object") {
             current[part] = {};
         }
         current = current[part];
     }
-    current[parts[parts.length - 1]] = value;
+    const lastKey = parts[parts.length - 1];
+    if (lastKey !== '__proto__' && lastKey !== 'constructor' && lastKey !== 'prototype') {
+        current[lastKey] = value;
+    }
 }
 
 export function evaluateShowIfCondition(showIf, formValues) {

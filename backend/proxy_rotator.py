@@ -248,8 +248,6 @@ class SocksProxyRotator:
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
                 text=True,
-                encoding="utf-8",
-                errors="ignore",
                 bufsize=1,
                 env=env,
                 **extra_kwargs
@@ -374,15 +372,16 @@ class SocksProxyRotator:
         loop = asyncio.get_running_loop()
 
         def _fetch_url(target_url: str) -> str:
-            ctx = ssl.create_default_context()
-            ctx.check_hostname = False
-            ctx.verify_mode = ssl.CERT_NONE
-            req = urllib.request.Request(
+            if not target_url.startswith(("https://", "http://")):
+                return ""
+            import requests
+            resp = requests.get(
                 target_url,
-                headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Sentinel/1.0"}
+                headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Sentinel/1.0"},
+                timeout=3.5,
+                verify=False
             )
-            with urllib.request.urlopen(req, timeout=3.5, context=ctx) as response:
-                return response.read().decode("utf-8", errors="ignore")
+            return resp.text
 
         try:
             content = await loop.run_in_executor(None, _fetch_url, base_url)

@@ -159,7 +159,13 @@ export function compileXrayTransportSettings(network, streamSettings) {
         if (extraStr) {
             try {
                 const extra = JSON.parse(extraStr);
-                Object.assign(settings, extra);
+                if (extra && typeof extra === 'object' && !Array.isArray(extra)) {
+                    for (const key of Object.keys(extra)) {
+                        if (key !== '__proto__' && key !== 'constructor' && key !== 'prototype') {
+                            settings[key] = extra[key];
+                        }
+                    }
+                }
             } catch(e) { /* ignore invalid JSON */ }
         }
         streamSettings.xhttpSettings = settings;

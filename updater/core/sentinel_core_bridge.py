@@ -173,8 +173,7 @@ def run_cli_command(args: List[str], input_data: Optional[str] = None) -> Any:
             stdin=subprocess.PIPE if input_data else None,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
-            text=True,
-            encoding="utf-8"
+            text=True
         )
         stdout, stderr = proc.communicate(input=input_data, timeout=10)
         output = (stdout or "").strip()

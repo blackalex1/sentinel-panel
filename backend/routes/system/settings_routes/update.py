@@ -172,7 +172,7 @@ def _detect_installed_core_version(bin_dir: str) -> Tuple[bool, str]:
             if resp.get("success"):
                 return bool(resp.get("is_installed", False)), str(resp.get("version", "Не установлена"))
         except Exception:
-            pass
+                            pass
 
     # Fallback 2: Direct FFI inspection of libsentinel-core in bin_dir
     system = platform.system().lower()
@@ -195,7 +195,7 @@ def _detect_installed_core_version(bin_dir: str) -> Tuple[bool, str]:
                 if v_out and v_out != "dev":
                     return True, v_out
             except Exception:
-                pass
+                            pass
             return True, "Установлена (.so найдена)"
 
     # Fallback 3: Direct CLI check of sentinel-core binary
@@ -227,37 +227,40 @@ def _check_core_release(force: bool = False) -> Dict[str, Any]:
     is_installed, current_ver = _detect_installed_core_version(bin_dir)
 
     api_url = "https://api.github.com/repos/blackalex1/sentinel-core/releases"
-    req = urllib.request.Request(
-        api_url,
-        headers={
-            "User-Agent": f"Sentinel-Panel-Updater/{PANEL_VERSION}",
-            "Accept": "application/vnd.github.v3+json",
-        },
-    )
-
     releases = []
     stable_ver = ""
     latest_ver = ""
 
+    if not api_url.startswith(("https://", "http://")):
+        return {"success": False, "error": "Invalid update API URL"}
+
+    import requests
     try:
-        with urllib.request.urlopen(req, timeout=6) as resp:
-            if resp.status == 200:
-                raw_data = json.loads(resp.read().decode("utf-8"))
-                if isinstance(raw_data, list):
-                    for r in raw_data:
-                        t = r.get("tag_name", "")
-                        if not t:
-                            continue
-                        releases.append({
-                            "tag": t,
-                            "name": r.get("name") or t,
-                            "prerelease": bool(r.get("prerelease")),
-                            "published_at": r.get("published_at", ""),
-                            "body": r.get("body", ""),
-                        })
-                    if releases:
-                        stable_ver = next((r["tag"] for r in releases if not r["prerelease"]), releases[0]["tag"])
-                        latest_ver = releases[0]["tag"]
+        resp = requests.get(
+            api_url,
+            headers={
+                "User-Agent": f"Sentinel-Panel-Updater/{PANEL_VERSION}",
+                "Accept": "application/vnd.github.v3+json",
+            },
+            timeout=6
+        )
+        if resp.status_code == 200:
+            raw_data = resp.json()
+            if isinstance(raw_data, list):
+                for r in raw_data:
+                    t = r.get("tag_name", "")
+                    if not t:
+                        continue
+                    releases.append({
+                        "tag": t,
+                        "name": r.get("name") or t,
+                        "prerelease": bool(r.get("prerelease")),
+                        "published_at": r.get("published_at", ""),
+                        "body": r.get("body", ""),
+                    })
+                if releases:
+                    stable_ver = next((r["tag"] for r in releases if not r["prerelease"]), releases[0]["tag"])
+                    latest_ver = releases[0]["tag"]
     except Exception as e:
         logger.warning(f"Failed to fetch Sentinel Core releases from GitHub: {e}")
 
@@ -294,39 +297,42 @@ def _check_github_release(force: bool = False) -> Dict[str, Any]:
     current_ver = PANEL_VERSION
     api_url = "https://api.github.com/repos/blackalex1/sentinel-panel/releases/latest"
 
-    req = urllib.request.Request(
-        api_url,
-        headers={
-            "User-Agent": f"Sentinel-Panel-Updater/{PANEL_VERSION}",
-            "Accept": "application/vnd.github.v3+json",
-        },
-    )
+    if not api_url.startswith(("https://", "http://")):
+        return {"success": False, "error": "Invalid update API URL"}
 
+    import requests
     try:
-        with urllib.request.urlopen(req, timeout=6) as resp:
-            if resp.status == 200:
-                data = json.loads(resp.read().decode("utf-8"))
-                tag_name = data.get("tag_name", "v0.0.1")
-                clean_latest = tag_name.lstrip("v")
-                body = data.get("body", "")
-                html_url = data.get("html_url", "")
-                published_at = data.get("published_at", "")
+        resp = requests.get(
+            api_url,
+            headers={
+                "User-Agent": f"Sentinel-Panel-Updater/{PANEL_VERSION}",
+                "Accept": "application/vnd.github.v3+json",
+            },
+            timeout=6
+        )
+        if resp.status_code == 200:
+            data = resp.json()
+            tag_name = data.get("tag_name", "v0.0.1")
+            clean_latest = tag_name.lstrip("v")
+            body = data.get("body", "")
+            html_url = data.get("html_url", "")
+            published_at = data.get("published_at", "")
 
-                has_update = _parse_version(clean_latest) > _parse_version(current_ver)
+            has_update = _parse_version(clean_latest) > _parse_version(current_ver)
 
-                result = {
-                    "success": True,
-                    "current_version": current_ver,
-                    "latest_version": clean_latest,
-                    "tag_name": tag_name,
-                    "has_update": has_update,
-                    "release_notes": body,
-                    "release_url": html_url,
-                    "published_at": published_at,
-                }
-                _CACHE["data"] = result
-                _CACHE["timestamp"] = now
-                return result
+            result = {
+                "success": True,
+                "current_version": current_ver,
+                "latest_version": clean_latest,
+                "tag_name": tag_name,
+                "has_update": has_update,
+                "release_notes": body,
+                "release_url": html_url,
+                "published_at": published_at,
+            }
+            _CACHE["data"] = result
+            _CACHE["timestamp"] = now
+            return result
     except Exception as e:
         logger.warning(f"Failed to check GitHub releases: {e}")
 
@@ -402,44 +408,45 @@ def _standalone_download_core_sync(
     for base in base_urls:
         url = f"{base}/{lib_name}"
         try:
-            req = urllib.request.Request(url, headers={"User-Agent": "Sentinel-Panel-Updater/0.0.1"})
-            with urllib.request.urlopen(req, timeout=30) as resp:
-                if resp.status == 200:
-                    cl_header = resp.headers.get("Content-Length")
-                    total_bytes = int(cl_header) if cl_header and cl_header.isdigit() else 0
-                    downloaded = 0
-                    start_time = time.time()
-                    last_cb_time = start_time
-                    with open(target_lib, "wb") as f:
-                        while True:
-                            chunk = resp.read(65536)
-                            if not chunk:
-                                break
-                            f.write(chunk)
-                            downloaded += len(chunk)
-                            now = time.time()
-                            if progress_callback and (now - last_cb_time >= 0.1 or (total_bytes > 0 and downloaded >= total_bytes)):
-                                last_cb_time = now
-                                elapsed = max(0.001, now - start_time)
-                                speed = downloaded / elapsed
-                                spd_str = f"{speed / (1024*1024):.1f} MB/s" if speed >= 1024*1024 else f"{speed / 1024:.1f} KB/s"
-                                pct = int((downloaded / total_bytes) * 100) if total_bytes > 0 else 0
-                                rem = max(0, total_bytes - downloaded)
-                                eta_s = int(rem / speed) if speed > 0 and total_bytes > 0 else 0
-                                eta_str = f"{eta_s}s" if eta_s < 60 else f"{eta_s // 60}m {eta_s % 60}s"
-                                progress_callback({
-                                    "stage": f"Загрузка {lib_name}",
-                                    "percent": pct,
-                                    "downloaded_bytes": downloaded,
-                                    "total_bytes": total_bytes,
-                                    "speed": spd_str,
-                                    "eta": eta_str,
-                                    "filename": lib_name,
-                                    "finished": False,
-                                })
+            if not url.startswith(("https://", "http://")):
+                continue
+            import requests
+            resp = requests.get(url, headers={"User-Agent": "Sentinel-Panel-Updater/0.0.1"}, stream=True, timeout=30)
+            if resp.status_code == 200:
+                cl_header = resp.headers.get("Content-Length")
+                total_bytes = int(cl_header) if cl_header and cl_header.isdigit() else 0
+                downloaded = 0
+                start_time = time.time()
+                last_cb_time = start_time
+                with open(target_lib, "wb") as f:
+                    for chunk in resp.iter_content(chunk_size=65536):
+                        if not chunk:
+                            break
+                        f.write(chunk)
+                        downloaded += len(chunk)
+                        now = time.time()
+                        if progress_callback and (now - last_cb_time >= 0.1 or (total_bytes > 0 and downloaded >= total_bytes)):
+                            last_cb_time = now
+                            elapsed = max(0.001, now - start_time)
+                            speed = downloaded / elapsed
+                            spd_str = f"{speed / (1024*1024):.1f} MB/s" if speed >= 1024*1024 else f"{speed / 1024:.1f} KB/s"
+                            pct = int((downloaded / total_bytes) * 100) if total_bytes > 0 else 0
+                            rem = max(0, total_bytes - downloaded)
+                            eta_s = int(rem / speed) if speed > 0 and total_bytes > 0 else 0
+                            eta_str = f"{eta_s}s" if eta_s < 60 else f"{eta_s // 60}m {eta_s % 60}s"
+                            progress_callback({
+                                "stage": f"Загрузка {lib_name}",
+                                "percent": pct,
+                                "downloaded_bytes": downloaded,
+                                "total_bytes": total_bytes,
+                                "speed": spd_str,
+                                "eta": eta_str,
+                                "filename": lib_name,
+                                "finished": False,
+                            })
                     if os_name != "windows":
                         try:
-                            os.chmod(target_lib, 0o755)
+                            os.chmod(target_lib, 0o750)
                         except Exception:
                             pass
                     lib_downloaded = True
@@ -451,49 +458,50 @@ def _standalone_download_core_sync(
     for base in base_urls:
         url = f"{base}/{cli_name}"
         try:
-            req = urllib.request.Request(url, headers={"User-Agent": "Sentinel-Panel-Updater/0.0.1"})
-            with urllib.request.urlopen(req, timeout=30) as resp:
-                if resp.status == 200:
-                    cl_header = resp.headers.get("Content-Length")
-                    total_bytes = int(cl_header) if cl_header and cl_header.isdigit() else 0
-                    downloaded = 0
-                    start_time = time.time()
-                    last_cb_time = start_time
-                    with open(target_cli, "wb") as f:
-                        while True:
-                            chunk = resp.read(65536)
-                            if not chunk:
-                                break
-                            f.write(chunk)
-                            downloaded += len(chunk)
-                            now = time.time()
-                            if progress_callback and (now - last_cb_time >= 0.1 or (total_bytes > 0 and downloaded >= total_bytes)):
-                                last_cb_time = now
-                                elapsed = max(0.001, now - start_time)
-                                speed = downloaded / elapsed
-                                spd_str = f"{speed / (1024*1024):.1f} MB/s" if speed >= 1024*1024 else f"{speed / 1024:.1f} KB/s"
-                                pct = int((downloaded / total_bytes) * 100) if total_bytes > 0 else 0
-                                rem = max(0, total_bytes - downloaded)
-                                eta_s = int(rem / speed) if speed > 0 and total_bytes > 0 else 0
-                                eta_str = f"{eta_s}s" if eta_s < 60 else f"{eta_s // 60}m {eta_s % 60}s"
-                                progress_callback({
-                                    "stage": f"Загрузка {cli_name}",
-                                    "percent": pct,
-                                    "downloaded_bytes": downloaded,
-                                    "total_bytes": total_bytes,
-                                    "speed": spd_str,
-                                    "eta": eta_str,
-                                    "filename": cli_name,
-                                    "finished": False,
-                                })
+            if not url.startswith(("https://", "http://")):
+                continue
+            import requests
+            resp = requests.get(url, headers={"User-Agent": "Sentinel-Panel-Updater/0.0.1"}, stream=True, timeout=30)
+            if resp.status_code == 200:
+                cl_header = resp.headers.get("Content-Length")
+                total_bytes = int(cl_header) if cl_header and cl_header.isdigit() else 0
+                downloaded = 0
+                start_time = time.time()
+                last_cb_time = start_time
+                with open(target_cli, "wb") as f:
+                    for chunk in resp.iter_content(chunk_size=65536):
+                        if not chunk:
+                            break
+                        f.write(chunk)
+                        downloaded += len(chunk)
+                        now = time.time()
+                        if progress_callback and (now - last_cb_time >= 0.1 or (total_bytes > 0 and downloaded >= total_bytes)):
+                            last_cb_time = now
+                            elapsed = max(0.001, now - start_time)
+                            speed = downloaded / elapsed
+                            spd_str = f"{speed / (1024*1024):.1f} MB/s" if speed >= 1024*1024 else f"{speed / 1024:.1f} KB/s"
+                            pct = int((downloaded / total_bytes) * 100) if total_bytes > 0 else 0
+                            rem = max(0, total_bytes - downloaded)
+                            eta_s = int(rem / speed) if speed > 0 and total_bytes > 0 else 0
+                            eta_str = f"{eta_s}s" if eta_s < 60 else f"{eta_s // 60}m {eta_s % 60}s"
+                            progress_callback({
+                                "stage": f"Загрузка {cli_name}",
+                                "percent": pct,
+                                "downloaded_bytes": downloaded,
+                                "total_bytes": total_bytes,
+                                "speed": spd_str,
+                                "eta": eta_str,
+                                "filename": cli_name,
+                                "finished": False,
+                            })
                     if os_name != "windows":
                         try:
-                            os.chmod(target_cli, 0o755)
+                            os.chmod(target_cli, 0o750)
                         except Exception:
                             pass
                     break
         except Exception:
-            pass
+                            pass
 
     # Create alias for sentinel-core.dll/so
     alt_lib = os.path.join(bin_dir, f"sentinel-core{lib_ext}")
@@ -504,7 +512,7 @@ def _standalone_download_core_sync(
             else:
                 shutil.copy2(target_lib, alt_lib)
     except Exception:
-        pass
+                            pass
 
     if lib_downloaded:
         if progress_callback:
@@ -640,7 +648,7 @@ async def get_core_update_progress(request: Request):
             if resp.get("success") and resp.get("progress"):
                 return JSONResponse(content=resp["progress"])
         except Exception:
-            pass
+                            pass
 
     return JSONResponse(content=data)
 

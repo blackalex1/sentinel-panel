@@ -15,10 +15,7 @@ DEFAULT_GEOSITE_URL = "https://github.com/Loyalsoldier/v2ray-rules-dat/releases/
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
 HEADERS = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 SentinelPanel/1.0"}
-try:
-    import defusedxml.ElementTree as ET
-except ImportError:
-    import xml.etree.ElementTree as ET
+import defusedxml.ElementTree as ET
 
 _XRAY_RELEASES_CACHE = {}
 CACHE_TTL = 3600  # 1 hour cache for releases
@@ -190,7 +187,7 @@ def download_xray_core(download_url: str = None):
             
         if not backend.xray.IS_WINDOWS:
             try:
-                os.chmod(temp_xray_bin_path, 0o755)  # nosec B103
+                os.chmod(temp_xray_bin_path, 0o750)  # nosec B103
                 logging.info("Chmod +x set on temporary Xray binary.")
             except Exception as e:
                 logging.error(f"Failed to set executable permission on temporary Linux binary: {e}")
@@ -232,7 +229,7 @@ def download_xray_core(download_url: str = None):
                 
         if not backend.xray.IS_WINDOWS:
             try:
-                os.chmod(backend.xray.XRAY_BIN_PATH, 0o755)  # nosec B103
+                os.chmod(backend.xray.XRAY_BIN_PATH, 0o750)  # nosec B103
             except Exception:
                 pass
                 
