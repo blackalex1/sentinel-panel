@@ -47,6 +47,8 @@ class AcmeClient:
             headers = {}
         ctx = ssl.create_default_context()
         
+        if not url.startswith(('https://', 'http://')):
+            raise ValueError(f'Invalid ACME endpoint scheme: {url}')
         req = urllib.request.Request(url, data=data, headers=headers, method=method)
         try:
             with urllib.request.urlopen(req, context=ctx, timeout=15) as resp:

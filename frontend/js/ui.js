@@ -57,7 +57,11 @@ export async function loadComponent(id, filePath, targetSelector) {
         const html = await response.text();
         const target = document.querySelector(targetSelector);
         if (target) {
-            target.insertAdjacentHTML('beforeend', html);
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(html, "text/html");
+            while (doc.body.firstChild) {
+                target.appendChild(doc.body.firstChild);
+            }
             loadedComponents.add(id);
             try {
                 translatePage();

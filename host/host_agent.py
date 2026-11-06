@@ -278,8 +278,8 @@ def main():
         
         # Set permissions so container processes (including unprivileged appuser) can access the socket
         try:
-            os.chmod(str(SOCKET_DIR), 0o777)
-            os.chmod(str(SOCKET_PATH), 0o666)
+            os.chmod(str(SOCKET_DIR), 0o750)
+            os.chmod(str(SOCKET_PATH), 0o660)
             logging.info("Socket permissions set to 0666 (accessible by unprivileged container appuser)")
         except Exception as e:
             logging.warning(f"Could not adjust socket permissions: {e}")

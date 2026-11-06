@@ -13,10 +13,7 @@ def _get_bin_suffix():
 HEADERS = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 SentinelPanel/1.0"}
 
 import time
-try:
-    import defusedxml.ElementTree as ET
-except ImportError:
-    import xml.etree.ElementTree as ET
+import defusedxml.ElementTree as ET
 
 _HYSTERIA_RELEASES_CACHE = {}
 CACHE_TTL = 3600  # 1 hour cache for releases
@@ -215,7 +212,7 @@ def download_hysteria_core(download_url: str = None):
                 
         if not backend.hysteria.IS_WINDOWS:
             try:
-                os.chmod(temp_bin_path, 0o755)  # nosec B103
+                os.chmod(temp_bin_path, 0o750)  # nosec B103
                 logging.info("Chmod +x set on temporary Hysteria binary.")
             except Exception as e:
                 logging.error(f"Failed to set executable on temporary Hysteria binary: {e}")

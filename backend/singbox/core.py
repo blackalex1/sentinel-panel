@@ -28,10 +28,7 @@ def get_installed_singbox_version() -> str:
 
 HEADERS = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 SentinelPanel/1.0"}
 
-try:
-    import defusedxml.ElementTree as ET
-except ImportError:
-    import xml.etree.ElementTree as ET
+import defusedxml.ElementTree as ET
 
 _SINGBOX_RELEASES_CACHE = {}
 CACHE_TTL = 3600  # 1 hour cache for releases
@@ -196,7 +193,16 @@ def download_singbox_core(download_url: str = None):
 
         if is_tar:
             with tarfile.open(archive_path, "r:gz") as tar_ref:
-                tar_ref.extractall(temp_extract_dir)
+                resolved_dst = temp_extract_dir.resolve()
+                safe_members = []
+                for m in tar_ref.getmembers():
+                    m_path = (temp_extract_dir / m.name).resolve()
+                    if resolved_dst in m_path.parents or m_path == resolved_dst:
+                        safe_members.append(m)
+                if hasattr(tarfile, 'data_filter'):
+                    tar_ref.extractall(temp_extract_dir, filter='data')
+                else:
+                    tar_ref.extractall(temp_extract_dir, members=safe_members)
         else:
             with zipfile.ZipFile(archive_path, "r") as zip_ref:
                 zip_ref.extractall(temp_extract_dir)
@@ -217,7 +223,7 @@ def download_singbox_core(download_url: str = None):
 
         if not IS_WINDOWS:
             try:
-                os.chmod(extracted_bin, 0o755)
+                os.chmod(extracted_bin, 0o750)
             except Exception as e:
                 logging.error(f"Failed to set chmod +x on temporary sing-box binary: {e}")
 
@@ -242,7 +248,7 @@ def download_singbox_core(download_url: str = None):
 
         if not IS_WINDOWS:
             try:
-                os.chmod(SINGBOX_BIN_PATH, 0o755)
+                os.chmod(SINGBOX_BIN_PATH, 0o750)
             except Exception:
                 pass
 

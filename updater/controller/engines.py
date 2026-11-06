@@ -83,7 +83,7 @@ class ProxyEngineManager:
         if os.path.isfile(sb_bin):
             if platform.system() != "Windows":
                 try:
-                    os.chmod(sb_bin, 0o755)
+                    os.chmod(sb_bin, 0o750)
                 except Exception:
                     pass
             try:
@@ -102,7 +102,7 @@ class ProxyEngineManager:
         if os.path.isfile(xray_bin):
             if platform.system() != "Windows":
                 try:
-                    os.chmod(xray_bin, 0o755)
+                    os.chmod(xray_bin, 0o750)
                 except Exception:
                     pass
             try:
@@ -179,7 +179,7 @@ class ProxyEngineManager:
             if os.path.isfile(tmp_target) and os.path.getsize(tmp_target) > 0:
                 if os_name != "windows":
                     try:
-                        os.chmod(tmp_target, 0o755)
+                        os.chmod(tmp_target, 0o750)
                     except Exception:
                         pass
                 if os.path.exists(target_bin):
@@ -240,7 +240,7 @@ class ProxyEngineManager:
                             shutil.copyfileobj(src, dst)
                         if base in ["xray", "xray.exe"] and os_name != "windows":
                             try:
-                                os.chmod(tmp_file, 0o755)
+                                os.chmod(tmp_file, 0o750)
                             except Exception:
                                 pass
                         if os.path.exists(target_file):

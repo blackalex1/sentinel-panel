@@ -53,6 +53,8 @@ def register_warp() -> Optional[Dict]:
     
     try:
         data_bytes = json.dumps(payload).encode('utf-8')
+        if not url.startswith(('https://', 'http://')):
+            return None
         req = urllib.request.Request(url, data=data_bytes, headers=headers, method="POST")
         
         # We disable verification in case of local networking/proxy issues, but standard SSL context is fine

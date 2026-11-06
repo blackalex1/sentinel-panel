@@ -109,7 +109,7 @@ def _fetch_hysteria_direct_traffic() -> Dict[str, Dict[str, Any]]:
     Acts as defense-in-depth even if an older sentinel-core binary is running on the host.
     """
     import json
-    import urllib.request
+    import requests
     admin_ports = set()
     try:
         from backend.config import BIN_DIR
@@ -131,16 +131,16 @@ def _fetch_hysteria_direct_traffic() -> Dict[str, Dict[str, Any]]:
     direct_hy: Dict[str, Dict[str, Any]] = {}
     for port in admin_ports:
         try:
-            req = urllib.request.Request(f"http://127.0.0.1:{port}/traffic")
-            with urllib.request.urlopen(req, timeout=0.25) as resp:
-                if resp.status == 200:
-                    raw = json.loads(resp.read().decode("utf-8"))
-                    for email, t in raw.items():
-                        tx = int(t.get("tx", 0) or 0)
-                        rx = int(t.get("rx", 0) or 0)
-                        entry = direct_hy.setdefault(email, {"tx": 0, "rx": 0})
-                        entry["tx"] += tx
-                        entry["rx"] += rx
+            p_int = int(port)
+            resp = requests.get(f"http://127.0.0.1:{p_int}/traffic", timeout=0.25)
+            if resp.status_code == 200:
+                raw = resp.json()
+                for email, t in raw.items():
+                    tx = int(t.get("tx", 0) or 0)
+                    rx = int(t.get("rx", 0) or 0)
+                    entry = direct_hy.setdefault(email, {"tx": 0, "rx": 0})
+                    entry["tx"] += tx
+                    entry["rx"] += rx
         except Exception:
             pass
 
@@ -154,7 +154,7 @@ def _fetch_singbox_direct_traffic() -> Dict[str, Dict[str, Any]]:
     Acts as defense-in-depth even if an older sentinel-core binary is running on the host.
     """
     import json
-    import urllib.request
+    import requests
     from backend.config import BIN_DIR, SINGBOX_CONFIG_PATH
 
     clash_ports = set()
@@ -195,13 +195,12 @@ def _fetch_singbox_direct_traffic() -> Dict[str, Dict[str, Any]]:
     raw_responses = []
     for port in clash_ports:
         try:
-            req = urllib.request.Request(f"http://127.0.0.1:{port}/connections")
-            if secret:
-                req.add_header("Authorization", f"Bearer {secret}")
-            with urllib.request.urlopen(req, timeout=0.25) as resp:
-                if resp.status == 200:
-                    raw = json.loads(resp.read().decode("utf-8"))
-                    raw_responses.append((port, raw))
+            p_int = int(port)
+            hdrs = {"Authorization": f"Bearer {secret}"} if secret else {}
+            resp = requests.get(f"http://127.0.0.1:{p_int}/connections", headers=hdrs, timeout=0.25)
+            if resp.status_code == 200:
+                raw = resp.json()
+                raw_responses.append((port, raw))
         except Exception:
             pass
 
