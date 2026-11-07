@@ -10,12 +10,19 @@ set -e
 for dir in "/app/config" "/app/bin" "/app/backups" "/app/frontend/decoy"; do
     if [ -d "$dir" ]; then
         chown -R appuser:appuser "$dir" 2>/dev/null || true
-        chmod 775 "$dir" 2>/dev/null || true
+        chmod -R 775 "$dir" 2>/dev/null || true
     fi
 done
 
+# Ensure binary directory has executable and readable permissions for appuser
+if [ -d "/app/bin" ]; then
+    chown -R appuser:appuser /app/bin 2>/dev/null || true
+    chmod -R 755 /app/bin 2>/dev/null || true
+fi
+
 # Ensure socket directory allows IPC communication with host agent
 if [ -d "/var/run/sentinel" ]; then
+    chown -R appuser:appuser /var/run/sentinel 2>/dev/null || true
     chmod 777 /var/run/sentinel 2>/dev/null || true
     if [ -e "/var/run/sentinel/agent.sock" ]; then
         chmod 666 /var/run/sentinel/agent.sock 2>/dev/null || true

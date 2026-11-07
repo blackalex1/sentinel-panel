@@ -176,7 +176,7 @@ class Downloader:
                     if platform.system() != "Windows" and not dest.endswith(".h"):
                         try:
                             # nosemgrep: python.lang.security.audit.insecure-file-permissions.insecure-file-permissions
-                            os.chmod(tmp_dest, 0o700)
+                            os.chmod(tmp_dest, 0o755)
                         except Exception:
                             pass
                     os.replace(tmp_dest, dest)
@@ -281,7 +281,7 @@ class Downloader:
                     if platform.system() != "Windows" and not dest.endswith(".h"):
                         try:
                             # nosemgrep: python.lang.security.audit.insecure-file-permissions.insecure-file-permissions
-                            os.chmod(tmp_dest, 0o700)
+                            os.chmod(tmp_dest, 0o755)
                         except Exception:
                             pass
                     os.replace(tmp_dest, dest)

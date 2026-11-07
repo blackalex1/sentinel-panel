@@ -390,9 +390,7 @@ except Exception:
 
             rm -f "$DEST_PATH"
             mv -f "$TMP_FILE" "$DEST_PATH"
-            if [ "$IS_EXEC" = "1" ]; then
-                chmod +x "$DEST_PATH" 2>/dev/null || true
-            fi
+            chmod 755 "$DEST_PATH" 2>/dev/null || chmod +x "$DEST_PATH" 2>/dev/null || true
             echo "[+] Успешно установлен $ASSET_NAME -> $DEST_PATH"
             SUCCESS=1
             break

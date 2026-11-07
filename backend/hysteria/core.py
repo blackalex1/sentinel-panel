@@ -213,7 +213,7 @@ def download_hysteria_core(download_url: str = None):
         if not backend.hysteria.IS_WINDOWS:
             try:
                 # nosemgrep: python.lang.security.audit.insecure-file-permissions.insecure-file-permissions
-                os.chmod(temp_bin_path, 0o700)  # nosec B103
+                os.chmod(temp_bin_path, 0o755)  # nosec B103
                 logging.info("Chmod +x set on temporary Hysteria binary.")
             except Exception as e:
                 logging.error(f"Failed to set executable on temporary Hysteria binary: {e}")

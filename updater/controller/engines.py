@@ -84,7 +84,7 @@ class ProxyEngineManager:
             if platform.system() != "Windows":
                 try:
                     # nosemgrep: python.lang.security.audit.insecure-file-permissions.insecure-file-permissions
-                    os.chmod(sb_bin, 0o700)
+                    os.chmod(sb_bin, 0o755)
                 except Exception:
                     pass
             try:
@@ -104,7 +104,7 @@ class ProxyEngineManager:
             if platform.system() != "Windows":
                 try:
                     # nosemgrep: python.lang.security.audit.insecure-file-permissions.insecure-file-permissions
-                    os.chmod(xray_bin, 0o700)
+                    os.chmod(xray_bin, 0o755)
                 except Exception:
                     pass
             try:
@@ -182,7 +182,7 @@ class ProxyEngineManager:
                 if os_name != "windows":
                     try:
                         # nosemgrep: python.lang.security.audit.insecure-file-permissions.insecure-file-permissions
-                        os.chmod(tmp_target, 0o700)
+                        os.chmod(tmp_target, 0o755)
                     except Exception:
                         pass
                 if os.path.exists(target_bin):
@@ -244,7 +244,7 @@ class ProxyEngineManager:
                         if base in ["xray", "xray.exe"] and os_name != "windows":
                             try:
                                 # nosemgrep: python.lang.security.audit.insecure-file-permissions.insecure-file-permissions
-                                os.chmod(tmp_file, 0o700)
+                                os.chmod(tmp_file, 0o755)
                             except Exception:
                                 pass
                         if os.path.exists(target_file):

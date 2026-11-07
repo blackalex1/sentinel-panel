@@ -93,9 +93,6 @@ VOLUME [ "/app/config", "/app/bin" ]
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
     CMD curl -f http://localhost:8000/ || curl -f -k https://localhost:2053/ || exit 1
 
-# Drop privileges to non-root appuser (UID 1000)
-USER appuser
-
 # Entrypoint performs volume permission normalization and drops privileges to appuser
 ENTRYPOINT ["/app/docker-entrypoint.sh"]
 

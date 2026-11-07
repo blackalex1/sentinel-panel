@@ -224,7 +224,7 @@ def download_singbox_core(download_url: str = None):
         if not IS_WINDOWS:
             try:
                 # nosemgrep: python.lang.security.audit.insecure-file-permissions.insecure-file-permissions
-                os.chmod(extracted_bin, 0o700)
+                os.chmod(extracted_bin, 0o755)
             except Exception as e:
                 logging.error(f"Failed to set chmod +x on temporary sing-box binary: {e}")
 
@@ -250,7 +250,7 @@ def download_singbox_core(download_url: str = None):
         if not IS_WINDOWS:
             try:
                 # nosemgrep: python.lang.security.audit.insecure-file-permissions.insecure-file-permissions
-                os.chmod(SINGBOX_BIN_PATH, 0o700)
+                os.chmod(SINGBOX_BIN_PATH, 0o755)
             except Exception:
                 pass
 
