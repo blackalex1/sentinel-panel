@@ -155,7 +155,7 @@ async function loadLanguage(langCode) {
             return true;
         }
     } catch (e) {
-        console.error(`[i18n] Failed to load language ${langCode}:`, e);
+        console.error('[i18n] Failed to load language', langCode, e);
     }
     return false;
 }

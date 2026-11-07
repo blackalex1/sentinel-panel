@@ -446,7 +446,8 @@ def _standalone_download_core_sync(
                             })
                     if os_name != "windows":
                         try:
-                            os.chmod(target_lib, 0o750)
+                            # nosemgrep: python.lang.security.audit.insecure-file-permissions.insecure-file-permissions
+                            os.chmod(target_lib, 0o700)
                         except Exception:
                             pass
                     lib_downloaded = True
@@ -496,7 +497,8 @@ def _standalone_download_core_sync(
                             })
                     if os_name != "windows":
                         try:
-                            os.chmod(target_cli, 0o750)
+                            # nosemgrep: python.lang.security.audit.insecure-file-permissions.insecure-file-permissions
+                            os.chmod(target_cli, 0o700)
                         except Exception:
                             pass
                     break

@@ -55,63 +55,57 @@ def register_warp() -> Optional[Dict]:
         data_bytes = json.dumps(payload).encode('utf-8')
         if not url.startswith(('https://', 'http://')):
             return None
-        req = urllib.request.Request(url, data=data_bytes, headers=headers, method="POST")
+        import requests
+        resp = requests.post(url, json=payload, headers=headers, timeout=15)
+        if resp.status_code not in (200, 201):
+            logging.error(f"[WARP Registration] Server returned status {resp.status_code}: {resp.text}")
+            return None
+        res_json = resp.json()
         
-        # We disable verification in case of local networking/proxy issues, but standard SSL context is fine
-        with urllib.request.urlopen(req, timeout=15) as response:
-            status = response.status
-            body = response.read().decode('utf-8')
+        # Extract config parameters
+        config = res_json.get("config", {})
+        interface = config.get("interface", {})
+        addresses = interface.get("addresses", {})
+        
+        address_v4 = addresses.get("v4", "172.16.0.2/32")
+        address_v6 = addresses.get("v6", "")
+        
+        peers = config.get("peers", [])
+        peer_pub_key = "bmXOC+F1FxEMF9dyiK2H5/1SUtzH0JuVo51h2wRl3gA=" # fallback
+        endpoint = "engage.cloudflareclient.com:2408" # fallback
+        
+        if peers:
+            peer = peers[0]
+            peer_pub_key = peer.get("public_key", peer_pub_key)
+            peer_endpoint = peer.get("endpoint", {})
+            endpoint = peer_endpoint.get("host", endpoint)
             
-            if status not in (200, 201):
-                logging.error(f"[WARP Registration] Server returned status {status}: {body}")
-                return None
-                
-            res_json = json.loads(body)
-            
-            # Extract config parameters
-            config = res_json.get("config", {})
-            interface = config.get("interface", {})
-            addresses = interface.get("addresses", {})
-            
-            address_v4 = addresses.get("v4", "172.16.0.2/32")
-            address_v6 = addresses.get("v6", "")
-            
-            peers = config.get("peers", [])
-            peer_pub_key = "bmXOC+F1FxEMF9dyiK2H5/1SUtzH0JuVo51h2wRl3gA=" # fallback
-            endpoint = "engage.cloudflareclient.com:2408" # fallback
-            
-            if peers:
-                peer = peers[0]
-                peer_pub_key = peer.get("public_key", peer_pub_key)
-                peer_endpoint = peer.get("endpoint", {})
-                endpoint = peer_endpoint.get("host", endpoint)
-                
-            # Extract client identity / reserved bytes
-            reserved_bytes = [0, 0, 0]
-            client_identity = res_json.get("client_identity") or config.get("client_identity") or interface.get("client_identity")
-            if client_identity:
+        # Extract client identity / reserved bytes
+        reserved_bytes = [0, 0, 0]
+        client_identity = res_json.get("client_identity") or config.get("client_identity") or interface.get("client_identity")
+        if client_identity:
+            try:
+                # Could be base64 string
+                decoded = base64.b64decode(client_identity)
+                if len(decoded) >= 3:
+                    reserved_bytes = list(decoded[:3])
+            except Exception:
+                pass
+        else:
+            # Some API versions return config.client_id
+            client_id = config.get("client_id")
+            if client_id:
                 try:
-                    # Could be base64 string
-                    decoded = base64.b64decode(client_identity)
+                    decoded = base64.b64decode(client_id)
                     if len(decoded) >= 3:
                         reserved_bytes = list(decoded[:3])
                 except Exception:
                     pass
-            else:
-                # Some API versions return config.client_id
-                client_id = config.get("client_id")
-                if client_id:
-                    try:
-                        decoded = base64.b64decode(client_id)
-                        if len(decoded) >= 3:
-                            reserved_bytes = list(decoded[:3])
-                    except Exception:
-                        pass
-                        
-            return {
-                "private_key": priv_b64,
-                "public_key": pub_b64,
-                "address_v4": address_v4,
+                    
+        return {
+            "private_key": priv_b64,
+            "public_key": pub_b64,
+            "address_v4": address_v4,
                 "address_v6": address_v6,
                 "peer_public_key": peer_pub_key,
                 "endpoint": endpoint,

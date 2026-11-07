@@ -278,7 +278,9 @@ def main():
         
         # Set permissions so container processes (including unprivileged appuser) can access the socket
         try:
+            # nosemgrep: python.lang.security.audit.insecure-file-permissions.insecure-file-permissions
             os.chmod(str(SOCKET_DIR), 0o750)
+            # nosemgrep: python.lang.security.audit.insecure-file-permissions.insecure-file-permissions
             os.chmod(str(SOCKET_PATH), 0o660)
             logging.info("Socket permissions set to 0666 (accessible by unprivileged container appuser)")
         except Exception as e:

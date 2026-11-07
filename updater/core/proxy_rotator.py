@@ -293,16 +293,12 @@ class SocksProxyRotator:
                     pass
 
             try:
-                ctx = ssl.create_default_context()
-                ctx.check_hostname = False
-                ctx.verify_mode = ssl.CERT_NONE
                 if not mirror_url.startswith(('https://', 'http://')):
                     return ""
-                req = urllib.request.Request(mirror_url, headers={"User-Agent": "Mozilla/5.0 Sentinel/1.0"})
-                with urllib.request.urlopen(req, timeout=2.0, context=ctx) as resp:
-                    data = resp.read().decode("utf-8", errors="ignore")
-                    if data and len(data) > 20:
-                        return data
+                import requests
+                resp = requests.get(mirror_url, headers={"User-Agent": "Mozilla/5.0 Sentinel/1.0"}, timeout=2.0)
+                if resp.status_code == 200 and len(resp.text) > 20:
+                    return resp.text
             except Exception:
                 pass
             return ""

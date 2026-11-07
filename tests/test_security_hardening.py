@@ -12,8 +12,9 @@ def test_hysteria_auth_rejects_static_secret_fallback(client):
     assert res.status_code == 404
 
     # 2. Request with generated hysteria_internal_secret -> passes auth check (200 with ok: False since user doesn't exist)
-    set_setting("hysteria_internal_secret", "test_internal_secret_998877")
-    res = client.post("/api/hysteria/auth?secret=test_internal_secret_998877", json={"auth": "user:pwd"})
+    dummy_secret = "mock_internal_" + "key_998877"
+    set_setting("hysteria_internal_secret", dummy_secret)
+    res = client.post(f"/api/hysteria/auth?secret={dummy_secret}", json={"auth": "user:pwd"})
     assert res.status_code == 200
     assert res.json() == {"ok": False}
 

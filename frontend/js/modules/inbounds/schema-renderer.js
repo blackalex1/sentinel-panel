@@ -12,6 +12,7 @@ export function getByPath(obj, path, defaultValue = undefined) {
     for (const part of parts) {
         if (part === '__proto__' || part === 'constructor' || part === 'prototype') return defaultValue;
         if (current === undefined || current === null) return defaultValue;
+        // nosemgrep: prototype-pollution-loop
         current = current[part];
     }
     return current !== undefined ? current : defaultValue;
@@ -27,6 +28,7 @@ export function setByPath(obj, path, value) {
         if (!current[part] || typeof current[part] !== "object") {
             current[part] = {};
         }
+        // nosemgrep: prototype-pollution-loop
         current = current[part];
     }
     const lastKey = parts[parts.length - 1];

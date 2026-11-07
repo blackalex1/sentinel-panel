@@ -34,20 +34,22 @@ def load_reg_credentials() -> tuple[str, str]:
 def get_warp_quota(reg_id: str, token: str) -> tuple[int, int]:
     """Queries Cloudflare API to get premium data quota and usage in bytes."""
     url = f"https://api.cloudflareclient.com/v1/reg/{reg_id}"
-    req = urllib.request.Request(url)
-    req.add_header("Authorization", f"Bearer {token}")
-    req.add_header("User-Agent", "okhttp/3.12.1")
-    req.add_header("Content-Type", "application/json")
+    import requests
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "User-Agent": "okhttp/3.12.1",
+        "Content-Type": "application/json"
+    }
     try:
-        with urllib.request.urlopen(req, timeout=5) as response:
-            if response.status == 200:
-                resp_data = json.loads(response.read().decode("utf-8"))
-                account = resp_data.get("account", {})
-                quota = account.get("quota", 0)
-                premium_data = account.get("premium_data", 0)
-                usage = account.get("usage", 0)
-                total_quota = max(quota, premium_data)
-                return total_quota, usage
+        resp = requests.get(url, headers=headers, timeout=5)
+        if resp.status_code == 200:
+            resp_data = resp.json()
+            account = resp_data.get("account", {})
+            quota = account.get("quota", 0)
+            premium_data = account.get("premium_data", 0)
+            usage = account.get("usage", 0)
+            total_quota = max(quota, premium_data)
+            return total_quota, usage
     except Exception as e:
         logging.error(f"Error querying WARP quota from Cloudflare API: {e}")
     return 0, 0

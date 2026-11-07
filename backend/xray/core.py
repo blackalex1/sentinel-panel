@@ -187,7 +187,8 @@ def download_xray_core(download_url: str = None):
             
         if not backend.xray.IS_WINDOWS:
             try:
-                os.chmod(temp_xray_bin_path, 0o750)  # nosec B103
+                # nosemgrep: python.lang.security.audit.insecure-file-permissions.insecure-file-permissions
+                os.chmod(temp_xray_bin_path, 0o700)  # nosec B103
                 logging.info("Chmod +x set on temporary Xray binary.")
             except Exception as e:
                 logging.error(f"Failed to set executable permission on temporary Linux binary: {e}")
@@ -229,7 +230,8 @@ def download_xray_core(download_url: str = None):
                 
         if not backend.xray.IS_WINDOWS:
             try:
-                os.chmod(backend.xray.XRAY_BIN_PATH, 0o750)  # nosec B103
+                # nosemgrep: python.lang.security.audit.insecure-file-permissions.insecure-file-permissions
+                os.chmod(backend.xray.XRAY_BIN_PATH, 0o700)  # nosec B103
             except Exception:
                 pass
                 

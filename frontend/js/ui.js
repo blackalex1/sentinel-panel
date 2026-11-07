@@ -72,7 +72,7 @@ export async function loadComponent(id, filePath, targetSelector) {
             return true;
         }
     } catch (err) {
-        console.error(`Error loading component ${id}:`, err);
+        console.error('Error loading component', id, err);
     }
     return false;
 }

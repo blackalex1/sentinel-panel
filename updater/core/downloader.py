@@ -175,7 +175,8 @@ class Downloader:
                 if file_size >= min_size:
                     if platform.system() != "Windows" and not dest.endswith(".h"):
                         try:
-                            os.chmod(tmp_dest, 0o750)
+                            # nosemgrep: python.lang.security.audit.insecure-file-permissions.insecure-file-permissions
+                            os.chmod(tmp_dest, 0o700)
                         except Exception:
                             pass
                     os.replace(tmp_dest, dest)
@@ -279,7 +280,8 @@ class Downloader:
                 if file_size >= min_size:
                     if platform.system() != "Windows" and not dest.endswith(".h"):
                         try:
-                            os.chmod(tmp_dest, 0o750)
+                            # nosemgrep: python.lang.security.audit.insecure-file-permissions.insecure-file-permissions
+                            os.chmod(tmp_dest, 0o700)
                         except Exception:
                             pass
                     os.replace(tmp_dest, dest)

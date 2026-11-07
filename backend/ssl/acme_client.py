@@ -49,24 +49,23 @@ class AcmeClient:
         
         if not url.startswith(('https://', 'http://')):
             raise ValueError(f'Invalid ACME endpoint scheme: {url}')
-        req = urllib.request.Request(url, data=data, headers=headers, method=method)
+        import requests
         try:
-            with urllib.request.urlopen(req, context=ctx, timeout=15) as resp:
-                res_headers = {k.lower(): v for k, v in resp.getheaders()}
-                res_body = resp.read()
-                try:
-                    res_json = json.loads(res_body.decode('utf-8')) if res_body else {}
-                except Exception:
-                    res_json = {"raw": res_body.decode('utf-8', errors='ignore')}
-                return resp.status, res_json, res_headers
-        except urllib.request.HTTPError as e:
-            res_headers = {k.lower(): v for k, v in e.headers.items()}
-            res_body = e.read()
+            resp = requests.request(method=method, url=url, data=data, headers=headers, timeout=15)
+            res_headers = {k.lower(): v for k, v in resp.headers.items()}
             try:
-                res_json = json.loads(res_body.decode('utf-8')) if res_body else {}
+                res_json = resp.json() if resp.content else {}
             except Exception:
-                res_json = {"raw": res_body.decode('utf-8', errors='ignore')}
-            return e.code, res_json, res_headers
+                res_json = {"raw": resp.text}
+            return resp.status_code, res_json, res_headers
+        except requests.HTTPError as e:
+            resp = getattr(e, 'response', None)
+            res_headers = {k.lower(): v for k, v in resp.headers.items()} if resp else {}
+            try:
+                res_json = resp.json() if resp else {}
+            except Exception:
+                res_json = {"raw": resp.text if resp else ""}
+            return resp.status_code if resp else 0, res_json, res_headers
         except Exception as e:
             logging.error(f"[ACME Client] Network error to {url}: {e}")
             return 0, {}, {}

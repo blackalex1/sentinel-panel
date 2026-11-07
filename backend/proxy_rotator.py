@@ -379,7 +379,7 @@ class SocksProxyRotator:
                 target_url,
                 headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Sentinel/1.0"},
                 timeout=3.5,
-                verify=False
+                verify=True
             )
             return resp.text
 

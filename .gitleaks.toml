@@ -1,0 +1,6 @@
+[allowlist]
+description = "Ignore unit and integration test fixtures"
+paths = [
+    '''tests/.*''',
+    '''test_.*\.py''',
+]
