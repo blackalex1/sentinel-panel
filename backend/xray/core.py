@@ -339,19 +339,8 @@ def get_geo_files_info() -> dict:
 
 def ensure_xray_installed():
     """Проверяет наличие Xray, скачивает при необходимости"""
-    need_install = False
-    if not backend.xray.XRAY_BIN_PATH.exists():
-        need_install = True
-    else:
-        try:
-            cmd = [str(backend.xray.XRAY_BIN_PATH), "version"]
-            result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=3)
-            if result.returncode != 0:
-                need_install = True
-        except Exception:
-            need_install = True
-            
-    if need_install:
+    ver = get_installed_xray_version()
+    if ver in ("Not Installed", "Unknown"):
         logging.info("Xray core not found or not working (wrong architecture?). Installing/Updating...")
         try:
             backend.xray.download_xray_core()
@@ -360,30 +349,9 @@ def ensure_xray_installed():
 
 def get_installed_xray_version() -> str:
     """Gets the currently installed version dynamically via sentinel-core."""
-    bin_path = backend.xray.XRAY_BIN_PATH
-    if not bin_path.exists():
-        for alt_name in ["xray", "xray.exe"]:
-            alt = backend.xray.BIN_DIR / alt_name
-            if alt.exists():
-                bin_path = alt
-                break
-        else:
-            return "Not Installed"
     try:
         from backend.sentinel_core_bridge import get_core_version
-        v = get_core_version("xray", str(bin_path))
-        if v and v != "Unknown":
-            return v
+        return get_core_version("xray", str(backend.xray.XRAY_BIN_PATH))
     except Exception as e:
         logging.error(f"Failed to check Xray version via sentinel-core: {e}")
-
-    try:
-        import subprocess, re
-        res = subprocess.run([str(bin_path), "version"], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, timeout=3)
-        m = re.search(r'Xray\s+([v\d\.\-]+)', res.stdout, re.IGNORECASE)
-        if m:
-            v = m.group(1)
-            return v if v.startswith("v") else f"v{v}"
-    except Exception:
-        pass
-    return "Unknown"
+        return "Unknown"

@@ -15,33 +15,12 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(
 
 def get_installed_singbox_version() -> str:
     """Возвращает версию локально установленного ядра sing-box через sentinel-core"""
-    bin_path = SINGBOX_BIN_PATH
-    if not bin_path.exists():
-        for alt_name in ["sing-box", "sing-box.exe", "singbox", "singbox.exe"]:
-            alt = BIN_DIR / alt_name
-            if alt.exists():
-                bin_path = alt
-                break
-        else:
-            return "Not installed"
     try:
         from backend.sentinel_core_bridge import get_core_version
-        v = get_core_version("sing-box", str(bin_path))
-        if v and v != "Unknown":
-            return v
+        return get_core_version("sing-box", str(SINGBOX_BIN_PATH))
     except Exception as e:
         logging.error(f"Error getting installed sing-box version via sentinel-core: {e}")
-
-    try:
-        import subprocess, re
-        res = subprocess.run([str(bin_path), "version"], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, timeout=3)
-        m = re.search(r'sing-box\s+version\s+([v\d\.\-]+)', res.stdout, re.IGNORECASE)
-        if m:
-            v = m.group(1)
-            return v if v.startswith("v") else f"v{v}"
-    except Exception:
-        pass
-    return "Unknown"
+        return "Unknown"
 
 HEADERS = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 SentinelPanel/1.0"}
 

@@ -90,35 +90,12 @@ def get_cores_status() -> Dict[str, Any]:
 
 def get_core_version(core_name: str, bin_path: str) -> str:
     """Detects version string of any installed proxy core via sentinel-core with mtime caching."""
-    if not os.path.exists(bin_path):
-        d = os.path.dirname(bin_path)
-        base = os.path.basename(bin_path).lower()
-        alt_candidates = []
-        if "hysteria" in base:
-            alt_candidates = [
-                os.path.join(d, "hysteria.exe" if sys.platform == "win32" else "hysteria"),
-                os.path.join(d, "hysteria2.exe" if sys.platform == "win32" else "hysteria2"),
-            ]
-        elif "sing-box" in base or "singbox" in base:
-            alt_candidates = [
-                os.path.join(d, "sing-box.exe" if sys.platform == "win32" else "sing-box"),
-            ]
-        elif "xray" in base:
-            alt_candidates = [
-                os.path.join(d, "xray.exe" if sys.platform == "win32" else "xray"),
-            ]
-        for alt in alt_candidates:
-            if os.path.exists(alt):
-                bin_path = alt
-                break
-        else:
-            return "Not Installed"
-
+    # Sentinel-Core Go engine natively resolves aliases (e.g. architecture suffixes) and enforces permissions
     try:
-        mtime = os.path.getmtime(bin_path)
+        mtime = os.path.getmtime(bin_path) if os.path.exists(bin_path) else 0.0
     except Exception:
         mtime = 0.0
-    cache_key = (core_name, bin_path, mtime)
+    cache_key = (core_name, str(bin_path), mtime)
     if cache_key in _CORE_VERSION_CACHE:
         return _CORE_VERSION_CACHE[cache_key]
 
@@ -135,28 +112,5 @@ def get_core_version(core_name: str, bin_path: str) -> str:
         version = res["version"]
         _CORE_VERSION_CACHE[cache_key] = version
         return version
-
-    # Direct binary version execution fallback
-    try:
-        import subprocess, re
-        cmd = [str(bin_path), "version"]
-        proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, timeout=3)
-        out = (proc.stdout or "").strip()
-        for l in out.splitlines():
-            l_trim = l.strip()
-            m = re.search(r'(?:version|xray)?\s*[:\s]?\s*v?(\d+\.\d+(?:\.\d+)?(?:-[a-zA-Z0-9.]+)?)', l_trim, re.IGNORECASE)
-            if m:
-                v = m.group(1)
-                version = 'v' + v if not v.startswith('v') else v
-                _CORE_VERSION_CACHE[cache_key] = version
-                return version
-        m = re.search(r'v?(\d+\.\d+(?:\.\d+)?(?:-[a-zA-Z0-9.]+)?)', out)
-        if m:
-            v = m.group(0)
-            version = v if v.startswith('v') else 'v' + v
-            _CORE_VERSION_CACHE[cache_key] = version
-            return version
-    except Exception as e:
-        logger.debug("Direct binary version execution error: %s", e)
 
     return "Unknown"
