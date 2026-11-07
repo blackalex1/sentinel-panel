@@ -1,3 +1,3 @@
 """Sentinel Control Panel Version Definition."""
 
-PANEL_VERSION = "0.0.3"
+PANEL_VERSION = "0.0.4"
