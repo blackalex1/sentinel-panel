@@ -1,3 +1,26 @@
+
+def extract_ip_from_addr(raw_addr: str):
+    if not raw_addr:
+        return None
+    raw = str(raw_addr).strip()
+    if raw.startswith("[") and "]" in raw:
+        return raw[1:raw.index("]")]
+    if ":" in raw:
+        parts = raw.rsplit(":", 1)
+        try:
+            import ipaddress
+            ipaddress.ip_address(parts[0])
+            return parts[0]
+        except ValueError:
+            pass
+        try:
+            import ipaddress
+            ipaddress.ip_address(raw)
+            return raw
+        except ValueError:
+            pass
+    return raw.strip("[]")
+
 import time
 import logging
 from fastapi import APIRouter, Request
@@ -69,7 +92,7 @@ async def hysteria_client_auth(request: Request, payload: dict, secret: str = No
 
     req_obj = payload.get("req") or {}
     raw_addr = payload.get("addr") or payload.get("ip") or payload.get("client_ip") or req_obj.get("ip") or ""
-    client_ip = raw_addr.split(":")[0].strip() if raw_addr else None
+    client_ip = extract_ip_from_addr(raw_addr)
 
     with backend.database.db_session() as session:
         client = None

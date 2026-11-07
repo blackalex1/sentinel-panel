@@ -31,7 +31,7 @@ def get_routing_presets() -> List[Dict[str, Any]]:
     """Returns available routing presets list directly from sentinel-core."""
     try:
         res = _ffi_call_json("SentinelListPresets")
-        if isinstance(res, list):
+        if isinstance(res, list) and any(p.get("id") == "ipv6" for p in res):
             return res
     except Exception as e:
         logger.debug("FFI get_routing_presets error: %s", e)
@@ -47,7 +47,7 @@ def get_preset_details(preset_id: str) -> Dict[str, Any]:
     """Returns rules and metadata for a specific preset ID."""
     try:
         res = _ffi_call_json("SentinelGetPreset", preset_id)
-        if isinstance(res, dict) and ("rules" in res or "id" in res):
+        if isinstance(res, dict) and (res.get("id") == preset_id or "rules" in res or "ips" in res):
             return res
     except Exception as e:
         logger.debug("FFI get_preset_details error: %s", e)

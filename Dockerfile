@@ -55,13 +55,14 @@ RUN pip install --no-cache-dir --upgrade pip "setuptools>=78.1.1"
 
 # Create unprivileged user (UID 1000) and configure passwordless sudo for network firewall tools
 RUN useradd -u 1000 -m -s /bin/bash appuser && \
-    echo "appuser ALL=(ALL) NOPASSWD: /usr/sbin/iptables, /usr/sbin/nft, /usr/sbin/ip, /sbin/iptables, /sbin/nft, /sbin/ip" > /etc/sudoers.d/appuser && \
+    echo "appuser ALL=(ALL) NOPASSWD: /usr/sbin/iptables, /usr/sbin/ip6tables, /usr/sbin/nft, /usr/sbin/ip, /sbin/iptables, /sbin/ip6tables, /sbin/nft, /sbin/ip" > /etc/sudoers.d/appuser && \
     chmod 0440 /etc/sudoers.d/appuser
 
-# Transparent wrappers for iptables/nft allowing non-root appuser execution
+# Transparent wrappers for iptables/ip6tables/nft allowing non-root appuser execution
 RUN printf '#!/bin/sh\nif [ "$(id -u)" = "0" ]; then exec /usr/sbin/iptables "$@"; else exec sudo /usr/sbin/iptables "$@"; fi\n' > /usr/local/bin/iptables && \
+    printf '#!/bin/sh\nif [ "$(id -u)" = "0" ]; then exec /usr/sbin/ip6tables "$@"; else exec sudo /usr/sbin/ip6tables "$@"; fi\n' > /usr/local/bin/ip6tables && \
     printf '#!/bin/sh\nif [ "$(id -u)" = "0" ]; then exec /usr/sbin/nft "$@"; else exec sudo /usr/sbin/nft "$@"; fi\n' > /usr/local/bin/nft && \
-    chmod +x /usr/local/bin/iptables /usr/local/bin/nft
+    chmod +x /usr/local/bin/iptables /usr/local/bin/ip6tables /usr/local/bin/nft
 
 # Set working directory
 WORKDIR /app

@@ -49,7 +49,9 @@ async def block_ip_api(request: Request, payload: dict = None):
     try:
         if os.name != "nt":
             import subprocess
-            subprocess.run(["iptables", "-I", "INPUT", "-s", ip, "-j", "DROP"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            ip_obj = ipaddress.ip_network(ip, strict=False)
+            fw_tool = "ip6tables" if ip_obj.version == 6 else "iptables"
+            subprocess.run([fw_tool, "-I", "INPUT", "-s", str(ip_obj), "-j", "DROP"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     except Exception as ex:
         logging.error(f"[Block IP API] Error blocking IP via iptables: {ex}")
 
@@ -119,7 +121,9 @@ async def allow_ip_api(request: Request):
     try:
         if os.name != "nt":
             import subprocess
-            subprocess.run(["iptables", "-D", "INPUT", "-s", ip, "-j", "DROP"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            ip_obj = ipaddress.ip_network(ip, strict=False)
+            fw_tool = "ip6tables" if ip_obj.version == 6 else "iptables"
+            subprocess.run([fw_tool, "-D", "INPUT", "-s", str(ip_obj), "-j", "DROP"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     except Exception:
         pass
 

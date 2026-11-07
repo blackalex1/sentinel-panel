@@ -1,5 +1,5 @@
 from urllib.parse import quote
-from backend.links.protocols.utils import get_cert_sha256_fingerprint, get_configured_fingerprint
+from backend.links.protocols.utils import format_endpoint, get_cert_sha256_fingerprint, get_configured_fingerprint
 
 def build_vless_link(inbound: dict, client: dict, host: str, port: int, display_name: str, settings: dict, stream_settings: dict, network: str, security: str, flow: str) -> str:
     uid = client.get('client_uuid_or_pwd') or client.get('id')
@@ -111,7 +111,8 @@ def build_vless_link(inbound: dict, client: dict, host: str, port: int, display_
         params.append(f"mode={mode}")
         
     query = "&".join(params)
-    return f"vless://{uid}@{host}:{port}?{query}#{quote(display_name)}"
+    endpoint = format_endpoint(host, port)
+    return f"vless://{uid}@{endpoint}?{query}#{quote(display_name)}"
 
 
 def build_vless_mihomo_proxy(inbound: dict, client: dict, host: str, port: int, display_name: str, settings: dict, stream_settings: dict, network: str, security: str, flow: str) -> dict:

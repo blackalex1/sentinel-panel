@@ -57,3 +57,11 @@ def get_configured_fingerprint(stream_settings: dict, security_type: str = "real
 
     return str(fp).strip() if fp else "chrome"
 
+
+
+def format_endpoint(host: str, port: int) -> str:
+    """Formats host and port into RFC 3986 compliant host:port string, bracketing IPv6."""
+    h = str(host).strip("[] \t")
+    if ":" in h:
+        return f"[{h}]:{port}"
+    return f"{h}:{port}"

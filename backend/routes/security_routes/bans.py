@@ -60,10 +60,11 @@ async def unban_ip(request: Request, ip: str = Form(None)):
         if os.name != "nt":
             try:
                 import ipaddress
-                ipaddress.ip_address(target_ip)
-                subprocess.run(["iptables", "-D", "INPUT", "-s", target_ip, "-j", "DROP"], capture_output=True)
+                ip_obj = ipaddress.ip_network(target_ip, strict=False)
+                fw_tool = "ip6tables" if ip_obj.version == 6 else "iptables"
+                subprocess.run([fw_tool, "-D", "INPUT", "-s", str(ip_obj), "-j", "DROP"], capture_output=True)
             except Exception as ex:
-                logging.warning(f"Failed to remove IP from iptables: {ex}")
+                logging.warning(f"Failed to remove IP from firewall: {ex}")
             
         return {"success": True, "msg": t("security_ip_unbanned", lang=lang, category="backend", ip=target_ip)}
     return {"success": False, "msg": t("security_ip_not_in_banned_list", lang=lang, category="backend", ip=target_ip)}

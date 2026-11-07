@@ -271,10 +271,11 @@ async def tg_2fa_action(payload: Tg2faActionBody, request: Request):
                 if os.name != "nt":
                     try:
                         import ipaddress
-                        ipaddress.ip_address(client_ip)
-                        subprocess.run(["iptables", "-I", "INPUT", "-s", client_ip, "-j", "DROP"], capture_output=True)
+                        ip_obj = ipaddress.ip_network(client_ip, strict=False)
+                        fw_tool = "ip6tables" if ip_obj.version == 6 else "iptables"
+                        subprocess.run([fw_tool, "-I", "INPUT", "-s", str(ip_obj), "-j", "DROP"], capture_output=True)
                     except Exception as ex:
-                        logging.warning(f"Failed to block IP via iptables: {ex}")
+                        logging.warning(f"Failed to block IP via firewall: {ex}")
                     
             session.commit()
             return {"success": True, "msg": t("two_factor_ip_blocked", lang=lang, category="backend")}

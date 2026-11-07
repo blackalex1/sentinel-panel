@@ -1,3 +1,4 @@
+from backend.links.protocols.utils import format_endpoint
 import base64
 from urllib.parse import quote
 
@@ -6,7 +7,8 @@ def build_shadowsocks_link(inbound: dict, client: dict, host: str, port: int, di
     password = client.get('client_uuid_or_pwd') or client.get('password')
     credentials = f"{method}:{password}"
     b64_credentials = base64.b64encode(credentials.encode('utf-8')).decode('utf-8')
-    return f"ss://{b64_credentials}@{host}:{port}#{quote(display_name)}"
+    endpoint = format_endpoint(host, port)
+    return f"ss://{b64_credentials}@{endpoint}#{quote(display_name)}"
 
 
 def build_shadowsocks_mihomo_proxy(inbound: dict, client: dict, host: str, port: int, display_name: str, settings: dict) -> dict:

@@ -1,5 +1,5 @@
 from urllib.parse import quote
-from backend.links.protocols.utils import get_cert_sha256_fingerprint, is_ip
+from backend.links.protocols.utils import format_endpoint, get_cert_sha256_fingerprint, is_ip
 
 def get_hysteria2_cert_path(inbound: dict, stream_settings: dict, sni: str) -> str:
     hysteria_opts = stream_settings.get('hysteria', {})
@@ -74,7 +74,8 @@ def build_hysteria2_link(inbound: dict, client: dict, host: str, port: int, disp
     query = "&".join(params)
     username = quote(client_email, safe='')
     encoded_password = quote(password, safe='')
-    return f"hysteria2://{username}:{encoded_password}@{host}:{port}?{query}#{quote(display_name)}"
+    endpoint = format_endpoint(host, port)
+    return f"hysteria2://{username}:{encoded_password}@{endpoint}?{query}#{quote(display_name)}"
 
 
 def build_hysteria2_mihomo_proxy(inbound: dict, client: dict, host: str, port: int, display_name: str, stream_settings: dict, client_email: str) -> dict:

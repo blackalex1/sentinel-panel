@@ -1,5 +1,5 @@
 from urllib.parse import quote
-from backend.links.protocols.utils import get_cert_sha256_fingerprint, get_configured_fingerprint
+from backend.links.protocols.utils import format_endpoint, get_cert_sha256_fingerprint, get_configured_fingerprint
 
 def build_trojan_link(inbound: dict, client: dict, host: str, port: int, display_name: str, settings: dict, stream_settings: dict, network: str, security: str) -> str:
     password = client.get('client_uuid_or_pwd') or client.get('password')
@@ -101,7 +101,8 @@ def build_trojan_link(inbound: dict, client: dict, host: str, port: int, display
             params.append(f"xver={mux_xver}")
 
     query = "&".join(params)
-    return f"trojan://{password}@{host}:{port}?{query}#{quote(display_name)}"
+    endpoint = format_endpoint(host, port)
+    return f"trojan://{password}@{endpoint}?{query}#{quote(display_name)}"
 
 
 def build_trojan_mihomo_proxy(inbound: dict, client: dict, host: str, port: int, display_name: str, settings: dict, stream_settings: dict, network: str, security: str) -> dict:
