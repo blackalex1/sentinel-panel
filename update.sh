@@ -37,6 +37,22 @@ export GIT_ASKPASS=""
 if [ -z "${BOOTSTRAPPED:-}" ] && [ -d .git ] && command -v git &>/dev/null; then
     OLD_HEAD=$(git rev-parse HEAD 2>/dev/null || true)
     
+    # Detect current branch dynamically (fallback to main)
+    BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "main")
+    if [ -z "$BRANCH" ] || [ "$BRANCH" = "HEAD" ]; then
+        BRANCH="main"
+    fi
+
+    # Resolve HTTPS repository URL (convert git@github.com:... to https://...)
+    ORIGIN_URL=$(git config --get remote.origin.url 2>/dev/null || true)
+    REPO_HTTPS="$ORIGIN_URL"
+    if [[ "$ORIGIN_URL" =~ ^git@github\.com:(.+)$ ]]; then
+        REPO_HTTPS="https://github.com/${BASH_REMATCH[1]}"
+    fi
+    if [ -z "$REPO_HTTPS" ]; then
+        REPO_HTTPS="https://github.com/blackalex1/sentinel-panel.git"
+    fi
+
     # Check for proxy configuration in .env
     FETCH_ARGS=(-c "safe.directory=*" -c "core.askPass=true" -c "credential.helper=" -c "http.connectTimeout=4" -c "http.timeout=8")
     for env_f in "bot/config/.env" "config/.env" ".env"; do
@@ -49,23 +65,40 @@ if [ -z "${BOOTSTRAPPED:-}" ] && [ -d .git ] && command -v git &>/dev/null; then
         fi
     done
 
-    FETCH_OK=0
-    if timeout 10 git "${FETCH_ARGS[@]}" fetch origin main 2>/dev/null; then
-        FETCH_OK=1
-    elif timeout 10 git -c "safe.directory=*" -c "core.askPass=true" -c "credential.helper=" -c "http.proxy=" -c "https.proxy=" fetch origin main 2>/dev/null; then
-        FETCH_OK=1
+    # Multi-mirror fallback list (HTTPS repo -> CDN mirrors -> origin)
+    FETCH_SOURCES=()
+    if [ -n "$ORIGIN_URL" ] && [[ ! "$ORIGIN_URL" =~ ^git@ ]]; then
+        FETCH_SOURCES+=("origin")
     fi
+    FETCH_SOURCES+=("$REPO_HTTPS" "https://gh-proxy.com/$REPO_HTTPS" "https://ghfast.top/$REPO_HTTPS")
+    if [[ "$ORIGIN_URL" =~ ^git@ ]]; then
+        FETCH_SOURCES+=("origin")
+    fi
+
+    FETCH_OK=0
+    for src in "${FETCH_SOURCES[@]}"; do
+        if timeout 10 git "${FETCH_ARGS[@]}" fetch "$src" "$BRANCH" 2>/dev/null; then
+            FETCH_OK=1
+            break
+        elif timeout 10 git -c "safe.directory=*" -c "core.askPass=true" -c "credential.helper=" -c "http.proxy=" -c "https.proxy=" fetch "$src" "$BRANCH" 2>/dev/null; then
+            FETCH_OK=1
+            break
+        fi
+    done
 
     if [ "$FETCH_OK" -eq 1 ]; then
         git reset --hard FETCH_HEAD 2>/dev/null || true
     fi
     NEW_HEAD=$(git rev-parse HEAD 2>/dev/null || true)
     if [ -n "$OLD_HEAD" ] && [ -n "$NEW_HEAD" ] && [ "$OLD_HEAD" != "$NEW_HEAD" ]; then
-        echo -e "\033[0;32m[✔]\033[0m Скрипт обновления обновлен из Git (${OLD_HEAD:0:7} -> ${NEW_HEAD:0:7})."
         export SENTINEL_OLD_HEAD="$OLD_HEAD"
         export SENTINEL_NEW_HEAD="$NEW_HEAD"
-        export BOOTSTRAPPED=1
-        exec bash "$0" "$@"
+        UPDATER_CHANGED=$(git diff --name-only "$OLD_HEAD" "$NEW_HEAD" -- update.sh updater/ 2>/dev/null || true)
+        if [ -n "$UPDATER_CHANGED" ]; then
+            echo -e "\033[0;32m[✔]\033[0m Обнаружены изменения в скрипте обновления (${OLD_HEAD:0:7} -> ${NEW_HEAD:0:7}). Перезапуск скрипта..."
+            export BOOTSTRAPPED=1
+            exec bash "$0" "$@"
+        fi
     fi
 fi
 

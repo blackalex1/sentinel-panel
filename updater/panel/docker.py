@@ -1,4 +1,4 @@
-"""Docker Compose & Database Volume Migration Manager for Sentinel Panel."""
+"""Docker Compose Manager for Sentinel Panel."""
 
 from __future__ import annotations
 
@@ -28,7 +28,7 @@ from ..core.common import (
 
 
 class DockerManager:
-    """Manages process cleanup, PostgreSQL volume migration, and Docker Compose rebuilding."""
+    """Manages container lifecycle, BuildKit caching, and zero/minimal-downtime updates."""
 
     def __init__(self, project_dir: str, proxy_url: Optional[str] = None) -> None:
         self.project_dir = project_dir
@@ -60,38 +60,6 @@ class DockerManager:
         except Exception:
             pass
 
-    def migrate_database_volumes(self) -> None:
-        """Migrates legacy spectre-panel_pgdata volume to sentinel-panel_pgdata with compose labels."""
-        try:
-            volumes_out = run_command(["docker", "volume", "ls", "-q"], capture=True, check=False).stdout.strip().splitlines()
-            has_old = "spectre-panel_pgdata" in volumes_out
-            has_new = "sentinel-panel_pgdata" in volumes_out
-
-            if has_old and not has_new:
-                log_warn("Обнаружен том базы данных старой версии (spectre-panel_pgdata). Миграция в sentinel-panel_pgdata...")
-                run_command(
-                    [
-                        "docker", "volume", "create",
-                        "--label", "com.docker.compose.project=sentinel-panel",
-                        "--label", "com.docker.compose.volume=pgdata",
-                        "sentinel-panel_pgdata",
-                    ],
-                    check=True,
-                )
-
-                run_command(
-                    [
-                        "docker", "run", "--rm",
-                        "-v", "spectre-panel_pgdata:/from",
-                        "-v", "sentinel-panel_pgdata:/to",
-                        "alpine", "ash", "-c", "cp -a /from/. /to/",
-                    ],
-                    check=True,
-                )
-                log_success("Миграция данных PostgreSQL в sentinel-panel_pgdata успешно завершена!")
-        except Exception as e:
-            log_warn(f"Пропуск автоматической миграции томов Docker: {e}")
-
     def cleanup_build_artifacts(self) -> None:
         """Removes dangling images and stale BuildKit cache after building."""
         log_info("Очистка неиспользуемых слоев и кэша сборщика Docker...")
@@ -104,34 +72,20 @@ class DockerManager:
         try:
             # 2. Удаление висячего кэша сборщика BuildKit
             run_command(["docker", "builder", "prune", "-f"], check=False)
-            # 3. Удаление всех неиспользуемых слоев кэша сборщика старше 24 часов
-            run_command(["docker", "builder", "prune", "-a", "-f", "--filter", "until=24h"], check=False)
+            # 3. Удаление всех неиспользуемых слоев кэша сборщика старше 7 дней (168 часов)
+            run_command(["docker", "builder", "prune", "-a", "-f", "--filter", "until=168h"], check=False)
         except Exception as e:
             log_warn(f"Не удалось выполнить docker builder prune: {e}")
 
     def rebuild_and_restart(self) -> bool:
-        """Rebuilds and restarts all Docker containers."""
+        """Rebuilds Docker image in background and performs zero/minimal-downtime swap."""
         if not shutil.which("docker"):
             log_error("Docker не установлен на системе.")
             return False
 
         compose_cmd = self._get_compose_cmd()
 
-        log_info("Остановка предыдущих контейнеров Docker...")
-        try:
-            run_command(compose_cmd + ["down", "--remove-orphans"], cwd=self.project_dir, check=False)
-            run_command(compose_cmd + ["-p", "spectre-panel", "down", "--remove-orphans"], cwd=self.project_dir, check=False)
-            # Remove any lingering containers with conflicting fixed names from prior installs
-            for cname in ("sentinel-db", "sentinel-panel", "spectre-panel", "spectre-db"):
-                run_command(["docker", "rm", "-f", cname], check=False)
-        except Exception:
-            pass
-
-        self.cleanup_conflicting_processes()
-        self.migrate_database_volumes()
-
-        log_info("Сборка и запуск контейнеров панели (docker compose up -d --build)...")
-
+        # 1. Setup build environment and proxy if available
         docker_env: Dict[str, str] = {}
         if self.proxy_url:
             p_url = self.proxy_url
@@ -158,24 +112,52 @@ class DockerManager:
             else:
                 log_info(f"Прокси {p_url} не отвечает или закрыт, сборка Docker будет выполнена напрямую.")
 
+        # 2. Phase 1: Background Build while existing container continues serving traffic
+        log_info("Сборка обновленного Docker-образа (панель продолжает работу без даунтайма)...")
+        build_cmd = compose_cmd + ["build", "sentinel-panel"]
+        build_success = False
+
         try:
-            run_command(compose_cmd + ["up", "-d", "--build"], cwd=self.project_dir, env=docker_env if docker_env else None, check=True)
-            log_success("Контейнеры Docker успешно собраны и запущены!")
-            self.cleanup_build_artifacts()
-            return True
+            run_command(build_cmd, cwd=self.project_dir, env=docker_env if docker_env else None, check=True)
+            build_success = True
         except Exception as e:
             if docker_env:
                 log_warn(f"Сборка Docker через прокси завершилась с ошибкой ({e}). Повтор напрямую...")
                 try:
-                    run_command(compose_cmd + ["up", "-d", "--build"], cwd=self.project_dir, env=None, check=True)
-                    log_success("Контейнеры Docker успешно собраны и запущены (напрямую)!")
-                    self.cleanup_build_artifacts()
-                    return True
+                    run_command(build_cmd, cwd=self.project_dir, env=None, check=True)
+                    build_success = True
                 except Exception as e_direct:
-                    log_error(f"Ошибка запуска Docker Compose: {e_direct}")
+                    log_error(f"Ошибка сборки Docker Compose напрямую: {e_direct}")
+                    log_warn("Предыдущая версия панели не останавливалась и продолжает работать.")
                     return False
-            log_error(f"Ошибка запуска Docker Compose: {e}")
+            else:
+                log_error(f"Ошибка сборки Docker Compose: {e}")
+                log_warn("Предыдущая версия панели не останавливалась и продолжает работать.")
+                return False
+
+        if not build_success:
             return False
+
+        log_success("Новый Docker-образ успешно собран!")
+
+        # 4. Phase 2: Instant swap to newly built image (downtime: ~1-2 seconds)
+        log_info("Переключение на новую версию контейнера (docker compose up -d)...")
+        try:
+            run_command(compose_cmd + ["up", "-d", "--remove-orphans"], cwd=self.project_dir, check=True)
+            log_success("Контейнеры Docker успешно запущены с минимальным даунтаймом!")
+            self.cleanup_build_artifacts()
+            return True
+        except Exception as e_up:
+            log_warn(f"Быстрое переключение завершилось с предупреждением: {e_up}. Попытка восстановления...")
+            try:
+                self.cleanup_conflicting_processes()
+                run_command(compose_cmd + ["up", "-d", "--force-recreate", "--remove-orphans"], cwd=self.project_dir, check=True)
+                log_success("Контейнеры Docker успешно запущены (восстановлено)!")
+                self.cleanup_build_artifacts()
+                return True
+            except Exception as e_retry:
+                log_error(f"Критическая ошибка запуска Docker Compose: {e_retry}")
+                return False
 
     def stream_live_logs(self) -> None:
         """Attaches to live container log stream until interrupted by user (Ctrl+C)."""

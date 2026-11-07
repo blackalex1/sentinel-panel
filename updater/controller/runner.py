@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import os
+import shutil
 import signal
 import subprocess
 import sys
@@ -24,6 +25,7 @@ from ..core.common import (
     log_step,
     log_success,
     log_warn,
+    run_command,
 )
 from ..core.git import GitManager
 from ..core.network import NetworkManager
@@ -101,12 +103,37 @@ class ControllerRunner:
         elif not self.skip_git and not self.bootstrapped:
             updated = git_mgr.update_codebase(silent_if_uptodate=False)
             if updated:
-                log_info("Кодовая база обновлена. Перезапуск обновленного скрипта...")
-                new_argv = [sys.executable, "-m", "updater.main", "--bootstrapped"]
-                for a in sys.argv[1:]:
-                    if a not in ("--bootstrapped",):
-                        new_argv.append(a)
-                os.execv(sys.executable, new_argv)
+                old_c = git_mgr.last_old_commit
+                new_c = git_mgr.last_new_commit
+                if old_c:
+                    os.environ["SENTINEL_OLD_HEAD"] = old_c
+                if new_c:
+                    os.environ["SENTINEL_NEW_HEAD"] = new_c
+
+                # Check if updater logic itself (update.sh or updater/) was modified
+                updater_diff = ""
+                if old_c and new_c and old_c != new_c:
+                    updater_diff = run_command(
+                        ["git", "-c", "safe.directory=*", "diff", "--name-only", f"{old_c}..{new_c}", "--", "update.sh", "updater/"],
+                        cwd=self.project_dir,
+                        capture=True,
+                        check=False,
+                    ).stdout.strip()
+
+                if updater_diff:
+                    log_info("Обнаружены изменения в самом скрипте обновления. Перезапуск...")
+                    os.environ["BOOTSTRAPPED"] = "1"
+                    pass_args = [a for a in sys.argv[1:] if a not in ("--bootstrapped", "")]
+                    update_sh = os.path.join(self.project_dir, "update.sh")
+                    bash_bin = shutil.which("bash") or "/bin/bash"
+
+                    if os.path.isfile(update_sh) and shutil.which("bash") and sys.platform != "win32":
+                        os.execv(bash_bin, ["bash", update_sh, "--bootstrapped"] + pass_args)
+                    else:
+                        new_argv = [sys.executable, "-m", "updater.main", "--bootstrapped"] + pass_args
+                        os.execv(sys.executable, new_argv)
+                else:
+                    log_success("Кодовая база приложения обновлена. Продолжение процесса...")
         else:
             log_success("Кодовая база актуальна (Up to date).")
             git_mgr.display_changelog(max_commits=3)

@@ -32,6 +32,8 @@ class GitManager:
         self.project_dir = project_dir
         self.repo_url = repo_url
         self.proxy_url = proxy_url
+        self.last_old_commit: str = ""
+        self.last_new_commit: str = ""
 
     def _get_candidate_remotes(self) -> List[str]:
         """Builds a list of fetch sources including official URL and CDN mirrors."""
@@ -97,6 +99,7 @@ class GitManager:
         old_commit = ""
         try:
             old_commit = run_command(["git", "rev-parse", "HEAD"], cwd=self.project_dir, capture=True, check=False).stdout.strip()
+            self.last_old_commit = old_commit
         except Exception:
             pass
 
@@ -131,6 +134,7 @@ class GitManager:
         new_commit = ""
         try:
             new_commit = run_command(["git", "rev-parse", "HEAD"], cwd=self.project_dir, capture=True, check=False).stdout.strip()
+            self.last_new_commit = new_commit
         except Exception:
             pass
 
