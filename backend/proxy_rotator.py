@@ -372,16 +372,34 @@ class SocksProxyRotator:
         loop = asyncio.get_running_loop()
 
         def _fetch_url(target_url: str) -> str:
-            if not target_url.startswith(("https://", "http://")):
-                return ""
+            candidates = [target_url]
+            if "raw.githubusercontent.com/" in target_url:
+                parts = target_url.split("raw.githubusercontent.com/", 1)[1].split("/", 2)
+                if len(parts) == 3:
+                    user, repo, branch_path = parts[0], parts[1], parts[2]
+                    branch, path = branch_path.split("/", 1) if "/" in branch_path else (branch_path, "")
+                    candidates.append(f"https://fastly.jsdelivr.net/gh/{user}/{repo}@{branch}/{path}")
+                    candidates.append(f"https://cdn.jsdelivr.net/gh/{user}/{repo}@{branch}/{path}")
+            candidates.extend([
+                f"https://ghfast.top/{target_url}",
+                f"https://gh-proxy.com/{target_url}",
+            ])
             import requests
-            resp = requests.get(
-                target_url,
-                headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Sentinel/1.0"},
-                timeout=3.5,
-                verify=True
-            )
-            return resp.text
+            for cand in candidates:
+                try:
+                    if not cand.startswith(("https://", "http://")):
+                        continue
+                    resp = requests.get(
+                        cand,
+                        headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Sentinel/1.0"},
+                        timeout=3.5,
+                        verify=True
+                    )
+                    if resp.status_code == 200 and len(resp.text) > 10:
+                        return resp.text
+                except Exception:
+                    continue
+            return ""
 
         try:
             content = await loop.run_in_executor(None, _fetch_url, base_url)

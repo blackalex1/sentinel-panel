@@ -376,7 +376,8 @@ class NetworkManager:
                     print(f"    {DARK_GRAY}{line_str}{RESET}", flush=True)
             elif self.rotator_proc.poll() is not None:
                 log_warn("Процесс ротатора завершился до установления соединения. Продолжение через зеркала...")
-                break
+                self.cleanup()
+                return None
 
             time.sleep(0.05)
 

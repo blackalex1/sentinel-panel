@@ -280,13 +280,26 @@ class SocksProxyRotator:
     async def _fetch_single_source(self, base_url: str) -> str:
         """Скачивает файл подписки, параллельно опрашивая все CDN-зеркала и возвращая самый быстрый ответ."""
         loop = asyncio.get_running_loop()
-        prefixes = ["https://gh-proxy.com/", "https://ghfast.top/", "https://gh.ddlc.top/"]
+
+        candidates = [base_url]
+        if "raw.githubusercontent.com/" in base_url:
+            parts = base_url.split("raw.githubusercontent.com/", 1)[1].split("/", 2)
+            if len(parts) == 3:
+                user, repo, branch_path = parts[0], parts[1], parts[2]
+                branch, path = branch_path.split("/", 1) if "/" in branch_path else (branch_path, "")
+                candidates.append(f"https://fastly.jsdelivr.net/gh/{user}/{repo}@{branch}/{path}")
+                candidates.append(f"https://cdn.jsdelivr.net/gh/{user}/{repo}@{branch}/{path}")
+        candidates.extend([
+            f"https://ghfast.top/{base_url}",
+            f"https://gh-proxy.com/{base_url}",
+            f"https://mirror.ghproxy.com/{base_url}",
+        ])
 
         def _fetch_from_mirror(mirror_url: str) -> str:
             if shutil.which("curl"):
-                cmd = ["curl", "-fsSL", "-k", "--connect-timeout", "2", "--max-time", "3", mirror_url]
+                cmd = ["curl", "-fsSL", "-k", "--connect-timeout", "4", "--max-time", "6", mirror_url]
                 try:
-                    res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, timeout=3.5)
+                    res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, timeout=7.0)
                     if res.returncode == 0 and res.stdout and len(res.stdout) > 20:
                         return res.stdout.decode("utf-8", errors="ignore")
                 except Exception:
@@ -296,17 +309,17 @@ class SocksProxyRotator:
                 if not mirror_url.startswith(('https://', 'http://')):
                     return ""
                 import requests
-                resp = requests.get(mirror_url, headers={"User-Agent": "Mozilla/5.0 Sentinel/1.0"}, timeout=2.0)
+                resp = requests.get(mirror_url, headers={"User-Agent": "Mozilla/5.0 Sentinel/1.0"}, timeout=4.0)
                 if resp.status_code == 200 and len(resp.text) > 20:
                     return resp.text
             except Exception:
                 pass
             return ""
 
-        async def _async_probe(pref: str) -> str:
-            return await loop.run_in_executor(None, _fetch_from_mirror, f"{pref}{base_url}")
+        async def _async_probe(candidate_url: str) -> str:
+            return await loop.run_in_executor(None, _fetch_from_mirror, candidate_url)
 
-        tasks = [_async_probe(p) for p in prefixes]
+        tasks = [_async_probe(c) for c in candidates]
         for coro in asyncio.as_completed(tasks):
             try:
                 content = await coro
@@ -346,7 +359,7 @@ class SocksProxyRotator:
             target_host=target_host,
             target_port=443,
             use_tls=True,
-            timeout_ms=1800,
+            timeout_ms=3500,
             concurrency=32,
         )
 
