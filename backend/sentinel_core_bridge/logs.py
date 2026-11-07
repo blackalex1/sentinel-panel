@@ -77,6 +77,10 @@ def find_xray_client_email(
     max_age_sec: int = 300
 ) -> tuple[Optional[str], Optional[str], Optional[str]]:
     """Searches Xray/Sing-box log lines for client email, IP, and inbound tag via sentinel-core."""
+    if dst_ip:
+        dst_ip = dst_ip.replace("[", "").replace("]", "").strip()
+    if client_ip:
+        client_ip = client_ip.replace("[", "").replace("]", "").strip()
     import json
     lines_json = json.dumps(lines)
     try:
@@ -108,6 +112,8 @@ def find_hysteria_client_email(
     max_age_sec: int = 300
 ) -> Optional[str]:
     """Searches Hysteria 2 log lines for client user/email via sentinel-core."""
+    if dst_ip:
+        dst_ip = dst_ip.replace("[", "").replace("]", "").strip()
     import json
     lines_json = json.dumps(lines)
     try:

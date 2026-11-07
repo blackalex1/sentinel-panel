@@ -27,6 +27,11 @@ async def client_by_connection(
     if not check_auth(request):
         return decoy_response()
         
+    if dst_ip:
+        dst_ip = dst_ip.strip("[] '\"")
+    if client_ip:
+        client_ip = client_ip.strip("[] '\"")
+
     # 1. Hysteria 2: query in-memory core logs (last 45s)
     hys_lines = get_in_memory_core_logs("hysteria", 500)
     if hys_lines:

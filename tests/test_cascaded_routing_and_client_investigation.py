@@ -168,3 +168,97 @@ def test_api_client_by_connection_cascaded_and_direct(client, monkeypatch):
     assert res4.status_code == 200
     data4 = res4.json()
     assert data4["success"] is False, "Отключенный клиент должен игнорироваться, чтобы не вызывать зацикливания"
+
+
+def test_three_server_cascaded_investigation_ipv4_to_ipv6(client, monkeypatch):
+    """
+    Тестирует расследование в 3-уровневом каскаде:
+    - Сервер 1 (LXC Gateway) -> подключается к Серверу 2 по IPv4 (198.51.100.20:443)
+    - Сервер 2 (Transit Relay) -> подключается к Серверу 3 по IPv6 ([2001:db8:2000::3]:8443)
+    - Сервер 3 (Exit VPS) -> клиент совершает обращение на sensitive port 22 ([2001:db8:bad:c0de::1]:22)
+    Проверяем пошаговую атрибуцию через эндпоинт /api/security/client-by-connection от Сервера 3 к Серверу 1.
+    """
+    import backend.routes.security_routes.management as mgmt
+    monkeypatch.setattr(mgmt, "check_auth", lambda r: True)
+
+    now_str_xray = time.strftime("%Y/%m/%d %H:%M:%S")
+    now_str_iso = time.strftime("%Y-%m-%dT%H:%M:%SZ")
+    target_ipv6 = "2001:db8:bad:c0de::1"
+    target_port = 22
+
+    with db_session() as session:
+        session.query(ClientStats).delete()
+        session.query(Inbound).delete()
+        session.commit()
+
+        ib1 = Inbound(remark="Gateway Inbound", port=10443, protocol="vless", core="xray", enable=1)
+        ib2 = Inbound(remark="Relay Inbound", port=20443, protocol="vless", core="xray", enable=1)
+        ib3 = Inbound(remark="Exit Inbound", port=30443, protocol="hysteria", core="hysteria", enable=1)
+        session.add_all([ib1, ib2, ib3])
+        session.flush()
+
+        # Сервер 1: реальный клиент
+        c_attacker = ClientStats(inbound_id=ib1.id, email="attacker_v4_v6@corp.lan", client_uuid_or_pwd="pwd1", enable=1)
+        # Сервер 2: транзитный аккаунт Сервера 1
+        c_tunnel_s1 = ClientStats(inbound_id=ib2.id, email="server1_transit_tunnel@corp.lan", client_uuid_or_pwd="pwd2", enable=1)
+        # Сервер 3: транзитный аккаунт Сервера 2 и невиновный клиент
+        c_tunnel_s2 = ClientStats(inbound_id=ib3.id, email="server2_transit_tunnel@corp.lan", client_uuid_or_pwd="pwd3", enable=1)
+        c_innocent = ClientStats(inbound_id=ib3.id, email="innocent_v6_client@corp.lan", client_uuid_or_pwd="pwd4", enable=1)
+
+        session.add_all([c_attacker, c_tunnel_s1, c_tunnel_s2, c_innocent])
+        session.commit()
+
+    # Имитируем логи всех 3 серверов
+    s1_logs = [
+        f"{now_str_xray} [info] 198.51.100.42:51234 accepted tcp:[{target_ipv6}]:{target_port} [vless-in >> out-s2-v4] email: attacker_v4_v6@corp.lan",
+    ]
+    s2_logs = [
+        f'{{"time":"{now_str_iso}","auth":"server1_transit_tunnel@corp.lan","addr":"198.51.100.10:45123"}}',
+        f'{{"time":"{now_str_iso}","id":"server1_transit_tunnel@corp.lan","reqAddr":"[{target_ipv6}]:{target_port}"}}',
+    ]
+    s3_logs = [
+        f'{{"time":"{now_str_iso}","auth":"server2_transit_tunnel@corp.lan","addr":"[2001:db8:2000::2]:52341"}}',
+        f'{{"time":"{now_str_iso}","id":"server2_transit_tunnel@corp.lan","reqAddr":"[{target_ipv6}]:{target_port}"}}',
+        f'{{"time":"{now_str_iso}","id":"innocent_v6_client@corp.lan","reqAddr":"[2001:db8:good::1]:443"}}',
+    ]
+
+    current_logs = {"xray": [], "hysteria": []}
+    def mock_get_logs(core, limit=500):
+        return current_logs.get(core, [])
+
+    monkeypatch.setattr("backend.routes.security_routes.management.get_in_memory_core_logs", mock_get_logs)
+
+    # 1. Расследование на Сервере 3 (Exit VPS)
+    current_logs["hysteria"] = s3_logs
+    current_logs["xray"] = []
+    res3 = client.get(f"/api/security/client-by-connection?dst_ip={target_ipv6}&port={target_port}")
+    assert res3.status_code == 200
+    data3 = res3.json()
+    assert data3["success"] is True
+    assert data3["email"] == "server2_transit_tunnel@corp.lan"
+    assert data3["client_ip"] == "2001:db8:2000::2"  # IPv6-адрес Сервера 2
+
+    # 2. Расследование на Сервере 2 (Intermediate Relay)
+    current_logs["hysteria"] = s2_logs
+    current_logs["xray"] = []
+    res2 = client.get(f"/api/security/client-by-connection?dst_ip={target_ipv6}&port={target_port}")
+    assert res2.status_code == 200
+    data2 = res2.json()
+    assert data2["success"] is True
+    assert data2["email"] == "server1_transit_tunnel@corp.lan"
+    assert data2["client_ip"] == "198.51.100.10"  # IPv4-адрес Сервера 1
+
+    # 3. Расследование на Сервере 1 (Home Gateway / Origin)
+    current_logs["hysteria"] = []
+    current_logs["xray"] = s1_logs
+    res1 = client.get(f"/api/security/client-by-connection?dst_ip={target_ipv6}&port={target_port}")
+    assert res1.status_code == 200
+    data1 = res1.json()
+    assert data1["success"] is True
+    assert data1["email"] == "attacker_v4_v6@corp.lan"  # Истинный клиент!
+    assert data1["client_ip"] == "198.51.100.42"
+
+    # 4. Проверка с квадратными скобками [2001:db8:bad:c0de::1]
+    res1_bracket = client.get(f"/api/security/client-by-connection?dst_ip=[{target_ipv6}]&port={target_port}")
+    assert res1_bracket.status_code == 200
+    assert res1_bracket.json()["email"] == "attacker_v4_v6@corp.lan"
