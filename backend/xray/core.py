@@ -360,13 +360,30 @@ def ensure_xray_installed():
 
 def get_installed_xray_version() -> str:
     """Gets the currently installed version dynamically via sentinel-core."""
-    if not backend.xray.XRAY_BIN_PATH.exists():
-        return "Not Installed"
+    bin_path = backend.xray.XRAY_BIN_PATH
+    if not bin_path.exists():
+        for alt_name in ["xray", "xray.exe"]:
+            alt = backend.xray.BIN_DIR / alt_name
+            if alt.exists():
+                bin_path = alt
+                break
+        else:
+            return "Not Installed"
     try:
         from backend.sentinel_core_bridge import get_core_version
-        v = get_core_version("xray", str(backend.xray.XRAY_BIN_PATH))
+        v = get_core_version("xray", str(bin_path))
         if v and v != "Unknown":
             return v
     except Exception as e:
         logging.error(f"Failed to check Xray version via sentinel-core: {e}")
+
+    try:
+        import subprocess, re
+        res = subprocess.run([str(bin_path), "version"], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, timeout=3)
+        m = re.search(r'Xray\s+([v\d\.\-]+)', res.stdout, re.IGNORECASE)
+        if m:
+            v = m.group(1)
+            return v if v.startswith("v") else f"v{v}"
+    except Exception:
+        pass
     return "Unknown"

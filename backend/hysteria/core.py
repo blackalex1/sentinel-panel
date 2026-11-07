@@ -267,15 +267,45 @@ def ensure_hysteria_installed():
 
 def get_installed_hysteria_version() -> str:
     """Runs version check to get the currently installed version dynamically via sentinel-core."""
-    if not backend.hysteria.HYSTERIA_BIN_PATH.exists():
-        return "Not Installed"
+    bin_path = backend.hysteria.HYSTERIA_BIN_PATH
+    if not bin_path.exists():
+        for alt_name in [
+            "hysteria", "hysteria.exe", "hysteria2", "hysteria2.exe",
+            f"hysteria-linux-{_get_bin_suffix()}", f"hysteria-windows-{_get_bin_suffix()}.exe"
+        ]:
+            alt = backend.hysteria.BIN_DIR / alt_name
+            if alt.exists():
+                bin_path = alt
+                backend.hysteria.HYSTERIA_BIN_PATH = alt
+                break
+        else:
+            return "Not Installed"
     try:
         from backend.sentinel_core_bridge import get_core_version
-        v = get_core_version("hysteria2", str(backend.hysteria.HYSTERIA_BIN_PATH))
+        v = get_core_version("hysteria2", str(bin_path))
         if v and v != "Unknown":
             return v
     except Exception as e:
         logging.error(f"Error getting hysteria2 version via sentinel-core: {e}")
+
+    try:
+        import subprocess, re
+        cmd = [str(bin_path), "version"]
+        res = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, timeout=3)
+        out = (res.stdout or "").strip()
+        for l in out.splitlines():
+            l_trim = l.strip()
+            m = re.search(r'(?:version)?\s*[:\s]?\s*v?(\d+\.\d+(?:\.\d+)?(?:-[a-zA-Z0-9.]+)?)', l_trim, re.IGNORECASE)
+            if m:
+                v = m.group(1)
+                return 'v' + v if not v.startswith('v') else v
+        m = re.search(r'v?(\d+\.\d+(?:\.\d+)?(?:-[a-zA-Z0-9.]+)?)', out)
+        if m:
+            v = m.group(0)
+            return v if v.startswith('v') else 'v' + v
+    except Exception:
+        pass
+
     return "Unknown"
 
 def generate_self_signed_cert(force: bool = False):
