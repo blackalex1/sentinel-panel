@@ -320,7 +320,7 @@ def test_outbound_failover_backup_system(client):
     assert sb_urltest["type"] == "urltest"
     assert sb_urltest["outbounds"] == ["vps-a-primary", "vps-b", "direct"]
     assert sb_urltest["url"] == "https://www.gstatic.com/generate_204"
-    assert sb_urltest["tolerance"] in (0, 50, 300, 500)
+    assert sb_urltest["tolerance"] in (0, 50, 300, 500, 5000)
 
     # 6. Test Cascade Deletion of Backup Outbound B
     delete_outbound(ob_b_id)

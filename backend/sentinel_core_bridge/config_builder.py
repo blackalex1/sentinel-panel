@@ -353,9 +353,17 @@ def compile_node_server_config(target_core: str) -> Dict[str, Any]:
         
         # DNS Configuration resolution
         dns_preset = (get_setting("dns_preset") or "google").lower()
+        if dns_preset not in ("cloudflare", "google", "adguard", "yandex", "custom"):
+            dns_preset = "google"
         dns_remote = get_setting("dns_remote_server") or ""
+        if dns_remote == "false":
+            dns_remote = ""
         dns_direct = get_setting("dns_direct_server") or ""
-        dns_strategy = get_setting("dns_strategy") or "ipv4_only"
+        if dns_direct == "false":
+            dns_direct = ""
+        dns_strategy = get_setting("dns_strategy")
+        if dns_strategy not in ("prefer_ipv4", "prefer_ipv6", "ipv4_only", "ipv6_only"):
+            dns_strategy = "ipv4_only"
         dns_custom = get_setting("dns_custom_servers") or ""
 
         # Default direct DNS for server/local resolution should always be standard UDP (8.8.8.8)

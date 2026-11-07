@@ -102,7 +102,9 @@ def generate_hysteria_config(inbound_id: int, port: int, clients: list, stream_s
         dns_preset = (get_setting("dns_preset") or "google").lower()
         dns_remote = get_setting("dns_remote_server") or ""
         dns_direct = get_setting("dns_direct_server") or ""
-        dns_strategy = get_setting("dns_strategy") or "ipv4_only"
+        dns_strategy = get_setting("dns_strategy")
+        if dns_strategy not in ("prefer_ipv4", "prefer_ipv6", "ipv4_only", "ipv6_only"):
+            dns_strategy = "ipv4_only"
         dns_custom = get_setting("dns_custom_servers") or ""
 
         if dns_preset == "cloudflare":

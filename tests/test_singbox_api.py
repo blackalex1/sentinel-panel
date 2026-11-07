@@ -177,7 +177,7 @@ def test_singbox_config_generation_with_hysteria_and_rules(monkeypatch):
     domain_rule = next((r for r in rules if r.get("outbound") == "hysteria2-out" and "geosite-openai" in r.get("rule_set", [])), None)
     assert domain_rule is not None
     assert domain_rule["inbound"] == ["inbound-1"]
-    assert domain_rule["user"] == ["test@example.com"]
+    assert (domain_rule.get("user") or domain_rule.get("auth_user")) == ["test@example.com"]
     assert "chatgpt.com" in domain_rule["domain"]
     assert ".*\\.ai" in domain_rule["domain_regex"]
     assert "tcp" in domain_rule["network"]

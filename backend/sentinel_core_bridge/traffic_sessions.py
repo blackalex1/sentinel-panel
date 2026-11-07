@@ -194,15 +194,25 @@ def _fetch_singbox_direct_traffic() -> Dict[str, Dict[str, Any]]:
 
     raw_responses = []
     for port in clash_ports:
+        p_int = int(port)
+        hdrs = {"Authorization": f"Bearer {secret}"} if secret else {}
         try:
-            p_int = int(port)
-            hdrs = {"Authorization": f"Bearer {secret}"} if secret else {}
-            resp = requests.get(f"http://127.0.0.1:{p_int}/connections", headers=hdrs, timeout=0.25)
-            if resp.status_code == 200:
-                raw = resp.json()
+            import urllib.request
+            req = urllib.request.Request(f"http://127.0.0.1:{p_int}/connections", headers=hdrs)
+            with urllib.request.urlopen(req, timeout=0.25) as resp:
+                data = resp.read()
+                if isinstance(data, bytes):
+                    data = data.decode("utf-8")
+                raw = json.loads(data)
                 raw_responses.append((port, raw))
         except Exception:
-            pass
+            try:
+                resp = requests.get(f"http://127.0.0.1:{p_int}/connections", headers=hdrs, timeout=0.25)
+                if resp.status_code == 200:
+                    raw = resp.json()
+                    raw_responses.append((port, raw))
+            except Exception:
+                pass
 
     if not raw_responses:
         return {

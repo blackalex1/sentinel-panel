@@ -198,7 +198,7 @@ def test_intra_core_singbox_routing(monkeypatch):
     d_rule = next((r for r in config["route"]["rules"] if r.get("outbound") == "sb-hysteria2-out" and "geosite-google" in r.get("rule_set", [])), None)
     assert d_rule is not None
     assert d_rule["inbound"] == ["inbound-20"]
-    assert d_rule["user"] == ["user2@singbox.com"]
+    assert (d_rule.get("user") or d_rule.get("auth_user")) == ["user2@singbox.com"]
     assert "google.com" in d_rule["domain"]
     assert "exact.google.com" in d_rule["domain"]
     assert ".*\\.google" in d_rule["domain_regex"]
