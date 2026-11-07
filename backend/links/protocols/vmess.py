@@ -5,10 +5,11 @@ from backend.links.protocols.utils import get_cert_sha256_fingerprint, get_confi
 def build_vmess_link(inbound: dict, client: dict, host: str, port: int, display_name: str, settings: dict, stream_settings: dict, network: str, security: str, security_cipher: str, alter_id: int) -> str:
     uid = client.get('client_uuid_or_pwd') or client.get('id')
     
+    clean_host = host.strip("[]") if (host and ":" in host and host.startswith("[")) else host
     vmess_obj = {
         "v": "2",
         "ps": display_name,
-        "add": host,
+        "add": clean_host,
         "port": port,
         "id": uid,
         "aid": alter_id,
