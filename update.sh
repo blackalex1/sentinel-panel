@@ -77,10 +77,10 @@ if [ -z "${BOOTSTRAPPED:-}" ] && [ -d .git ] && command -v git &>/dev/null; then
 
     FETCH_OK=0
     for src in "${FETCH_SOURCES[@]}"; do
-        if timeout 10 git "${FETCH_ARGS[@]}" fetch "$src" "$BRANCH" 2>/dev/null; then
+        if timeout 10 git "${FETCH_ARGS[@]}" fetch --tags "$src" "$BRANCH" 2>/dev/null; then
             FETCH_OK=1
             break
-        elif timeout 10 git -c "safe.directory=*" -c "core.askPass=true" -c "credential.helper=" -c "http.proxy=" -c "https.proxy=" fetch "$src" "$BRANCH" 2>/dev/null; then
+        elif timeout 10 git -c "safe.directory=*" -c "core.askPass=true" -c "credential.helper=" -c "http.proxy=" -c "https.proxy=" fetch --tags "$src" "$BRANCH" 2>/dev/null; then
             FETCH_OK=1
             break
         fi
@@ -88,6 +88,11 @@ if [ -z "${BOOTSTRAPPED:-}" ] && [ -d .git ] && command -v git &>/dev/null; then
 
     if [ "$FETCH_OK" -eq 1 ]; then
         git reset --hard FETCH_HEAD 2>/dev/null || true
+        # Synchronize VERSION from git tag
+        TAG_VER=$(git describe --tags --abbrev=0 2>/dev/null | tr -d 'v \r\n' || true)
+        if [ -n "$TAG_VER" ]; then
+            echo "$TAG_VER" > "$SCRIPT_DIR/VERSION"
+        fi
     fi
     NEW_HEAD=$(git rev-parse HEAD 2>/dev/null || true)
     if [ -n "$OLD_HEAD" ] && [ -n "$NEW_HEAD" ] && [ "$OLD_HEAD" != "$NEW_HEAD" ]; then

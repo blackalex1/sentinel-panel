@@ -35,6 +35,23 @@ class GitManager:
         self.last_old_commit: str = ""
         self.last_new_commit: str = ""
 
+    def _sync_version_file(self) -> None:
+        """Synchronizes VERSION file in project directory from latest git tag."""
+        try:
+            tag_res = run_command(
+                ["git", "-c", "safe.directory=*", "describe", "--tags", "--abbrev=0"],
+                cwd=self.project_dir,
+                capture=True,
+                check=False,
+            )
+            if tag_res.returncode == 0 and tag_res.stdout.strip():
+                clean_tag = tag_res.stdout.strip().lstrip("v")
+                v_path = os.path.join(self.project_dir, "VERSION")
+                with open(v_path, "w", encoding="utf-8") as vf:
+                    vf.write(f"{clean_tag}\n")
+        except Exception:
+            pass
+
     def _get_candidate_remotes(self) -> List[str]:
         """Builds a list of fetch sources including official URL and CDN mirrors."""
         remotes = ["origin"]
@@ -106,10 +123,11 @@ class GitManager:
         pull_success = False
         for remote in self._get_candidate_remotes():
             try:
-                fetch_cmd = ["git"] + git_config_args + ["fetch", remote, branch]
+                fetch_cmd = ["git"] + git_config_args + ["fetch", "--tags", remote, branch]
                 res = run_command(fetch_cmd, cwd=self.project_dir, env=git_env, capture=True, check=False, timeout=12.0)
                 if res.returncode == 0:
                     run_command(["git", "reset", "--hard", "FETCH_HEAD"], cwd=self.project_dir, check=True)
+                    self._sync_version_file()
                     pull_success = True
                     break
             except Exception:

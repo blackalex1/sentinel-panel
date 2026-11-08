@@ -104,3 +104,26 @@ def test_docker_manager_cleanup_build_artifacts(monkeypatch):
     assert any("builder" in cmd and "prune" in cmd for cmd in executed_commands)
 
 
+
+
+def test_dynamic_panel_version_resolution(tmp_path, monkeypatch):
+    from backend.version import _resolve_panel_version, PANEL_VERSION_FALLBACK
+
+    # 1. Test environment variable priority
+    monkeypatch.setenv("PANEL_VERSION", "v2.5.0")
+    assert _resolve_panel_version() == "2.5.0"
+
+    # 2. Test VERSION file detection
+    monkeypatch.delenv("PANEL_VERSION", raising=False)
+    fake_version_file = tmp_path / "VERSION"
+    fake_version_file.write_text("3.1.4\n")
+
+    monkeypatch.setattr(
+        "backend.version.Path.is_file",
+        lambda p: str(p).endswith("VERSION"),
+    )
+    monkeypatch.setattr(
+        "backend.version.Path.read_text",
+        lambda p, **kwargs: "3.1.4\n",
+    )
+    assert _resolve_panel_version() == "3.1.4"

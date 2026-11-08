@@ -30,6 +30,7 @@ services:
       - ./backups:/app/backups
       - ./frontend/decoy:/app/frontend/decoy
       - ./updater:/app/updater
+      - ./VERSION:/app/VERSION:ro
       - /var/run/sentinel:/var/run/sentinel
     environment:
       - PYTHONUNBUFFERED=1
