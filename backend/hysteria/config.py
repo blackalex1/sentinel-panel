@@ -79,6 +79,7 @@ def generate_hysteria_config(inbound_id: int, port: int, clients: list, stream_s
             "tag": f"inbound-{inbound_id}",
             "certPath": cert_path,
             "keyPath": key_path,
+            "sni": hysteria_opts.get("sni", ""),
             "authUrl": auth_url,
             "adminPort": admin_port,
             "portHop": hysteria_opts.get("hop", ""),
@@ -148,8 +149,6 @@ def generate_hysteria_config(inbound_id: int, port: int, clients: list, stream_s
                     cfg_dict = cfg
             else:
                 cfg_dict = res
-        if isinstance(cfg_dict, dict) and "tls" in cfg_dict and isinstance(cfg_dict["tls"], dict):
-            cfg_dict["tls"]["sniGuard"] = "disable"
         return cfg_dict
     except Exception as e:
         logging.error(f"Error compiling hysteria2 config via sentinel-core: {e}")
