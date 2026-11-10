@@ -298,17 +298,26 @@ def generate_self_signed_cert(force: bool = False):
         # Собираем SNI из всех Hysteria инбаундов
         custom_snis = set()
         try:
-            from backend.inbounds import get_all_inbounds
+            from backend.database import get_all_inbounds
             for ib in get_all_inbounds():
                 if ib.get("protocol") == "hysteria2":
-                    import json
-                    st = json.loads(ib.get("stream_settings") or "{}")
+                    raw_st = ib.get("stream_settings")
+                    if isinstance(raw_st, dict):
+                        st = raw_st
+                    elif isinstance(raw_st, str) and raw_st.strip():
+                        import json
+                        try:
+                            st = json.loads(raw_st)
+                        except Exception:
+                            st = {}
+                    else:
+                        st = {}
                     h_opt = st.get("hysteria", {})
-                    s = h_opt.get("sni") or st.get("sni") or ""
+                    s = h_opt.get("sni") or st.get("sni") or ib.get("sni") or ""
                     if s:
                         custom_snis.add(s.strip())
-        except Exception:
-            pass
+        except Exception as e:
+            logging.error(f"Error gathering SNIs for Hysteria cert: {e}")
 
         primary_cn = sorted(list(custom_snis))[0] if custom_snis else (server_domain.strip() if server_domain else "localhost")
 
@@ -472,18 +481,23 @@ def get_hysteria_cert_status() -> dict:
 
         # 6. Сверка со всеми активными инбаундами Hysteria 2
         try:
-            from backend.inbounds import get_all_inbounds
+            from backend.database import get_all_inbounds
             inbounds = get_all_inbounds()
             for ib in inbounds:
-                if ib.get("protocol") == "hysteria2" and ib.get("enable"):
-                    stream_settings = {}
-                    try:
+                if ib.get("protocol") == "hysteria2" and bool(ib.get("enable", 1)):
+                    raw_st = ib.get("stream_settings")
+                    if isinstance(raw_st, dict):
+                        stream_settings = raw_st
+                    elif isinstance(raw_st, str) and raw_st.strip():
                         import json
-                        stream_settings = json.loads(ib.get("stream_settings") or "{}")
-                    except Exception:
-                        pass
+                        try:
+                            stream_settings = json.loads(raw_st)
+                        except Exception:
+                            stream_settings = {}
+                    else:
+                        stream_settings = {}
                     h_opts = stream_settings.get("hysteria", {})
-                    sni = h_opts.get("sni") or stream_settings.get("sni") or ""
+                    sni = h_opts.get("sni") or stream_settings.get("sni") or ib.get("sni") or ""
                     if sni:
                         matched = False
                         for san_name in sans:
@@ -494,7 +508,7 @@ def get_hysteria_cert_status() -> dict:
                             status["needs_reissue"] = True
                             status["reissue_reasons"].append(f"В сертификате отсутствует SNI '{sni}' из настроек подключения #{ib.get('id')}.")
         except Exception as ex:
-            logging.debug(f"Error checking inbounds SNI for Hysteria cert status: {ex}")
+            logging.error(f"Error checking inbounds SNI for Hysteria cert status: {ex}")
 
         status["valid"] = (status["key_matches"] and not status["is_expired"] and not status["needs_reissue"])
     except Exception as e:
