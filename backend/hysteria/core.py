@@ -268,10 +268,15 @@ def get_installed_hysteria_version() -> str:
         return "Unknown"
 
 def generate_self_signed_cert(force: bool = False):
-    """Генерирует самоподписанный сертификат для Hysteria, если его нет. При force=True принудительно перевыпускает."""
+    """Генерирует самоподписанный сертификат для Hysteria, если его нет или если он требует перевыпуска под текущие SNI. При force=True принудительно перевыпускает."""
     if not force and backend.hysteria.HYSTERIA_CERT_PATH.exists() and backend.hysteria.HYSTERIA_KEY_PATH.exists():
         if backend.hysteria.HYSTERIA_CERT_PATH.stat().st_size > 0 and backend.hysteria.HYSTERIA_KEY_PATH.stat().st_size > 0:
-            return
+            try:
+                cert_status = get_hysteria_cert_status()
+                if not cert_status.get("needs_reissue"):
+                    return True
+            except Exception:
+                return True
         
     logging.info("Generating self-signed SSL certificate for Hysteria 2...")
     
