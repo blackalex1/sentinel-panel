@@ -266,10 +266,11 @@ export async function updateTabVisibility(proto) {
     const coreElem = document.getElementById("ib-core");
     const core = (coreElem && coreElem.value) ? coreElem.value : "xray";
     const isXray = (core === "xray" || core === "xray-core" || !core);
+    const protoKey = (proto === "hysteria") ? "hysteria2" : proto;
 
     try {
         const schema = await fetchCapabilitiesSchema();
-        const protoCap = (schema && schema.protocols) ? schema.protocols[proto] : null;
+        const protoCap = (schema && schema.protocols) ? schema.protocols[protoKey] : null;
 
         if (protoCap && Array.isArray(protoCap.tabDefinitions) && protoCap.tabDefinitions.length > 0) {
             const activeTabBtn = tabsContainer ? tabsContainer.querySelector(".modal-tab-btn.active") : null;
@@ -335,10 +336,12 @@ export async function updateCoreOptions(proto) {
     const coreSelect = document.getElementById("ib-core");
     if (!coreSelect) return;
     
+    const protoKey = (proto === "hysteria") ? "hysteria2" : proto;
+
     try {
         const schema = await fetchCapabilitiesSchema();
-        if (schema && schema.protocols && schema.protocols[proto]) {
-            const supportedEngines = schema.protocols[proto].supportedEngines || [];
+        if (schema && schema.protocols && schema.protocols[protoKey]) {
+            const supportedEngines = schema.protocols[protoKey].supportedEngines || [];
             
             const newOptions = [];
             (schema.engines || []).forEach(eng => {
@@ -370,6 +373,7 @@ export async function updateCoreOptions(proto) {
                 } else if (coreSelect.options.length > 0) {
                     coreSelect.value = coreSelect.options[0].value;
                 }
+                coreSelect.dispatchEvent(new Event("change", { bubbles: true }));
             }
         }
     } catch (e) {
@@ -390,7 +394,7 @@ export async function handleProtocolChange(proto) {
     } else if (proto === "trojan") {
         if (networkSelect) networkSelect.value = "tcp";
         if (securitySelect) securitySelect.value = "tls";
-    } else if (proto === "hysteria2") {
+    } else if (proto === "hysteria2" || proto === "hysteria") {
         if (networkSelect) networkSelect.value = "quic";
         if (securitySelect) securitySelect.value = "tls";
     }

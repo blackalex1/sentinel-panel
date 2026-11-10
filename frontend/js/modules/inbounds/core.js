@@ -138,7 +138,6 @@ export function serializeFormToJson() {
             network: "tcp,udp"
         };
     } else if (protocol === "hysteria2") {
-        sniffing = { enabled: false, destOverride: [] };
         compileHysteriaSettings(streamSettings, settings, originalClients);
     }
     
@@ -317,11 +316,12 @@ export async function openEditInboundModal(id) {
     protoSelect.value = target.protocol;
     protoSelect.disabled = true; // Lock protocol editing
 
-    handleProtocolChange(target.protocol);
+    await handleProtocolChange(target.protocol);
 
     const coreSelect = document.getElementById("ib-core");
     if (coreSelect) {
         coreSelect.value = target.core || (target.protocol === "hysteria2" ? "hysteria" : "xray");
+        coreSelect.dispatchEvent(new Event("change", { bubbles: true }));
     }
     
     document.getElementById("inbound-modal-title").innerText = t("inbound_edit_title", "Редактирование подключения");

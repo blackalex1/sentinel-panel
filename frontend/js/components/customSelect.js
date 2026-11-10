@@ -123,6 +123,16 @@ export function initCustomSelect(selectElement) {
                 container.classList.remove("dropup");
             }
 
+            // Sync options before opening in case select was modified dynamically
+            const curOpts = Array.from(selectElement.options);
+            const curDivs = dropdown.querySelectorAll(".custom-select-option");
+            if (curOpts.length !== curDivs.length) {
+                if (rebuildTimeout) clearTimeout(rebuildTimeout);
+                buildOptions();
+            } else {
+                updateSelectedUI();
+            }
+
             container.classList.add("open");
             let p = container.parentElement;
             while (p && !p.classList.contains("modal-card") && !p.classList.contains("content-area") && p !== document.body) {
@@ -135,6 +145,14 @@ export function initCustomSelect(selectElement) {
     selectElement.addEventListener("change", () => {
         updateSelectedUI();
     });
+
+    if (selectElement.form) {
+        selectElement.form.addEventListener("reset", () => {
+            setTimeout(() => {
+                updateSelectedUI();
+            }, 10);
+        });
+    }
     
     // Rebuild options safely if options change dynamically (debounced to avoid freeze loops)
     let rebuildTimeout = null;

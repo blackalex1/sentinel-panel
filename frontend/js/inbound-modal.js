@@ -84,7 +84,11 @@ export function setupInboundListeners(loadInboundsCallback) {
             jsonEditor.value = "";
         }
         
-        handleProtocolChange("vless");
+        if (protoSelect) {
+            protoSelect.value = "vless";
+            protoSelect.dispatchEvent(new Event("change", { bubbles: true }));
+        }
+        await handleProtocolChange("vless");
         switchInboundModalTab("basic");
         
         document.getElementById("inbound-modal").classList.add("active");

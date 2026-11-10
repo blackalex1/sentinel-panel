@@ -116,7 +116,6 @@ def _sanitize_hysteria_payload(payload):
     if payload.protocol == "hysteria2":
         if payload.core != "singbox":
             payload.core = "hysteria"
-        payload.sniffing = {"enabled": False, "destOverride": []}
         hysteria_opts = (payload.streamSettings or {}).get("hysteria", {})
         if hysteria_opts.get("ignoreClientBandwidth"):
             hysteria_opts["upMbps"] = 0
