@@ -20,12 +20,29 @@ def get_hysteria2_cert_path(inbound: dict, stream_settings: dict, sni: str) -> s
     return cert_path
 
 
+def get_effective_hysteria_port(port: int, hop: str) -> int:
+    """Returns the effective listening port. If hop is a range and port is outside that range, returns range start."""
+    if hop and "-" in hop:
+        parts = hop.split("-", 1)
+        try:
+            start_p = int(parts[0].strip())
+            end_p = int(parts[1].strip())
+            if start_p <= end_p:
+                if port < start_p or port > end_p:
+                    return start_p
+        except (ValueError, TypeError):
+            pass
+    return port
+
+
 def build_hysteria2_link(inbound: dict, client: dict, host: str, port: int, display_name: str, stream_settings: dict, client_email: str) -> str:
     password = client.get('client_uuid_or_pwd') or client.get('password')
     
     hysteria_opts = stream_settings.get('hysteria', {})
     obfs_password = hysteria_opts.get('obfsPassword', '')
     hop = hysteria_opts.get('hop', '')
+
+    effective_port = get_effective_hysteria_port(port, hop)
 
     up_mbps = hysteria_opts.get('upMbps') or hysteria_opts.get('up_mbps')
     down_mbps = hysteria_opts.get('downMbps') or hysteria_opts.get('down_mbps')
@@ -74,7 +91,7 @@ def build_hysteria2_link(inbound: dict, client: dict, host: str, port: int, disp
     query = "&".join(params)
     username = quote(client_email, safe='')
     encoded_password = quote(password, safe='')
-    endpoint = format_endpoint(host, port)
+    endpoint = format_endpoint(host, effective_port)
     return f"hysteria2://{username}:{encoded_password}@{endpoint}?{query}#{quote(display_name)}"
 
 
@@ -85,6 +102,8 @@ def build_hysteria2_mihomo_proxy(inbound: dict, client: dict, host: str, port: i
     hysteria_opts = stream_settings.get('hysteria', {})
     obfs_password = hysteria_opts.get('obfsPassword', '')
     hop = hysteria_opts.get('hop', '')
+
+    effective_port = get_effective_hysteria_port(port, hop)
 
     up_mbps = hysteria_opts.get('upMbps') or hysteria_opts.get('up_mbps')
     down_mbps = hysteria_opts.get('downMbps') or hysteria_opts.get('down_mbps')
@@ -98,7 +117,7 @@ def build_hysteria2_mihomo_proxy(inbound: dict, client: dict, host: str, port: i
         "name": display_name,
         "type": "hysteria2",
         "server": host,
-        "port": int(port),
+        "port": int(effective_port),
         "password": full_password,
         "sni": sni or host,
         "skip-cert-verify": True,

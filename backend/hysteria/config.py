@@ -143,10 +143,14 @@ def generate_hysteria_config(inbound_id: int, port: int, clients: list, stream_s
             if "config" in res:
                 cfg = res["config"]
                 if isinstance(cfg, str):
-                    return json.loads(cfg)
+                    cfg_dict = json.loads(cfg)
                 elif isinstance(cfg, dict):
-                    return cfg
-            return res
+                    cfg_dict = cfg
+            else:
+                cfg_dict = res
+        if isinstance(cfg_dict, dict) and "tls" in cfg_dict and isinstance(cfg_dict["tls"], dict):
+            cfg_dict["tls"]["sniGuard"] = "disable"
+        return cfg_dict
     except Exception as e:
         logging.error(f"Error compiling hysteria2 config via sentinel-core: {e}")
     return {}
