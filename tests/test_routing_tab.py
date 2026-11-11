@@ -1,4 +1,5 @@
-from backend.database import get_all_outbounds, get_all_routing_rules, add_outbound, get_outbound_by_id, delete_outbound, add_routing_rule, get_routing_rule_by_id, delete_routing_rule
+import json
+from backend.database import get_all_outbounds, get_all_routing_rules, add_outbound, update_outbound, get_outbound_by_id, delete_outbound, add_routing_rule, get_routing_rule_by_id, delete_routing_rule
 
 def test_routing_tab_features(client):
     """Test custom outbounds, routing rules, config builder integration, and API routes."""
@@ -315,18 +316,46 @@ def test_outbound_failover_backup_system(client):
     assert sb_primary is not None
     assert sb_primary["type"] == "vless"
 
-    sb_urltest = next((ob for ob in sb_outbounds if ob["tag"] == "vps-a"), None)
-    assert sb_urltest is not None
-    assert sb_urltest["type"] == "urltest"
-    assert sb_urltest["outbounds"] == ["vps-a-primary", "vps-b", "direct"]
-    assert sb_urltest["url"] == "https://www.gstatic.com/generate_204"
-    assert sb_urltest["tolerance"] in (0, 50, 300, 500, 5000)
+    sb_group = next((ob for ob in sb_outbounds if ob["tag"] == "vps-a"), None)
+    assert sb_group is not None
+    assert sb_group["type"] == "selector"
+    assert sb_group["default"] == "vps-a-primary"
+    assert sb_group["outbounds"] == ["vps-a-primary", "vps-b", "direct"]
+    assert sb_group["interrupt_exist_connections"] is False
+
+    # Verify clash_mode=Direct is placed before user/inbound rules
+    sb_rules = sb_cfg.get("route", {}).get("rules", [])
+    clash_idx = next((i for i, r in enumerate(sb_rules) if r.get("clash_mode") == "Direct"), -1)
+    assert clash_idx >= 0, "Expected clash_mode=Direct rule in sing-box config"
+
+    # Verify least_ping and round_robin compile as urltest with 50ms tolerance and custom interval preserved
+    for strat in ("least_ping", "round_robin"):
+        update_outbound(
+            outbound_id=ob_a_id,
+            remark="Primary VPS A",
+            protocol="vless",
+            tag="vps-a",
+            settings_dict={
+                "vnext": [{"address": "1.1.1.1", "port": 443, "users": [{"id": "uuid-a"}]}],
+                "backup_outbounds": ["vps-b", "direct"],
+                "fallback_strategy": strat,
+                "health_check_url": "https://www.gstatic.com/generate_204",
+                "health_check_interval": 120,
+            },
+        )
+        cfg_strat = generate_singbox_config_json()
+        grp = next((ob for ob in cfg_strat.get("outbounds", []) if ob["tag"] == "vps-a"), None)
+        assert grp is not None
+        assert grp["type"] == "urltest"
+        assert grp["tolerance"] == 50
+        assert grp["interval"] == "120s"
+        assert grp["interrupt_exist_connections"] is False
+        assert grp["url"] == "https://www.gstatic.com/generate_204"
 
     # 6. Test Cascade Deletion of Backup Outbound B
     delete_outbound(ob_b_id)
 
     ob_a_updated = get_outbound_by_id(ob_a_id)
-    import json
     settings_a = json.loads(ob_a_updated["settings"])
     assert "vps-b" not in settings_a["backup_outbounds"]
     assert settings_a["backup_outbounds"] == ["direct"]
@@ -334,6 +363,111 @@ def test_outbound_failover_backup_system(client):
     # Cleanup
     delete_routing_rule(rule_id)
     delete_outbound(ob_a_id)
+
+
+def test_singbox_failover_sync_and_ffi_step(monkeypatch):
+    """Test collecting priority failover metadata and driving Clash API selection via Go FFI."""
+    import threading
+    from http.server import BaseHTTPRequestHandler, HTTPServer
+    from backend.singbox.service import collect_priority_failover_groups
+    from backend.sentinel_core_bridge import configure_singbox_failover, step_singbox_failover
+
+    selected_log = []
+    delay_calls = []
+
+    class MockClashHandler(BaseHTTPRequestHandler):
+        def log_message(self, format, *args):
+            return
+
+        def do_GET(self):
+            if self.path == "/proxies":
+                body = json.dumps({
+                    "proxies": {
+                        "hy2-edge": {
+                            "type": "Selector",
+                            "name": "hy2-edge",
+                            "now": "",
+                            "all": ["hy2-edge-primary", "vless-bak"],
+                        }
+                    }
+                }).encode("utf-8")
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.end_headers()
+                self.wfile.write(body)
+                return
+            if self.path.startswith("/proxies/hy2-edge-primary/delay") or self.path.startswith("/proxies/vless-bak/delay"):
+                delay_calls.append(self.path)
+                body = json.dumps({"delay": 42}).encode("utf-8")
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.end_headers()
+                self.wfile.write(body)
+                return
+            self.send_response(404)
+            self.end_headers()
+
+        def do_PUT(self):
+            if self.path == "/proxies/hy2-edge":
+                length = int(self.headers.get("Content-Length", "0"))
+                payload = json.loads(self.rfile.read(length).decode("utf-8"))
+                selected_log.append(payload.get("name"))
+                self.send_response(204)
+                self.end_headers()
+                return
+            self.send_response(404)
+            self.end_headers()
+
+    server = HTTPServer(("127.0.0.1", 0), MockClashHandler)
+    clash_addr = f"127.0.0.1:{server.server_port}"
+    srv_thread = threading.Thread(target=server.serve_forever, daemon=True)
+    srv_thread.start()
+
+    try:
+        mock_outbounds = [
+            {
+                "tag": "hy2-edge",
+                "enable": 1,
+                "settings": json.dumps({
+                    "backup_outbounds": ["vless-bak"],
+                    "fallback_strategy": "priority",
+                    "health_check_url": "https://cp.cloudflare.com/generate_204",
+                    "health_check_interval": 45,
+                }),
+            },
+            {
+                "tag": "least-only",
+                "enable": 1,
+                "settings": json.dumps({
+                    "backup_outbounds": ["vless-bak"],
+                    "fallback_strategy": "least_ping",
+                    "health_check_interval": 30,
+                }),
+            },
+        ]
+        monkeypatch.setattr("backend.singbox.config.get_all_outbounds", lambda: mock_outbounds)
+        monkeypatch.setattr(
+            "backend.singbox.config.read_singbox_config",
+            lambda: {"experimental": {"clash_api": {"external_controller": clash_addr}}},
+        )
+
+        extracted_addr, groups = collect_priority_failover_groups()
+        assert extracted_addr == clash_addr
+        assert len(groups) == 1
+        assert groups[0]["tag"] == "hy2-edge"
+        assert groups[0]["primary"] == "hy2-edge-primary"
+        assert groups[0]["outbounds"] == ["hy2-edge-primary", "vless-bak"]
+        assert groups[0]["probeUrl"] == "https://cp.cloudflare.com/generate_204"
+        assert groups[0]["probeInterval"] == 45
+
+        assert configure_singbox_failover(extracted_addr, groups) is True
+        assert step_singbox_failover() is True
+        assert selected_log == ["hy2-edge-primary"]
+        assert any("cp.cloudflare.com" in c for c in delay_calls)
+    finally:
+        server.shutdown()
+        server.server_close()
+
 
 
 

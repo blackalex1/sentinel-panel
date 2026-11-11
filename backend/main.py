@@ -167,6 +167,13 @@ async def poll_xray_stats_loop():
     except Exception as e:
         logging.error(f"Error in initial stats polling: {e}")
         
+    try:
+        from backend.singbox.service import is_singbox_running, sync_singbox_failover_config
+        if await asyncio.to_thread(is_singbox_running):
+            await asyncio.to_thread(sync_singbox_failover_config, True)
+    except Exception as e:
+        logging.debug(f"Failed to attach sing-box failover watcher on startup: {e}")
+
     last_releases_refresh = time.time()
     while True:
         try:

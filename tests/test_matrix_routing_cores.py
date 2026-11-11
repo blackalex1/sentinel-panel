@@ -476,18 +476,20 @@ def test_multi_split_routing_with_blocked_bittorrent(monkeypatch):
     assert valid_sb is True, f"Real sing-box binary validation failed: {msg_sb}"
 
     rules = config["route"]["rules"]
+    assert rules[0].get("clash_mode") == "Direct"
+    user_rules = [r for r in rules if "clash_mode" not in r and "action" not in r]
 
-    # Rule 1 in Sing-box config MUST be BitTorrent Block
-    assert rules[0]["outbound"] == "block"
-    assert "bittorrent" in rules[0]["protocol"]
+    # Rule 1 in Sing-box user rules MUST be BitTorrent Block
+    assert user_rules[0]["outbound"] == "block"
+    assert "bittorrent" in user_rules[0]["protocol"]
 
     # Rule 2 MUST be Hysteria2 VPN route for OpenAI/ChatGPT
-    assert rules[1]["outbound"] == "hysteria2-vpn"
-    assert "geosite-openai" in rules[1]["rule_set"]
+    assert user_rules[1]["outbound"] == "hysteria2-vpn"
+    assert "geosite-openai" in user_rules[1]["rule_set"]
 
     # Rule 3 MUST be Direct route for Gov RU
-    assert rules[2]["outbound"] == "direct"
-    assert "geosite-category-gov-ru" in rules[2]["rule_set"]
+    assert user_rules[2]["outbound"] == "direct"
+    assert "geosite-category-gov-ru" in user_rules[2]["rule_set"]
 
     # Outbounds fallback order: direct must be available for unrouted traffic
     assert config["outbounds"][0]["tag"] == "direct"

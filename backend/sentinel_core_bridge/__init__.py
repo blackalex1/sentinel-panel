@@ -37,6 +37,9 @@ from backend.sentinel_core_bridge.lifecycle import (
     validate_core_config,
     get_cores_status,
     get_core_version,
+    configure_singbox_failover,
+    ensure_singbox_failover,
+    step_singbox_failover,
 )
 
 from backend.sentinel_core_bridge.traffic_sessions import (
@@ -105,6 +108,9 @@ __all__ = [
     "validate_core_config",
     "get_cores_status",
     "get_core_version",
+    "configure_singbox_failover",
+    "ensure_singbox_failover",
+    "step_singbox_failover",
     # Traffic & Sessions
     "get_unified_traffic",
     "get_active_sessions",

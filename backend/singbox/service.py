@@ -66,12 +66,97 @@ def is_singbox_running() -> bool:
 
     return False
 
+def collect_priority_failover_groups() -> tuple[str, list[dict]]:
+    """Extracts strict-priority failover group settings from panel outbounds and compiled sing-box config."""
+    from backend.singbox.config import get_all_outbounds, read_singbox_config
+
+    clash_addr = "127.0.0.1:9090"
+    try:
+        cfg = read_singbox_config()
+        if isinstance(cfg, dict):
+            ext = ((cfg.get("experimental") or {}).get("clash_api") or {}).get("external_controller")
+            if ext:
+                clash_addr = str(ext)
+    except Exception:
+        pass
+
+    groups = []
+    for ob in get_all_outbounds() or []:
+        if not ob.get("enable", 1):
+            continue
+        tag = str(ob.get("tag") or "").strip()
+        if not tag:
+            continue
+        raw_settings = ob.get("settings")
+        settings = {}
+        if isinstance(raw_settings, dict):
+            settings = raw_settings
+        elif isinstance(raw_settings, str) and raw_settings.strip():
+            try:
+                parsed = json.loads(raw_settings)
+                if isinstance(parsed, dict):
+                    settings = parsed
+            except Exception:
+                settings = {}
+
+        strategy = str(settings.get("fallback_strategy") or "priority").strip().lower()
+        if strategy not in ("", "priority", "primary", "fallback"):
+            continue
+
+        backups = []
+        raw_backups = settings.get("backup_outbounds")
+        if isinstance(raw_backups, list):
+            for b in raw_backups:
+                b_str = str(b).strip()
+                if b_str and b_str != tag and b_str not in backups:
+                    backups.append(b_str)
+        fb_single = str(settings.get("fallback_outbound") or "").strip()
+        if fb_single and fb_single != tag and fb_single not in backups:
+            backups.append(fb_single)
+
+        if not backups:
+            continue
+
+        probe_url = str(settings.get("health_check_url") or "https://www.gstatic.com/generate_204").strip()
+        try:
+            probe_int = int(settings.get("health_check_interval") or 30)
+        except Exception:
+            probe_int = 30
+        if probe_int < 5:
+            probe_int = 5 if probe_int > 0 else 30
+
+        primary_tag = f"{tag}-primary"
+        groups.append({
+            "tag": tag,
+            "primary": primary_tag,
+            "outbounds": [primary_tag] + backups,
+            "probeUrl": probe_url,
+            "probeInterval": probe_int,
+            "strategy": "priority",
+        })
+
+    return clash_addr, groups
+
+
+def sync_singbox_failover_config(ensure_watcher: bool = False) -> None:
+    """Synchronizes strict-priority failover metadata with sentinel-core supervisor."""
+    try:
+        from backend.sentinel_core_bridge import configure_singbox_failover, ensure_singbox_failover
+        clash_addr, groups = collect_priority_failover_groups()
+        configure_singbox_failover(clash_addr, groups)
+        if ensure_watcher:
+            ensure_singbox_failover(clash_addr)
+    except Exception as e:
+        logging.debug(f"Failed to sync sing-box failover config: {e}")
+
+
 def start_singbox(force_generate: bool = False) -> bool:
     """Запускает процесс sing-box через sentinel-core"""
     global singbox_process, LAST_SINGBOX_ERROR
     LAST_SINGBOX_ERROR = ""
     if is_singbox_running():
         logging.info("Sing-box is already running.")
+        sync_singbox_failover_config(ensure_watcher=True)
         return True
 
     inbounds = get_all_inbounds()
@@ -111,6 +196,7 @@ def start_singbox(force_generate: bool = False) -> bool:
     try:
         from backend.sentinel_core_bridge import start_core
         if start_core("sing-box", str(SINGBOX_BIN_PATH), str(SINGBOX_CONFIG_PATH)):
+            sync_singbox_failover_config(ensure_watcher=True)
             logging.info("Sing-box started successfully via sentinel-core.")
             return True
         logging.error("sentinel-core failed to start sing-box.")

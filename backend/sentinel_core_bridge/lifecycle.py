@@ -1,6 +1,7 @@
+import json
 import logging
 import os
-from typing import Dict, Any, Tuple
+from typing import Dict, Any, List, Tuple
 
 from backend.sentinel_core_bridge.ffi import (
     _ffi_call_str,
@@ -114,3 +115,36 @@ def get_core_version(core_name: str, bin_path: str) -> str:
         return version
 
     return "Unknown"
+
+
+def configure_singbox_failover(clash_addr: str, groups: List[Dict[str, Any]]) -> bool:
+    """Updates strict-priority failover group settings in sentinel-core supervisor."""
+    try:
+        res = _ffi_call_json("SentinelConfigureSingBoxFailover", str(clash_addr or ""), json.dumps(groups or []))
+        if isinstance(res, dict) and res.get("success") is True:
+            return True
+    except Exception as e:
+        logger.debug("FFI configure_singbox_failover error: %s", e)
+    return False
+
+
+def ensure_singbox_failover(clash_addr: str = "127.0.0.1:9090") -> bool:
+    """Starts or ensures the background Clash API strict-priority failover watcher is active."""
+    try:
+        res = _ffi_call_json("SentinelEnsureSingBoxFailover", str(clash_addr or ""))
+        if isinstance(res, dict) and res.get("success") is True:
+            return True
+    except Exception as e:
+        logger.debug("FFI ensure_singbox_failover error: %s", e)
+    return False
+
+
+def step_singbox_failover() -> bool:
+    """Runs a single synchronous strict-priority failover check via sentinel-core."""
+    try:
+        res = _ffi_call_json("SentinelStepSingBoxFailover")
+        if isinstance(res, dict) and res.get("success") is True:
+            return True
+    except Exception as e:
+        logger.debug("FFI step_singbox_failover error: %s", e)
+    return False
