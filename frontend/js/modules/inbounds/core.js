@@ -80,6 +80,39 @@ export function switchInboundModalTab(tabName) {
     return true;
 }
 
+function applySniffingToForm(sniffing) {
+    const src = (sniffing && typeof sniffing === "object") ? sniffing : {};
+    // Match compiler default (xray & sing-box): empty {} means sniffing is enabled unless explicitly false.
+    const hasExplicitEnabled = typeof src.enabled === "boolean";
+    const sniffingChecked = hasExplicitEnabled ? src.enabled : true;
+
+    const sniffingInput = document.getElementById("ib-sniffing");
+    if (sniffingInput) sniffingInput.checked = sniffingChecked;
+
+    const httpEl = document.getElementById("ib-sniffing-http");
+    const tlsEl = document.getElementById("ib-sniffing-tls");
+    const quicEl = document.getElementById("ib-sniffing-quic");
+    const fakednsEl = document.getElementById("ib-sniffing-fakedns");
+    const routeOnlyEl = document.getElementById("ib-sniffing-routeonly");
+
+    if (httpEl) httpEl.checked = false;
+    if (tlsEl) tlsEl.checked = false;
+    if (quicEl) quicEl.checked = false;
+    if (fakednsEl) fakednsEl.checked = false;
+    if (routeOnlyEl) routeOnlyEl.checked = false;
+
+    if (sniffingChecked) {
+        const dests = (Array.isArray(src.destOverride) && (src.destOverride.length > 0 || hasExplicitEnabled))
+            ? src.destOverride
+            : ["http", "tls", "quic"];
+        if (httpEl) httpEl.checked = dests.includes("http");
+        if (tlsEl) tlsEl.checked = dests.includes("tls");
+        if (quicEl) quicEl.checked = dests.includes("quic");
+        if (fakednsEl) fakednsEl.checked = dests.includes("fakedns");
+        if (routeOnlyEl) routeOnlyEl.checked = src.routeOnly || false;
+    }
+}
+
 export function serializeFormToJson() {
     const remark = document.getElementById("ib-remark").value;
     const port = parseInt(document.getElementById("ib-port").value) || 0;
@@ -196,24 +229,7 @@ export function populateFormFromJson(payload) {
     const coreVal = payload.core || (protocol === "hysteria2" ? "hysteria" : "xray");
 
     // Sniffing
-    const sniffingChecked = sniffing.enabled || false;
-    const sniffingInput = document.getElementById("ib-sniffing");
-    if (sniffingInput) sniffingInput.checked = sniffingChecked;
-    
-    if (document.getElementById("ib-sniffing-http")) document.getElementById("ib-sniffing-http").checked = false;
-    if (document.getElementById("ib-sniffing-tls")) document.getElementById("ib-sniffing-tls").checked = false;
-    if (document.getElementById("ib-sniffing-quic")) document.getElementById("ib-sniffing-quic").checked = false;
-    if (document.getElementById("ib-sniffing-fakedns")) document.getElementById("ib-sniffing-fakedns").checked = false;
-    if (document.getElementById("ib-sniffing-routeonly")) document.getElementById("ib-sniffing-routeonly").checked = false;
-    
-    if (sniffingChecked) {
-        const dests = sniffing.destOverride || [];
-        if (document.getElementById("ib-sniffing-http")) document.getElementById("ib-sniffing-http").checked = dests.includes("http");
-        if (document.getElementById("ib-sniffing-tls")) document.getElementById("ib-sniffing-tls").checked = dests.includes("tls");
-        if (document.getElementById("ib-sniffing-quic")) document.getElementById("ib-sniffing-quic").checked = dests.includes("quic");
-        if (document.getElementById("ib-sniffing-fakedns")) document.getElementById("ib-sniffing-fakedns").checked = dests.includes("fakedns");
-        if (document.getElementById("ib-sniffing-routeonly")) document.getElementById("ib-sniffing-routeonly").checked = sniffing.routeOnly || false;
-    }
+    applySniffingToForm(sniffing);
 
     if (protocol === "vless" || protocol === "vmess" || protocol === "trojan") {
         if (streamSettings.network !== undefined) {
@@ -345,24 +361,7 @@ export async function openEditInboundModal(id) {
     }
     
     // Sniffing
-    const sniffingChecked = sniffing.enabled || false;
-    const sniffingInput = document.getElementById("ib-sniffing");
-    if (sniffingInput) sniffingInput.checked = sniffingChecked;
-    
-    if (document.getElementById("ib-sniffing-http")) document.getElementById("ib-sniffing-http").checked = false;
-    if (document.getElementById("ib-sniffing-tls")) document.getElementById("ib-sniffing-tls").checked = false;
-    if (document.getElementById("ib-sniffing-quic")) document.getElementById("ib-sniffing-quic").checked = false;
-    if (document.getElementById("ib-sniffing-fakedns")) document.getElementById("ib-sniffing-fakedns").checked = false;
-    if (document.getElementById("ib-sniffing-routeonly")) document.getElementById("ib-sniffing-routeonly").checked = false;
-    
-    if (sniffingChecked) {
-        const dests = sniffing.destOverride || [];
-        if (document.getElementById("ib-sniffing-http")) document.getElementById("ib-sniffing-http").checked = dests.includes("http");
-        if (document.getElementById("ib-sniffing-tls")) document.getElementById("ib-sniffing-tls").checked = dests.includes("tls");
-        if (document.getElementById("ib-sniffing-quic")) document.getElementById("ib-sniffing-quic").checked = dests.includes("quic");
-        if (document.getElementById("ib-sniffing-fakedns")) document.getElementById("ib-sniffing-fakedns").checked = dests.includes("fakedns");
-        if (document.getElementById("ib-sniffing-routeonly")) document.getElementById("ib-sniffing-routeonly").checked = sniffing.routeOnly || false;
-    }
+    applySniffingToForm(sniffing);
 
     if (target.protocol === "vless" || target.protocol === "vmess" || target.protocol === "trojan") {
         const net = streamSettings.network || "tcp";
