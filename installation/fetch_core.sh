@@ -11,6 +11,8 @@ AUTO_MODE=0
 FORCE_MODE=0
 PROXY_URL=""
 NO_PROXY=0
+EXPLICIT_TAG=""
+ALLOW_BETA=0
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -20,6 +22,14 @@ while [[ $# -gt 0 ]]; do
             ;;
         --force|-f)
             FORCE_MODE=1
+            shift
+            ;;
+        --tag|-t)
+            EXPLICIT_TAG="$2"
+            shift 2
+            ;;
+        --beta|--prerelease)
+            ALLOW_BETA=1
             shift
             ;;
         --proxy|-p)
@@ -170,7 +180,9 @@ print('||')
 fi
 
 SELECTED_TAG=""
-if [ -t 0 ] && [ "$AUTO_MODE" -eq 0 ]; then
+if [ -n "$EXPLICIT_TAG" ]; then
+    SELECTED_TAG="$EXPLICIT_TAG"
+elif [ -t 0 ] && [ "$AUTO_MODE" -eq 0 ]; then
     echo ""
     echo "===================================================="
     echo "🛡️  ВЫБОР ВЕРСИИ ЯДРА SENTINEL-CORE"
@@ -218,7 +230,11 @@ if [ -t 0 ] && [ "$AUTO_MODE" -eq 0 ]; then
     fi
 else
     # Non-interactive / Auto mode
-    SELECTED_TAG="${STABLE_VER:-${PRERELEASE_VER:-${LATEST_ANY:-v0.0.7}}}"
+    if [ "$ALLOW_BETA" -eq 1 ]; then
+        SELECTED_TAG="${LATEST_ANY:-${PRERELEASE_VER:-${STABLE_VER:-v0.0.7}}}"
+    else
+        SELECTED_TAG="${STABLE_VER:-${LATEST_ANY:-v0.0.7}}"
+    fi
 fi
 
 echo "[+] Выбранная версия Sentinel-Core: $SELECTED_TAG"
@@ -388,7 +404,6 @@ except Exception:
                 echo "[+] SHA-256 проверен (${ACTUAL_HASH:0:16}...)"
             fi
 
-            rm -f "$DEST_PATH"
             mv -f "$TMP_FILE" "$DEST_PATH"
             chmod 755 "$DEST_PATH" 2>/dev/null || chmod +x "$DEST_PATH" 2>/dev/null || true
             echo "[+] Успешно установлен $ASSET_NAME -> $DEST_PATH"
@@ -401,7 +416,7 @@ except Exception:
 
     rm -f "$DIGEST_FILE"
     if [ "$SUCCESS" -eq 0 ]; then
-        if [ -f "$DEST_PATH" ]; then
+        if [ -z "$EXPLICIT_TAG" ] && [ "$FORCE_MODE" -eq 0 ] && [ -f "$DEST_PATH" ]; then
             echo "[-] Не удалось загрузить $ASSET_NAME из релиза. Сохранена локальная копия."
         else
             echo "[!] Ошибка: Не удалось скачать $ASSET_NAME."
@@ -417,15 +432,23 @@ download_asset "$BIN_NAME" "$DEST_BIN" 1 || true
 
 # 8. Download C-Shared library
 echo "[+] Загрузка библиотеки $LIB_NAME..."
-download_asset "$LIB_NAME" "$DEST_LIB" 0 || true
+LIB_DL_OK=1
+if ! download_asset "$LIB_NAME" "$DEST_LIB" 0; then
+    LIB_DL_OK=0
+fi
 
-# Create symlink/alias for shared library
+# Create symlink/alias for shared library atomically
 if [ -f "$DEST_LIB" ]; then
     if [ "$OS" != "windows" ]; then
-        ln -sf "$DEST_LIB" "$ALT_LIB" 2>/dev/null || cp -f "$DEST_LIB" "$ALT_LIB" 2>/dev/null || true
+        ln -sfn "$DEST_LIB" "$ALT_LIB" 2>/dev/null || cp -f "$DEST_LIB" "$ALT_LIB" 2>/dev/null || true
     else
         cp -f "$DEST_LIB" "$ALT_LIB" 2>/dev/null || true
     fi
+fi
+
+if [ "$LIB_DL_OK" -eq 0 ]; then
+    echo "[!] Ошибка обновления библиотеки $LIB_NAME."
+    exit 1
 fi
 
 # 9. Download header file

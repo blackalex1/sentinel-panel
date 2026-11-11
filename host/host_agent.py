@@ -32,7 +32,8 @@ _host_agent_core_progress = {
 def _update_host_core_progress(data: dict) -> None:
     global _host_agent_core_progress
     _host_agent_core_progress.update(data)
-    _host_agent_core_progress["active"] = True
+    if "active" not in data:
+        _host_agent_core_progress["active"] = True
 
 
 from agent.optimizations import (
@@ -158,6 +159,9 @@ def handle_client(conn):
                         response = {"success": True, "progress": dict(_host_agent_core_progress)}
                     elif action == "trigger_core_update":
                         core_ver = str(request.get("version", "")).strip()
+                        channel = str(request.get("channel", "stable") or "stable").strip().lower()
+                        if channel not in ("stable", "beta"):
+                            channel = "stable"
                         force = bool(request.get("force", False))
                         bin_dir = _resolve_bin_dir()
                         installed_ok = False
@@ -166,7 +170,7 @@ def handle_client(conn):
                         _update_host_core_progress({
                             "active": True,
                             "percent": 0,
-                            "stage": f"Подготовка к установке Sentinel-Core {core_ver or 'latest'}...",
+                            "stage": f"Подготовка к установке Sentinel-Core {core_ver or channel}...",
                             "finished": False,
                             "success": False,
                             "error": "",
@@ -182,8 +186,11 @@ def handle_client(conn):
                                 progress_callback=_update_host_core_progress,
                             )
                             if not core_ver:
-                                stable_v, _, latest_v = mgr.fetch_releases()
-                                core_ver = stable_v or latest_v
+                                stable_v, pre_v, latest_v = mgr.fetch_releases()
+                                if channel == "beta":
+                                    core_ver = latest_v or pre_v or stable_v
+                                else:
+                                    core_ver = stable_v or (latest_v if not pre_v else "")
                             if core_ver and mgr.download_core(core_ver):
                                 _, inst_ver = mgr.get_installed_version()
                                 installed_ok = True
@@ -211,27 +218,65 @@ def handle_client(conn):
                             fetch_script = next((s for s in fetch_candidates if os.path.isfile(s)), None)
                             if fetch_script:
                                 try:
+                                    import re
                                     import subprocess
                                     cmd = ["bash", fetch_script, bin_dir, "--auto"]
+                                    if core_ver and re.match(r"^v?[A-Za-z0-9._-]+$", core_ver):
+                                        cmd.extend(["--tag", core_ver])
+                                    elif channel == "beta":
+                                        cmd.append("--beta")
                                     if force:
                                         cmd.append("--force")
                                     sub_res = subprocess.run(cmd, capture_output=True, text=True, timeout=90)
                                     if sub_res.returncode == 0:
                                         installed_ok = True
+                                        detected_ver = ""
+                                        try:
+                                            from updater.core.sentinel_core import SentinelCoreManager
+                                            _, detected_ver = SentinelCoreManager(bin_dir=bin_dir, auto_mode=True).get_installed_version()
+                                        except Exception:
+                                            pass
+                                        final_ver = detected_ver or core_ver or "latest"
                                         response = {
                                             "success": True,
-                                            "version": core_ver or "latest",
-                                            "msg": f"Sentinel ядро успешно установлено через {os.path.basename(fetch_script)}.",
+                                            "version": final_ver,
+                                            "msg": f"Sentinel ядро {final_ver} успешно установлено через {os.path.basename(fetch_script)}.",
                                         }
+                                        _update_host_core_progress({
+                                            "active": False,
+                                            "percent": 100,
+                                            "finished": True,
+                                            "success": True,
+                                            "stage": "Sentinel-Core успешно установлен!",
+                                        })
                                     else:
+                                        err_out = sub_res.stderr or sub_res.stdout or err_msg
                                         response = {
                                             "success": False,
-                                            "msg": f"Ошибка {fetch_script}: {sub_res.stderr or sub_res.stdout or err_msg}",
+                                            "msg": f"Ошибка {fetch_script}: {err_out}",
                                         }
+                                        _update_host_core_progress({
+                                            "active": False,
+                                            "finished": True,
+                                            "success": False,
+                                            "error": err_out,
+                                        })
                                 except Exception as fe:
                                     response = {"success": False, "msg": f"{err_msg}; fallback error: {fe}"}
+                                    _update_host_core_progress({
+                                        "active": False,
+                                        "finished": True,
+                                        "success": False,
+                                        "error": str(fe),
+                                    })
                             else:
                                 response = {"success": False, "msg": err_msg or "Ошибка установки ядра"}
+                                _update_host_core_progress({
+                                    "active": False,
+                                    "finished": True,
+                                    "success": False,
+                                    "error": err_msg or "Ошибка установки ядра",
+                                })
                         
                     conn.sendall((json.dumps(response) + "\n").encode("utf-8"))
                 except json.JSONDecodeError:

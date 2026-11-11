@@ -2,6 +2,7 @@ import ctypes
 import json
 import logging
 import os
+import re
 import subprocess
 import sys
 from typing import Dict, Any, List, Optional
@@ -10,6 +11,8 @@ logger = logging.getLogger(__name__)
 
 _SENTINEL_LIB: Optional[ctypes.CDLL] = None
 _SENTINEL_LIB_TRIED: bool = False
+_SENTINEL_LIB_PATH: Optional[str] = None
+_SENTINEL_LOADED_VERSION: Optional[str] = None
 
 
 def _get_sentinel_core_bin() -> str:
@@ -107,6 +110,7 @@ def _init_sentinel_lib(lib: Any) -> Any:
         ("SentinelGenerateVlessEncKeys", []),
         ("SentinelRegisterHysteriaPort", [ctypes.c_int]),
         ("SentinelConfigureSupervisor", [ctypes.c_char_p, ctypes.c_char_p, ctypes.c_char_p]),
+        ("SentinelGetEngineVersion", []),
         ("SentinelGetCoreVersion", [ctypes.c_char_p, ctypes.c_char_p]),
         ("SentinelPopLogLine", [ctypes.c_char_p, ctypes.c_int]),
         ("SentinelGetInMemoryLogs", [ctypes.c_char_p, ctypes.c_int]),
@@ -141,9 +145,54 @@ def _init_sentinel_lib(lib: Any) -> Any:
     return lib
 
 
+def _normalize_engine_version(raw_ver: Optional[str]) -> Optional[str]:
+    """Normalizes raw SentinelGetEngineVersion output to vX.Y.Z format when present."""
+    if not raw_ver:
+        return None
+    clean = str(raw_ver).strip()
+    if not clean:
+        return None
+    if re.match(r"^\d+\.\d+", clean):
+        return f"v{clean}"
+    return clean
+
+
+def _read_engine_version_from_lib(lib: Any) -> Optional[str]:
+    """Queries SentinelGetEngineVersion directly from an already-loaded CDLL handle."""
+    if lib is None or not hasattr(lib, "SentinelGetEngineVersion"):
+        return None
+    try:
+        func = getattr(lib, "SentinelGetEngineVersion")
+        try:
+            func.argtypes = []
+            func.restype = ctypes.c_void_p
+        except (AttributeError, TypeError):
+            pass
+        ptr = func()
+        if not ptr:
+            return None
+        if isinstance(ptr, bytes):
+            return _normalize_engine_version(ptr.decode("utf-8", errors="replace"))
+        if isinstance(ptr, str):
+            return _normalize_engine_version(ptr)
+        try:
+            raw_bytes = ctypes.cast(ctypes.c_void_p(ptr) if isinstance(ptr, int) else ptr, ctypes.c_char_p).value
+            decoded = raw_bytes.decode("utf-8", errors="replace") if raw_bytes else None
+            return _normalize_engine_version(decoded)
+        finally:
+            if hasattr(lib, "SentinelFreeString"):
+                try:
+                    lib.SentinelFreeString(ctypes.c_void_p(ptr) if isinstance(ptr, int) else ptr)
+                except Exception:
+                    pass
+    except Exception as e:
+        logger.debug("Failed to read SentinelGetEngineVersion from loaded lib: %s", e)
+        return None
+
+
 def get_sentinel_lib() -> Optional[ctypes.CDLL]:
     """Returns the loaded ctypes.CDLL instance for sentinel-core, or None if unavailable."""
-    global _SENTINEL_LIB, _SENTINEL_LIB_TRIED
+    global _SENTINEL_LIB, _SENTINEL_LIB_TRIED, _SENTINEL_LIB_PATH, _SENTINEL_LOADED_VERSION
     if _SENTINEL_LIB is not None:
         return _SENTINEL_LIB
     if _SENTINEL_LIB_TRIED:
@@ -158,20 +207,41 @@ def get_sentinel_lib() -> Optional[ctypes.CDLL]:
         lib = ctypes.CDLL(lib_path)
         _init_sentinel_lib(lib)
         _SENTINEL_LIB = lib
-        logger.info("Loaded sentinel-core shared library from %s", lib_path)
+        _SENTINEL_LIB_PATH = lib_path
+        _SENTINEL_LOADED_VERSION = _read_engine_version_from_lib(lib)
+        logger.info("Loaded sentinel-core shared library from %s (version=%s)", lib_path, _SENTINEL_LOADED_VERSION or "unknown")
         return _SENTINEL_LIB
     except Exception as e:
         logger.warning("Failed to load sentinel-core shared library (%s): %s", lib_path, e)
         return None
 
 
-def set_sentinel_lib(lib: Optional[ctypes.CDLL]) -> None:
+def set_sentinel_lib(lib: Optional[ctypes.CDLL], lib_path: Optional[str] = None) -> None:
     """Explicitly sets or resets the CDLL instance (useful for testing or runtime injection)."""
-    global _SENTINEL_LIB, _SENTINEL_LIB_TRIED
+    global _SENTINEL_LIB, _SENTINEL_LIB_TRIED, _SENTINEL_LIB_PATH, _SENTINEL_LOADED_VERSION
     if lib is not None:
         _init_sentinel_lib(lib)
+        _SENTINEL_LIB_PATH = lib_path
+        _SENTINEL_LOADED_VERSION = _read_engine_version_from_lib(lib)
+    else:
+        _SENTINEL_LIB_PATH = None
+        _SENTINEL_LOADED_VERSION = None
     _SENTINEL_LIB = lib
     _SENTINEL_LIB_TRIED = (lib is not None)
+
+
+def get_loaded_core_version() -> Optional[str]:
+    """Returns the Sentinel-Core engine version currently loaded in process RAM, or None if not loaded."""
+    if _SENTINEL_LIB is None:
+        return None
+    if _SENTINEL_LOADED_VERSION:
+        return _SENTINEL_LOADED_VERSION
+    return _read_engine_version_from_lib(_SENTINEL_LIB)
+
+
+def get_loaded_core_path() -> Optional[str]:
+    """Returns the filesystem path from which the active Sentinel-Core library was loaded."""
+    return _SENTINEL_LIB_PATH
 
 
 def _ffi_call_str(func_name: str, *args) -> Optional[str]:

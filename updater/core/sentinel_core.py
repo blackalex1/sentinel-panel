@@ -10,7 +10,7 @@ import shutil
 import subprocess
 import sys
 import urllib.request
-from typing import Dict, Optional, Tuple
+from typing import Any, Dict, Optional, Tuple
 
 from .common import (
     BOLD,
@@ -133,10 +133,16 @@ class SentinelCoreManager:
 
         data = self.downloader.fetch_github_api(f"https://api.github.com/repos/{self.REPO}/releases", timeout=5.0)
         if isinstance(data, list) and len(data) > 0:
-            stable = next((r["tag_name"] for r in data if not r.get("prerelease")), "")
-            prerelease = data[0]["tag_name"] if data[0].get("prerelease") else ""
-            latest_any = data[0]["tag_name"]
-            return stable, prerelease, latest_any
+            non_drafts = [r for r in data if isinstance(r, dict) and not r.get("draft") and r.get("tag_name")]
+            if non_drafts:
+                def _is_pre(r: dict) -> bool:
+                    tag_l = str(r.get("tag_name", "")).lower()
+                    return bool(r.get("prerelease")) or any(x in tag_l for x in ("-beta", "-alpha", "-rc", "-pre", "-dev"))
+
+                stable = next((r["tag_name"] for r in non_drafts if not _is_pre(r)), "")
+                prerelease = next((r["tag_name"] for r in non_drafts if _is_pre(r)), "")
+                latest_any = non_drafts[0]["tag_name"]
+                return stable, prerelease, latest_any
 
         # Fallback to git ls-remote
         if shutil.which("git"):
@@ -176,7 +182,7 @@ class SentinelCoreManager:
 
         return "", "", ""
 
-    def select_version(self) -> Optional[str]:
+    def select_version(self, channel: str = "stable") -> Optional[str]:
         """Interactive or automated version selector."""
         is_installed, current_ver = self.get_installed_version()
         stable_ver, prerelease_ver, latest_any = self.fetch_releases()
@@ -185,7 +191,10 @@ class SentinelCoreManager:
         current_tag = current_tag_match.group(0) if current_tag_match else ""
 
         if not sys.stdin.isatty() or self.auto_mode:
-            target = stable_ver or prerelease_ver or latest_any
+            if str(channel).strip().lower() == "beta":
+                target = latest_any or prerelease_ver or stable_ver
+            else:
+                target = stable_ver or (latest_any if not prerelease_ver else "")
             if not target:
                 log_warn("Не удалось автоматически определить версию ядра с GitHub. Пропуск...")
                 return None
@@ -300,8 +309,32 @@ class SentinelCoreManager:
                         checksum_map[name] = digest
         return checksum_map, size_map
 
+    @staticmethod
+    def _atomic_replace_file(src_tmp: str, dest: str) -> None:
+        """Atomically swaps staging file onto destination path (safe for mapped .so on Linux)."""
+        os.replace(src_tmp, dest)
+
+    @staticmethod
+    def _refresh_lib_alias(target_lib: str, alt_lib: str, os_name: str) -> None:
+        """Atomically refreshes the secondary sentinel-core.{so,dll,dylib} alias."""
+        if not os.path.exists(target_lib):
+            return
+        try:
+            if os_name != "windows":
+                tmp_link = f"{alt_lib}.link.{os.getpid()}"
+                if os.path.lexists(tmp_link):
+                    os.unlink(tmp_link)
+                os.symlink(target_lib, tmp_link)
+                os.replace(tmp_link, alt_lib)
+            else:
+                tmp_copy = f"{alt_lib}.tmp.{os.getpid()}"
+                shutil.copy2(target_lib, tmp_copy)
+                os.replace(tmp_copy, alt_lib)
+        except Exception as e:
+            log_warn(f"Не удалось обновить симлинк {os.path.basename(alt_lib)}: {e}")
+
     def download_core(self, tag: str) -> bool:
-        """Downloads only the single C-shared dynamic library (libsentinel-core.so / .dll)."""
+        """Downloads and atomically swaps C-shared library and CLI binary after SHA-256 verification."""
         log_info(f"Установка Sentinel-Core (C-FFI) {BOLD}{tag}{RESET} в {self.bin_dir}...")
 
         os_name, arch, lib_ext = self._get_platform_info()
@@ -314,6 +347,7 @@ class SentinelCoreManager:
         ]
         lib_asset = next((c for c in lib_candidates if c in size_map or c in checksum_map), lib_candidates[0])
         target_lib = os.path.join(self.bin_dir, f"libsentinel-core{lib_ext}")
+        staging_lib = f"{target_lib}.staging.{os.getpid()}"
 
         if self.progress_callback:
             try:
@@ -328,79 +362,97 @@ class SentinelCoreManager:
             except Exception:
                 pass
 
-        # Download Shared Library
-        lib_ok = self.downloader.download_file_with_mirrors(
-            f"{base_release_url}/{lib_asset}",
-            target_lib,
-            filename_for_log=lib_asset,
-            expected_size=size_map.get(lib_asset, 0),
-        )
-        if not lib_ok:
-            log_error(f"Не удалось загрузить библиотеку {lib_asset}")
-            return False
+        try:
+            # Download Shared Library into staging file first
+            lib_ok = self.downloader.download_file_with_mirrors(
+                f"{base_release_url}/{lib_asset}",
+                staging_lib,
+                filename_for_log=lib_asset,
+                expected_size=size_map.get(lib_asset, 0),
+            )
+            if not lib_ok:
+                log_error(f"Не удалось загрузить библиотеку {lib_asset}")
+                return False
 
-        if os_name != "windows":
-            try:
-                # nosemgrep: python.lang.security.audit.insecure-file-permissions.insecure-file-permissions
-                os.chmod(target_lib, 0o755)
-            except Exception:
-                pass
-
-        if lib_asset in checksum_map:
-            if self.progress_callback:
+            if os_name != "windows":
                 try:
-                    self.progress_callback({
-                        "stage": f"Проверка контрольной суммы SHA-256 для {lib_asset}...",
-                        "percent": 90,
-                        "filename": lib_asset,
-                        "finished": False,
-                    })
+                    # nosemgrep: python.lang.security.audit.insecure-file-permissions.insecure-file-permissions
+                    os.chmod(staging_lib, 0o755)
                 except Exception:
                     pass
-            actual = Downloader.compute_sha256(target_lib)
-            if actual.lower() == checksum_map[lib_asset].lower():
+
+            if lib_asset in checksum_map:
+                if self.progress_callback:
+                    try:
+                        self.progress_callback({
+                            "stage": f"Проверка контрольной суммы SHA-256 для {lib_asset}...",
+                            "percent": 90,
+                            "filename": lib_asset,
+                            "finished": False,
+                        })
+                    except Exception:
+                        pass
+                actual = Downloader.compute_sha256(staging_lib)
+                if actual.lower() != checksum_map[lib_asset].lower():
+                    log_error(f"Несовпадение SHA-256 для {lib_asset}! Замена библиотеки отменена.")
+                    return False
                 log_success(f"SHA-256 проверен ({actual[:16]}...)")
-            else:
-                log_warn(f"Несовпадение SHA-256 для {lib_asset}!")
+
+            self._atomic_replace_file(staging_lib, target_lib)
+        finally:
+            if os.path.lexists(staging_lib):
+                try:
+                    os.remove(staging_lib)
+                except Exception:
+                    pass
 
         # Download CLI Binary if present in release assets
         exe_ext = ".exe" if os_name == "windows" else ""
         cli_asset = f"sentinel-core-{os_name}-{arch}{exe_ext}"
         target_cli = os.path.join(self.bin_dir, f"sentinel-core{exe_ext}")
+        staging_cli = f"{target_cli}.staging.{os.getpid()}"
         if cli_asset in size_map or cli_asset in checksum_map:
-            if self.progress_callback:
-                try:
-                    self.progress_callback({
-                        "stage": f"Загрузка бинарника {cli_asset}...",
-                        "percent": 92,
-                        "filename": cli_asset,
-                        "finished": False,
-                    })
-                except Exception:
-                    pass
-            cli_ok = self.downloader.download_file_with_mirrors(
-                f"{base_release_url}/{cli_asset}",
-                target_cli,
-                filename_for_log=cli_asset,
-                expected_size=size_map.get(cli_asset, 0),
-            )
-            if cli_ok and os_name != "windows" and os.path.exists(target_cli):
-                try:
-                    # nosemgrep: python.lang.security.audit.insecure-file-permissions.insecure-file-permissions
-                    os.chmod(target_cli, 0o755)
-                except Exception:
-                    pass
+            try:
+                if self.progress_callback:
+                    try:
+                        self.progress_callback({
+                            "stage": f"Загрузка бинарника {cli_asset}...",
+                            "percent": 92,
+                            "filename": cli_asset,
+                            "finished": False,
+                        })
+                    except Exception:
+                        pass
+                cli_ok = self.downloader.download_file_with_mirrors(
+                    f"{base_release_url}/{cli_asset}",
+                    staging_cli,
+                    filename_for_log=cli_asset,
+                    expected_size=size_map.get(cli_asset, 0),
+                )
+                if cli_ok and os.path.exists(staging_cli):
+                    if cli_asset in checksum_map:
+                        cli_hash = Downloader.compute_sha256(staging_cli)
+                        if cli_hash.lower() != checksum_map[cli_asset].lower():
+                            log_warn(f"Несовпадение SHA-256 для {cli_asset}, замена CLI пропущена.")
+                            cli_ok = False
+                    if cli_ok:
+                        if os_name != "windows":
+                            try:
+                                # nosemgrep: python.lang.security.audit.insecure-file-permissions.insecure-file-permissions
+                                os.chmod(staging_cli, 0o755)
+                            except Exception:
+                                pass
+                        self._atomic_replace_file(staging_cli, target_cli)
+            finally:
+                if os.path.lexists(staging_cli):
+                    try:
+                        os.remove(staging_cli)
+                    except Exception:
+                        pass
 
-        # Create alias in project bin (sentinel-core.dll/so <-> libsentinel-core.dll/so)
+        # Atomically refresh alias in project bin (sentinel-core.dll/so <-> libsentinel-core.dll/so)
         alt_lib = os.path.join(self.bin_dir, f"sentinel-core{lib_ext}")
-        try:
-            if not os.path.exists(alt_lib) and os.path.exists(target_lib):
-                if os_name != "windows":
-                    os.symlink(target_lib, alt_lib)
-                else:
-                    shutil.copy2(target_lib, alt_lib)
-        except Exception:
-            pass
+        self._refresh_lib_alias(target_lib, alt_lib, os_name)
 
         # Also download sentinel-core.h if present
         h_asset = "sentinel-core.h"

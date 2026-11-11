@@ -445,17 +445,25 @@ async def catch_all(request: Request, path_name: str):
 
 if __name__ == "__main__":
     import uvicorn
+    from backend.runtime import (
+        is_restart_requested,
+        is_running_in_docker,
+        mark_started_from_main,
+        perform_execv_restart,
+    )
     from backend.ssl_utils import generate_default_self_signed_cert, SSL_CERT_PATH, SSL_KEY_PATH
-    
+
+    mark_started_from_main()
+
     # Гарантируем наличие сертификатов перед запуском веб-сервера
     try:
         generate_default_self_signed_cert()
     except Exception as e:
         logging.error(f"Failed to generate default self-signed certificate before startup: {e}")
-        
+
     ssl_key = str(SSL_KEY_PATH) if SSL_KEY_PATH.exists() else None
     ssl_cert = str(SSL_CERT_PATH) if SSL_CERT_PATH.exists() else None
-    
+
     if ssl_key and ssl_cert:
         logging.info(f"Starting HTTPS server on port {settings.PANEL_PORT}...")
         uvicorn.run(
@@ -471,4 +479,8 @@ if __name__ == "__main__":
         logging.warning("SSL certificates not found. Starting HTTP server...")
         logging.info(f"Starting server on port {settings.PANEL_PORT}...")
         uvicorn.run("backend.main:app", host="0.0.0.0", port=settings.PANEL_PORT, server_header=False, reload=False)  # nosec B104
+
+    if is_restart_requested() and not is_running_in_docker():
+        logging.info("Panel restart requested on bare-metal host; replacing process via execv...")
+        perform_execv_restart()
 

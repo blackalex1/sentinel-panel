@@ -78,6 +78,7 @@ async def get_settings_api(request: Request):
             "dns_direct_server": get_setting("dns_direct_server", "8.8.8.8"),
             "dns_strategy": get_setting("dns_strategy", "ipv4_only"),
             "dns_custom_servers": get_setting("dns_custom_servers", ""),
+            "update_channel": "beta" if str(get_setting("update_channel", "stable")).strip().lower() == "beta" else "stable",
             "use_custom_xray_config": get_setting("use_custom_xray_config", "false"),
             "use_custom_singbox_config": get_setting("use_custom_singbox_config", "false"),
             "use_custom_hysteria_config": "true" if has_custom_hysteria else "false"
@@ -329,6 +330,16 @@ async def update_settings_api(request: Request):
         if tg_changed:
             from backend.bot_manager import restart_telegram_bot
             restart_telegram_bot()
+
+        if "update_channel" in data:
+            raw_chan = str(data.get("update_channel", "stable")).strip().lower()
+            norm_chan = "beta" if raw_chan in ("beta", "prerelease", "pre-release", "pre") else "stable"
+            set_setting("update_channel", norm_chan)
+            try:
+                from backend.routes.system.settings_routes.update import _invalidate_update_caches
+                _invalidate_update_caches()
+            except Exception:
+                pass
             
         return {
             "success": True,
