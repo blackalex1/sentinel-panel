@@ -312,7 +312,7 @@ function renderCoreUI(data) {
     const alertBox = document.getElementById("core-update-alert-box");
     const alertTitle = document.getElementById("core-update-alert-title");
     const alertDesc = document.getElementById("core-update-alert-desc");
-    const selectEl = document.getElementById("core-version-select");
+    const selectEl = document.getElementById("sentinel-core-version-select");
     const btnApply = document.getElementById("btn-apply-core-update");
     const btnApplyText = document.getElementById("btn-apply-core-text");
     const githubLink = document.getElementById("btn-open-core-github");
@@ -440,7 +440,7 @@ function renderCoreUI(data) {
 }
 
 function updateSelectedReleaseNotes() {
-    const selectEl = document.getElementById("core-version-select");
+    const selectEl = document.getElementById("sentinel-core-version-select");
     const notesBox = document.getElementById("core-release-notes-container");
     const notesContent = document.getElementById("core-release-notes-content");
     const tagInfo = document.getElementById("core-selected-tag-info");
@@ -687,7 +687,7 @@ export function setupUpdateListeners() {
                     body: JSON.stringify({ channel: newChannel })
                 });
                 if (res && res.success) {
-                    const selectEl = document.getElementById("core-version-select");
+                    const selectEl = document.getElementById("sentinel-core-version-select");
                     if (selectEl) selectEl.value = "";
                     showToast(res.msg || "Канал обновлений обновлён.", "success");
                     await Promise.all([checkPanelUpdates(true), checkCoreUpdates(true)]);
@@ -836,7 +836,7 @@ export function setupUpdateListeners() {
     }
 
     // 4. Core Version Selector
-    const selectCoreVer = document.getElementById("core-version-select");
+    const selectCoreVer = document.getElementById("sentinel-core-version-select");
     if (selectCoreVer) {
         selectCoreVer.addEventListener("change", () => {
             updateSelectedReleaseNotes();
@@ -847,7 +847,7 @@ export function setupUpdateListeners() {
     const btnApplyCore = document.getElementById("btn-apply-core-update");
     if (btnApplyCore) {
         btnApplyCore.addEventListener("click", async () => {
-            const selectEl = document.getElementById("core-version-select");
+            const selectEl = document.getElementById("sentinel-core-version-select");
             const selectedVer = selectEl?.value || latestCoreData?.latest_version || "";
             const displayVer = selectedVer || latestCoreData?.latest_version || "latest";
 
@@ -869,7 +869,7 @@ export function setupUpdateListeners() {
     const btnReinstallCore = document.getElementById("btn-reinstall-core");
     if (btnReinstallCore) {
         btnReinstallCore.addEventListener("click", async () => {
-            const selectEl = document.getElementById("core-version-select");
+            const selectEl = document.getElementById("sentinel-core-version-select");
             const currVer = latestCoreData?.current_version || "";
             const isValidCurrSemver = /^v?\d+\.\d+/.test(currVer.trim());
             const selectedVer = selectEl?.value || (isValidCurrSemver ? currVer : "") || latestCoreData?.latest_version || "";

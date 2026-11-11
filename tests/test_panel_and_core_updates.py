@@ -238,6 +238,13 @@ def test_update_channel_endpoint_and_filtering(client, monkeypatch):
     core_after_beta = client.get("/api/system/settings/update/core/check?force=true").json()
     assert core_after_beta["has_update"] is False
     assert core_after_beta["restart_required"] is False
+    assert [r["tag"] for r in core_after_beta["releases"]] == ["v0.0.25"]
+
+    # In beta channel with beta already installed, beta release stays visible in selector
+    client.post("/api/system/settings/update/channel", json={"channel": "beta"})
+    core_beta_installed = client.get("/api/system/settings/update/core/check?force=true").json()
+    assert core_beta_installed["has_update"] is False
+    assert [r["tag"] for r in core_beta_installed["releases"]] == ["v0.0.26-beta", "v0.0.25"]
 
 
 def test_core_restart_required_detection_and_restart_endpoint(client, monkeypatch):
@@ -498,3 +505,19 @@ def test_git_manager_forces_fetch_and_ignores_filemode(tmp_path, monkeypatch):
     assert ["git", "reset", "--hard", "FETCH_HEAD"] in recorded_cmds
     assert ["git", "reset", "--hard", "HEAD"] in recorded_cmds
     assert (tmp_path / "VERSION").read_text(encoding="utf-8").strip() == "0.0.27"
+
+
+def test_update_dom_select_id_does_not_collide_with_xray():
+    base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    with open(os.path.join(base_dir, "frontend", "components", "xray.html"), "r", encoding="utf-8") as f:
+        xray_html = f.read()
+    with open(os.path.join(base_dir, "frontend", "components", "settings", "update.html"), "r", encoding="utf-8") as f:
+        update_html = f.read()
+    with open(os.path.join(base_dir, "frontend", "js", "modules", "settings", "update.js"), "r", encoding="utf-8") as f:
+        update_js = f.read()
+
+    assert 'id="core-version-select"' in xray_html
+    assert 'id="core-version-select"' not in update_html
+    assert 'id="sentinel-core-version-select"' in update_html
+    assert '"sentinel-core-version-select"' in update_js
+    assert '"core-version-select"' not in update_js
