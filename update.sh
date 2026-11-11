@@ -27,9 +27,12 @@ cleanup_updater_processes() {
 }
 trap cleanup_updater_processes EXIT INT TERM HUP
 
-# 2. Configure Git safe directory and non-interactive authentication
+# 2. Configure Git safe directory, ignore Docker chmod noise, and disable prompts
 git config --global --add safe.directory "$SCRIPT_DIR" 2>/dev/null || true
 git config --global --add safe.directory "*" 2>/dev/null || true
+if [ -d .git ] && command -v git &>/dev/null; then
+    git config core.filemode false 2>/dev/null || true
+fi
 export GIT_TERMINAL_PROMPT=0
 export GIT_ASKPASS=""
 
@@ -52,9 +55,10 @@ if [ -z "${BOOTSTRAPPED:-}" ] && [ -d .git ] && command -v git &>/dev/null; then
     if [ -z "$REPO_HTTPS" ]; then
         REPO_HTTPS="https://github.com/blackalex1/sentinel-panel.git"
     fi
+    OFFICIAL_HTTPS="https://github.com/blackalex1/sentinel-panel.git"
 
     # Check for proxy configuration in .env
-    FETCH_ARGS=(-c "safe.directory=*" -c "core.askPass=true" -c "credential.helper=" -c "http.connectTimeout=4" -c "http.timeout=8")
+    FETCH_ARGS=(-c "safe.directory=*" -c "core.askPass=true" -c "credential.helper=" -c "http.connectTimeout=6" -c "http.timeout=20")
     for env_f in "bot/config/.env" "config/.env" ".env"; do
         if [ -f "$env_f" ]; then
             P_URL=$(grep -E '^[[:space:]]*PROXY_URL=' "$env_f" 2>/dev/null | cut -d'=' -f2- | tr -d '"'\'' ')
@@ -65,22 +69,32 @@ if [ -z "${BOOTSTRAPPED:-}" ] && [ -d .git ] && command -v git &>/dev/null; then
         fi
     done
 
-    # Multi-mirror fallback list (HTTPS repo -> CDN mirrors -> origin)
+    # Multi-mirror fallback list (HTTPS repo -> official -> CDN mirrors -> origin)
     FETCH_SOURCES=()
     if [ -n "$ORIGIN_URL" ] && [[ ! "$ORIGIN_URL" =~ ^git@ ]]; then
         FETCH_SOURCES+=("origin")
     fi
-    FETCH_SOURCES+=("$REPO_HTTPS" "https://gh-proxy.com/$REPO_HTTPS" "https://ghfast.top/$REPO_HTTPS")
+    FETCH_SOURCES+=("$REPO_HTTPS")
+    if [ "$REPO_HTTPS" != "$OFFICIAL_HTTPS" ]; then
+        FETCH_SOURCES+=("$OFFICIAL_HTTPS")
+    fi
+    FETCH_SOURCES+=("https://gh-proxy.com/$OFFICIAL_HTTPS" "https://ghfast.top/$OFFICIAL_HTTPS")
     if [[ "$ORIGIN_URL" =~ ^git@ ]]; then
         FETCH_SOURCES+=("origin")
     fi
 
     FETCH_OK=0
     for src in "${FETCH_SOURCES[@]}"; do
-        if timeout 10 git "${FETCH_ARGS[@]}" fetch --tags "$src" "$BRANCH" 2>/dev/null; then
+        if timeout 25 git "${FETCH_ARGS[@]}" fetch --tags --force "$src" "$BRANCH" 2>/dev/null; then
             FETCH_OK=1
             break
-        elif timeout 10 git -c "safe.directory=*" -c "core.askPass=true" -c "credential.helper=" -c "http.proxy=" -c "https.proxy=" fetch --tags "$src" "$BRANCH" 2>/dev/null; then
+        elif timeout 25 git "${FETCH_ARGS[@]}" fetch --force "$src" "$BRANCH" 2>/dev/null; then
+            FETCH_OK=1
+            break
+        elif timeout 25 git -c "safe.directory=*" -c "core.askPass=true" -c "credential.helper=" -c "http.proxy=" -c "https.proxy=" fetch --tags --force "$src" "$BRANCH" 2>/dev/null; then
+            FETCH_OK=1
+            break
+        elif timeout 25 git -c "safe.directory=*" -c "core.askPass=true" -c "credential.helper=" -c "http.proxy=" -c "https.proxy=" fetch --force "$src" "$BRANCH" 2>/dev/null; then
             FETCH_OK=1
             break
         fi

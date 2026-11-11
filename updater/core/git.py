@@ -25,6 +25,9 @@ from .common import (
 )
 
 
+OFFICIAL_REPO_URL = "https://github.com/blackalex1/sentinel-panel.git"
+
+
 class GitManager:
     """Manages Git updates with automatic multi-mirror fallback and changelog visualization."""
 
@@ -54,13 +57,28 @@ class GitManager:
 
     def _get_candidate_remotes(self) -> List[str]:
         """Builds a list of fetch sources including official URL and CDN mirrors."""
-        remotes = ["origin"]
-        if self.repo_url:
-            remotes.append(self.repo_url)
-            remotes.append(f"https://gh-proxy.com/{self.repo_url}")
-            remotes.append(f"https://ghfast.top/{self.repo_url}")
-            remotes.append(f"https://gh.ddlc.top/{self.repo_url}")
+        remotes: List[str] = ["origin"]
+        urls: List[str] = []
+        for candidate in (self.repo_url, OFFICIAL_REPO_URL):
+            if candidate and candidate not in urls:
+                urls.append(candidate)
+        for base_url in urls:
+            remotes.append(base_url)
+            remotes.append(f"https://gh-proxy.com/{base_url}")
+            remotes.append(f"https://ghfast.top/{base_url}")
+            remotes.append(f"https://gh.ddlc.top/{base_url}")
         return remotes
+
+    def _restore_stash(self, warn_on_conflict: bool = False) -> None:
+        """Restores auto-stashed local changes or cleanly resets conflicting merges."""
+        try:
+            pop_res = run_command(["git", "stash", "pop"], cwd=self.project_dir, capture=True, check=False)
+            if getattr(pop_res, "returncode", 0) != 0:
+                if warn_on_conflict:
+                    log_warn("Авто-восстановление локальных изменений конфликтует с обновлением (оставлен чистый код из Git, изменения в stash).")
+                run_command(["git", "reset", "--hard", "HEAD"], cwd=self.project_dir, capture=True, check=False)
+        except Exception:
+            pass
 
     def update_codebase(self, silent_if_uptodate: bool = False) -> bool:
         """Pulls latest updates from Git origin or fallback mirrors. Returns True if new commits were pulled."""
@@ -71,6 +89,12 @@ class GitManager:
 
         if not silent_if_uptodate:
             log_info("Проверка и получение обновлений Git...")
+
+        # Ignore chmod/filemode differences created inside containers
+        try:
+            run_command(["git", "config", "core.filemode", "false"], cwd=self.project_dir, capture=True, check=False)
+        except Exception:
+            pass
 
         # Stash local changes if any
         stashed = False
@@ -92,8 +116,8 @@ class GitManager:
             "-c", "safe.directory=*",
             "-c", "core.askPass=true",
             "-c", "credential.helper=",
-            "-c", "http.connectTimeout=4",
-            "-c", "http.timeout=8",
+            "-c", "http.connectTimeout=6",
+            "-c", "http.timeout=20",
         ]
         if self.proxy_url:
             proxy_val = self.proxy_url
@@ -121,33 +145,37 @@ class GitManager:
             pass
 
         pull_success = False
+        last_fetch_err = ""
         for remote in self._get_candidate_remotes():
-            try:
-                fetch_cmd = ["git"] + git_config_args + ["fetch", "--tags", remote, branch]
-                res = run_command(fetch_cmd, cwd=self.project_dir, env=git_env, capture=True, check=False, timeout=12.0)
-                if res.returncode == 0:
-                    run_command(["git", "reset", "--hard", "FETCH_HEAD"], cwd=self.project_dir, check=True)
-                    self._sync_version_file()
-                    pull_success = True
-                    break
-            except Exception:
-                continue
+            for fetch_flags in (["fetch", "--tags", "--force"], ["fetch", "--force"]):
+                try:
+                    fetch_cmd = ["git"] + git_config_args + fetch_flags + [remote, branch]
+                    res = run_command(fetch_cmd, cwd=self.project_dir, env=git_env, capture=True, check=False, timeout=25.0)
+                    if res.returncode == 0:
+                        run_command(["git", "reset", "--hard", "FETCH_HEAD"], cwd=self.project_dir, check=True)
+                        self._sync_version_file()
+                        pull_success = True
+                        break
+                    err_text = (getattr(res, "stderr", "") or getattr(res, "stdout", "") or "").strip()
+                    if err_text:
+                        last_fetch_err = err_text.splitlines()[-1]
+                except Exception as exc:
+                    last_fetch_err = str(exc)
+                    continue
+            if pull_success:
+                break
 
         if not pull_success:
             if not silent_if_uptodate:
                 log_warn("Не удалось загрузить новые коммиты из Git (используется текущая локальная версия).")
+                if last_fetch_err:
+                    log_warn(f"Причина Git fetch: {last_fetch_err}")
             if stashed:
-                try:
-                    run_command(["git", "stash", "pop"], cwd=self.project_dir, check=False)
-                except Exception:
-                    pass
+                self._restore_stash(warn_on_conflict=False)
             return False
 
         if stashed:
-            try:
-                run_command(["git", "stash", "pop"], cwd=self.project_dir, check=False)
-            except Exception:
-                pass
+            self._restore_stash(warn_on_conflict=not silent_if_uptodate)
 
         new_commit = ""
         try:

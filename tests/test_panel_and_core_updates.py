@@ -453,3 +453,48 @@ def test_runtime_restart_skips_under_pytest_and_ffi_tracks_loaded_version(monkey
         ffi._SENTINEL_LIB_TRIED = prev_tried
         ffi._SENTINEL_LOADED_VERSION = prev_ver
         ffi._SENTINEL_LIB_PATH = prev_path
+
+
+def test_git_manager_forces_fetch_and_ignores_filemode(tmp_path, monkeypatch):
+    from types import SimpleNamespace
+    import updater.core.git as git_mod
+
+    (tmp_path / ".git").mkdir()
+    monkeypatch.setattr(git_mod.shutil, "which", lambda name: "/usr/bin/git" if name == "git" else None)
+
+    recorded_cmds = []
+    rev_parse_calls = {"head": 0}
+
+    def fake_run_command(cmd, cwd=None, env=None, capture=False, check=False, timeout=None):
+        recorded_cmds.append(list(cmd))
+        if cmd[:3] == ["git", "status", "--porcelain"]:
+            return SimpleNamespace(returncode=0, stdout=" M update.sh\n", stderr="")
+        if cmd[:3] == ["git", "rev-parse", "--abbrev-ref"]:
+            return SimpleNamespace(returncode=0, stdout="main\n", stderr="")
+        if cmd[:3] == ["git", "rev-parse", "HEAD"]:
+            rev_parse_calls["head"] += 1
+            sha = "1111111\n" if rev_parse_calls["head"] == 1 else "2222222\n"
+            return SimpleNamespace(returncode=0, stdout=sha, stderr="")
+        if "fetch" in cmd:
+            if "--tags" in cmd:
+                return SimpleNamespace(returncode=1, stdout="", stderr=" ! [rejected] v0.0.1 -> v0.0.1 (would clobber existing tag)")
+            return SimpleNamespace(returncode=0, stdout="", stderr="")
+        if cmd[:4] == ["git", "-c", "safe.directory=*", "describe"]:
+            return SimpleNamespace(returncode=0, stdout="v0.0.27\n", stderr="")
+        if cmd[:3] == ["git", "stash", "pop"]:
+            return SimpleNamespace(returncode=1, stdout="", stderr="CONFLICT (content): Merge conflict in update.sh")
+        return SimpleNamespace(returncode=0, stdout="", stderr="")
+
+    monkeypatch.setattr(git_mod, "run_command", fake_run_command)
+
+    mgr = git_mod.GitManager(str(tmp_path))
+    assert git_mod.OFFICIAL_REPO_URL in mgr._get_candidate_remotes()
+
+    ok = mgr.update_codebase(silent_if_uptodate=True)
+    assert ok is True
+    assert ["git", "config", "core.filemode", "false"] in recorded_cmds
+    assert any("--tags" in c and "--force" in c for c in recorded_cmds if "fetch" in c)
+    assert any("fetch" in c and "--force" in c and "--tags" not in c for c in recorded_cmds)
+    assert ["git", "reset", "--hard", "FETCH_HEAD"] in recorded_cmds
+    assert ["git", "reset", "--hard", "HEAD"] in recorded_cmds
+    assert (tmp_path / "VERSION").read_text(encoding="utf-8").strip() == "0.0.27"
