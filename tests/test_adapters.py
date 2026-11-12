@@ -81,3 +81,28 @@ def test_build_singbox_reality_normalization():
     assert sb["tls"]["reality"]["public_key"] == "my-pbk-key"
     assert sb["tls"]["reality"]["short_id"] == "1234abcd"
 
+def test_build_singbox_tuic_and_shadowtls():
+    assert detect_best_engine("shadowtls", "auto") == "sing-box"
+    assert detect_best_engine("tuic", "auto") == "sing-box"
+    tuic = build_outbound_config(
+        "auto",
+        "tuic",
+        {"host": "tuic.example.com", "port": 8443, "uuid": "u1", "password": "p1", "congestionControl": "bbr"},
+        {"sni": "tuic.example.com", "alpn": "h3"},
+        tag="tuic-test",
+    )
+    assert tuic["type"] == "tuic"
+    assert tuic["congestion_control"] == "bbr"
+    assert tuic["tls"]["alpn"] == ["h3"]
+
+    stls = build_outbound_config(
+        "auto",
+        "shadowtls",
+        {"host": "stls.example.com", "port": 443, "password": "sec", "shadowTlsVersion": 3, "sni": "apple.com"},
+        {"sni": "apple.com"},
+        tag="stls-test",
+    )
+    assert stls["type"] == "shadowtls"
+    assert stls["version"] == 3
+    assert stls["tls"]["server_name"] == "apple.com"
+

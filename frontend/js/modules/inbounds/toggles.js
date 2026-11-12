@@ -1,5 +1,5 @@
 import { generateRandomPassword, editInboundId, switchInboundModalTab } from "./core.js";
-import { renderDynamicModalTabs } from "./schema-renderer.js";
+import { renderDynamicModalTabs, normalizeEngineId } from "./schema-renderer.js";
 import { t } from "../../i18n.js";
 import { apiFetch } from "../../api.js";
 
@@ -34,9 +34,11 @@ export function updateFormToggles() {
     // Bind change listener on ib-core if not already bound
     if (coreElem && !coreElem.dataset.bound) {
         coreElem.dataset.bound = "true";
-        coreElem.addEventListener("change", () => {
+        coreElem.addEventListener("change", async () => {
+            const p = document.getElementById("ib-protocol") ? document.getElementById("ib-protocol").value : "vless";
+            await syncInboundOptionsFromSchema(p, coreElem.value);
             updateFormToggles();
-            updateTabVisibility(document.getElementById("ib-protocol") ? document.getElementById("ib-protocol").value : "vless");
+            await updateTabVisibility(p);
         });
     }
 
@@ -63,21 +65,30 @@ export function updateFormToggles() {
         if (realityGroup) realityGroup.style.display = (security === "reality") ? "block" : "none";
         if (tlsGroup) tlsGroup.style.display = (security === "tls") ? "block" : "none";
         
-        // Transport settings subgroups
-        if (tcpGroup) tcpGroup.style.display = (network === "tcp") ? "block" : "none";
+        // Transport settings subgroups (Xray-only controls hidden when core is sing-box)
+        if (tcpGroup) tcpGroup.style.display = (network === "tcp" && isXray) ? "block" : "none";
         if (wsGroup) wsGroup.style.display = (network === "ws") ? "block" : "none";
         if (grpcGroup) grpcGroup.style.display = (network === "grpc") ? "block" : "none";
-        if (h2Group) h2Group.style.display = (network === "h2") ? "block" : "none";
+        if (h2Group) h2Group.style.display = (network === "h2" && !isXray) ? "block" : "none";
         if (httpupgradeGroup) httpupgradeGroup.style.display = (network === "httpupgrade") ? "block" : "none";
-        if (xhttpGroup) xhttpGroup.style.display = (network === "xhttp") ? "block" : "none";
-        if (mkcpGroup) mkcpGroup.style.display = (network === "mkcp") ? "block" : "none";
-        
+        if (xhttpGroup) xhttpGroup.style.display = (network === "xhttp" && isXray) ? "block" : "none";
+        if (mkcpGroup) mkcpGroup.style.display = (network === "mkcp" && isXray) ? "block" : "none";
+
+        const grpcMultiGroup = document.getElementById("ib-grpc-multi-mode")?.closest(".input-group");
+        if (grpcMultiGroup) grpcMultiGroup.style.display = isXray ? "block" : "none";
+
+        const realitySpxGroup = document.getElementById("ib-reality-spx")?.closest(".input-group");
+        if (realitySpxGroup) realitySpxGroup.style.display = isXray ? "block" : "none";
+
         // TCP HTTP masquerade fields toggle
-        if (network === "tcp") {
+        if (network === "tcp" && isXray) {
             const tcpTypeElem = document.getElementById("ib-tcp-type");
             const tcpType = tcpTypeElem ? tcpTypeElem.value : "none";
             const tcpHttp = document.getElementById("tcp-http-settings");
             if (tcpHttp) tcpHttp.style.display = (tcpType === "http") ? "block" : "none";
+        } else {
+            const tcpHttp = document.getElementById("tcp-http-settings");
+            if (tcpHttp) tcpHttp.style.display = "none";
         }
         
         // Fallbacks settings display is strictly Xray-only!
@@ -216,6 +227,8 @@ export function updateFormToggles() {
         if (mkcpGroup) mkcpGroup.style.display = "none";
         if (ssGroup) ssGroup.style.display = "none";
         if (hysteriaGroup) hysteriaGroup.style.display = "block";
+        const hy2RoutingGroup = document.getElementById("ib-hysteria-routing-xray")?.closest(".input-group");
+        if (hy2RoutingGroup) hy2RoutingGroup.style.display = (core === "sing-box") ? "none" : "block";
         
         // Hysteria 2 Protection Mode (masq vs obfs)
         const hystModeElem = document.getElementById("ib-hysteria-mode");
@@ -373,11 +386,95 @@ export async function updateCoreOptions(proto) {
                 } else if (coreSelect.options.length > 0) {
                     coreSelect.value = coreSelect.options[0].value;
                 }
+                await syncInboundOptionsFromSchema(proto, coreSelect.value);
                 coreSelect.dispatchEvent(new Event("change", { bubbles: true }));
             }
         }
     } catch (e) {
         console.warn("Error updating core options from schema:", e);
+    }
+}
+
+function syncSelectOptionsFromList(selectEl, values, labelMap = {}, preferredDefault = null) {
+    if (!selectEl || !Array.isArray(values) || values.length === 0) return false;
+    const currentOpts = Array.from(selectEl.options).map(o => o.value);
+    const same = currentOpts.length === values.length && currentOpts.every((v, i) => v === values[i]);
+    const prevVal = selectEl.value;
+    if (!same) {
+        selectEl.innerHTML = "";
+        values.forEach(v => {
+            selectEl.appendChild(new Option(labelMap[v] || v, v));
+        });
+    }
+    if (values.includes(prevVal)) {
+        selectEl.value = prevVal;
+        return false;
+    }
+    if (preferredDefault && values.includes(preferredDefault)) {
+        selectEl.value = preferredDefault;
+    } else {
+        selectEl.value = values[0];
+    }
+    return selectEl.value !== prevVal;
+}
+
+export async function syncInboundOptionsFromSchema(proto, coreOverride = null) {
+    const schema = await fetchCapabilitiesSchema();
+    if (!schema || !schema.protocols) return;
+
+    const protoKey = (proto === "hysteria") ? "hysteria2" : proto;
+    const cap = schema.protocols[protoKey];
+    if (!cap) return;
+
+    const coreElem = document.getElementById("ib-core");
+    const normEngine = normalizeEngineId(coreOverride !== null ? coreOverride : (coreElem ? coreElem.value : ""));
+
+    // 1. Transports for active engine
+    const netLabels = {
+        tcp: "TCP (Raw)",
+        ws: "WebSocket (ws)",
+        grpc: "gRPC",
+        h2: "HTTP/2 (h2)",
+        http: "HTTP/2 (http)",
+        httpupgrade: "HTTPUpgrade",
+        xhttp: "XHTTP (SplitHTTP)",
+        mkcp: "mKCP (UDP)",
+        quic: "QUIC"
+    };
+    const engTransports = (cap.engineTransports && normEngine && Array.isArray(cap.engineTransports[normEngine]))
+        ? cap.engineTransports[normEngine]
+        : cap.supportedTransports;
+    if (Array.isArray(engTransports) && engTransports.length > 0) {
+        const netSelect = document.getElementById("ib-network");
+        syncSelectOptionsFromList(netSelect, engTransports, netLabels, cap.defaultTransport || engTransports[0]);
+    }
+
+    // 2. Security modes for active engine
+    const secLabels = {
+        reality: "REALITY",
+        tls: "TLS",
+        none: "None",
+        shadowtls: "ShadowTLS"
+    };
+    const engSec = (cap.engineSecurity && normEngine && Array.isArray(cap.engineSecurity[normEngine]))
+        ? cap.engineSecurity[normEngine]
+        : cap.supportedSecurity;
+    if (Array.isArray(engSec) && engSec.length > 0) {
+        const secSelect = document.getElementById("ib-security");
+        syncSelectOptionsFromList(secSelect, engSec, secLabels, cap.defaultSecurity || engSec[0]);
+    }
+
+    // 3. uTLS Fingerprints (from schema engineFingerprints or outbound fallback, never hardcoded 'opera')
+    let fps = (cap.engineFingerprints && normEngine && Array.isArray(cap.engineFingerprints[normEngine]))
+        ? cap.engineFingerprints[normEngine]
+        : null;
+    if (!fps && cap.engineFingerprints) {
+        const firstKey = Object.keys(cap.engineFingerprints)[0];
+        if (firstKey) fps = cap.engineFingerprints[firstKey];
+    }
+    if (Array.isArray(fps) && fps.length > 0) {
+        syncSelectOptionsFromList(document.getElementById("ib-tls-fp"), fps, {}, "chrome");
+        syncSelectOptionsFromList(document.getElementById("ib-reality-fp"), fps, {}, "chrome");
     }
 }
 
@@ -400,6 +497,7 @@ export async function handleProtocolChange(proto) {
     }
     
     await updateCoreOptions(proto);
+    await syncInboundOptionsFromSchema(proto);
     updateFormToggles();
     await updateTabVisibility(proto);
 }

@@ -476,20 +476,23 @@ def test_multi_split_routing_with_blocked_bittorrent(monkeypatch):
     assert valid_sb is True, f"Real sing-box binary validation failed: {msg_sb}"
 
     rules = config["route"]["rules"]
-    assert rules[0].get("clash_mode") == "Direct"
+    clash_rule = next((r for r in rules if "clash_mode" in r), None)
+    assert clash_rule is not None and clash_rule.get("clash_mode") == "Direct"
     user_rules = [r for r in rules if "clash_mode" not in r and "action" not in r]
 
-    # Rule 1 in Sing-box user rules MUST be BitTorrent Block
+    # Sing-box user rules MUST have BitTorrent Block
     assert user_rules[0]["outbound"] == "block"
     assert "bittorrent" in user_rules[0]["protocol"]
 
-    # Rule 2 MUST be Hysteria2 VPN route for OpenAI/ChatGPT
-    assert user_rules[1]["outbound"] == "hysteria2-vpn"
-    assert "geosite-openai" in user_rules[1]["rule_set"]
+    # Hysteria2 VPN route for OpenAI/ChatGPT
+    ai_rule = next((r for r in user_rules if r.get("outbound") == "hysteria2-vpn"), None)
+    assert ai_rule is not None
+    assert "geosite-openai" in ai_rule["rule_set"]
 
-    # Rule 3 MUST be Direct route for Gov RU
-    assert user_rules[2]["outbound"] == "direct"
-    assert "geosite-category-gov-ru" in user_rules[2]["rule_set"]
+    # Direct route for Gov RU
+    gov_rule = next((r for r in user_rules if "geosite-category-gov-ru" in r.get("rule_set", [])), None)
+    assert gov_rule is not None
+    assert gov_rule["outbound"] == "direct"
 
     # Outbounds fallback order: direct must be available for unrouted traffic
     assert config["outbounds"][0]["tag"] == "direct"

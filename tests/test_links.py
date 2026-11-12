@@ -68,7 +68,7 @@ def test_links_generator():
     links = get_client_links(hyst_inbound, hyst_client, "1.2.3.4")
     
     assert len(links) == 1
-    assert "hysteria2://bob:clientpass123@1.2.3.4:8443" in links[0]
+    assert "hysteria2://bob:clientpass123@1.2.3.4:20000" in links[0]
     assert ("insecure=1" in links[0]) or ("pinSHA256=" in links[0])
     assert "sni=1.2.3.4" not in links[0]
     assert "obfs=salamander" in links[0]

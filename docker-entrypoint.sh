@@ -50,6 +50,14 @@ for bin_file in "/app/bin/sing-box" "/app/bin/xray" "/app/bin/sentinel-core"; do
     fi
 done
 
+# Grant CAP_NET_RAW to system ping utility so unprivileged appuser can send ICMP probes
+if command -v ping >/dev/null 2>&1 && command -v setcap >/dev/null 2>&1; then
+    PING_BIN="$(readlink -f "$(command -v ping)")"
+    if [ -f "$PING_BIN" ]; then
+        setcap 'cap_net_raw=+ep' "$PING_BIN" 2>/dev/null || true
+    fi
+fi
+
 # 3. Drop root privileges and execute the main application as appuser
 if [ "$(id -u)" = "0" ]; then
     exec gosu appuser "$@"

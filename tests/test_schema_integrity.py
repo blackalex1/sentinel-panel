@@ -71,3 +71,41 @@ def test_schema_tab_definitions_fields_validity():
                 target = field.get("targetField", "")
                 assert "realitySettings" not in target, f"Field {target} should not be in Hysteria 2"
                 assert "decryption" not in target, f"Field {target} should not be in Hysteria 2"
+
+def test_schema_engine_specific_outbound_options():
+    schema = get_capabilities_schema(lang="ru")
+    outbounds = schema.get("outboundProtocols", {})
+    vless_ob = outbounds.get("vless", {})
+    eng_transports = vless_ob.get("engineTransports", {})
+    assert "xhttp" in eng_transports.get("xray-core", [])
+    assert "xhttp" not in eng_transports.get("sing-box", [])
+    assert "h2" not in eng_transports.get("xray-core", [])
+    assert "h2" in eng_transports.get("sing-box", [])
+    fps = vless_ob.get("engineFingerprints", {}).get("xray-core", [])
+    assert "chrome" in fps and "opera" not in fps
+    assert "tuic" in outbounds and outbounds["tuic"].get("supportedEngines") == ["sing-box"]
+    assert "shadowtls" in outbounds and outbounds["shadowtls"].get("supportedEngines") == ["sing-box"]
+
+    # Strict engine isolation checks on inbound + outbound tabDefinitions
+    vless_in = schema.get("protocols", {}).get("vless", {})
+    for tab in vless_in.get("tabDefinitions", []):
+        for grp in tab.get("groups", []):
+            for field in grp.get("fields", []):
+                if field.get("targetField") == "streamSettings.realitySettings.spiderX":
+                    assert field.get("supportedEngines") == ["xray-core"]
+
+    hy2_in = schema.get("protocols", {}).get("hysteria2", {})
+    sniff_tabs = [t for t in hy2_in.get("tabDefinitions", []) if t.get("id") == "sniffing"]
+    assert len(sniff_tabs) == 1 and sniff_tabs[0].get("supportedEngines") == ["sing-box"]
+
+    hy2_ob = outbounds.get("hysteria2", {})
+    hy2_fields = {
+        f.get("targetField"): f
+        for tab in hy2_ob.get("tabDefinitions", [])
+        for grp in tab.get("groups", [])
+        for f in grp.get("fields", [])
+        if f.get("targetField")
+    }
+    assert hy2_fields["upMbps"].get("supportedEngines") == ["hysteria2", "sing-box"]
+    assert hy2_fields["downMbps"].get("supportedEngines") == ["hysteria2", "sing-box"]
+    assert hy2_fields["pinnedPeerCertSha256"].get("supportedEngines") == ["xray-core", "hysteria2"]

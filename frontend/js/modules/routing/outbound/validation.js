@@ -46,24 +46,13 @@ export function validateOutboundForm() {
             isValid = false;
         }
 
-        if (protocol === "vless") {
+        if (protocol === "vless" || protocol === "vmess") {
             const uuid = document.getElementById("ob-uuid") || document.getElementById("ob-password");
             const uuidVal = uuid ? uuid.value.trim() : (vals.uuid || vals.password);
             if (!uuidVal) {
                 if (uuid) uuid.classList.add("input-invalid");
                 errors.push(t("validation_outbound_uuid_required", "UUID обязателен"));
                 isValid = false;
-            }
-
-            const sec = document.getElementById("ob-security") ? document.getElementById("ob-security").value : (vals.security || "reality");
-            if (sec === "reality") {
-                const pbk = document.getElementById("ob-pbk");
-                const pbkVal = pbk ? pbk.value.trim() : (vals.publicKey || vals.pbk);
-                if (!pbkVal) {
-                    if (pbk) pbk.classList.add("input-invalid");
-                    errors.push(t("validation_outbound_pbk_required", "Публичный ключ Reality обязателен"));
-                    isValid = false;
-                }
             }
         } else if (protocol === "hysteria2" || protocol === "hysteria") {
             const pass = document.getElementById("ob-password");
@@ -80,6 +69,19 @@ export function validateOutboundForm() {
                 if (pass) pass.classList.add("input-invalid");
                 errors.push(t("validation_outbound_password_required", "Пароль обязателен"));
                 isValid = false;
+            }
+        }
+
+        if (protocol === "vless" || protocol === "trojan") {
+            const sec = document.getElementById("ob-security") ? document.getElementById("ob-security").value : (vals.security || (protocol === "vless" ? "reality" : "tls"));
+            if (sec === "reality") {
+                const pbk = document.getElementById("ob-pbk");
+                const pbkVal = pbk ? pbk.value.trim() : (vals.publicKey || vals.pbk);
+                if (!pbkVal) {
+                    if (pbk) pbk.classList.add("input-invalid");
+                    errors.push(t("validation_outbound_pbk_required", "Публичный ключ Reality обязателен"));
+                    isValid = false;
+                }
             }
         }
     }

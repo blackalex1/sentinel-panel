@@ -117,22 +117,40 @@ export function switchActiveSchemaTab(tabsContainer, activeTabId) {
     });
 }
 
+export function normalizeEngineId(engine) {
+    const raw = String(engine || "").trim().toLowerCase();
+    if (!raw || raw === "auto") return "";
+    if (raw === "xray" || raw === "xray-core") return "xray-core";
+    if (raw === "singbox" || raw === "sing-box") return "sing-box";
+    if (raw === "hysteria" || raw === "hysteria2" || raw === "hy2") return "hysteria2";
+    return raw;
+}
+
+export function isSupportedByEngine(supportedEngines, activeEngine) {
+    const normEngine = normalizeEngineId(activeEngine);
+    if (!normEngine) return true;
+    if (!Array.isArray(supportedEngines) || supportedEngines.length === 0) return true;
+    return supportedEngines.map(e => normalizeEngineId(e)).includes(normEngine);
+}
+
 /**
  * Dynamically renders the entire Outbound form based on sentinel-core Outbound tabDefinitions
  */
-export function renderDynamicOutboundForm(containerEl, tabsContainerEl, tabDefinitions, currentValues = {}, onFieldChange = null) {
+export function renderDynamicOutboundForm(containerEl, tabsContainerEl, tabDefinitions, currentValues = {}, onFieldChange = null, activeEngine = "") {
     if (!containerEl || !Array.isArray(tabDefinitions)) return;
+
+    const visibleTabs = tabDefinitions.filter(tab => isSupportedByEngine(tab.supportedEngines, activeEngine));
 
     containerEl.innerHTML = "";
     if (tabsContainerEl) {
         tabsContainerEl.innerHTML = "";
     }
 
-    let activeTabId = tabDefinitions.length > 0 ? tabDefinitions[0].id : "basic";
+    let activeTabId = visibleTabs.length > 0 ? visibleTabs[0].id : "basic";
 
     // 1. Render Tab Buttons
     if (tabsContainerEl) {
-        tabDefinitions.forEach((tab, idx) => {
+        visibleTabs.forEach((tab, idx) => {
             const btn = document.createElement("button");
             btn.type = "button";
             btn.className = `btn secondary-btn modal-tab-btn ${idx === 0 ? "active" : ""}`;
@@ -170,14 +188,14 @@ export function renderDynamicOutboundForm(containerEl, tabsContainerEl, tabDefin
     }
 
     // 2. Render Tab Panels & Field Groups
-    tabDefinitions.forEach((tab, tabIdx) => {
+    visibleTabs.forEach((tab, tabIdx) => {
         const panel = document.createElement("div");
         panel.className = `tab-panel ${tabIdx === 0 ? "active-panel" : ""}`;
         panel.id = `ob-tab-panel-${tab.id}`;
         panel.style.display = (tabIdx === 0) ? "block" : "none";
 
         if (Array.isArray(tab.groups)) {
-            tab.groups.forEach(group => {
+            tab.groups.filter(g => isSupportedByEngine(g.supportedEngines, activeEngine)).forEach(group => {
                 const groupCard = document.createElement("div");
                 groupCard.className = "settings-group-card";
                 groupCard.style.cssText = "background: rgba(15, 23, 42, 0.45); border: 1px solid var(--border-color); border-radius: 12px; padding: 18px 22px; margin-bottom: 18px;";
@@ -202,7 +220,7 @@ export function renderDynamicOutboundForm(containerEl, tabsContainerEl, tabDefin
                 row.style.cssText = "display: flex; flex-wrap: wrap; gap: 14px;";
 
                 if (Array.isArray(group.fields)) {
-                    group.fields.forEach(field => {
+                    group.fields.filter(f => isSupportedByEngine(f.supportedEngines, activeEngine)).forEach(field => {
                         const fieldWrap = document.createElement("div");
                         fieldWrap.className = `input-group ${field.gridColumn || "col-12"}`;
                         
@@ -234,27 +252,47 @@ export function renderDynamicOutboundForm(containerEl, tabsContainerEl, tabDefin
                             const sel = document.createElement("select");
                             sel.id = field.id;
                             sel.className = "glass-select";
-                            if (Array.isArray(field.options)) {
-                                field.options.forEach(opt => {
-                                    const optEl = document.createElement("option");
-                                    optEl.value = opt.value;
-                                    let labelText = opt.label || "";
-                                    if (labelText === "UI_OPT_NONE") {
-                                        labelText = t("opt_none_obfs", "Отсутствует (Без обфускации)");
-                                    } else if (labelText === "UI_OPT_NO_FLOW") {
-                                        labelText = t("opt_no_flow", "Без flow");
-                                    } else if (labelText === "UI_OPT_NO_ENCRYPTION") {
-                                        labelText = t("opt_no_encryption", "Без шифрования");
-                                    }
-                                    optEl.textContent = labelText;
-                                    if (String(val) === String(opt.value)) {
-                                        optEl.selected = true;
-                                    }
-                                    sel.appendChild(optEl);
-                                });
+                            const filteredOpts = Array.isArray(field.options)
+                                ? field.options.filter(opt => isSupportedByEngine(opt.supportedEngines, activeEngine))
+                                : [];
+                            filteredOpts.forEach(opt => {
+                                const optEl = document.createElement("option");
+                                optEl.value = opt.value;
+                                let labelText = opt.label || "";
+                                if (labelText === "UI_OPT_NONE") {
+                                    labelText = t("opt_none_obfs", "Отсутствует (Без обфускации)");
+                                } else if (labelText === "UI_OPT_NO_FLOW") {
+                                    labelText = t("opt_no_flow", "Без flow");
+                                } else if (labelText === "UI_OPT_NO_ENCRYPTION") {
+                                    labelText = t("opt_no_encryption", "Без шифрования");
+                                }
+                                optEl.textContent = labelText;
+                                if (opt.showIf) {
+                                    optEl.setAttribute("data-show-if", JSON.stringify(opt.showIf));
+                                }
+                                if (String(val) === String(opt.value)) {
+                                    optEl.selected = true;
+                                }
+                                sel.appendChild(optEl);
+                            });
+                            if (val !== undefined && val !== null && !filteredOpts.some(o => String(o.value) === String(val))) {
+                                if (filteredOpts.length > 0) {
+                                    const defVal = field.default !== undefined && filteredOpts.some(o => String(o.value) === String(field.default))
+                                        ? field.default
+                                        : filteredOpts[0].value;
+                                    sel.value = defVal;
+                                    setByPath(currentValues, field.targetField, defVal);
+                                }
                             }
                             sel.addEventListener("change", (e) => {
-                                setByPath(currentValues, field.targetField, e.target.value);
+                                const nextVal = e.target.value;
+                                setByPath(currentValues, field.targetField, nextVal);
+                                // Auto-normalize REALITY with incompatible transports when user picks ws/httpupgrade/h2
+                                if (field.targetField === "network" && ["ws", "httpupgrade", "h2"].includes(nextVal) && currentValues.security === "reality") {
+                                    setByPath(currentValues, "security", "tls");
+                                    const secSel = containerEl.querySelector("#ob-security");
+                                    if (secSel) secSel.value = "tls";
+                                }
                                 refreshVisibility();
                                 if (typeof onFieldChange === "function") onFieldChange(currentValues);
                             });
@@ -277,7 +315,7 @@ export function renderDynamicOutboundForm(containerEl, tabsContainerEl, tabDefin
                             });
                             fieldWrap.appendChild(checkLabel);
                         } else {
-                            // Text, Number, Password inputs
+                            // Text, Number, Password inputs (with optional datalist presets from field.options)
                             const isNumeric = (field.type === "number" && field.targetField !== "port" && field.id !== "ob-port" && !String(val).includes("-") && !String(val).includes(",") && !String(val).includes(":"));
                             const input = document.createElement("input");
                             input.id = field.id;
@@ -287,6 +325,25 @@ export function renderDynamicOutboundForm(containerEl, tabsContainerEl, tabDefin
                             input.autocomplete = (field.type === "password") ? "new-password" : "off";
                             input.placeholder = field.placeholder || "";
                             input.value = (val !== undefined && val !== null) ? val : "";
+
+                            const presetOpts = Array.isArray(field.options)
+                                ? field.options.filter(opt => isSupportedByEngine(opt.supportedEngines, activeEngine))
+                                : [];
+                            if (presetOpts.length > 0 && field.type !== "password") {
+                                const listId = `${field.id}-presets`;
+                                const datalist = document.createElement("datalist");
+                                datalist.id = listId;
+                                presetOpts.forEach(opt => {
+                                    const oEl = document.createElement("option");
+                                    oEl.value = opt.value;
+                                    if (opt.label && opt.label !== opt.value) {
+                                        oEl.label = opt.label;
+                                    }
+                                    datalist.appendChild(oEl);
+                                });
+                                input.setAttribute("list", listId);
+                                fieldWrap.appendChild(datalist);
+                            }
 
                             input.addEventListener("input", (e) => {
                                 const raw = e.target.value;

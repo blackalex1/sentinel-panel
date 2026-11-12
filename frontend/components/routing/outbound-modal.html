@@ -17,12 +17,18 @@
                     </div>
                 </div>
 
-                <!-- Protocol Selector (Dynamic from Core Schema) -->
-                <div class="input-row" style="margin-bottom: 20px;">
-                    <div class="input-group" style="flex: 1;">
+                <!-- Protocol & Engine Selectors (Dynamic from Core Schema) -->
+                <div class="input-row" style="margin-bottom: 20px; display: flex; flex-wrap: wrap; gap: 14px;">
+                    <div class="input-group" style="flex: 2 1 260px;">
                         <label data-i18n="routing_modal_protocol" for="ob-protocol"></label>
                         <select class="glass-select" id="ob-protocol">
                             <!-- Dynamically loaded from sentinel-core outboundProtocols -->
+                        </select>
+                    </div>
+                    <div class="input-group" style="flex: 1 1 200px;">
+                        <label data-i18n="routing_modal_engine" for="ob-engine">Ядро (Core)</label>
+                        <select class="glass-select" id="ob-engine">
+                            <option value="">Auto (Все опции)</option>
                         </select>
                     </div>
                 </div>

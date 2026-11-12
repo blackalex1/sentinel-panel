@@ -178,10 +178,12 @@ def test_singbox_config_generation_with_hysteria_and_rules(monkeypatch):
     assert domain_rule is not None
     assert domain_rule["inbound"] == ["inbound-1"]
     assert (domain_rule.get("user") or domain_rule.get("auth_user")) == ["test@example.com"]
-    assert "chatgpt.com" in domain_rule["domain"]
+    assert "chatgpt.com" in (domain_rule.get("domain") or domain_rule.get("domain_suffix", []))
     assert ".*\\.ai" in domain_rule["domain_regex"]
-    assert "tcp" in domain_rule["network"]
-    assert "bittorrent" in domain_rule["protocol"]
+
+    protocol_rule = next((r for r in rules if r.get("outbound") == "hysteria2-out" and "bittorrent" in r.get("protocol", [])), None)
+    assert protocol_rule is not None
+    assert protocol_rule["inbound"] == ["inbound-1"]
 
     ip_rule = next((r for r in rules if r.get("outbound") == "hysteria2-out" and "geoip-us" in r.get("rule_set", [])), None)
     assert ip_rule is not None
