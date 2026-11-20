@@ -222,7 +222,20 @@ else
     echo "  [!] Notice: libsentinel-core shared library not found in $SCRIPT_DIR/bin"
 fi
 
-# 6. Build and run Docker containers
+# 6. Configure host firewall (UFW / firewalld) if active to allow Web Panel and Let's Encrypt validation
+if command -v ufw >/dev/null 2>&1 && ufw status 2>/dev/null | grep -q "Status: active"; then
+    echo "[+] UFW active. Ensuring ports 80/tcp and ${FINAL_PORT}/tcp are allowed..."
+    ufw allow 80/tcp comment "Let's Encrypt HTTP-01" 2>/dev/null || ufw allow 80/tcp 2>/dev/null || true
+    ufw allow "${FINAL_PORT}/tcp" comment "Sentinel Panel" 2>/dev/null || ufw allow "${FINAL_PORT}/tcp" 2>/dev/null || true
+    ufw reload 2>/dev/null || true
+elif command -v firewall-cmd >/dev/null 2>&1 && systemctl is-active --quiet firewalld 2>/dev/null; then
+    echo "[+] firewalld active. Ensuring ports 80/tcp and ${FINAL_PORT}/tcp are allowed..."
+    firewall-cmd --permanent --add-port=80/tcp 2>/dev/null || true
+    firewall-cmd --permanent --add-port="${FINAL_PORT}/tcp" 2>/dev/null || true
+    firewall-cmd --reload 2>/dev/null || true
+fi
+
+# 7. Build and run Docker containers
 echo "[+] Starting Docker Compose..."
 cd "$SCRIPT_DIR" || exit 1
 docker compose build

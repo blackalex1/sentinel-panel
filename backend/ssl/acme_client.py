@@ -188,22 +188,32 @@ class AcmeClient:
         logging.error(f"[ACME Client] Challenge trigger failed status={status}: {res_json}")
         return False
 
-    def poll_authorization(self, auth_url: str) -> bool:
-        """Polls the authorization status until valid or failed."""
+    def poll_authorization(self, auth_url: str) -> Tuple[bool, Optional[str]]:
+        """Polls the authorization status until valid or failed. Returns (is_valid, error_detail)."""
         import time
+        last_error_detail = None
         for _ in range(15):  # 15 attempts, 2 sec interval
             status, res_json, _ = self._sign_and_post(auth_url, None)
             if status == 200:
                 auth_status = res_json.get("status")
                 logging.info(f"[ACME Client] Authorization status: {auth_status}")
                 if auth_status == "valid":
-                    return True
+                    return True, None
                 if auth_status in ("invalid", "revoked", "expired"):
-                    logging.error(f"[ACME Client] Authorization failed with status: {auth_status}")
-                    return False
+                    # Extract detailed diagnostic from challenges if present
+                    for chal in res_json.get("challenges", []):
+                        if isinstance(chal, dict) and chal.get("error"):
+                            err_info = chal["error"]
+                            if isinstance(err_info, dict) and err_info.get("detail"):
+                                last_error_detail = err_info["detail"]
+                                break
+                    if not last_error_detail and isinstance(res_json.get("error"), dict):
+                        last_error_detail = res_json["error"].get("detail")
+                    logging.error(f"[ACME Client] Authorization failed with status: {auth_status}, detail: {last_error_detail or res_json}")
+                    return False, last_error_detail
             time.sleep(2)
         logging.error("[ACME Client] Authorization polling timed out.")
-        return False
+        return False, "Authorization polling timed out"
 
     def finalize_order(self, finalize_url: str, domain: str, domain_key: ec.EllipticCurvePrivateKey) -> Optional[str]:
         """Submits CSR to finalize certificate order."""

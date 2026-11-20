@@ -10,7 +10,9 @@ def run_acme_flow(domain: str, email: str, use_staging: bool = False) -> Tuple[b
     
     # Start temporary HTTP server on port 80 to answer challenge
     temp_server = TemporaryAcmeServer(port=80)
-    temp_server.start()
+    if not temp_server.start():
+        bind_err = temp_server.last_error or "port 80 is occupied by another process or insufficient privileges"
+        return False, f"Failed to start temporary HTTP challenge server on port 80 ({bind_err})", None, None
     
     try:
         client = AcmeClient(use_staging=use_staging)
@@ -47,10 +49,11 @@ def run_acme_flow(domain: str, email: str, use_staging: bool = False) -> Tuple[b
                 return False, "Failed to trigger ACME challenge validation", None, None
                 
             # Poll authorization status
-            success = client.poll_authorization(auth_url)
+            success, err_detail = client.poll_authorization(auth_url)
             ACME_CHALLENGES.pop(token, None)
             if not success:
-                return False, "ACME domain authorization validation failed (Let's Encrypt was unable to reach /.well-known/acme-challenge/ over port 80)", None, None
+                detail_msg = f": {err_detail}" if err_detail else " (Let's Encrypt was unable to reach /.well-known/acme-challenge/ over port 80)"
+                return False, f"ACME domain authorization validation failed{detail_msg}", None, None
                 
         # Finalize certificate
         domain_key = ec.generate_private_key(ec.SECP256R1())

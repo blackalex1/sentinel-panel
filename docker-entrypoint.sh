@@ -37,16 +37,24 @@ fi
 # Ensure app directory permissions
 chown -R appuser:appuser /app/updater 2>/dev/null || true
 
-# 2. Grant capabilities to Python interpreter for network binding and raw sockets
-PYTHON_BIN="/app/.venv/bin/python"
-if [ -f "$PYTHON_BIN" ] && command -v setcap >/dev/null 2>&1; then
-    setcap 'cap_net_bind_service,cap_net_admin=+ep' "$PYTHON_BIN" 2>/dev/null || true
-fi
+# 2. Grant capabilities to Python interpreter for network binding (<1024 ports like 80/443) and raw sockets
+sysctl -w net.ipv4.ip_unprivileged_port_start=0 2>/dev/null || true
+echo 0 > /proc/sys/net/ipv4/ip_unprivileged_port_start 2>/dev/null || true
+
+for py_path in "/app/.venv/bin/python" "$(command -v python3 2>/dev/null)" "$(command -v python 2>/dev/null)"; do
+    if [ -n "$py_path" ] && [ -e "$py_path" ]; then
+        REAL_PY="$(readlink -f "$py_path" 2>/dev/null || echo "$py_path")"
+        if [ -f "$REAL_PY" ] && command -v setcap >/dev/null 2>&1; then
+            setcap 'cap_net_bind_service,cap_net_admin=+ep' "$REAL_PY" 2>/dev/null || true
+        fi
+    fi
+done
 
 # Also grant capabilities to proxy core binaries in /app/bin if present
 for bin_file in "/app/bin/sing-box" "/app/bin/xray" "/app/bin/sentinel-core"; do
     if [ -f "$bin_file" ] && command -v setcap >/dev/null 2>&1; then
-        setcap 'cap_net_bind_service,cap_net_admin=+ep' "$bin_file" 2>/dev/null || true
+        REAL_BIN="$(readlink -f "$bin_file" 2>/dev/null || echo "$bin_file")"
+        setcap 'cap_net_bind_service,cap_net_admin=+ep' "$REAL_BIN" 2>/dev/null || true
     fi
 done
 

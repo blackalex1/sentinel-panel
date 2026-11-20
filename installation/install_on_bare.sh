@@ -40,6 +40,22 @@ chmod +x "$SCRIPT_DIR/bin"/* 2>/dev/null || true
 export PYTHONPATH="$SCRIPT_DIR:${PYTHONPATH:-}"
 
 echo "[+] Настройка фоновой службы хост-агента Sentinel..."
+if [ "$EUID" -eq 0 ]; then
+    PANEL_PORT=$(grep -E "^PANEL_PORT=" "$SCRIPT_DIR/config/.env" 2>/dev/null | cut -d'=' -f2 | tr -d '\r\n ' || echo "2053")
+    [ -z "$PANEL_PORT" ] && PANEL_PORT="2053"
+    if command -v ufw >/dev/null 2>&1 && ufw status 2>/dev/null | grep -q "Status: active"; then
+        echo "[+] UFW active. Ensuring ports 80/tcp and ${PANEL_PORT}/tcp are allowed..."
+        ufw allow 80/tcp comment "Let's Encrypt HTTP-01" 2>/dev/null || ufw allow 80/tcp 2>/dev/null || true
+        ufw allow "${PANEL_PORT}/tcp" comment "Sentinel Panel" 2>/dev/null || ufw allow "${PANEL_PORT}/tcp" 2>/dev/null || true
+        ufw reload 2>/dev/null || true
+    elif command -v firewall-cmd >/dev/null 2>&1 && systemctl is-active --quiet firewalld 2>/dev/null; then
+        echo "[+] firewalld active. Ensuring ports 80/tcp and ${PANEL_PORT}/tcp are allowed..."
+        firewall-cmd --permanent --add-port=80/tcp 2>/dev/null || true
+        firewall-cmd --permanent --add-port="${PANEL_PORT}/tcp" 2>/dev/null || true
+        firewall-cmd --reload 2>/dev/null || true
+    fi
+fi
+
 if [ "$EUID" -eq 0 ] && [ -f "$SCRIPT_DIR/host/sentinel-agent.service" ] && command -v systemctl &>/dev/null && [ -d "/etc/systemd/system" ]; then
     sed "s|/opt/sentinel-panel|$SCRIPT_DIR|g" "$SCRIPT_DIR/host/sentinel-agent.service" > /etc/systemd/system/sentinel-agent.service
     systemctl daemon-reload
