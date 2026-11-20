@@ -55,9 +55,6 @@ RUN apt-get update && apt-get upgrade -y && apt-get install -y --no-install-reco
     && if command -v ping >/dev/null 2>&1 && command -v setcap >/dev/null 2>&1; then \
         setcap 'cap_net_raw=+ep' "$(readlink -f "$(command -v ping)")" || true; \
        fi \
-    && if command -v python3 >/dev/null 2>&1 && command -v setcap >/dev/null 2>&1; then \
-        setcap 'cap_net_bind_service,cap_net_admin=+ep' "$(readlink -f "$(command -v python3)")" || true; \
-       fi \
     && rm -rf /var/lib/apt/lists/*
 
 # Upgrade system pip and setuptools in runtime image to eliminate CVE-2025-47273 and vendored package vulnerabilities
