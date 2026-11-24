@@ -6,7 +6,7 @@ import os
 import subprocess
 from pathlib import Path
 
-PANEL_VERSION_FALLBACK = "0.0.8"
+PANEL_VERSION_FALLBACK = "0.0.9"
 
 
 def _resolve_panel_version() -> str:
