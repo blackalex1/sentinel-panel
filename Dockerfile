@@ -25,11 +25,10 @@ FROM python:3.14-slim
 # trivy:ignore:AVD-DS-0002: Privilege dropping is handled dynamically via gosu appuser in docker-entrypoint.sh
 # checkov:skip=CKV_DOCKER_3: Privilege dropping is handled dynamically via gosu appuser in docker-entrypoint.sh
 
-# Build-time version arguments
-ARG PANEL_VERSION="0.0.8"
+# Optional build-time version override (written to /app/VERSION when set, never baked as stale ENV)
+ARG PANEL_VERSION=""
 
 # Set environment variables
-ENV PANEL_VERSION=${PANEL_VERSION}
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 ENV PYO3_USE_ABI3_FORWARD_COMPATIBILITY=1
@@ -83,6 +82,7 @@ RUN chmod +x /app/docker-entrypoint.sh && sed -i 's/\r$//' /app/docker-entrypoin
 
 # Copy version metadata and application code
 COPY VERSION* /app/
+RUN if [ -n "$PANEL_VERSION" ]; then printf '%s\n' "${PANEL_VERSION#v}" > /app/VERSION; fi
 COPY backend/ /app/backend/
 COPY frontend/ /app/frontend/
 COPY dist-react/ /app/dist-react/

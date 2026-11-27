@@ -56,7 +56,7 @@ jobs:
           echo "${CLEAN_VERSION}" > VERSION
           python3 -c "
           import re
-          path = 'backend/version.py'
+          path = 'backend/infra/version.py'
           with open(path, 'r', encoding='utf-8') as f:
               c = f.read()
           c = re.sub(r'PANEL_VERSION_FALLBACK\s*=\s*[\"\\'].*?[\"\\']', f'PANEL_VERSION_FALLBACK = \"${CLEAN_VERSION}\"', c)

@@ -130,6 +130,13 @@ def test_dynamic_panel_version_resolution(tmp_path, monkeypatch):
     assert _resolve_panel_version() == "3.1.4"
 
 
+def test_dockerfile_does_not_hardcode_stale_panel_version_env():
+    from pathlib import Path
+    dockerfile = (Path(__file__).resolve().parent.parent.parent / "Dockerfile").read_text(encoding="utf-8")
+    assert 'ARG PANEL_VERSION="0.0.' not in dockerfile
+    assert "ENV PANEL_VERSION=" not in dockerfile
+
+
 def test_semver_sort_and_prerelease_detection():
     from backend.routes.system.settings_routes import update as update_routes
 
