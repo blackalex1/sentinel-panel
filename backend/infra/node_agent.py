@@ -42,7 +42,21 @@ def generate_keypair() -> Tuple[str, str]:
     public_hex = private_key.public_key().public_bytes_raw().hex()
     return public_hex, private_hex
 
-async def register_with_master(master_url: str, join_code: str) -> bool:
+async def _post_to_master(
+    endpoint: str,
+    payload: dict,
+    *,
+    timeout: float,
+    headers: Optional[dict] = None,
+    ca_cert: Optional[str] = None,
+) -> httpx.Response:
+    """Sends an HTTPS POST request to Master with strict TLS or an explicit CA certificate."""
+    verify_target: str | bool = ca_cert if (ca_cert and os.path.exists(ca_cert)) else True
+    async with httpx.AsyncClient(timeout=timeout, verify=verify_target) as client:
+        return await client.post(endpoint, json=payload, headers=headers)
+
+
+async def register_with_master(master_url: str, join_code: str, ca_cert: Optional[str] = None) -> bool:
     """
     Registers this node with the Master Server using a temporary Join Code.
     Generates keys locally and uploads the Public Key.
@@ -67,14 +81,12 @@ async def register_with_master(master_url: str, join_code: str) -> bool:
     register_endpoint = f"{master_url.rstrip('/')}/api/nodes/register"
     
     try:
-        # Сначала пробуем безопасное подключение с проверкой SSL
-        try:
-            async with httpx.AsyncClient(timeout=15.0, verify=True) as client:
-                response = await client.post(register_endpoint, json=payload)
-        except Exception as ssl_err:
-            logging.warning(f"[Node Agent] SSL verification failed ({ssl_err}). Retrying without SSL validation...")
-            async with httpx.AsyncClient(timeout=15.0, verify=False) as client:
-                response = await client.post(register_endpoint, json=payload)
+        response = await _post_to_master(
+            register_endpoint,
+            payload,
+            timeout=15.0,
+            ca_cert=ca_cert,
+        )
 
         if response.status_code != 200:
             logging.error(f"[Node Agent] Registration failed with status {response.status_code}")
@@ -89,7 +101,8 @@ async def register_with_master(master_url: str, join_code: str) -> bool:
             "master_url": master_url,
             "master_public_key": data["master_public_key"],
             "private_key": priv_hex,
-            "public_key": pub_hex
+            "public_key": pub_hex,
+            **({"ca_cert": ca_cert} if ca_cert else {}),
         }
         save_node_config(config)
         logging.info(f"[Node Agent] Successfully registered! Saved Node ID: {data['node_id']}")
@@ -144,14 +157,13 @@ async def send_report_to_master(action: str, client_email: str,
     }
     
     try:
-        # Сначала пробуем безопасное подключение с проверкой SSL
-        try:
-            async with httpx.AsyncClient(timeout=10.0, verify=True) as client:
-                response = await client.post(report_endpoint, json=payload, headers=headers)
-        except Exception as ssl_err:
-            logging.warning(f"[Node Agent] SSL verification failed for report ({ssl_err}). Retrying without SSL validation...")
-            async with httpx.AsyncClient(timeout=10.0, verify=False) as client:
-                response = await client.post(report_endpoint, json=payload, headers=headers)
+        response = await _post_to_master(
+            report_endpoint,
+            payload,
+            timeout=10.0,
+            headers=headers,
+            ca_cert=config.get("ca_cert"),
+        )
 
         if response.status_code == 200:
             logging.info(f"[Node Agent] Report sent successfully for incident {incident_id}")

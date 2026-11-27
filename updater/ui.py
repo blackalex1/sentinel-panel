@@ -11,7 +11,7 @@ import socket
 import subprocess
 import sys
 import unicodedata
-from typing import Dict, List, Optional, Union
+from typing import Dict, List, Optional
 
 if sys.platform == "win32":
     try:
@@ -177,24 +177,25 @@ def free_port(port: int) -> None:
 
 
 def run_command(
-    cmd: Union[List[str], str],
+    cmd: List[str],
     cwd: Optional[str] = None,
     env: Optional[Dict[str, str]] = None,
     check: bool = True,
     capture: bool = False,
     timeout: Optional[float] = None,
 ) -> subprocess.CompletedProcess:
-    """Runs shell/system command with robust timeout and output capturing."""
+    """Runs system command without a shell."""
+    if isinstance(cmd, str):
+        raise ValueError("run_command requires an argument list, not a shell string.")
     merged_env = os.environ.copy()
     if env:
         merged_env.update(env)
 
-    shell = isinstance(cmd, str)
     return subprocess.run(
         cmd,
         cwd=cwd,
         env=merged_env,
-        shell=shell,
+        shell=False,
         check=check,
         capture_output=capture,
         text=True,

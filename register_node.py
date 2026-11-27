@@ -15,6 +15,11 @@ def main():
         required=True, 
         help="One-time join code generated on the Master Server (e.g., JOIN-A7F9B2)"
     )
+    parser.add_argument(
+        "--ca-cert",
+        default=None,
+        help="Optional path to Master Server CA certificate for private/self-signed TLS verification"
+    )
     
     args = parser.parse_args()
     
@@ -24,7 +29,7 @@ def main():
     
     # Run async registration
     try:
-        success = asyncio.run(register_with_master(args.master, args.join_code))
+        success = asyncio.run(register_with_master(args.master, args.join_code, ca_cert=args.ca_cert))
         if success:
             print("[+] Success: Node registered successfully! Configuration saved to node_config.json")
             sys.exit(0)

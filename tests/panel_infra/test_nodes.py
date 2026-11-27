@@ -253,3 +253,48 @@ def test_node_agent_bootstrap_and_autoban(client, monkeypatch):
     # Cleanup config file
     if CONFIG_FILE_PATH.exists():
         os.remove(CONFIG_FILE_PATH)
+
+
+def test_node_agent_never_falls_back_to_verify_false(monkeypatch, tmp_path):
+    """Node agent must fail closed on TLS errors rather than retrying with verify=False."""
+    import asyncio
+    import httpx
+    from backend.infra import node_agent
+
+    seen_verify = []
+
+    class FailingAsyncClient:
+        def __init__(self, *args, **kwargs):
+            seen_verify.append(kwargs.get("verify"))
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *args):
+            return False
+
+        async def post(self, *args, **kwargs):
+            raise httpx.ConnectError("TLS verification failed")
+
+    monkeypatch.setattr("backend.infra.node_agent.httpx.AsyncClient", FailingAsyncClient)
+    monkeypatch.setattr(node_agent, "CONFIG_FILE_PATH", tmp_path / "node_config.json")
+
+    ok = asyncio.run(register_with_master("https://master.example.test", "JOIN-123"))
+    assert ok is False
+    assert seen_verify == [True]
+
+    ca_file = tmp_path / "master-ca.pem"
+    ca_file.write_text("dummy", encoding="utf-8")
+    save_node_config({
+        "node_id": "n1",
+        "node_api_token": "tok",
+        "master_url": "https://master.example.test",
+        "master_public_key": "00" * 32,
+        "private_key": generate_keypair()[1],
+        "public_key": "00" * 32,
+        "ca_cert": str(ca_file),
+    })
+    seen_verify.clear()
+    ok_report = asyncio.run(send_report_to_master("client_banned", "u@test"))
+    assert ok_report is False
+    assert seen_verify == [str(ca_file)]

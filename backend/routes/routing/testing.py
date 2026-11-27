@@ -322,6 +322,30 @@ def test_outbound_transit(protocol: str, settings: dict, stream_settings: dict =
             except Exception:
                 pass
 
+async def _probe_direct_http_urls(urls: tuple[str, ...], timeout: float, lang: str) -> dict:
+    """Probes direct HTTPS reachability with strict TLS certificate verification."""
+    import httpx
+
+    start_time = time.perf_counter()
+    try:
+        async with httpx.AsyncClient(timeout=timeout, verify=True) as client:
+            resp = None
+            for direct_url in urls:
+                try:
+                    resp = await client.get(direct_url)
+                    if resp.status_code in (200, 204):
+                        break
+                except Exception:
+                    continue
+        latency = (time.perf_counter() - start_time) * 1000
+        if resp and resp.status_code in (200, 204):
+            return {"success": True, "ping": round(latency, 2), "msg": t("testing_direct_working", lang=lang, category="backend")}
+        status_code = resp.status_code if resp else 0
+        return {"success": False, "msg": t("testing_unexpected_status_simple", lang=lang, category="backend", status=status_code)}
+    except Exception as e:
+        return {"success": False, "msg": t("testing_connection_exception", lang=lang, category="backend", error=str(e))}
+
+
 @router.post("/api/routing/outbounds/test")
 async def test_outbound_api(request: Request, payload: dict):
     """Tests an outbound connectivity without saving it (TCP ping or HTTP transit proxy check)."""
@@ -341,26 +365,11 @@ async def test_outbound_api(request: Request, payload: dict):
     
     if test_type == "http":
         if protocol == "freedom":
-            start_time = time.perf_counter()
-            try:
-                import httpx
-                async with httpx.AsyncClient(timeout=4.0, verify=False) as client:
-                    resp = None
-                    for direct_url in ("https://cp.cloudflare.com/generate_204", "https://www.gstatic.com/generate_204"):
-                        try:
-                            resp = await client.get(direct_url)
-                            if resp.status_code in (200, 204):
-                                break
-                        except Exception:
-                            continue
-                latency = (time.perf_counter() - start_time) * 1000
-                if resp and resp.status_code in (200, 204):
-                    return {"success": True, "ping": round(latency, 2), "msg": t("testing_direct_working", lang=lang, category="backend")}
-                else:
-                    status_code = resp.status_code if resp else 0
-                    return {"success": False, "msg": t("testing_unexpected_status_simple", lang=lang, category="backend", status=status_code)}
-            except Exception as e:
-                return {"success": False, "msg": t("testing_connection_exception", lang=lang, category="backend", error=str(e))}
+            return await _probe_direct_http_urls(
+                ("https://cp.cloudflare.com/generate_204", "https://www.gstatic.com/generate_204"),
+                timeout=4.0,
+                lang=lang,
+            )
                 
         if core and core != "auto":
             return await asyncio.to_thread(test_outbound_transit, protocol, settings, stream_settings, core=core)
@@ -420,18 +429,11 @@ async def test_outbound_by_id_api(request: Request, id: int, test_type: str = "t
     
     if test_type == "http":
         if protocol == "freedom":
-            start_time = time.perf_counter()
-            try:
-                import httpx
-                async with httpx.AsyncClient(timeout=3.0, verify=False) as client:
-                    resp = await client.get("https://www.gstatic.com/generate_204")
-                latency = (time.perf_counter() - start_time) * 1000
-                if resp.status_code in (200, 204):
-                    return {"success": True, "ping": round(latency, 2), "msg": t("testing_direct_working", lang=lang, category="backend")}
-                else:
-                    return {"success": False, "msg": t("testing_unexpected_status_simple", lang=lang, category="backend", status=resp.status_code)}
-            except Exception as e:
-                return {"success": False, "msg": t("testing_connection_exception", lang=lang, category="backend", error=str(e))}
+            return await _probe_direct_http_urls(
+                ("https://www.gstatic.com/generate_204",),
+                timeout=3.0,
+                lang=lang,
+            )
                 
         if core and core != "auto":
             return await asyncio.to_thread(test_outbound_transit, protocol, settings, stream_settings, core=core)
