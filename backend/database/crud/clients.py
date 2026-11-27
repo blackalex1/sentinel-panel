@@ -1,5 +1,5 @@
 from backend.models import ClientStats
-import backend.database
+from backend.database import connection as _db_conn
 
 def client_to_dict(c: ClientStats) -> dict:
     if not c:
@@ -20,34 +20,34 @@ def client_to_dict(c: ClientStats) -> dict:
     }
 
 def get_clients_for_inbound(inbound_id: int):
-    with backend.database.db_session() as session:
+    with _db_conn.db_session() as session:
         clients = session.query(ClientStats).filter_by(inbound_id=inbound_id).order_by(ClientStats.id.asc()).all()
-        return [backend.database.client_to_dict(c) for c in clients]
+        return [client_to_dict(c) for c in clients]
 
 def get_all_clients_grouped_by_inbound() -> dict:
-    with backend.database.db_session() as session:
+    with _db_conn.db_session() as session:
         clients = session.query(ClientStats).order_by(ClientStats.id.asc()).all()
         res = {}
         for c in clients:
-            d = backend.database.client_to_dict(c)
+            d = client_to_dict(c)
             res.setdefault(c.inbound_id, []).append(d)
         return res
 
 def get_client_by_email(inbound_id: int, email: str):
-    with backend.database.db_session() as session:
+    with _db_conn.db_session() as session:
         c = session.query(ClientStats).filter_by(inbound_id=inbound_id, email=email).first()
-        return backend.database.client_to_dict(c)
+        return client_to_dict(c)
 
 def get_client_by_id_or_pwd(inbound_id: int, client_id: str):
-    with backend.database.db_session() as session:
+    with _db_conn.db_session() as session:
         c = session.query(ClientStats).filter(
             (ClientStats.inbound_id == inbound_id) & 
             ((ClientStats.client_uuid_or_pwd == client_id) | (ClientStats.email == client_id))
         ).first()
-        return backend.database.client_to_dict(c)
+        return client_to_dict(c)
 
 def add_client_db(inbound_id: int, email: str, client_uuid_or_pwd: str, total_gb: int = 0, expiry_time: int = 0, limit_ip: int = 0, enable: int = 1, block_reason: str = "", allowed_ips: str = ""):
-    with backend.database.db_session() as session:
+    with _db_conn.db_session() as session:
         # Проверка уникальности email для данного inbound
         existing = session.query(ClientStats).filter_by(inbound_id=inbound_id, email=email).first()
         if existing:
@@ -77,7 +77,7 @@ def update_client_db(inbound_id: int, old_email: str = None, new_email: str = No
     old_email = old_email.strip()
     new_email = new_email.strip()
     
-    with backend.database.db_session() as session:
+    with _db_conn.db_session() as session:
         # Look up by either email or UUID/password to be fully robust
         c = session.query(ClientStats).filter(
             (ClientStats.inbound_id == inbound_id) & 
@@ -116,7 +116,7 @@ def update_client_db(inbound_id: int, old_email: str = None, new_email: str = No
 
 def block_client_db(inbound_id: int, email: str, reason: str):
     """Блокирует клиента в БД с указанием причины"""
-    with backend.database.db_session() as session:
+    with _db_conn.db_session() as session:
         c = session.query(ClientStats).filter_by(inbound_id=inbound_id, email=email).first()
         if c:
             c.enable = 0
@@ -126,7 +126,7 @@ def block_client_db(inbound_id: int, email: str, reason: str):
 
 def unblock_client_db(inbound_id: int, email: str):
     """Разблокирует клиента в БД и очищает причину блокировки"""
-    with backend.database.db_session() as session:
+    with _db_conn.db_session() as session:
         c = session.query(ClientStats).filter_by(inbound_id=inbound_id, email=email).first()
         if c:
             c.enable = 1
@@ -135,7 +135,7 @@ def unblock_client_db(inbound_id: int, email: str):
         return False
 
 def delete_client_db(inbound_id: int, email: str):
-    with backend.database.db_session() as session:
+    with _db_conn.db_session() as session:
         c = session.query(ClientStats).filter_by(inbound_id=inbound_id, email=email).first()
         if not c:
             return False
@@ -145,7 +145,7 @@ def delete_client_db(inbound_id: int, email: str):
 def update_client_traffic(inbound_id: int, email: str, up_add: int, down_add: int) -> bool:
     if up_add <= 0 and down_add <= 0:
         return True
-    with backend.database.db_session() as session:
+    with _db_conn.db_session() as session:
         # 1. Exact match by email for this specific inbound
         c = session.query(ClientStats).filter_by(inbound_id=inbound_id, email=email).first()
         # 2. Exact match by client_uuid_or_pwd or case-insensitive email
@@ -175,7 +175,7 @@ def update_client_traffic(inbound_id: int, email: str, up_add: int, down_add: in
 def update_client_traffic_by_email(email: str, up_add: int, down_add: int, core: str = None) -> bool:
     if up_add <= 0 and down_add <= 0:
         return True
-    with backend.database.db_session() as session:
+    with _db_conn.db_session() as session:
         # If core is specified, prefer client matching the core's inbound
         query = session.query(ClientStats)
         if core:
@@ -216,7 +216,7 @@ def update_client_traffic_by_email(email: str, up_add: int, down_add: int, core:
 
 def reset_client_traffic_db(inbound_id: int, email: str) -> bool:
     """Resets cumulative upload and download traffic to 0 for a specific client on an inbound."""
-    with backend.database.db_session() as session:
+    with _db_conn.db_session() as session:
         c = session.query(ClientStats).filter_by(inbound_id=inbound_id, email=email).first()
         if not c:
             c = session.query(ClientStats).filter(
@@ -234,7 +234,7 @@ def reset_client_traffic_db(inbound_id: int, email: str) -> bool:
 
 def reset_all_client_traffics_for_inbound_db(inbound_id: int) -> bool:
     """Resets traffic for all clients on a specific inbound."""
-    with backend.database.db_session() as session:
+    with _db_conn.db_session() as session:
         session.query(ClientStats).filter_by(inbound_id=inbound_id).update({
             "up": 0, "down": 0, "last_seen_up": 0, "last_seen_down": 0
         })
@@ -243,7 +243,7 @@ def reset_all_client_traffics_for_inbound_db(inbound_id: int) -> bool:
 
 def reset_client_traffic_globally_db(email: str) -> bool:
     """Resets traffic for a client by email across all inbounds."""
-    with backend.database.db_session() as session:
+    with _db_conn.db_session() as session:
         records = session.query(ClientStats).filter(
             (ClientStats.email == email) | (ClientStats.email.ilike(email)) | (ClientStats.client_uuid_or_pwd == email)
         ).all()
@@ -258,14 +258,17 @@ def reset_client_traffic_globally_db(email: str) -> bool:
 def reset_all_traffics_db() -> bool:
     """Resets all clients, inbounds, and daily traffic counters globally."""
     from backend.models import Inbound, ClientTrafficDaily
-    with backend.database.db_session() as session:
+    with _db_conn.db_session() as session:
         session.query(ClientStats).update({"up": 0, "down": 0, "last_seen_up": 0, "last_seen_down": 0})
         session.query(Inbound).update({"up": 0, "down": 0})
         session.query(ClientTrafficDaily).delete()
         return True
 
 
-def sanitize_anomalous_traffic_db(threshold_bytes: int = 100 * 1024 * 1024 * 1024 * 1024) -> int:
+def sanitize_anomalous_traffic_db(
+    threshold_bytes: int = 100 * 1024 * 1024 * 1024 * 1024,
+    on_repaired=None,
+) -> int:
     """
     Finds and resets client, inbound, and daily traffic records with impossible / corrupted traffic (> 100 TB),
     which resulted from compounding cumulative counter bugs. Re-syncs the live traffic baseline and
@@ -273,7 +276,7 @@ def sanitize_anomalous_traffic_db(threshold_bytes: int = 100 * 1024 * 1024 * 102
     """
     from backend.models import Inbound, ClientTrafficDaily
     repaired_count = 0
-    with backend.database.db_session() as session:
+    with _db_conn.db_session() as session:
         corrupted_clients = session.query(ClientStats).filter(
             (ClientStats.down > threshold_bytes) | (ClientStats.up > threshold_bytes)
         ).all()
@@ -296,10 +299,9 @@ def sanitize_anomalous_traffic_db(threshold_bytes: int = 100 * 1024 * 1024 * 102
             (ClientTrafficDaily.down > threshold_bytes) | (ClientTrafficDaily.up > threshold_bytes)
         ).delete()
 
-    if repaired_count > 0:
+    if repaired_count > 0 and on_repaired is not None:
         try:
-            from backend.sentinel_core_bridge import sync_unified_traffic_baseline
-            sync_unified_traffic_baseline()
+            on_repaired()
         except Exception:
             pass
 

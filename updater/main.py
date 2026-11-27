@@ -13,7 +13,7 @@ if __package__ is None or __package__ == "":
         sys.path.insert(0, pkg_dir)
     from updater.config import TARGET, TargetType
     from updater.controller.runner import ControllerRunner
-    from updater.core.common import (
+    from updater.ui import (
         BOLD,
         CYAN,
         GREEN,
@@ -33,7 +33,7 @@ if __package__ is None or __package__ == "":
 else:
     from .config import TARGET, TargetType
     from .controller.runner import ControllerRunner
-    from .core.common import (
+    from .ui import (
         BOLD,
         CYAN,
         GREEN,

@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Request
 from backend.sentinel_core_bridge import get_capabilities_schema
-from backend.auth_utils import check_auth, decoy_response
+from backend.auth import check_auth, decoy_response
 
 router = APIRouter()
 

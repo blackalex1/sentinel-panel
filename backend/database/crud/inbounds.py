@@ -1,6 +1,6 @@
 import json
 from backend.models import Inbound
-import backend.database
+from backend.database import connection as _db_conn
 
 def inbound_to_dict(ib: Inbound) -> dict:
     if not ib:
@@ -25,17 +25,17 @@ def inbound_to_dict(ib: Inbound) -> dict:
     }
 
 def get_all_inbounds():
-    with backend.database.db_session() as session:
+    with _db_conn.db_session() as session:
         ibs = session.query(Inbound).order_by(Inbound.id.asc()).all()
-        return [backend.database.inbound_to_dict(ib) for ib in ibs]
+        return [inbound_to_dict(ib) for ib in ibs]
 
 def get_inbound_by_id(inbound_id: int):
-    with backend.database.db_session() as session:
+    with _db_conn.db_session() as session:
         ib = session.query(Inbound).filter_by(id=inbound_id).first()
-        return backend.database.inbound_to_dict(ib)
+        return inbound_to_dict(ib)
 
 def add_inbound(remark: str, port: int, protocol: str, settings_dict: dict, stream_settings_dict: dict = None, sniffing_dict: dict = None, total: int = 0, expiry_time: int = 0, core: str = "xray"):
-    with backend.database.db_session() as session:
+    with _db_conn.db_session() as session:
         # Проверка уникальности порта
         existing = session.query(Inbound).filter_by(port=port).first()
         if existing:
@@ -61,7 +61,7 @@ def add_inbound(remark: str, port: int, protocol: str, settings_dict: dict, stre
         return ib.id
 
 def update_inbound(inbound_id: int, remark: str, port: int, protocol: str, settings_dict: dict, stream_settings_dict: dict = None, sniffing_dict: dict = None, enable: int = 1, total: int = 0, expiry_time: int = 0, core: str = None):
-    with backend.database.db_session() as session:
+    with _db_conn.db_session() as session:
         # Проверка уникальности порта среди других записей
         port_owner = session.query(Inbound).filter_by(port=port).first()
         if port_owner and port_owner.id != inbound_id:
@@ -87,7 +87,7 @@ def update_inbound(inbound_id: int, remark: str, port: int, protocol: str, setti
         return True
 
 def delete_inbound(inbound_id: int):
-    with backend.database.db_session() as session:
+    with _db_conn.db_session() as session:
         ib = session.query(Inbound).filter_by(id=inbound_id).first()
         if not ib:
             return False
@@ -113,7 +113,7 @@ def delete_inbound(inbound_id: int):
         return True
 
 def update_inbound_traffic(inbound_id: int, up_add: int, down_add: int):
-    with backend.database.db_session() as session:
+    with _db_conn.db_session() as session:
         ib = session.query(Inbound).filter_by(id=inbound_id).first()
         if ib:
             ib.up += up_add

@@ -8,13 +8,13 @@ def get_hysteria2_cert_path(inbound: dict, stream_settings: dict, sni: str) -> s
     if cert_mode == 'custom':
         cert_path = hysteria_opts.get('certPath', '')
     else:
-        import backend.hysteria
-        backend.hysteria.generate_self_signed_cert()
-        p = backend.hysteria.HYSTERIA_CERT_PATH
+        import backend.cores.hysteria
+        backend.cores.hysteria.generate_self_signed_cert()
+        p = backend.cores.hysteria.HYSTERIA_CERT_PATH
         if p.exists():
             cert_path = str(p)
         else:
-            from backend.ssl_utils import SSL_CERT_PATH
+            from backend.ssl.utils import SSL_CERT_PATH
             if SSL_CERT_PATH.exists():
                 cert_path = str(SSL_CERT_PATH)
     return cert_path

@@ -19,8 +19,8 @@ from typing import Any, Dict, Optional, Tuple
 from fastapi import APIRouter, Query, Request
 from fastapi.responses import JSONResponse
 
-from backend.auth_utils import check_auth, decoy_response
-from backend.version import PANEL_VERSION
+from backend.auth import check_auth, decoy_response
+from backend.infra.version import PANEL_VERSION
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -913,7 +913,7 @@ async def restart_panel_api(request: Request):
     _CORE_CACHE["data"] = None
     restarting = False
     try:
-        from backend.runtime import schedule_panel_restart
+        from backend.infra.runtime import schedule_panel_restart
         restarting = schedule_panel_restart(delay_seconds=1.0, reason="manual restart after core update")
     except Exception as e:
         logger.error(f"Failed to schedule panel restart: {e}")
@@ -1179,7 +1179,7 @@ async def apply_core_update(request: Request):
     restarting = False
     if applied:
         try:
-            from backend.runtime import schedule_panel_restart
+            from backend.infra.runtime import schedule_panel_restart
             restarting = schedule_panel_restart(
                 delay_seconds=1.2,
                 reason=f"sentinel-core updated to {installed_ver or target_tag}",

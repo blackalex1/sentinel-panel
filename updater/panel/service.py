@@ -7,7 +7,7 @@ import shutil
 import subprocess
 import sys
 
-from ..core.common import (
+from ..ui import (
     BOLD,
     GREEN,
     RED,

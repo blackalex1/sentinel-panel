@@ -14,7 +14,7 @@ from backend.models import (
 from backend.database.connection import db_session, normalize_database_url
 from backend.database.crud.auth import hash_password
 
-def init_db():
+def init_db(preset_provider=None, on_traffic_repaired=None):
     """Создает таблицы базы данных и записывает начальные настройки под правами администратора"""
     # 1. Создание структуры таблиц под учетной записью администратора (DDL)
     admin_url = settings.DATABASE_ADMIN_URL or settings.DATABASE_URL
@@ -224,10 +224,9 @@ def init_db():
             session.add(Outbound(remark="Block Connection", protocol="blackhole", tag="blocked", settings="{}", enable=1, is_system=1))
             logging.info("Default outbounds seeded.")
 
-        # 4. Семена правил маршрутизации (Routing Rules) по умолчанию из sentinel-core
+        # 4. Семена правил маршрутизации (Routing Rules) по умолчанию
         if session.query(RoutingRule).count() == 0:
-            from backend.sentinel_core_bridge import get_preset_details
-            bt_spec = get_preset_details("bittorrent")
+            bt_spec = preset_provider("bittorrent") if preset_provider else None
             if isinstance(bt_spec, dict) and "id" in bt_spec:
                 remark = bt_spec.get("name", "Block BitTorrent")
                 out_tag = "blocked" if bt_spec.get("defaultTarget") == "block" else bt_spec.get("defaultTarget", "blocked")
@@ -298,19 +297,7 @@ def init_db():
             session.add(default_client)
             logging.info(f"Default Hysteria 2 inbound seeded on port {hys_port} with client 'default_client' (password: {hys_pwd}).")
 
-    # 6. Load active sessions from database into memory to persist across restarts
-    try:
-        from backend.auth_utils import ACTIVE_SESSIONS
-        now = int(time.time())
-        with db_session() as session:
-            active_db_sessions = session.query(UserSession).filter(UserSession.expires_at > now).all()
-            for s in active_db_sessions:
-                ACTIVE_SESSIONS.add(s.session_id)
-        logging.info(f"Loaded {len(active_db_sessions)} active sessions from database.")
-    except Exception as e:
-        logging.error(f"Failed to load active sessions from database: {e}")
-
-    # 7. Auto-migration: trim leading/trailing whitespace from client emails in database and inbounds settings JSON
+    # 6. Auto-migration: trim leading/trailing whitespace from client emails in database and inbounds settings JSON
     try:
         with db_session() as session:
             # First, check and update client_stats
@@ -386,7 +373,7 @@ def init_db():
     # 10. Auto-remediation: repair anomalous Petabyte/inflated traffic counters caused by compounding bugs
     try:
         from backend.database.crud.clients import sanitize_anomalous_traffic_db
-        repaired = sanitize_anomalous_traffic_db()
+        repaired = sanitize_anomalous_traffic_db(on_repaired=on_traffic_repaired)
         if repaired > 0:
             logging.info(f"[Auto-Remediation] Repaired {repaired} client traffic record(s) with anomalous/inflated stats.")
     except Exception as e:

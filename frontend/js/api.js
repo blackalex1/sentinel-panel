@@ -1,5 +1,3 @@
-import { showToast } from "./ui.js";
-import { t } from "./i18n.js";
 
 let csrfToken = "";
 
@@ -32,7 +30,7 @@ export async function apiFetch(url, options = {}) {
         }
         console.error("API error:", error);
         if (!url.includes("csrf-token") && !url.includes("status")) {
-            showToast(t("api_connection_error", "Ошибка соединения с API"), "error");
+            window.dispatchEvent(new CustomEvent("show-toast", { detail: { key: "api_connection_error", fallback: "Ошибка соединения с API", type: "error" } }));
         }
         return null;
     }

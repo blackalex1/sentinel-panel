@@ -11,15 +11,15 @@ import {
     populateOutboundDropdowns,
     validateOutboundForm,
     parseProxyLink
-} from "./modules/routing-outbounds.js";
+} from "./modules/routing/outbounds.js";
 import {
     loadRoutingRules,
     openRoutingRuleModal,
     toggleRoutingRule,
     deleteRoutingRule,
     setupRoutingRulesListeners
-} from "./modules/routing-rules.js";
-import "./modules/drag-drop.js";
+} from "./modules/routing/rules.js";
+import "./modules/routing/rules/drag-drop.js";
 import { setupOutboundFormListeners } from "./modules/routing/outbound-form.js";
 
 // Re-export outbounds and rules for outside use

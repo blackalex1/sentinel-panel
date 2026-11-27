@@ -2,8 +2,9 @@
 import { translatePage, t } from "./i18n.js";
 
 window.addEventListener("show-toast", (e) => {
-    if (e.detail && e.detail.text) {
-        showToast(e.detail.text, e.detail.type || "success");
+    if (e.detail) {
+        const msg = e.detail.key ? t(e.detail.key, e.detail.fallback || "") : e.detail.text;
+        if (msg) showToast(msg, e.detail.type || "success");
     }
 });
 

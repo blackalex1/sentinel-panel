@@ -1,7 +1,7 @@
 import argparse
 import asyncio
 import sys
-from backend.node_agent import register_with_master
+from backend.infra.node_agent import register_with_master
 
 def main():
     parser = argparse.ArgumentParser(description="Sentinel Panel Edge Node Registration Utility")

@@ -8,10 +8,10 @@ from backend.database import (
     add_client_db, get_inbound_by_id, update_inbound, get_client_by_id_or_pwd,
     delete_client_db, get_clients_for_inbound, update_client_db
 )
-from backend.xray import restart_xray
-from backend.hysteria import restart_hysteria
-from backend.links_generator import get_client_links, get_client_mihomo_yaml
-from backend.i18n import t, get_lang
+from backend.cores.xray import restart_xray
+from backend.cores.hysteria import restart_hysteria
+from backend.links.generator import get_client_links, get_client_mihomo_yaml
+from backend.infra.i18n import t, get_lang
 import backend.routes.clients
 
 router = APIRouter()
@@ -57,7 +57,7 @@ async def add_client_api(request: Request, payload: Optional[ClientSettings] = N
         # Добавляем в базу данных
         success = add_client_db(ib_id, email, c_id, total_gb, expiry_time, limit_ip, enable, allowed_ips=allowed_ips)
         if success:
-            from backend.audit import log_action, get_actor_username
+            from backend.alerts.audit import log_action, get_actor_username
             actor = get_actor_username(request)
             log_action(actor, "create_client", target=email, details=f"inbound_id:{ib_id}, total_gb:{total_gb}, limit_ip:{limit_ip}, allowed_ips:{allowed_ips}")
             # Обновляем JSON-настройки самого inbound
@@ -90,7 +90,7 @@ async def add_client_api(request: Request, payload: Optional[ClientSettings] = N
             )
             
             # Перезапуск сервисов в фоне с debounce
-            from backend.utils.service_restart import restart_services_background
+            from backend.infra.service_restart import restart_services_background
             restart_services_background(delay=0.5)
             return {"success": True, "msg": t("client_added", lang=lang, category="backend")}
             
@@ -153,13 +153,13 @@ async def update_client_api(request: Request, client_id: str, payload: Optional[
         # Обновляем в client_stats
         success = update_client_db(ib_id, client_id, email, total_gb, expiry_time, limit_ip, enable, client_uuid_or_pwd=c_id, allowed_ips=allowed_ips)
         if success:
-            from backend.audit import log_action, get_actor_username
+            from backend.alerts.audit import log_action, get_actor_username
             actor = get_actor_username(request)
             log_action(actor, "update_client", target=email, details=f"inbound_id:{ib_id}, old_email:{client_id}, new_email:{email}, total_gb:{total_gb}, limit_ip:{limit_ip}, allowed_ips:{allowed_ips}, enable:{enable}")
             # Сброс IP кэша в планировщике, если клиент активирован (снята блокировка)
             if enable == 1:
                 try:
-                    from backend.scheduler import ACTIVE_IP_CACHE
+                    from backend.scheduler_jobs import ACTIVE_IP_CACHE
                     if email in ACTIVE_IP_CACHE:
                         ACTIVE_IP_CACHE[email] = {}
                     if client_id in ACTIVE_IP_CACHE:
@@ -172,7 +172,7 @@ async def update_client_api(request: Request, client_id: str, payload: Optional[
                 if inbound:
                     if inbound["protocol"] == "hysteria2":
                         try:
-                            from backend.hysteria import kick_client_hysteria_api
+                            from backend.cores.hysteria import kick_client_hysteria_api
                             kick_client_hysteria_api(ib_id, client_id)
                             if email != client_id:
                                 kick_client_hysteria_api(ib_id, email)
@@ -180,7 +180,7 @@ async def update_client_api(request: Request, client_id: str, payload: Optional[
                             logging.error(f"Failed to kick Hysteria2 client: {e}")
                     else:
                         try:
-                            from backend.xray import remove_client_api
+                            from backend.cores.xray import remove_client_api
                             remove_client_api(ib_id, client_id)
                             if email != client_id:
                                 remove_client_api(ib_id, email)
@@ -225,7 +225,7 @@ async def update_client_api(request: Request, client_id: str, payload: Optional[
                 except Exception:
                     pass
 
-            from backend.utils.service_restart import restart_services_background
+            from backend.infra.service_restart import restart_services_background
             restart_services_background(delay=0.5)
             return {"success": True, "msg": t("client_updated", lang=lang, category="backend")}
         return {"success": False, "msg": t("client_not_found", lang=lang, category="backend")}
@@ -248,7 +248,7 @@ async def delete_client_api(request: Request, inbound_id: int, client_id: str):
         success = delete_client(inbound_id, client_id)
         
     if success:
-        from backend.audit import log_action, get_actor_username
+        from backend.alerts.audit import log_action, get_actor_username
         actor = get_actor_username(request)
         log_action(actor, "delete_client", target=email, details=f"inbound_id:{inbound_id}")
         
@@ -273,7 +273,7 @@ async def delete_client_api(request: Request, inbound_id: int, client_id: str):
         except Exception:
             pass
 
-        from backend.utils.service_restart import restart_services_background
+        from backend.infra.service_restart import restart_services_background
         restart_services_background(delay=0.5)
         return {"success": True, "msg": t("client_deleted", lang=lang, category="backend")}
         

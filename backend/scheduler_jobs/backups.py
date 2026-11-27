@@ -24,7 +24,7 @@ def check_and_run_backups():
         logging.info("[Backup Scheduler] Starting automated backup...")
         try:
             # 1. Run backup
-            from backend.backup import create_backup_dump
+            from backend.backups import create_backup_dump
             dump_data = create_backup_dump()
             
             # 2. Save locally
@@ -90,7 +90,7 @@ def asyncio_send_backup_to_telegram(bot_token: str, admin_ids: list, file_path: 
         
         async def send_to_all_and_cleanup():
             from backend.database import get_setting
-            from backend.i18n import t
+            from backend.infra.i18n import t
             lang = get_setting("language", "ru")
             caption_text = t("backup_scheduler_telegram_caption", lang, filename=filename)
             try:

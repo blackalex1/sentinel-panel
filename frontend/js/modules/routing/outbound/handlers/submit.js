@@ -1,7 +1,7 @@
 import { apiFetch } from "../../../../api.js";
 import { showToast } from "../../../../ui.js";
 import { t } from "../../../../i18n.js";
-import { loadOutbounds } from "../../../routing-outbounds.js";
+import { loadOutbounds } from "../table_render.js";
 import { validateOutboundForm } from "../validation.js";
 import { getCurrentOutboundValues } from "../modal_manager.js";
 import { buildOutboundPayload } from "../payload_builder.js";

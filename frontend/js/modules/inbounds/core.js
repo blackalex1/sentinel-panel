@@ -7,25 +7,16 @@ import { compileHysteriaSettings, populateHysteriaSettings } from "./hysteria.js
 import { updateFormToggles, updateTabVisibility, handleProtocolChange } from "./toggles.js";
 import { validateInboundForm } from "./validation.js";
 
-export let editInboundId = null;
-export let originalClients = [];
+import {
+    editInboundId,
+    originalClients,
+    setEditInboundId,
+    setOriginalClients,
+    generateRandomPassword,
+    registerTabSwitchHandler
+} from "./state.js";
 
-export function setEditInboundId(val) {
-    editInboundId = val;
-}
-
-export function setOriginalClients(val) {
-    originalClients = val;
-}
-
-export function generateRandomPassword(length = 16) {
-    const chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-    let password = "";
-    for (let i = 0; i < length; i++) {
-        password += chars.charAt(Math.floor(Math.random() * chars.length));
-    }
-    return password;
-}
+export { editInboundId, originalClients, setEditInboundId, setOriginalClients, generateRandomPassword };
 
 export function switchInboundModalTab(tabName) {
     const tabButtons = document.querySelectorAll(".modal-tab-btn");
@@ -79,6 +70,8 @@ export function switchInboundModalTab(tabName) {
     
     return true;
 }
+
+registerTabSwitchHandler(switchInboundModalTab);
 
 function applySniffingToForm(sniffing) {
     const src = (sniffing && typeof sniffing === "object") ? sniffing : {};
@@ -304,7 +297,7 @@ export async function handleInboundFormSubmit(e, loadInboundsCallback) {
         document.getElementById("inbound-modal").classList.remove("active");
         if (editInboundId !== null) {
             showToast(t("inbound_updated_toast", "Подключение успешно обновлено!"));
-            editInboundId = null;
+            setEditInboundId(null);
         } else {
             showToast(t("inbound_created_toast", "Подключение успешно создано!"));
         }
@@ -323,7 +316,7 @@ export async function openEditInboundModal(id) {
     const target = listRes.obj.find(x => x.id === id);
     if (!target) return;
     
-    editInboundId = id;
+    setEditInboundId(id);
     
     document.getElementById("ib-remark").value = target.remark;
     document.getElementById("ib-port").value = target.port;

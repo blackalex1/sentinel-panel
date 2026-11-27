@@ -1,7 +1,7 @@
 import os
 from pathlib import Path
 from fastapi import APIRouter, Request
-from backend.auth_utils import check_auth, decoy_response
+from backend.auth import check_auth, decoy_response
 from backend.config import FRONTEND_DIR
 
 router = APIRouter()

@@ -23,7 +23,7 @@ except ImportError:
         TELEGRAM_ADMIN_IDS = os.getenv("TELEGRAM_ADMIN_IDS", "")
     settings = MockSettings()
 
-from backend.i18n import t
+from backend.infra.i18n import t
 
 # Настройка логирования
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
@@ -109,7 +109,7 @@ if dp:
         secret_path = settings.PANEL_SECRET_PATH
         
         from backend.database import get_setting
-        from backend.ssl_utils import SSL_CERT_PATH, SSL_KEY_PATH
+        from backend.ssl.utils import SSL_CERT_PATH, SSL_KEY_PATH
         
         ssl_domain = get_setting("ssl_domain", "")
         has_ssl = SSL_CERT_PATH.exists() and SSL_KEY_PATH.exists()
@@ -147,7 +147,7 @@ if dp:
             return
             
         try:
-            from backend.backup import create_backup_dump
+            from backend.backups import create_backup_dump
             dump_data = create_backup_dump()
             
             file_data = dump_data.encode("utf-8")
@@ -167,7 +167,7 @@ if dp:
             return
             
         try:
-            from backend.host_client import host_client
+            from backend.infra.host_client import host_client
             stats = host_client.send_command("get_system_stats")
             
             from backend.database import db_session
@@ -231,7 +231,7 @@ if dp:
         try:
             from backend.database import db_session
             from backend.models import ClientStats, Inbound
-            from backend.links_generator import get_client_links
+            from backend.links.generator import get_client_links
             
             found_clients = []
             with db_session() as session:
@@ -342,8 +342,8 @@ if dp:
         try:
             from backend.database import db_session
             from backend.models import ClientStats, Inbound
-            from backend.xray import restart_xray, remove_client_api
-            from backend.hysteria import restart_hysteria, kick_client_hysteria_api
+            from backend.cores.xray import restart_xray, remove_client_api
+            from backend.cores.hysteria import restart_hysteria, kick_client_hysteria_api
             import json
             
             disabled_count = 0
@@ -411,8 +411,8 @@ if dp:
         try:
             from backend.database import db_session
             from backend.models import ClientStats, Inbound
-            from backend.xray import restart_xray
-            from backend.hysteria import restart_hysteria
+            from backend.cores.xray import restart_xray
+            from backend.cores.hysteria import restart_hysteria
             import json
             
             enabled_count = 0
@@ -571,7 +571,7 @@ if dp:
         try:
             from backend.database import db_session
             from backend.models import ClientStats
-            from backend.audit import log_action
+            from backend.alerts.audit import log_action
             
             with db_session() as session:
                 clients = session.query(ClientStats).filter_by(email=email).all()
@@ -615,7 +615,7 @@ if dp:
         try:
             from backend.database import db_session
             from backend.models import ClientStats
-            from backend.audit import log_action
+            from backend.alerts.audit import log_action
 
             new_allowed = ""
             with db_session() as session:
@@ -655,9 +655,9 @@ if dp:
         try:
             from backend.database import db_session
             from backend.models import ClientStats
-            from backend.hysteria import kick_client_hysteria_api
-            from backend.xray import remove_client_api
-            from backend.audit import log_action
+            from backend.cores.hysteria import kick_client_hysteria_api
+            from backend.cores.xray import remove_client_api
+            from backend.alerts.audit import log_action
 
             with db_session() as session:
                 clients = session.query(ClientStats).filter_by(email=email).all()
@@ -758,8 +758,8 @@ if dp:
 
         try:
             from backend.database import get_all_sessions_db, delete_session_db
-            from backend.auth_utils import ACTIVE_SESSIONS, CSRF_TOKENS
-            from backend.audit import log_action
+            from backend.auth import ACTIVE_SESSIONS, CSRF_TOKENS
+            from backend.alerts.audit import log_action
             
             sessions = get_all_sessions_db()
             terminated = 0
@@ -798,7 +798,7 @@ if dp:
             import secrets
             import string
             from backend.database.crud.auth import update_admin_password
-            from backend.audit import log_action
+            from backend.alerts.audit import log_action
             
             alphabet = string.ascii_letters + string.digits + "!@#$%&*+?="
             new_pwd = "".join(secrets.choice(alphabet) for _ in range(16))

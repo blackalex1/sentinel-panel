@@ -1,11 +1,11 @@
 import time
 from backend.models import SharedCache
-import backend.database
+from backend.database import connection as _db_conn
 
 def get_shared_cache(key: str) -> str | None:
     now = int(time.time())
     try:
-        with backend.database.db_session() as session:
+        with _db_conn.db_session() as session:
             item = session.query(SharedCache).filter(SharedCache.key == key, SharedCache.expires_at > now).first()
             if item:
                 return item.value
@@ -16,7 +16,7 @@ def get_shared_cache(key: str) -> str | None:
 def set_shared_cache(key: str, value: str, duration_seconds: int):
     expires_at = int(time.time()) + duration_seconds
     try:
-        with backend.database.db_session() as session:
+        with _db_conn.db_session() as session:
             # Delete if exists to overwrite
             session.query(SharedCache).filter(SharedCache.key == key).delete()
             item = SharedCache(key=key, value=value, expires_at=expires_at)
@@ -37,7 +37,7 @@ def atomic_increment_shared_cache(key: str, duration_seconds: int) -> int:
     now = int(time.time())
     expires_at = now + duration_seconds
     try:
-        with backend.database.db_session() as session:
+        with _db_conn.db_session() as session:
             from sqlalchemy import text
             result = session.execute(
                 text("""
@@ -76,7 +76,7 @@ def get_int_shared_cache(key: str) -> int:
 
 def delete_shared_cache(key: str):
     try:
-        with backend.database.db_session() as session:
+        with _db_conn.db_session() as session:
             session.query(SharedCache).filter(SharedCache.key == key).delete()
     except Exception:
         pass
@@ -84,7 +84,7 @@ def delete_shared_cache(key: str):
 def clean_expired_shared_cache():
     now = int(time.time())
     try:
-        with backend.database.db_session() as session:
+        with _db_conn.db_session() as session:
             session.query(SharedCache).filter(SharedCache.expires_at < now).delete()
     except Exception:
         pass

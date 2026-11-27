@@ -145,7 +145,7 @@ async def reset_client_traffic_global_api(request: Request, email: str):
     from backend.sentinel_core_bridge import sync_client_traffic_baseline
     if reset_client_traffic_globally_db(email):
         sync_client_traffic_baseline(email)
-        from backend.audit import log_action, get_actor_username
+        from backend.alerts.audit import log_action, get_actor_username
         actor = get_actor_username(request)
         log_action(actor, "reset_client_traffic", target=email, details="global_email_reset")
         return {"success": True, "msg": "Traffic reset successfully"}
@@ -158,8 +158,9 @@ async def sanitize_client_traffic_api(request: Request):
         return backend.routes.clients.decoy_response()
 
     from backend.database import sanitize_anomalous_traffic_db
-    repaired = sanitize_anomalous_traffic_db()
-    from backend.audit import log_action, get_actor_username
+    from backend.sentinel_core_bridge import sync_unified_traffic_baseline
+    repaired = sanitize_anomalous_traffic_db(on_repaired=sync_unified_traffic_baseline)
+    from backend.alerts.audit import log_action, get_actor_username
     actor = get_actor_username(request)
     log_action(actor, "sanitize_traffic", details=f"repaired_{repaired}_clients")
     return {"success": True, "repaired": repaired, "msg": f"Repaired {repaired} client record(s)"}

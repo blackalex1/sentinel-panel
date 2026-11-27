@@ -1,7 +1,7 @@
 import logging
 from fastapi import APIRouter, Request
 
-from backend.host_client import host_client
+from backend.infra.host_client import host_client
 from backend.database import get_setting
 import backend.routes.system
 
@@ -11,7 +11,7 @@ def sync_warp_outbound_state(warp_connected: bool):
     """Синхронизирует исходящее подключение warp в БД и перезапускает Xray при необходимости"""
     from backend.database import db_session
     from backend.models import Outbound, RoutingRule
-    from backend.xray import write_xray_config, restart_xray
+    from backend.cores.xray import write_xray_config, restart_xray
     
     changed = False
     with db_session() as session:
@@ -98,7 +98,7 @@ async def install_warp_api(request: Request):
         
     res = host_client.send_command("install_warp", timeout=180.0)
     
-    from backend.audit import log_action, get_actor_username
+    from backend.alerts.audit import log_action, get_actor_username
     actor = get_actor_username(request)
     
     if res.get("success"):
@@ -117,7 +117,7 @@ async def connect_warp_api(request: Request):
         
     res = host_client.send_command("connect_warp", timeout=15.0)
     
-    from backend.audit import log_action, get_actor_username
+    from backend.alerts.audit import log_action, get_actor_username
     actor = get_actor_username(request)
     
     if res.get("success"):
@@ -136,7 +136,7 @@ async def disconnect_warp_api(request: Request):
         
     res = host_client.send_command("disconnect_warp", timeout=15.0)
     
-    from backend.audit import log_action, get_actor_username
+    from backend.alerts.audit import log_action, get_actor_username
     actor = get_actor_username(request)
     
     if res.get("success"):
@@ -167,7 +167,7 @@ async def register_warp_api(request: Request):
         
     res = host_client.send_command("register_warp", {"license_key": license_key}, timeout=30.0)
     
-    from backend.audit import log_action, get_actor_username
+    from backend.alerts.audit import log_action, get_actor_username
     actor = get_actor_username(request)
     
     if res.get("success"):
@@ -191,7 +191,7 @@ async def uninstall_warp_api(request: Request):
         
     res = host_client.send_command("uninstall_warp", timeout=120.0)
     
-    from backend.audit import log_action, get_actor_username
+    from backend.alerts.audit import log_action, get_actor_username
     actor = get_actor_username(request)
     
     if res.get("success"):

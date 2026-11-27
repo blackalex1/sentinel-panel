@@ -1,7 +1,7 @@
 import time
 import threading
 from backend.models import SystemSetting
-import backend.database
+from backend.database import connection as _db_conn
 
 # ---------------------------------------------------------------------------
 # In-memory TTL cache for system settings.
@@ -22,7 +22,7 @@ def get_setting(key: str, default: str = "") -> str:
             return cached[0]
 
     # Cache miss — hit the database
-    with backend.database.db_session() as session:
+    with _db_conn.db_session() as session:
         setting = session.query(SystemSetting).filter_by(key=key).first()
         value = setting.value if setting else default
 
@@ -34,7 +34,7 @@ def get_setting(key: str, default: str = "") -> str:
 
 def set_setting(key: str, value: str):
     """Сохраняет или обновляет значение настройки в БД и сбрасывает кэш."""
-    with backend.database.db_session() as session:
+    with _db_conn.db_session() as session:
         setting = session.query(SystemSetting).filter_by(key=key).first()
         if setting:
             setting.value = str(value)

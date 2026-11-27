@@ -1,14 +1,14 @@
 import time
 import logging
 from backend.config import XRAY_LOG_PATH, HYSTERIA_LOG_PATH, SINGBOX_LOG_PATH
-from backend.utils import read_last_lines
+from backend.infra import read_last_lines
 from backend.database import db_session
 
 _last_db_cleanup = 0
 
 def truncate_logs_if_large():
     """Checks log file sizes and truncates them to last 2000 lines if they exceed 10 MB."""
-    from backend.bot_manager import TELEGRAM_BOT_LOG_PATH
+    from backend.infra.bot_manager import TELEGRAM_BOT_LOG_PATH
     
     logs_to_check = [
         ("Xray", XRAY_LOG_PATH),

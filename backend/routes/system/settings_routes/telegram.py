@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Request
 from backend.database import get_setting
-from backend.i18n import t, get_lang
+from backend.infra.i18n import t, get_lang
 
 router = APIRouter()
 
@@ -12,10 +12,10 @@ async def restart_telegram_bot_api(request: Request):
     
     lang = get_lang(request)
     try:
-        from backend.bot_manager import restart_telegram_bot
+        from backend.infra.bot_manager import restart_telegram_bot
         success = restart_telegram_bot()
         if success:
-            from backend.audit import log_action, get_actor_username
+            from backend.alerts.audit import log_action, get_actor_username
             actor = get_actor_username(request)
             log_action(actor, "restart_telegram_bot", details="status:success")
             return {"success": True, "msg": t("telegram_bot_restarted_success", lang=lang, category="backend")}

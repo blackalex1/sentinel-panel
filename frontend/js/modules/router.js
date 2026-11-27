@@ -2,11 +2,12 @@ import { loadStats, loadGlobalTrafficChart, loadDashboardClients } from "../dash
 import { loadHysteriaCoreInfo, loadHysteriaLogs, loadHysteriaConfig, startHysteriaLogsStream, stopHysteriaLogsStream } from "../hysteria.js";
 import { loadSingboxCoreInfo, loadSingboxLogs, startSingboxLogsStream, stopSingboxLogsStream } from "./singbox/core.js";
 import { loadSingboxConfig } from "./singbox/config.js";
-import { loadXrayConfig } from "./xray-config.js";
+import { loadXrayConfig } from "./xray/index.js";
 import { loadOutbounds, loadRoutingRules } from "../routing.js";
-import { loadSettings, loadOptimizationStatus, loadIpv6Status } from "./settings-ui.js";
-import { loadAuditLogs } from "./audit-logs.js";
-import { loadGeoInfo, startLogsStream, stopLogsStream } from "./xray-core.js";
+import { loadSettings, loadOptimizationStatus, loadIpv6Status } from "./settings/index.js";
+import { loadAuditLogs } from "./settings/audit-logs.js";
+import { loadCoreInfo, loadGeoInfo, startLogsStream, stopLogsStream } from "./xray/index.js";
+import { loadWarpStatus } from "./warp/status.js";
 import { t } from "../i18n.js";
 
 export let currentTab = "dashboard";
@@ -125,3 +126,20 @@ export function switchTab(tabId, loadInbounds, loadCoreInfo, loadLogs) {
         return loadAuditLogs();
     }
 }
+
+window.addEventListener("page-translated", () => {
+    updateCurrentTabTitle();
+});
+
+window.addEventListener("language-changed", () => {
+    try {
+        if (currentTab === "xray") loadCoreInfo();
+        else if (currentTab === "hysteria") loadHysteriaCoreInfo();
+        else if (currentTab === "singbox") loadSingboxCoreInfo();
+        else if (currentTab === "dashboard") loadStats();
+        else if (currentTab === "routing") { loadOutbounds(); loadRoutingRules(); }
+        else if (currentTab === "settings") loadWarpStatus();
+    } catch (e) {
+        console.error("[router] Error refreshing current view on language change:", e);
+    }
+});

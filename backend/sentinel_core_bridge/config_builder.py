@@ -55,28 +55,16 @@ def build_server_config(
     return run_core_command(["compile-server"], input_data=input_json)
 
 
-def compile_node_server_config(target_core: str) -> Dict[str, Any]:
+def compile_node_server_config(target_core: str, db_readers: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     """Compiles complete server config for any core (xray, sing-box, hysteria2) from DB via sentinel-core AST."""
     try:
         from backend.database import get_all_inbounds, get_clients_for_inbound, get_all_outbounds, get_all_routing_rules
-        
-        if target_core == "xray":
-            import backend.xray.config as xray_cfg_mod
-            get_inbounds_fn = getattr(xray_cfg_mod, "get_all_inbounds", None) or get_all_inbounds
-            get_clients_fn = getattr(xray_cfg_mod, "get_clients_for_inbound", None) or get_clients_for_inbound
-            get_outbounds_fn = getattr(xray_cfg_mod, "get_all_outbounds", None) or get_all_outbounds
-            get_rules_fn = getattr(xray_cfg_mod, "get_all_routing_rules", None) or get_all_routing_rules
-        elif target_core in ("singbox", "sing-box"):
-            import backend.singbox.config as sb_cfg_mod
-            get_inbounds_fn = getattr(sb_cfg_mod, "get_all_inbounds", None) or get_all_inbounds
-            get_clients_fn = getattr(sb_cfg_mod, "get_clients_for_inbound", None) or get_clients_for_inbound
-            get_outbounds_fn = getattr(sb_cfg_mod, "get_all_outbounds", None) or get_all_outbounds
-            get_rules_fn = getattr(sb_cfg_mod, "get_all_routing_rules", None) or get_all_routing_rules
-        else:
-            get_inbounds_fn = get_all_inbounds
-            get_clients_fn = get_clients_for_inbound
-            get_outbounds_fn = get_all_outbounds
-            get_rules_fn = get_all_routing_rules
+
+        readers = db_readers or {}
+        get_inbounds_fn = readers.get("get_all_inbounds") or get_all_inbounds
+        get_clients_fn = readers.get("get_clients_for_inbound") or get_clients_for_inbound
+        get_outbounds_fn = readers.get("get_all_outbounds") or get_all_outbounds
+        get_rules_fn = readers.get("get_all_routing_rules") or get_all_routing_rules
 
         inbounds = get_inbounds_fn()
         outbounds = get_outbounds_fn()

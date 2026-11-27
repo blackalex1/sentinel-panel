@@ -2,11 +2,11 @@ import time
 import psutil
 from fastapi import APIRouter, Request
 
-from backend.host_client import host_client
-from backend.xray import is_xray_running, get_installed_xray_version
-from backend.hysteria import is_hysteria_running, get_installed_hysteria_version
+from backend.infra.host_client import host_client
+from backend.cores.xray import is_xray_running, get_installed_xray_version
+from backend.cores.hysteria import is_hysteria_running, get_installed_hysteria_version
 import backend.routes.system
-from backend.i18n import t, get_lang
+from backend.infra.i18n import t, get_lang
 
 router = APIRouter()
 
@@ -32,7 +32,7 @@ async def server_status_api(request: Request):
         net_down = stats.get("netIO", {}).get("down", 0)
     else:
         # Резервный вариант сбора локальных метрик
-        from backend.host_client import _cached_stats, _boot_time
+        from backend.infra.host_client import _cached_stats, _boot_time
         cpu_percent = _cached_stats["cpu"]
         mem_current = _cached_stats["mem"]["current"]
         mem_total = _cached_stats["mem"]["total"]
@@ -44,7 +44,7 @@ async def server_status_api(request: Request):
         net_down = _cached_stats["netIO"]["down"]
     
     # Disk stats
-    from backend.host_client import _cached_stats
+    from backend.infra.host_client import _cached_stats
     disk_current = _cached_stats["disk"]["current"]
     disk_total = _cached_stats["disk"]["total"]
     disk_percent = _cached_stats["disk"]["percent"]
@@ -61,7 +61,7 @@ async def server_status_api(request: Request):
     hysteria_status = "running" if (core_status.get("hysteria2", {}).get("running") or is_hysteria_running()) else "stopped"
     
     lang = get_lang(request)
-    from backend.singbox import is_singbox_running, get_installed_singbox_version
+    from backend.cores.singbox import is_singbox_running, get_installed_singbox_version
     singbox_status = "running" if (core_status.get("sing-box", {}).get("running") or is_singbox_running()) else "stopped"
     singbox_version = get_installed_singbox_version() or t("status_unknown", lang=lang, category="backend")
 

@@ -7,7 +7,7 @@ import { initCustomSelect } from "../../../components/customSelect.js";
 // Ensure openJsonEditModal is initialized
 initEditorModal();
 
-export function getLogLevelStyle(level) {
+function getLogLevelStyle(level) {
     const l = (level || "").toLowerCase();
     let bg, color, border, arrowColor;
     if (l === "trace" || l === "debug") {
@@ -443,3 +443,7 @@ export async function loadXrayConfig() {
     
     translatePage();
 }
+
+window.addEventListener("xray-config-saved", () => {
+    loadXrayConfig();
+});

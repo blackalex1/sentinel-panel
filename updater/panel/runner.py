@@ -10,7 +10,7 @@ import subprocess
 import sys
 from typing import Optional
 
-from ..core.common import (
+from ..ui import (
     BOLD,
     CYAN,
     GREEN,

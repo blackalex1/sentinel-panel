@@ -1,7 +1,7 @@
 import { apiFetch, getCsrfToken } from "../../api.js";
 import { showToast, showConfirmDialog } from "../../ui.js";
 import { t } from "../../i18n.js";
-import { loadHysteriaConfig } from "./config.js";
+import { loadHysteriaConfig } from "./config_ui/render.js";
 
 
 export async function loadHysteriaCoreInfo() {

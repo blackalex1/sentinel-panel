@@ -1,4 +1,4 @@
-import { openOutboundModal } from "../../routing-outbounds.js";
+import { openOutboundModal } from "./modal_manager.js";
 import { updateOutboundFormFields } from "./fields.js";
 import { bindLinkImporterListener } from "./handlers/link_importer.js";
 import { bindTesterListener } from "./handlers/tester.js";

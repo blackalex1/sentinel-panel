@@ -8,7 +8,7 @@ import subprocess
 import sys
 import time
 
-from ..core.common import (
+from ..ui import (
     BOLD,
     CYAN,
     GREEN,

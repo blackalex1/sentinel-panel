@@ -2,7 +2,7 @@ import hashlib
 import os
 import secrets
 from backend.models import User
-import backend.database
+from backend.database import connection as _db_conn
 
 PBKDF2_ITERATIONS = 100000
 
@@ -23,28 +23,28 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
 
 
 def authenticate_admin(username: str, password_plain: str) -> bool:
-    with backend.database.db_session() as session:
+    with _db_conn.db_session() as session:
         user = session.query(User).filter_by(username=username).first()
         if not user:
             return False
-        return backend.database.verify_password(password_plain, user.password)
+        return verify_password(password_plain, user.password)
 
 def update_admin_password(username: str, new_password_plain: str) -> bool:
-    with backend.database.db_session() as session:
+    with _db_conn.db_session() as session:
         user = session.query(User).filter_by(username=username).first()
         if not user:
             return False
-        user.password = backend.database.hash_password(new_password_plain)
+        user.password = hash_password(new_password_plain)
         return True
 
 def update_admin_credentials(current_username: str, new_username: str, new_password_plain: str = None) -> bool:
-    with backend.database.db_session() as session:
+    with _db_conn.db_session() as session:
         user = session.query(User).filter_by(username=current_username).first()
         if not user:
             return False
         user.username = new_username
         if new_password_plain:
-            user.password = backend.database.hash_password(new_password_plain)
+            user.password = hash_password(new_password_plain)
         if current_username != new_username:
             from backend.models import UserSession
             session.query(UserSession).filter_by(username=current_username).update({"username": new_username})

@@ -1,7 +1,7 @@
 import { apiFetch, getCsrfToken } from "../../api.js";
 import { showToast } from "../../ui.js";
 import { t } from "../../i18n.js";
-import { loadXrayConfig } from "./config.js";
+import { loadXrayConfig } from "./config_ui/render.js";
 
 
 import { initCustomSelect } from "../../components/customSelect.js";

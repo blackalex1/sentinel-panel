@@ -1,7 +1,6 @@
 import { apiFetch } from "../../api.js";
 import { showToast } from "../../ui.js";
 import { t } from "../../i18n.js";
-import { loadSettings } from "./core.js";
 
 export function setupTelegramListeners() {
     const telegram2faEnableInput = document.getElementById("setting-telegram-2fa-enable");
@@ -70,7 +69,7 @@ export function setupTelegramListeners() {
 
             if (res && res.success) {
                 showToast(t("settings_saved_toast", "Настройки успешно сохранены!"));
-                loadSettings();
+                window.dispatchEvent(new CustomEvent("settings-refresh-requested"));
             } else {
                 showToast(res ? res.msg : t("settings_save_error", "Не удалось сохранить настройки"), "error");
             }

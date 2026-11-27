@@ -2,7 +2,7 @@ from fastapi import APIRouter, Request
 
 from backend.config import settings
 from backend.database import get_setting, set_setting
-from backend.i18n import t, get_lang
+from backend.infra.i18n import t, get_lang
 
 router = APIRouter()
 
@@ -22,7 +22,7 @@ async def get_settings_api(request: Request):
             totp_enabled = (user.totp_enabled == 1)
             admin_username = user.username
             
-        from backend.database import get_quick_security_rules_state
+        from backend.cores.adapters.routing_presets import get_quick_security_rules_state
         quick_states = get_quick_security_rules_state()
 
         from backend.models import Inbound
@@ -183,9 +183,9 @@ async def update_settings_api(request: Request):
 
         if decoy_updated:
             try:
-                from backend.xray import restart_xray
-                from backend.hysteria import restart_hysteria
-                from backend.singbox import restart_singbox
+                from backend.cores.xray import restart_xray
+                from backend.cores.hysteria import restart_hysteria
+                from backend.cores.singbox import restart_singbox
                 restart_xray()
                 restart_hysteria()
                 restart_singbox()
@@ -245,7 +245,7 @@ async def update_settings_api(request: Request):
         quick_block_changed = False
         dynamic_quick_keys = [k for k in data.keys() if k.startswith("block_") or k == "ip_checkers" or k == "ip_checkers_outbound"]
         if dynamic_quick_keys:
-            from backend.database import sync_quick_security_rules
+            from backend.cores.adapters.routing_presets import sync_quick_security_rules
             sync_quick_security_rules(data)
             for key in dynamic_quick_keys:
                 if key.endswith("_outbound"):
@@ -255,13 +255,13 @@ async def update_settings_api(request: Request):
             quick_block_changed = True
                     
         if quick_block_changed:
-            from backend.xray import write_xray_config, restart_xray
-            from backend.hysteria import restart_hysteria
+            from backend.cores.xray import write_xray_config, restart_xray
+            from backend.cores.hysteria import restart_hysteria
             write_xray_config()
             restart_xray()
             restart_hysteria()
             try:
-                from backend.singbox import write_singbox_config, restart_singbox
+                from backend.cores.singbox import write_singbox_config, restart_singbox
                 write_singbox_config(force=True)
                 restart_singbox()
             except Exception:
@@ -304,31 +304,31 @@ async def update_settings_api(request: Request):
         if dns_changed:
             import logging
             try:
-                from backend.singbox import write_singbox_config, restart_singbox
+                from backend.cores.singbox import write_singbox_config, restart_singbox
                 write_singbox_config(force=True)
                 restart_singbox()
             except Exception as e:
                 logging.error(f"Error restarting sing-box after DNS update: {e}")
             try:
-                from backend.xray import write_xray_config, restart_xray
+                from backend.cores.xray import write_xray_config, restart_xray
                 write_xray_config()
                 restart_xray()
             except Exception as e:
                 logging.error(f"Error restarting Xray after DNS update: {e}")
             try:
-                from backend.hysteria import restart_hysteria
+                from backend.cores.hysteria import restart_hysteria
                 restart_hysteria()
             except Exception as e:
                 logging.error(f"Error restarting Hysteria after DNS update: {e}")
 
         # Log action
-        from backend.audit import log_action, get_actor_username
+        from backend.alerts.audit import log_action, get_actor_username
         actor = get_actor_username(request)
         log_action(actor, "update_settings", target="general", details=f"Keys: {list(data.keys())}")
         
         # Trigger Telegram bot restart if settings changed
         if tg_changed:
-            from backend.bot_manager import restart_telegram_bot
+            from backend.infra.bot_manager import restart_telegram_bot
             restart_telegram_bot()
 
         if "update_channel" in data:
@@ -353,7 +353,7 @@ async def update_settings_api(request: Request):
 async def get_locales_list_api(request: Request):
     # Public endpoint — only returns a list of available language codes.
     # No sensitive data; accessible before login so the UI can load i18n.
-    from backend.i18n import get_available_languages
+    from backend.infra.i18n import get_available_languages
     return {
         "success": True,
         "obj": get_available_languages()
@@ -363,7 +363,7 @@ async def get_locales_list_api(request: Request):
 async def get_locale_dict_api(request: Request, lang: str):
     # Public endpoint — only returns frontend UI translation strings.
     # No sensitive data; accessible before login so the login page renders correctly.
-    from backend.i18n import _translations
+    from backend.infra.i18n import _translations
     lang_lower = lang.lower()
     lang_data = _translations.get(lang_lower)
 

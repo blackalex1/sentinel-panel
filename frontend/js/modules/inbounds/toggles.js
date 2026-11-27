@@ -1,4 +1,4 @@
-import { generateRandomPassword, editInboundId, switchInboundModalTab } from "./core.js";
+import { generateRandomPassword, editInboundId, switchInboundModalTab } from "./state.js";
 import { renderDynamicModalTabs, normalizeEngineId } from "./schema-renderer.js";
 import { t } from "../../i18n.js";
 import { apiFetch } from "../../api.js";

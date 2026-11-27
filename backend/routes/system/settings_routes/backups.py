@@ -2,7 +2,7 @@ import logging
 from fastapi import APIRouter, Request, Response
 
 from backend.database import get_setting, set_setting
-from backend.i18n import t
+from backend.infra.i18n import t
 
 router = APIRouter()
 
@@ -13,7 +13,7 @@ async def download_backup_api(request: Request):
         return system_facade.decoy_response()
     lang = get_setting("language", "ru")
     try:
-        from backend.backup import create_backup_dump
+        from backend.backups import create_backup_dump
         dump_str = create_backup_dump()
         return Response(
             content=dump_str,
@@ -50,7 +50,7 @@ async def upload_backup_api(request: Request):
                 }
                 
             try:
-                from backend.backup import decrypt_data
+                from backend.backups import decrypt_data
                 dump_str = decrypt_data(dump_str, password)
             except Exception as e:
                 logging.error(f"[Backup Upload] Failed to decrypt backup data: {e}")
@@ -60,8 +60,27 @@ async def upload_backup_api(request: Request):
                     "msg": t("backup_invalid_password", lang)
                 }
                 
-        from backend.backup import restore_backup_dump
-        success, msg = restore_backup_dump(dump_str, lang=lang)
+        from backend.backups import restore_backup_dump
+        from backend.sentinel_core_bridge import get_preset_details
+        from backend.cores.xray import write_xray_config
+        from backend.cores.hysteria import restart_hysteria
+
+        def _apply_restored_configs():
+            try:
+                from backend.cores.singbox import write_singbox_config, restart_singbox
+                write_singbox_config(force=True)
+                restart_singbox()
+            except Exception as e_sb:
+                logging.error(f"[Backup Restore] Failed to restart Sing-box: {e_sb}")
+            write_xray_config()
+            restart_hysteria()
+
+        success, msg = restore_backup_dump(
+            dump_str,
+            lang=lang,
+            preset_provider=get_preset_details,
+            on_restored=_apply_restored_configs,
+        )
         return {"success": success, "msg": msg}
     except Exception as e:
         return {"success": False, "msg": t("backup_upload_error", lang, error=str(e))}
@@ -85,7 +104,7 @@ async def clear_all_backups_api(request: Request):
                     pass
         
         # Log action
-        from backend.audit import log_action, get_actor_username
+        from backend.alerts.audit import log_action, get_actor_username
         actor = get_actor_username(request)
         log_action(actor, "clear_all_backups", details=f"deleted:{count}")
         
@@ -121,7 +140,7 @@ async def change_backup_password_api(request: Request):
         set_setting("backup_password", new_password)
         
         # Log action
-        from backend.audit import log_action, get_actor_username
+        from backend.alerts.audit import log_action, get_actor_username
         actor = get_actor_username(request)
         log_action(actor, "change_backup_password", details="status:success")
         

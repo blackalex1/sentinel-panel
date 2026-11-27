@@ -4,7 +4,7 @@ import { t, translatePage } from "../../../i18n.js";
 import { saveHysteriaConfigToServer } from "./api.js";
 import { initCustomSelect } from "../../../components/customSelect.js";
 
-export function getLogLevelStyle(level) {
+function getLogLevelStyle(level) {
     const l = (level || "").toLowerCase();
     let bg, color, border, arrowColor;
     if (l === "trace" || l === "debug") {

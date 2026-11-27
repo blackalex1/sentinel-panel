@@ -13,16 +13,11 @@ Submodules:
 """
 
 from backend.sentinel_core_bridge.ffi import (
-    _get_sentinel_core_bin,
     _find_sentinel_core_lib_path,
     _init_sentinel_lib,
     get_sentinel_lib,
     set_sentinel_lib,
     get_loaded_core_version,
-    get_loaded_core_path,
-    _ffi_call_str,
-    _ffi_call_json,
-    run_core_command,
 )
 
 from backend.sentinel_core_bridge.crypto import (
@@ -77,9 +72,7 @@ from backend.sentinel_core_bridge.routing import (
     generate_proxy_uri,
     parse_subscription,
     check_proxies,
-    test_profiles,
     ping_host,
-    set_core_language,
 )
 
 from backend.sentinel_core_bridge.config_builder import (
@@ -87,19 +80,17 @@ from backend.sentinel_core_bridge.config_builder import (
     compile_node_server_config,
     build_failover_client_config,
 )
+from backend.infra.log_streamer import register_core_log_source
+
+register_core_log_source(get_in_memory_core_logs, pop_core_log_line)
 
 __all__ = [
     # FFI
-    "_get_sentinel_core_bin",
     "_find_sentinel_core_lib_path",
     "_init_sentinel_lib",
     "get_sentinel_lib",
     "set_sentinel_lib",
     "get_loaded_core_version",
-    "get_loaded_core_path",
-    "_ffi_call_str",
-    "_ffi_call_json",
-    "run_core_command",
     # Crypto
     "generate_x25519_keypair",
     "generate_vlessenc_keypair",
@@ -141,9 +132,7 @@ __all__ = [
     "generate_proxy_uri",
     "parse_subscription",
     "check_proxies",
-    "test_profiles",
     "ping_host",
-    "set_core_language",
     # Config Builder
     "build_server_config",
     "compile_node_server_config",

@@ -11,7 +11,7 @@ import sys
 import time
 from typing import Optional
 
-from ..core.common import (
+from ..ui import (
     BOLD,
     CYAN,
     GREEN,
@@ -146,6 +146,7 @@ class ControllerRunner:
             no_proxy=self.no_proxy,
             auto_mode=self.auto_mode,
             allow_env=True,
+            engine_manager_factory=ProxyEngineManager,
         )
 
         def _cleanup_signal(signum, frame):

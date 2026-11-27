@@ -14,7 +14,7 @@ import tarfile
 import zipfile
 from typing import Optional, Tuple
 
-from ..core.common import (
+from ..ui import (
     BOLD,
     CYAN,
     GREEN,

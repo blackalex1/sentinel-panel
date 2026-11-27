@@ -36,23 +36,7 @@ def _update_host_core_progress(data: dict) -> None:
         _host_agent_core_progress["active"] = True
 
 
-from agent.optimizations import (
-    get_bbr_status,
-    enable_bbr,
-    get_optimization_status,
-    apply_network_optimizations,
-    get_ipv6_status,
-    set_ipv6_disabled,
-)
-from agent.monitor import get_system_stats
-from agent.warp import (
-    get_warp_status,
-    install_warp,
-    register_warp,
-    connect_warp,
-    disconnect_warp,
-    uninstall_warp,
-)
+from agent import dispatch_agent_action
 
 
 # Setup logging
@@ -96,43 +80,9 @@ def handle_client(conn):
                     
                     response = {"success": False, "msg": "Unknown action"}
                     
-                    if action == "get_bbr_status":
-                        response = {"success": True, "bbr_enabled": get_bbr_status()}
-                    elif action == "enable_bbr":
-                        success, msg = enable_bbr()
-                        response = {"success": success, "msg": msg}
-                    elif action == "get_system_stats":
-                        response = get_system_stats()
-                    elif action == "get_optimization_status":
-                        response = {"success": True, "optimized": get_optimization_status()}
-                    elif action == "apply_optimizations":
-                        success, msg = apply_network_optimizations()
-                        response = {"success": success, "msg": msg}
-                    elif action == "get_ipv6_status":
-                        status = get_ipv6_status()
-                        response = {"success": True, "ipv6_disabled": status.get("ipv6_disabled", False), "supported": status.get("supported", True)}
-                    elif action == "set_ipv6_disabled":
-                        disable = request.get("disable", True)
-                        success, msg = set_ipv6_disabled(disable)
-                        response = {"success": success, "msg": msg}
-                    elif action == "get_warp_status":
-                        response = get_warp_status()
-                    elif action == "install_warp":
-                        success, msg = install_warp()
-                        response = {"success": success, "msg": msg}
-                    elif action == "register_warp":
-                        license_key = request.get("license_key")
-                        success, msg = register_warp(license_key)
-                        response = {"success": success, "msg": msg}
-                    elif action == "connect_warp":
-                        success, msg = connect_warp()
-                        response = {"success": success, "msg": msg}
-                    elif action == "disconnect_warp":
-                        success, msg = disconnect_warp()
-                        response = {"success": success, "msg": msg}
-                    elif action == "uninstall_warp":
-                        success, msg = uninstall_warp()
-                        response = {"success": success, "msg": msg}
+                    dispatched = dispatch_agent_action(action, request)
+                    if dispatched is not None:
+                        response = dispatched
                     elif action == "trigger_panel_update":
                         import subprocess
                         update_scripts = [

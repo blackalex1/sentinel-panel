@@ -10,12 +10,12 @@ import {
     openLinksModal as coreOpenLinksModal,
     resetClientTraffic as coreResetClientTraffic,
     resetAllClientsTrafficForInbound as coreResetAllClientsTrafficForInbound
-} from "./modules/clients-core.js";
+} from "./modules/clients/core.js";
 
 import {
     openEditClientModal as formOpenEditClientModal,
     handleClientFormSubmit as formHandleClientFormSubmit
-} from "./modules/clients-form.js";
+} from "./modules/clients/form.js";
 
 import { generateUUID } from "./ui.js";
 import { t } from "./i18n.js";

@@ -4,9 +4,7 @@ import logging
 import asyncio
 from backend.models import ClientStats, Inbound
 from backend.database import db_session
-
-# Cache of active IPs in memory for limit checks: { email: { ip: timestamp } }
-ACTIVE_IP_CACHE = {}
+from backend.infra.runtime import ACTIVE_IP_CACHE
 
 # Notification timers to prevent Telegram spam
 _last_notified_blocks = {}
@@ -56,9 +54,8 @@ parse_recent_xray_ips = sync_active_ips_from_core
 parse_recent_singbox_ips = sync_active_ips_from_core
 parse_recent_hysteria_ips = sync_active_ips_from_core
 
-def enforce_client_limits_and_rules():
+def enforce_client_limits_and_rules(remove_client_fn=None, kick_hysteria_fn=None, notify_admin_fn=None):
     """Main background client limits scheduler running every 30 seconds."""
-    import backend.scheduler
     sync_active_ips_from_core()
     
     now_ts = time.time()
@@ -66,7 +63,7 @@ def enforce_client_limits_and_rules():
     need_config_update = False
     
     from backend.database import get_setting
-    from backend.i18n import t
+    from backend.infra.i18n import t
 
     sys_lang = get_setting("language", "ru")
     bot_token = get_setting("telegram_bot_token", "")
@@ -140,16 +137,20 @@ def enforce_client_limits_and_rules():
 
                 try:
                     if inbound.protocol == "hysteria2":
-                        backend.scheduler.kick_client_hysteria_api(inbound.id, c.email)
+                        if kick_hysteria_fn is None:
+                            from backend.cores.hysteria import kick_client_hysteria_api as kick_hysteria_fn
+                        kick_hysteria_fn(inbound.id, c.email)
                     else:
-                        backend.scheduler.remove_client_api(inbound.id, c.email)
+                        if remove_client_fn is None:
+                            from backend.cores.xray import remove_client_api as remove_client_fn
+                        remove_client_fn(inbound.id, c.email)
                 except Exception:
                     pass
-                    
-                backend.scheduler.asyncio_notify_admin(c.email, block_reason, bot_token, tg_admin_ids)
+
+                (notify_admin_fn or asyncio_notify_admin)(c.email, block_reason, bot_token, tg_admin_ids)
                 
     if need_config_update:
-        from backend.utils.service_restart import restart_services_background
+        from backend.infra.service_restart import restart_services_background
         restart_services_background(delay=0.5)
         
     # Run Backup
@@ -187,7 +188,7 @@ def asyncio_notify_admin(email: str, reason: str, bot_token: str, tg_admin_ids: 
         if bot_token and tg_admin_ids:
             from aiogram import Bot
             from backend.database import get_setting
-            from backend.i18n import t
+            from backend.infra.i18n import t
             lang = get_setting("language", "ru")
             temp_bot = Bot(token=bot_token)
             admin_ids = [x.strip() for x in tg_admin_ids.split(",") if x.strip()]

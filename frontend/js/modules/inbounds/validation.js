@@ -1,6 +1,6 @@
 import { showToast } from "../../ui.js";
 import { t } from "../../i18n.js";
-import { switchInboundModalTab } from "./core.js";
+import { switchInboundModalTab } from "./state.js";
 
 export function validateInboundForm() {
     let isValid = true;

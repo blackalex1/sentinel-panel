@@ -1,4 +1,4 @@
-from backend.version import PANEL_VERSION
+from backend.infra.version import PANEL_VERSION
 import asyncio
 import logging
 import time
@@ -13,11 +13,11 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from backend.config import settings, BASE_DIR
 from backend.database import init_db
-from backend.xray import start_xray, stop_xray, query_traffic_stats
-from backend.hysteria import start_hysteria, stop_hysteria, query_hysteria_traffic
-from backend.singbox import start_singbox, stop_singbox, query_singbox_traffic
-from backend.api import router
-from backend.auth_utils import decoy_response, handle_decoy_route, DecoyException
+from backend.cores.xray import start_xray, stop_xray, query_traffic_stats
+from backend.cores.hysteria import start_hysteria, stop_hysteria, query_hysteria_traffic
+from backend.cores.singbox import start_singbox, stop_singbox, query_singbox_traffic
+from backend.infra.api import router
+from backend.auth import decoy_response, handle_decoy_route, DecoyException
 
 # Настройка логирования — уровень берётся из config/.env (LOG_LEVEL=INFO по умолчанию)
 _log_level = getattr(logging, settings.LOG_LEVEL.upper(), logging.INFO)
@@ -38,8 +38,8 @@ async def sync_session_events_loop():
         try:
             await asyncio.sleep(2)
             from backend.sentinel_core_bridge import get_recent_session_events, get_active_sessions
-            from backend.audit import log_action
-            from backend.client_alerts import get_user_traffic_from_db
+            from backend.alerts.audit import log_action
+            from backend.alerts.client_alerts import get_user_traffic_from_db
             from backend.database import db_session
             from backend.models import AuditLog
 
@@ -145,18 +145,18 @@ async def poll_xray_stats_loop():
     try:
         await asyncio.to_thread(query_all_cores_traffic)
         
-        from backend.routes.clients import update_online_emails
+        from backend.routes.clients.actions import update_online_emails
         await asyncio.to_thread(update_online_emails)
         
-        from backend.scheduler import enforce_client_limits_and_rules
+        from backend.scheduler_jobs import enforce_client_limits_and_rules
         await asyncio.to_thread(enforce_client_limits_and_rules)
 
         # Warm up GitHub core releases cache asynchronously in background
         async def _warmup_core_releases():
             try:
-                from backend.singbox.core import get_singbox_releases
-                from backend.xray.core import get_xray_releases
-                from backend.hysteria.core import get_hysteria_releases
+                from backend.cores.singbox.core import get_singbox_releases
+                from backend.cores.xray.core import get_xray_releases
+                from backend.cores.hysteria.core import get_hysteria_releases
                 await asyncio.to_thread(get_singbox_releases)
                 await asyncio.to_thread(get_xray_releases)
                 await asyncio.to_thread(get_hysteria_releases)
@@ -168,7 +168,7 @@ async def poll_xray_stats_loop():
         logging.error(f"Error in initial stats polling: {e}")
         
     try:
-        from backend.singbox.service import is_singbox_running, sync_singbox_failover_config
+        from backend.cores.singbox.service import is_singbox_running, sync_singbox_failover_config
         if await asyncio.to_thread(is_singbox_running):
             await asyncio.to_thread(sync_singbox_failover_config, True)
     except Exception as e:
@@ -180,18 +180,18 @@ async def poll_xray_stats_loop():
             await asyncio.sleep(5)
             await asyncio.to_thread(query_all_cores_traffic)
             
-            from backend.routes.clients import update_online_emails
+            from backend.routes.clients.actions import update_online_emails
             await asyncio.to_thread(update_online_emails)
 
             # Update active Telegram cards traffic on the panel
             try:
-                from backend.telegram_alerts import update_panel_active_cards_traffic
+                from backend.alerts import update_panel_active_cards_traffic
                 await update_panel_active_cards_traffic()
             except Exception as e:
                 logging.error(f"Error updating active panel cards: {e}")
                 
             # Проверка лимитов клиентов (лимит трафика, срок действия, лимит IP)
-            from backend.scheduler import enforce_client_limits_and_rules
+            from backend.scheduler_jobs import enforce_client_limits_and_rules
             await asyncio.to_thread(enforce_client_limits_and_rules)
 
             # Автоматическое фоновое обновление версий ядер каждые 30 минут
@@ -208,11 +208,12 @@ async def poll_xray_stats_loop():
 async def lifespan(app: FastAPI):
     global polling_task
     # Инициализация БД
-    init_db()
+    from backend.sentinel_core_bridge import get_preset_details, sync_unified_traffic_baseline
+    init_db(preset_provider=get_preset_details, on_traffic_repaired=sync_unified_traffic_baseline)
     
     # Синхронизация статуса WARP с хоста при запуске
     try:
-        from backend.host_client import host_client
+        from backend.infra.host_client import host_client
         from backend.routes.system.warp import sync_warp_outbound_state
         status = host_client.send_command("get_warp_status", timeout=15.0)
         if isinstance(status, dict) and "connected" in status:
@@ -222,13 +223,13 @@ async def lifespan(app: FastAPI):
     
     # Генерация дефолтных самоподписанных сертификатов при старте
     try:
-        from backend.ssl_utils import generate_default_self_signed_cert
+        from backend.ssl.utils import generate_default_self_signed_cert
         generate_default_self_signed_cert()
     except Exception as e:
         logging.error(f"Failed to generate default self-signed certificate: {e}")
         
     # Загрузка словарей локализации
-    from backend.i18n import load_translations
+    from backend.infra.i18n import load_translations
     load_translations()
     
     # Запуск Xray, Hysteria 2 и sing-box
@@ -240,7 +241,7 @@ async def lifespan(app: FastAPI):
         logging.error(f"Failed to start sing-box at startup: {e}")
     
     # Запуск фоновых сборщиков и стримеров логов ядер
-    from backend.log_streamer import ensure_log_tailers
+    from backend.infra.log_streamer import ensure_log_tailers
     ensure_log_tailers()
 
     # Запуск фонового опроса трафика и синхронизации сессий
@@ -288,7 +289,7 @@ async def decoy_exception_handler(request: Request, exc: DecoyException):
 from fastapi.exceptions import RequestValidationError
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
-    from backend.auth_utils import check_auth
+    from backend.auth import check_auth
     if not check_auth(request):
         path = request.url.path.lstrip("/")
         return await handle_decoy_route(request, path)
@@ -366,7 +367,7 @@ app.include_router(router)
 # Роут для Let's Encrypt HTTP-01 верификации
 @app.get("/.well-known/acme-challenge/{token}")
 async def acme_challenge(token: str):
-    from backend.acme_client import ACME_CHALLENGES
+    from backend.ssl import ACME_CHALLENGES
     if token in ACME_CHALLENGES:
         return Response(content=ACME_CHALLENGES[token], media_type="text/plain")
     return Response(content="Challenge not found", status_code=404, media_type="text/plain")
@@ -412,7 +413,7 @@ class AuthenticatedStaticFiles(StaticFiles):
         ))
         
         if is_component or is_private_js:
-            from backend.auth_utils import check_auth, decoy_response
+            from backend.auth import check_auth, decoy_response
             req = Request(scope)
             if not check_auth(req):
                 return decoy_response()
@@ -445,13 +446,13 @@ async def catch_all(request: Request, path_name: str):
 
 if __name__ == "__main__":
     import uvicorn
-    from backend.runtime import (
+    from backend.infra.runtime import (
         is_restart_requested,
         is_running_in_docker,
         mark_started_from_main,
         perform_execv_restart,
     )
-    from backend.ssl_utils import generate_default_self_signed_cert, SSL_CERT_PATH, SSL_KEY_PATH
+    from backend.ssl.utils import generate_default_self_signed_cert, SSL_CERT_PATH, SSL_KEY_PATH
 
     mark_started_from_main()
 

@@ -190,24 +190,24 @@ def cleanup_real_core_processes(request):
             import logging as _logging
             _logging.disable(_logging.CRITICAL)
             try:
-                from backend.xray import stop_xray
+                from backend.cores.xray import stop_xray
                 stop_xray()
             except Exception:
                 pass
             try:
-                from backend.singbox import stop_singbox
+                from backend.cores.singbox import stop_singbox
                 stop_singbox()
             except Exception:
                 pass
             try:
-                from backend.hysteria import stop_hysteria
+                from backend.cores.hysteria import stop_hysteria
                 stop_hysteria()
             except Exception:
                 pass
             _logging.disable(_logging.NOTSET)
 
 # 2.5 Mock Host Client
-import backend.host_client
+import backend.infra.host_client
 mock_opt_state = {"optimized": False}
 def mock_send_command(action: str, params: dict = None, timeout: float = 3.0) -> dict:
     if action == "get_bbr_status":
@@ -228,10 +228,10 @@ def mock_send_command(action: str, params: dict = None, timeout: float = 3.0) ->
             "uptime": 7200,
             "netIO": {"up": 500000, "down": 1500000}
         }
-    return backend.host_client.host_client._mock_response(action, params)
+    return backend.infra.host_client.host_client._mock_response(action, params)
 
 
-backend.host_client.host_client.send_command = mock_send_command
+backend.infra.host_client.host_client.send_command = mock_send_command
 
 # Initialize the test database once
 from backend.database import init_db, set_setting
@@ -243,7 +243,7 @@ set_setting("telegram_admin_ids", "55555,66666")
 def clear_login_attempts():
     """Clear login rate-limiting attempts before each test."""
     try:
-        from backend.routes.auth_routes.login import LOGIN_ATTEMPTS
+        from backend.routes.auth.login import LOGIN_ATTEMPTS
         LOGIN_ATTEMPTS.clear()
     except Exception:
         try:
@@ -301,7 +301,7 @@ def mock_restart_services_background():
     isolated, and free from background thread noise.
     """
     import unittest.mock as mock
-    import backend.utils.service_restart as _restart_mod
+    import backend.infra.service_restart as _restart_mod
     with mock.patch.object(_restart_mod, "restart_services_background", return_value=None):
         yield
 
@@ -317,8 +317,8 @@ def isolated_db(tmp_path, monkeypatch):
     session_factory alone is sufficient to redirect all DB access.
 
     We intentionally do NOT patch db_session itself.  If we did, any module
-    that lazily does `from backend.database import db_session` (e.g. backend.audit
-    pulled in by backend.client_alerts during a test body) would permanently capture
+    that lazily does `from backend.database import db_session` (e.g. backend.alerts.audit
+    pulled in by backend.alerts.client_alerts during a test body) would permanently capture
     the per-test closure.  After teardown that module's local reference still points
     to the previous test's disposed engine, so the next test's log_action() silently
     writes to the dead engine while the test reads from the new one.

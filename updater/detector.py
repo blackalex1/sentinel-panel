@@ -7,7 +7,7 @@ import sys
 from typing import Optional
 
 from .config import TargetType
-from .core.common import (
+from .ui import (
     BOLD,
     CYAN,
     GREEN,

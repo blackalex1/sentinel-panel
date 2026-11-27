@@ -1,7 +1,6 @@
 import { apiFetch } from "../../api.js";
 import { showToast, showConfirmDialog } from "../../ui.js";
 import { t } from "../../i18n.js";
-import { loadSettings } from "./core.js";
 
 export function setupBackupsListeners() {
     // Card 6: Backups Settings Save
@@ -62,7 +61,7 @@ export function setupBackupsListeners() {
                 showToast(t("settings_saved_toast", "Настройки успешно сохранены!"));
                 const checkInput = document.getElementById("setting-backup-password-check");
                 if (checkInput) checkInput.value = "";
-                loadSettings();
+                window.dispatchEvent(new CustomEvent("settings-refresh-requested"));
             } else {
                 showToast(res ? res.msg : t("settings_save_error", "Не удалось сохранить настройки"), "error");
                 if (initialEncrypt && !encrypt) {

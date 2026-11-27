@@ -149,7 +149,8 @@ class Downloader:
                         pbar.update(delta)
                         last_size = cur_size
                         if cb:
-                            pct, spd, eta = self._compute_progress_stats(cur_size, total_size, pbar.start_time, pbar.current_speed)
+                            _, pb_start, pb_speed = pbar.stats_inputs()
+                            pct, spd, eta = self._compute_progress_stats(cur_size, total_size, pb_start, pb_speed)
                             try:
                                 cb({
                                     "stage": f"Загрузка {filename_label}",
@@ -257,14 +258,15 @@ class Downloader:
                         f_out.write(chunk)
                         pbar.update(len(chunk))
                         now = time.time()
-                        if cb and (now - last_cb_time >= 0.1 or (total_bytes > 0 and pbar.downloaded_bytes >= total_bytes)):
+                        dl_bytes, _, pb_speed = pbar.stats_inputs()
+                        if cb and (now - last_cb_time >= 0.1 or (total_bytes > 0 and dl_bytes >= total_bytes)):
                             last_cb_time = now
-                            pct, spd, eta = self._compute_progress_stats(pbar.downloaded_bytes, total_bytes, start_time, pbar.current_speed)
+                            pct, spd, eta = self._compute_progress_stats(dl_bytes, total_bytes, start_time, pb_speed)
                             try:
                                 cb({
                                     "stage": f"Загрузка {filename_label}",
                                     "percent": pct,
-                                    "downloaded_bytes": pbar.downloaded_bytes,
+                                    "downloaded_bytes": dl_bytes,
                                     "total_bytes": total_bytes,
                                     "speed": spd,
                                     "eta": eta,

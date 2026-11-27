@@ -350,7 +350,7 @@ async def update_panel_active_cards_traffic():
             if not card.get('admin_messages'):
                 continue
                 
-            from backend.client_alerts import get_user_traffic_from_db
+            from backend.alerts.client_alerts import get_user_traffic_from_db
             tx, rx = get_user_traffic_from_db(username)
             total_traffic = tx + rx
             

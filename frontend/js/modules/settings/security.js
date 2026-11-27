@@ -1,7 +1,6 @@
 import { apiFetch } from "../../api.js";
 import { showToast, showConfirmDialog } from "../../ui.js";
 import { t } from "../../i18n.js";
-import { loadSettings } from "./core.js";
 
 export async function loadActiveSessions() {
     const tbody = document.getElementById("active-sessions-tbody");
@@ -202,7 +201,7 @@ export function setupSecurityListeners() {
             if (res && res.success) {
                 showToast(res.msg || t("settings_2fa_enabled", "2FA успешно включена!"));
                 if (codeInput) codeInput.value = "";
-                await loadSettings();
+                window.dispatchEvent(new CustomEvent("settings-refresh-requested"));
             } else {
                 showToast(res ? res.msg : t("settings_2fa_enable_error", "Ошибка при включении 2FA"), "error");
             }
@@ -245,7 +244,7 @@ export function setupSecurityListeners() {
             if (res && res.success) {
                 showToast(res.msg || t("settings_2fa_disabled_toast", "2FA успешно отключена!"));
                 if (codeInput) codeInput.value = "";
-                await loadSettings();
+                window.dispatchEvent(new CustomEvent("settings-refresh-requested"));
             } else {
                 showToast(res ? res.msg : t("settings_2fa_disable_error", "Ошибка при отключении 2FA"), "error");
             }

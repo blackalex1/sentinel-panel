@@ -7,7 +7,7 @@ import tempfile
 import subprocess
 from pathlib import Path
 from backend.config import BIN_DIR, IS_WINDOWS, XRAY_BIN_PATH, SINGBOX_BIN_PATH
-from backend.hysteria import HYSTERIA_BIN_PATH
+from backend.cores.hysteria import HYSTERIA_BIN_PATH
 
 # ── Cross-process atomic port allocator ──────────────────────────────────────
 # Shared state lives in two temp files visible to all xdist worker processes:
@@ -203,7 +203,7 @@ def validate_hysteria_config(config_dict: dict) -> tuple[bool, str]:
     if not bin_path:
         return True, "Hysteria binary not found, skipping validation"
         
-    from backend.hysteria import generate_self_signed_cert, HYSTERIA_CERT_PATH, HYSTERIA_KEY_PATH
+    from backend.cores.hysteria import generate_self_signed_cert, HYSTERIA_CERT_PATH, HYSTERIA_KEY_PATH
     if not HYSTERIA_CERT_PATH.exists() or not HYSTERIA_KEY_PATH.exists():
         try:
             generate_self_signed_cert()

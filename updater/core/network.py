@@ -55,6 +55,7 @@ class NetworkManager:
         no_proxy: bool = False,
         auto_mode: bool = False,
         allow_env: bool = False,
+        engine_manager_factory=None,
     ) -> None:
         self.project_dir = project_dir
         self.custom_proxy: Optional[str] = proxy_arg
@@ -63,6 +64,7 @@ class NetworkManager:
         self.no_proxy: bool = no_proxy
         self.auto_mode: bool = auto_mode
         self.allow_env: bool = allow_env
+        self._engine_manager_factory = engine_manager_factory
         self.use_rotator: bool = True if not (no_proxy or proxy_arg) else False
         self.use_env_proxy: bool = False
         self.rotator_proc: Optional[subprocess.Popen] = None
@@ -255,10 +257,9 @@ class NetworkManager:
                 log_warn(f"Не удалось автоматически загрузить ядро Sentinel-Core: {e}")
 
         # 2. Download sing-box if missing
-        if not engine_exists:
+        if not engine_exists and self._engine_manager_factory is not None:
             try:
-                from ..controller.engines import ProxyEngineManager
-                engine_mgr = ProxyEngineManager(bin_dir=bin_dir, proxy_url=None, auto_mode=True)
+                engine_mgr = self._engine_manager_factory(bin_dir=bin_dir, proxy_url=None, auto_mode=True)
                 log_info("Загрузка движка Sing-box для VPN-ротатора...")
                 engine_mgr.download_singbox()
             except Exception as e:

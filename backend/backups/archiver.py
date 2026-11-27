@@ -4,8 +4,6 @@ import logging
 
 from backend.database import db_session
 from backend.models import User, Inbound, ClientStats, SystemSetting, Outbound, RoutingRule
-from backend.xray import write_xray_config
-from backend.hysteria import restart_hysteria
 
 def create_backup_dump() -> str:
     """Exports the entire database into a portable JSON string (with optional encryption)."""
@@ -115,10 +113,10 @@ def create_backup_dump() -> str:
         logging.error(f"[Backup] Failed to create database dump: {e}")
         raise e
 
-def restore_backup_dump(dump_str: str, lang: str = None) -> tuple[bool, str]:
+def restore_backup_dump(dump_str: str, lang: str = None, *, preset_provider=None, on_restored=None) -> tuple[bool, str]:
     """Restores the entire database from a JSON string (clear-slate import)."""
     from backend.database import get_setting
-    from backend.i18n import t
+    from backend.infra.i18n import t
     
     if not lang:
         lang = get_setting("language", "ru")
@@ -212,10 +210,9 @@ def restore_backup_dump(dump_str: str, lang: str = None) -> tuple[bool, str]:
                         sort_order=rr.get("sort_order", 0)
                     ))
             else:
-                # Default seeds for older backups without routing rules from sentinel-core
-                from backend.sentinel_core_bridge import get_preset_details
-                bt = get_preset_details("bittorrent") or {}
-                ads = get_preset_details("ads") or {}
+                # Default seeds for older backups without injected preset metadata
+                bt = (preset_provider("bittorrent") if preset_provider else None) or {}
+                ads = (preset_provider("ads") if preset_provider else None) or {}
                 session.add(RoutingRule(remark="API Traffic", outbound_tag="api", inbound_tags='["api"]', enable=1, sort_order=1))
                 session.add(RoutingRule(
                     remark=bt.get("name", "Block BitTorrent"),
@@ -258,17 +255,9 @@ def restore_backup_dump(dump_str: str, lang: str = None) -> tuple[bool, str]:
                     last_seen_down=c.get("last_seen_down", 0)
                 ))
                 
-        # 8. Update configurations and restart services (all 3 cores)
-        try:
-            from backend.singbox import write_singbox_config, restart_singbox
-            write_singbox_config(force=True)
-            restart_singbox()
-        except Exception as e_sb:
-            logging.error(f"[Backup Restore] Failed to restart Sing-box: {e_sb}")
+        if on_restored is not None:
+            on_restored()
 
-        write_xray_config()
-        restart_hysteria()
-        
         logging.info("[Backup] Database successfully restored from dump.")
         return True, t("backup_restore_success", lang)
     except Exception as e:

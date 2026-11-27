@@ -1,17 +1,19 @@
-import { loadInbounds as coreLoadInbounds, toggleInbound as coreToggleInbound, deleteInbound as coreDeleteInbound, renderInboundsList } from "./modules/inbound-core.js";
+import { loadInbounds as coreLoadInbounds, toggleInbound as coreToggleInbound, deleteInbound as coreDeleteInbound, renderInboundsList } from "./modules/inbounds/list.js";
 import {
     editInboundId,
     setEditInboundId as formSetEditInboundId,
-    updateFormToggles as formUpdateFormToggles,
-    handleProtocolChange as formHandleProtocolChange,
     handleInboundFormSubmit as formHandleInboundFormSubmit,
     openEditInboundModal as formOpenEditInboundModal,
     generateRandomPassword,
     switchInboundModalTab,
-    updateTabVisibility,
     originalClients
-} from "./modules/inbound-form.js";
-import { setupRealityListeners } from "./modules/inbound-reality.js";
+} from "./modules/inbounds/core.js";
+import {
+    updateFormToggles as formUpdateFormToggles,
+    handleProtocolChange as formHandleProtocolChange,
+    updateTabVisibility
+} from "./modules/inbounds/toggles.js";
+import { setupRealityListeners } from "./modules/inbounds/reality.js";
 import { t } from "./i18n.js";
 import { apiFetch } from "./api.js";
 import { showToast } from "./ui.js";

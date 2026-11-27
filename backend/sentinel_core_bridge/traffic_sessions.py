@@ -251,7 +251,7 @@ def _fetch_singbox_direct_traffic() -> Dict[str, Dict[str, Any]]:
     except Exception as e:
         logger.debug("Error loading singbox inbounds for traffic accounting: %s", e)
 
-    from backend.scheduler_jobs.limits import ACTIVE_IP_CACHE
+    from backend.infra.runtime import ACTIVE_IP_CACHE
     active_ip_to_email: Dict[str, str] = {}
     if ACTIVE_IP_CACHE:
         for em, ips in ACTIVE_IP_CACHE.items():
@@ -622,7 +622,7 @@ def query_all_cores_traffic(traffic_data_override=None):
                     active_core_by_email[em] = c_name
                     if c_ip and c_ip not in ("127.0.0.1", "::1", ""):
                         try:
-                            from backend.scheduler_jobs.limits import ACTIVE_IP_CACHE
+                            from backend.infra.runtime import ACTIVE_IP_CACHE
                             if em not in ACTIVE_IP_CACHE:
                                 ACTIVE_IP_CACHE[em] = {}
                             ACTIVE_IP_CACHE[em][c_ip] = s.get("last_seen_at", now_ts)

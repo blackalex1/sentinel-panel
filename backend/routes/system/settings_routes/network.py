@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Request
-from backend.host_client import host_client
+from backend.infra.host_client import host_client
 
 router = APIRouter()
 
@@ -35,7 +35,7 @@ async def enable_bbr_api(request: Request):
         except Exception:
             pass
 
-    from backend.audit import log_action, get_actor_username
+    from backend.alerts.audit import log_action, get_actor_username
     actor = get_actor_username(request)
     if res.get("success"):
         log_action(actor, "enable_bbr", details="status:success")
@@ -79,7 +79,7 @@ async def apply_optimizations_api(request: Request):
                 if not res.get("success"):
                     res = {"success": False, "msg": str(e)}
 
-    from backend.audit import log_action, get_actor_username
+    from backend.alerts.audit import log_action, get_actor_username
     actor = get_actor_username(request)
     if res.get("success"):
         log_action(actor, "apply_network_optimizations", details="status:success")
@@ -127,7 +127,7 @@ async def set_ipv6_status_api(request: Request):
         except Exception:
             pass
 
-    from backend.audit import log_action, get_actor_username
+    from backend.alerts.audit import log_action, get_actor_username
     actor = get_actor_username(request)
     action_name = "disable_ipv6" if disable else "enable_ipv6"
     if res.get("success"):

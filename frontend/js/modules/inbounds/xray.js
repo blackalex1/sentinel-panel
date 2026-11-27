@@ -1,5 +1,5 @@
 // Xray Core Inbound Form Handling
-import { compileXraySecuritySettings, populateXraySecuritySettings, compileXrayTransportSettings, populateXrayTransportSettings } from "../inbound-protocols.js";
+import { compileXraySecuritySettings, populateXraySecuritySettings, compileXrayTransportSettings, populateXrayTransportSettings } from "./protocols.js";
 
 export function compileXraySettings(protocol, security, network, streamSettings, settings) {
     compileXraySecuritySettings(security, streamSettings);

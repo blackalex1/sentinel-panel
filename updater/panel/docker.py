@@ -10,7 +10,7 @@ import time
 import urllib.parse
 from typing import Dict, List, Optional
 
-from ..core.common import (
+from ..ui import (
     BOLD,
     CYAN,
     GREEN,

@@ -1,8 +1,8 @@
 import { apiFetch, getCsrfToken } from "../../api.js";
 import { showToast } from "../../ui.js";
 import { t } from "../../i18n.js";
-import { loadWarpStatus, setupWarpListeners } from "../warp-ui.js";
-import { loadAuditLogs, setupAuditLogsListeners } from "../audit-logs.js";
+import { loadWarpStatus, setupWarpListeners } from "../warp/index.js";
+import { loadAuditLogs, setupAuditLogsListeners } from "./audit-logs.js";
 import { loadOptimizationStatus, loadIpv6Status } from "./network.js";
 import { loadActiveSessions } from "./security.js";
 
@@ -402,3 +402,7 @@ export function setupGeneralListeners() {
         });
     });
 }
+
+window.addEventListener("settings-refresh-requested", () => {
+    loadSettings();
+});

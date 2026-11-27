@@ -4,14 +4,14 @@ import { loadBbrStatus } from "./dashboard.js";
 import { t } from "./i18n.js";
 import { loadHysteriaCoreInfo, loadHysteriaLogs, setupHysteriaListeners } from "./hysteria.js";
 import { loadOutbounds, loadRoutingRules, setupRoutingListeners } from "./routing.js";
-import { setupSslListeners } from "./modules/ssl.js";
+import { setupSslListeners } from "./modules/settings/ssl.js";
 import { switchTab, currentTab } from "./modules/router.js";
-import { setupSettingsListeners, loadSettings, checkPanelUpdates, checkCoreUpdates } from "./modules/settings-ui.js";
+import { setupSettingsListeners, loadSettings, checkPanelUpdates, checkCoreUpdates } from "./modules/settings/index.js";
 import { setupInboundListeners, loadInbounds, toggleInbound, deleteInbound, openEditInboundModal } from "./inbound-modal.js";
 import { setupClientListeners, openClientsModal, setLoadInboundsCallback } from "./clients.js";
 
-import { loadXrayConfig, setupXrayConfigListeners } from "./modules/xray-config.js";
-import { loadCoreInfo, loadLogs, setupXrayCoreListeners, setupGeoListeners } from "./modules/xray-core.js";
+import { loadXrayConfig, setupXrayConfigListeners } from "./modules/xray/index.js";
+import { loadCoreInfo, loadLogs, setupXrayCoreListeners, setupGeoListeners } from "./modules/xray/index.js";
 import { setupSingboxCoreListeners } from "./modules/singbox/core.js";
 import { openGlobalTrafficDetailsModal } from "./modules/dashboard/traffic_modal.js";
 import { initServerMascot } from "./modules/dashboard/metrics.js";
@@ -93,7 +93,7 @@ function setupAuthorizedEventListeners() {
 
         const detailsBtn = e.target.closest ? e.target.closest("#btn-open-traffic-details, .open-traffic-details-btn") : null;
         if (detailsBtn) {
-            import("./modules/traffic/modal.js").then(m => m.openTrafficDetailsModal());
+            openGlobalTrafficDetailsModal();
         }
     });
 

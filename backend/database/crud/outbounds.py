@@ -1,6 +1,6 @@
 import json
 from backend.models import Outbound
-import backend.database
+from backend.database import connection as _db_conn
 
 def outbound_to_dict(ob: Outbound) -> dict:
     if not ob:
@@ -19,17 +19,17 @@ def outbound_to_dict(ob: Outbound) -> dict:
     }
 
 def get_all_outbounds():
-    with backend.database.db_session() as session:
+    with _db_conn.db_session() as session:
         obs = session.query(Outbound).all()
-        return [backend.database.outbound_to_dict(ob) for ob in obs]
+        return [outbound_to_dict(ob) for ob in obs]
 
 def get_outbound_by_id(outbound_id: int):
-    with backend.database.db_session() as session:
+    with _db_conn.db_session() as session:
         ob = session.query(Outbound).filter_by(id=outbound_id).first()
-        return backend.database.outbound_to_dict(ob)
+        return outbound_to_dict(ob)
 
 def add_outbound(remark: str, protocol: str, tag: str, settings_dict: dict, stream_settings_dict: dict = None, enable: int = 1, is_system: int = 0):
-    with backend.database.db_session() as session:
+    with _db_conn.db_session() as session:
         existing = session.query(Outbound).filter_by(tag=tag).first()
         if existing:
             return None
@@ -47,7 +47,7 @@ def add_outbound(remark: str, protocol: str, tag: str, settings_dict: dict, stre
         return ob.id
 
 def update_outbound(outbound_id: int, remark: str, protocol: str, tag: str, settings_dict: dict, stream_settings_dict: dict = None, enable: int = 1):
-    with backend.database.db_session() as session:
+    with _db_conn.db_session() as session:
         # Check tag uniqueness among other outbounds
         tag_owner = session.query(Outbound).filter_by(tag=tag).first()
         if tag_owner and tag_owner.id != outbound_id:
@@ -66,7 +66,7 @@ def update_outbound(outbound_id: int, remark: str, protocol: str, tag: str, sett
         return True
 
 def delete_outbound(outbound_id: int):
-    with backend.database.db_session() as session:
+    with _db_conn.db_session() as session:
         ob = session.query(Outbound).filter_by(id=outbound_id).first()
         if not ob or ob.is_system == 1:
             return False
@@ -93,7 +93,7 @@ def delete_outbound(outbound_id: int):
         return True
 
 def update_outbound_traffic(tag: str, up_add: int, down_add: int):
-    with backend.database.db_session() as session:
+    with _db_conn.db_session() as session:
         ob = session.query(Outbound).filter_by(tag=tag).first()
         if ob:
             ob.up = (ob.up or 0) + up_add

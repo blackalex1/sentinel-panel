@@ -8,7 +8,7 @@ import subprocess
 import sys
 from typing import Dict, Optional
 
-from ..core.common import (
+from ..ui import (
     BOLD,
     GREEN,
     RED,

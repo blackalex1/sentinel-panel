@@ -2,7 +2,7 @@ from fastapi import APIRouter, Request
 
 from backend.database import set_setting
 import backend.routes.system
-from backend.i18n import t, get_lang
+from backend.infra.i18n import t, get_lang
 
 router = APIRouter()
 
@@ -23,9 +23,9 @@ async def generate_ssl_api(request: Request):
             return {"success": False, "msg": t("ssl_missing_params", lang=lang, category="backend")}
         
         import asyncio
-        from backend.ssl_utils import request_ssl_cert
+        from backend.ssl.utils import request_ssl_cert
         success, msg = await asyncio.to_thread(request_ssl_cert, domain, email)
-        from backend.audit import log_action, get_actor_username
+        from backend.alerts.audit import log_action, get_actor_username
         actor = get_actor_username(request)
         if success:
             set_setting("ssl_domain", domain)
@@ -56,7 +56,7 @@ async def generate_ssl_api(request: Request):
             return {"success": False, "msg": msg}
     except Exception as e:
         try:
-            from backend.audit import log_action, get_actor_username
+            from backend.alerts.audit import log_action, get_actor_username
             actor = get_actor_username(request)
             log_action(actor, "generate_ssl", target=data.get("domain", "unknown"), details=f"status:error, error:{str(e)}")
         except Exception:

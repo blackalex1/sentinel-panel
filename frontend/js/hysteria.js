@@ -4,8 +4,8 @@ import {
     startHysteriaLogsStream as coreStartLogsStream,
     stopHysteriaLogsStream as coreStopLogsStream,
     setupHysteriaCoreListeners
-} from "./modules/hysteria-core.js";
-import { loadHysteriaConfig as configLoader, setupHysteriaConfigListeners } from "./modules/hysteria-config.js";
+} from "./modules/hysteria/core.js";
+import { loadHysteriaConfig as configLoader, setupHysteriaConfigListeners } from "./modules/hysteria/index.js";
 
 export async function loadHysteriaCoreInfo() {
     return await coreInfo();
